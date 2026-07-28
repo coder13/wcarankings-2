@@ -32,6 +32,7 @@ import {
   WCA_EVENTS,
 } from "@/lib/wca";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
+import { SEARCH_PAGE_SIZE } from "@/lib/search-pagination";
 import {
   JumpDownControls,
   JumpUpControls,
@@ -384,13 +385,14 @@ function searchRankings(
   selection: RegionSelection,
   search: string,
   regexSearch: boolean,
+  searchPage: number,
   signal: AbortSignal
 ) {
   const params = new URLSearchParams({
     eventId,
     result: rankingType,
     search,
-    searchLimit: "500",
+    searchPage: String(searchPage),
   });
   if (regexSearch) params.set("mode", "vim");
   if (selection.scope !== "world") params.set("region", selection.regionId);
@@ -400,7 +402,7 @@ function searchRankings(
       const body = (await response.json()) as { error?: string };
       throw new Error(body.error ?? "Search is unavailable.");
     }
-    return response.json() as Promise<{ entries: RankingEntry[] }>;
+    return response.json() as Promise<{ entries: RankingEntry[]; total: number }>;
   });
 }
 
@@ -495,6 +497,8 @@ export function RankingsExplorer({
   const [findIndex, setFindIndex] = useState(
     initialData?.searchMatches.length ? 0 : -1
   );
+  const [findTotal, setFindTotal] = useState(initialData?.searchTotal ?? 0);
+  const [findPage, setFindPage] = useState(0);
   const [findLoading, setFindLoading] = useState(false);
   const [findResolvedQuery, setFindResolvedQuery] = useState(
     normalizedInitialSearch
@@ -574,6 +578,8 @@ export function RankingsExplorer({
     orderSearchMatches(initialData?.searchMatches ?? [])
   );
   const findIndexRef = useRef(initialData?.searchMatches.length ? 0 : -1);
+  const findTotalRef = useRef(initialData?.searchTotal ?? 0);
+  const findPageRef = useRef(0);
   const rankingListRef = useRef<HTMLOListElement>(null);
   const eventPickerTriggerRef = useRef<HTMLButtonElement>(null);
   const railEventPickerTriggerRef = useRef<HTMLButtonElement>(null);
@@ -1411,32 +1417,60 @@ export function RankingsExplorer({
   const cycleFind = useCallback(
     (direction: 1 | -1 = 1) => {
       const matches = findMatchesRef.current;
-      if (matches.length === 0) return;
+      const totalMatches = findTotalRef.current;
+      if (matches.length === 0 || totalMatches === 0) return;
       const currentIndex = findIndexRef.current;
       const currentMatch =
-        currentIndex >= 0 ? matches[currentIndex] : null;
+        currentIndex >= 0 ? matches[currentIndex - findPageRef.current * SEARCH_PAGE_SIZE] : null;
       const nextIndex =
         currentIndex < 0
           ? direction > 0
             ? 0
-            : matches.length - 1
-          : (currentIndex + direction + matches.length) % matches.length;
-      const nextMatch = matches[nextIndex];
+            : totalMatches - 1
+          : (currentIndex + direction + totalMatches) % totalMatches;
+      const nextPage = Math.floor(nextIndex / SEARCH_PAGE_SIZE);
+      const nextMatch = matches[nextIndex - findPageRef.current * SEARCH_PAGE_SIZE];
       if (!nextMatch) {
-        findIndexRef.current = -1;
-        setFindIndex(-1);
+        const controller = new AbortController();
+        setFindLoading(true);
+        searchRankings(
+          eventId,
+          rankingType,
+          regionSelection,
+          findQuery.trim(),
+          regexSearch,
+          nextPage,
+          controller.signal,
+        ).then((data) => {
+          const orderedMatches = orderSearchMatches(data.entries);
+          const match = orderedMatches[nextIndex - nextPage * SEARCH_PAGE_SIZE];
+          if (!match) return;
+          findMatchesRef.current = orderedMatches;
+          findPageRef.current = nextPage;
+          findTotalRef.current = data.total;
+          findIndexRef.current = nextIndex;
+          setFindMatches(orderedMatches);
+          setFindPage(nextPage);
+          setFindTotal(data.total);
+          setFindIndex(nextIndex);
+          jumpToMatch(match, direction, currentMatch ?? null);
+        }).catch((requestError: unknown) => {
+          setFindError(requestError instanceof Error ? requestError.message : "Search is unavailable.");
+        }).finally(() => setFindLoading(false));
         return;
       }
       findIndexRef.current = nextIndex;
       setFindIndex(nextIndex);
       jumpToMatch(nextMatch, direction, currentMatch);
     },
-    [jumpToMatch]
+    [eventId, findQuery, jumpToMatch, rankingType, regexSearch, regionSelection]
   );
 
   const resetFind = useCallback(() => {
     findMatchesRef.current = [];
     findIndexRef.current = -1;
+    findTotalRef.current = 0;
+    findPageRef.current = 0;
     setSearchQueryParam("");
     updateQueryParams({ mode: null });
     setFindQuery("");
@@ -1445,6 +1479,8 @@ export function RankingsExplorer({
     setVimSearchQuery("");
     setFindMatches([]);
     setFindIndex(-1);
+    setFindTotal(0);
+    setFindPage(0);
     setFindLoading(false);
     setFindResolvedQuery("");
     setFindError("");
@@ -1502,8 +1538,12 @@ export function RankingsExplorer({
         }
         findMatchesRef.current = [];
         findIndexRef.current = -1;
+        findTotalRef.current = 0;
+        findPageRef.current = 0;
         setFindMatches([]);
         setFindIndex(-1);
+        setFindTotal(0);
+        setFindPage(0);
         setFindError("");
         setHighlightedPersonId("");
 
@@ -1520,6 +1560,7 @@ export function RankingsExplorer({
           regionSelection,
           normalizedQuery,
           regexSearch,
+          0,
           controller.signal
         )
           .then((data) => {
@@ -1527,7 +1568,11 @@ export function RankingsExplorer({
             setFindResolvedQuery(normalizedQuery);
             const orderedMatches = orderSearchMatches(data.entries);
             findMatchesRef.current = orderedMatches;
+            findTotalRef.current = data.total;
+            findPageRef.current = 0;
             setFindMatches(orderedMatches);
+            setFindTotal(data.total);
+            setFindPage(0);
             const firstMatch = orderedMatches[0];
             if (firstMatch) {
               findIndexRef.current = 0;
@@ -2496,7 +2541,7 @@ export function RankingsExplorer({
       ),
     [findMatches, findResolvedQuery]
   );
-  const activeFindMatch = findMatches[findIndex] ?? null;
+  const activeFindMatch = findMatches[findIndex - findPage * SEARCH_PAGE_SIZE] ?? null;
   const currentEvent = WCA_EVENTS.find((event) => event.id === eventId)!;
 
   return (
@@ -2521,6 +2566,7 @@ export function RankingsExplorer({
               findLoading={findLoading}
               findPending={findPending}
               findMatches={findMatches}
+              findTotal={findTotal}
               findIndex={findIndex}
               activeFindMatch={activeFindMatch}
               onOpen={activateFind}
@@ -2562,6 +2608,7 @@ export function RankingsExplorer({
           findLoading={findLoading}
           findPending={findPending}
           findMatches={findMatches}
+          findTotal={findTotal}
           findIndex={findIndex}
           onSearchOpen={activateFind}
           onSearchClose={closeFind}
@@ -2628,6 +2675,7 @@ export function RankingsExplorer({
           findQuery={findQuery}
           activeFindMatch={activeFindMatch}
           findMatches={findMatches}
+          findTotal={findTotal}
           findIndex={findIndex}
           vimHelpOpen={vimHelpOpen}
           onChange={setVimCommand}

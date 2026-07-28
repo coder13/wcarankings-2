@@ -13,6 +13,7 @@ export function VimSearchInput({
   findQuery,
   activeFindMatch,
   findMatches,
+  findTotal,
   findIndex,
   vimHelpOpen,
   onChange,
@@ -28,6 +29,7 @@ export function VimSearchInput({
   findQuery: string;
   activeFindMatch: RankingEntry | null;
   findMatches: RankingEntry[];
+  findTotal?: number;
   findIndex?: number;
   vimHelpOpen: boolean;
   onChange: (value: string) => void;
@@ -56,14 +58,15 @@ export function VimSearchInput({
     }
   };
   let matchStatus = "";
+  const total = findTotal ?? findMatches.length;
   if (findLoading || findPending) matchStatus = "Searching…";
   else if (findQuery.trim() && activeFindMatch) {
     matchStatus =
       typeof findIndex === "number"
-        ? `${findIndex + 1} of ${findMatches.length}`
+        ? `${findIndex + 1} of ${total}`
         : `${activeFindMatch.personName} · rank ${formatRankingNumber(activeFindMatch.rank)}`;
   } else if (findQuery.trim()) {
-    matchStatus = `${findMatches.length} ${findMatches.length === 1 ? "match" : "matches"}`;
+    matchStatus = `${total} ${total === 1 ? "match" : "matches"}`;
   }
 
   return (

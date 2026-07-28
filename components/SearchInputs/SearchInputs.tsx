@@ -17,6 +17,7 @@ export function SearchInputs({
   findLoading,
   findPending,
   findMatches,
+  findTotal,
   findIndex,
   activeFindMatch,
   onOpen,
@@ -32,6 +33,7 @@ export function SearchInputs({
   findLoading: boolean;
   findPending: boolean;
   findMatches: RankingEntry[];
+  findTotal?: number;
   findIndex: number;
   activeFindMatch: RankingEntry | null;
   onOpen: () => void;
@@ -63,11 +65,12 @@ export function SearchInputs({
     }
   };
   const searching = findLoading || findPending;
+  const total = findTotal ?? findMatches.length;
   let status = "";
   if (findError) status = findError;
   else if (findQuery.trim()) {
-    status = findMatches.length
-      ? `${findIndex + 1} of ${findMatches.length}`
+    status = total
+      ? `${findIndex + 1} of ${total}`
       : "No matches";
   }
 

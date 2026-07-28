@@ -39,6 +39,7 @@ export type InitialRankingData = Pick<
   startPosition: number;
   lastRank: number | null;
   searchMatches: RankingEntry[];
+  searchTotal: number;
   initialMatchPersonId: string;
   regexSearch?: boolean;
 };

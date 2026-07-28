@@ -83,17 +83,17 @@ function makeMockResponse(url: URL, init?: RequestInit) {
 
   const search = url.searchParams.get("search")?.trim().toLocaleLowerCase();
   if (search) {
-    const searchLimit = Number(url.searchParams.get("searchLimit")) || 500;
+    const searchPage = Math.max(0, Number(url.searchParams.get("searchPage")) || 0);
+    const matches = allEntries.filter(
+      (entry) =>
+        entry.personName.toLocaleLowerCase().includes(search) ||
+        entry.personId.toLocaleLowerCase().includes(search)
+    );
     return Promise.resolve(
       new Response(
         JSON.stringify({
-          entries: allEntries
-            .filter(
-              (entry) =>
-                entry.personName.toLocaleLowerCase().includes(search) ||
-                entry.personId.toLocaleLowerCase().includes(search)
-            )
-            .slice(0, searchLimit),
+          entries: matches.slice(searchPage * 50, (searchPage + 1) * 50),
+          total: matches.length,
         }),
         { headers: { "Content-Type": "application/json" } }
       )
@@ -175,6 +175,7 @@ const initialData = {
   total: allEntries.length,
   fetchedAt: MOCK_FETCHED_AT,
   searchMatches: [],
+  searchTotal: 0,
   initialMatchPersonId: "",
 };
 

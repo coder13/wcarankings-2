@@ -1,5 +1,6 @@
 import { query } from "@/db";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
+import { SEARCH_PAGE_SIZE, normalizeSearchPage } from "@/lib/search-pagination";
 import {
   normalPageKey,
   prewarmPageKeys,
@@ -21,8 +22,6 @@ import {
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const MAX_PAGE_SIZE = RESULTS_PAGE_SIZE;
-const MAX_SEARCH_RESULTS = 500;
-
 type RankingRow = {
   rank: number;
   sub_rank: number;
@@ -177,7 +176,7 @@ export async function queryMysql({
   locate,
   search,
   regexSearch = false,
-  searchLimit,
+  searchPage,
   paged,
 }: {
   eventId: string;
@@ -191,7 +190,7 @@ export async function queryMysql({
   locate: string;
   search: string;
   regexSearch?: boolean;
-  searchLimit: number;
+  searchPage: number;
   paged: boolean;
 }) {
   const splitEntriesTable = getRankingTable(type);
@@ -237,17 +236,28 @@ export async function queryMysql({
     const searchNameParameter = addParameter(values, searchPattern);
     const searchIdParameter = addParameter(values, searchPattern);
     const searchOperator = regexSearch ? "REGEXP" : "LIKE";
-    const searchResult = await query<RankingRow>(
+    const searchConditions = [
+      ...conditions,
+      `(person_name ${searchOperator} ${searchNameParameter} OR person_id ${searchOperator} ${searchIdParameter})`,
+    ];
+    const offset = searchPage * SEARCH_PAGE_SIZE;
+    const [searchResult, countResult] = await Promise.all([
+      query<RankingRow>(
       `SELECT ${rankColumn} AS rank, ${subRankColumn} AS sub_rank, person_id, person_name, country_id, country_name,
         country_iso2, continent_id, best, competition_id, competition_name,
         ${recordBadgeColumns}
       FROM ${rankingSource}
-      WHERE ${conditions.join(" AND ")}
-        AND (person_name ${searchOperator} ${searchNameParameter} OR person_id ${searchOperator} ${searchIdParameter})
-      ORDER BY ${subRankColumn}
-      LIMIT ${addParameter(values, searchLimit)}`,
+      WHERE ${searchConditions.join(" AND ")}
+      ORDER BY ${subRankColumn}, person_id
+      LIMIT ${addParameter(values, SEARCH_PAGE_SIZE)} OFFSET ${addParameter(values, offset)}`,
       values,
-    );
+      ),
+      query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM ${rankingSource}
+        WHERE ${searchConditions.join(" AND ")}`,
+        values.slice(0, -2),
+      ),
+    ]);
 
     return {
       entries: searchResult.rows.map(toRankingEntry),
@@ -255,7 +265,9 @@ export async function queryMysql({
       nextPageStart: null,
       previousPageStart: null,
       nextCursor: null,
-      total: searchResult.rowCount ?? searchResult.rows.length,
+      total: Number(countResult.rows[0]?.count ?? 0),
+      searchPage,
+      searchPageSize: SEARCH_PAGE_SIZE,
       exportDate: null,
       source: "wca" as const,
     };
@@ -375,7 +387,7 @@ async function prewarmFirstPages() {
       limit: PAGE_SIZE,
       locate: "",
       search: "",
-      searchLimit: MAX_SEARCH_RESULTS,
+      searchPage: 0,
       paged: true,
     }));
   }
@@ -407,8 +419,7 @@ export async function loadRankings(searchParams: URLSearchParams) {
   const locate = (searchParams.get("locate") ?? "").trim().toUpperCase();
   const search = (searchParams.get("search") ?? "").trim().slice(0, 80);
   const regexSearch = searchParams.get("mode") === "vim";
-  const requestedSearchLimit = Number(searchParams.get("searchLimit")) || MAX_SEARCH_RESULTS;
-  const searchLimit = Math.min(MAX_SEARCH_RESULTS, Math.max(1, requestedSearchLimit));
+  const searchPage = normalizeSearchPage(searchParams.get("searchPage"));
 
   if (scope !== "world" && !regionId) {
     throw new Error("Choose a region before loading rankings.");
@@ -430,7 +441,7 @@ export async function loadRankings(searchParams: URLSearchParams) {
     locate,
     search,
     regexSearch,
-    searchLimit,
+    searchPage,
     paged,
   };
   const isCacheablePage = paged && !search && !locate && !cursorRank && !cursorId;

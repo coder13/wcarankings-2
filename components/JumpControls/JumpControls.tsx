@@ -25,6 +25,7 @@ export function JumpUpControls({
   findLoading,
   findPending,
   findMatches,
+  findTotal,
   findIndex,
   onSearchOpen,
   onSearchClose,
@@ -43,6 +44,7 @@ export function JumpUpControls({
   findLoading: boolean;
   findPending: boolean;
   findMatches: RankingEntry[];
+  findTotal?: number;
   findIndex: number;
   onSearchOpen: () => void;
   onSearchClose: () => void;
@@ -79,11 +81,12 @@ export function JumpUpControls({
       ? "Jump to top"
       : `Jump ${formatRankingNumber(5000)}`;
   const searching = findLoading || findPending;
+  const total = findTotal ?? findMatches.length;
   let searchStatus = "";
   if (findError) searchStatus = findError;
   else if (findQuery.trim()) {
-    searchStatus = findMatches.length
-      ? `${findIndex + 1} of ${findMatches.length}`
+    searchStatus = total
+      ? `${findIndex + 1} of ${total}`
       : "No matches";
   }
 

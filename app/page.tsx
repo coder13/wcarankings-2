@@ -98,7 +98,6 @@ async function getInitialRankings(
           eventId,
           result: rankingType,
           search,
-          searchLimit: "500",
           ...(regexSearch ? { mode: "vim" } : {}),
           ...(scope === "world" ? {} : { region: regionId }),
         }),
@@ -148,6 +147,7 @@ async function getInitialRankings(
     fetchedAt: lastPage.fetchedAt ?? lastPage.exportDate ?? null,
     startRank,
     searchMatches,
+    searchTotal: searchResult?.total ?? 0,
     initialMatchPersonId: firstMatch?.personId ?? "",
     regexSearch,
   };

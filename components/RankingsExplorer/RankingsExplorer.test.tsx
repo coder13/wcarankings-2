@@ -60,6 +60,7 @@ test("renders the rankings shell with extracted components", () => {
         total: 1,
         fetchedAt: null,
         searchMatches: [],
+        searchTotal: 0,
         initialMatchPersonId: "",
       }}
       initialRegions={{ continents: [], countries: [] }}
