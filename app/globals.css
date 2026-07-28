@@ -122,9 +122,11 @@ select {
 .stickyRankingsRail {
   position: sticky;
   z-index: 10;
+  display: flex;
   top: 0.5em;
   width: min(100%, 1000px);
   margin: 0 auto 1em;
+  justify-content: center;
 }
 
 .themeToggle {
