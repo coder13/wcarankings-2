@@ -120,10 +120,13 @@ select {
 }
 
 .stickyRankingsRail {
+  --rail-scroll-progress: 0;
+  --rail-parallax-offset: 0px;
+
   position: sticky;
   z-index: 10;
   display: flex;
-  top: 0.5em;
+  top: 1em;
   width: min(100%, 1000px);
   margin: 0 auto 1em;
   justify-content: center;
@@ -131,18 +134,19 @@ select {
 
 .stickyRankingsRail > .Jump {
   background: var(--surface);
-  box-shadow: none;
-  transform: translateY(0);
-  transition: transform 180ms var(--cubic-move), box-shadow 180ms var(--cubic-move);
+  box-shadow:
+    0 calc(1px * (1 - var(--rail-scroll-progress)))
+      calc(4px * (1 - var(--rail-scroll-progress))) var(--shadow-soft),
+    0 calc(4px * var(--rail-scroll-progress))
+      calc(16px * var(--rail-scroll-progress)) var(--shadow);
+  transform: translateY(
+    calc(var(--rail-parallax-offset) - (0.25em * var(--rail-scroll-progress)))
+  );
+  transition: none;
 }
 
 .stickyRankingsRail .findBar--rail {
   background: var(--surface);
-}
-
-.stickyRankingsRail[data-floating="true"] > .Jump {
-  box-shadow: 0 4px 16px var(--shadow);
-  transform: translateY(-0.25em);
 }
 
 .themeToggle {
@@ -374,12 +378,9 @@ select {
 }
 
 .debugScrollY {
-  position: fixed;
-  z-index: 11;
-  top: 0.75em;
-  left: 1em;
+  margin-left: auto;
   color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.75em;
-  pointer-events: none;
+  font-variant-numeric: tabular-nums;
 }

@@ -19,49 +19,123 @@
 }
 
 .Jump--rankings {
+  --rail-control-height: calc(52px - (12px * var(--rail-scroll-progress, 0)));
+  --rail-event-width: calc(
+    44px + ((9em - 44px) * (1 - var(--rail-scroll-progress, 0)))
+  );
+  --rail-select-width: calc(
+    9.25em - (1.5em * var(--rail-scroll-progress, 0))
+  );
+  --expanded-result-type-width: calc(
+    var(--rail-select-width) +
+      (2.75em * (1 - var(--rail-scroll-progress, 0)))
+  );
+  --result-type-width: var(--expanded-result-type-width);
+
+  min-height: var(--rail-control-height);
+  border-radius: calc(var(--rail-control-height) / 2);
+  font-size: calc(1rem + (0.125rem * (1 - var(--rail-scroll-progress, 0))));
   overflow: visible;
 }
 
 .Jump-railSettings {
-  --rail-select-width: clamp(7.5em, 16vw, 8.5em);
-  --expanded-result-type-width: 10.5em;
-  --result-type-width: var(--expanded-result-type-width);
   --rail-settings-width: calc(
-    44px + var(--result-type-width) + var(--rail-select-width)
+    var(--rail-event-width) + var(--result-type-width) + var(--rail-select-width)
   );
 
   display: flex;
   width: var(--rail-settings-width);
-  min-width: var(--rail-settings-width);
+  min-width: 0;
   flex: 0 0 var(--rail-settings-width);
   overflow: visible;
   opacity: 1;
-  transition: flex-basis 250ms var(--cubic-move), opacity 150ms var(--cubic-move);
-}
-
-.Jump--rankings[data-compact-result-type="true"] .Jump-railSettings {
-  --result-type-width: var(--rail-select-width);
+  transition: opacity 150ms var(--cubic-move);
 }
 
 .Jump-railSettings > .EventPicker-preview {
-  flex: 0 0 44px;
+  width: var(--rail-event-width);
+  height: var(--rail-control-height);
+  flex: 0 0 var(--rail-event-width);
+  border-radius: calc(var(--rail-control-height) / 2) 0 0
+    calc(var(--rail-control-height) / 2);
+}
+
+@media only screen and (min-width: 601px) {
+  .Jump-railSettings > .EventPicker-preview {
+    display: flex;
+    gap: calc(0.5em * (1 - var(--rail-scroll-progress, 0)));
+    padding: 0 calc(0.5em * (1 - var(--rail-scroll-progress, 0)));
+    justify-content: center;
+    font-size: 1em;
+  }
+
+  .Jump-railSettings > .EventPicker-preview::before {
+    flex: 0 0 auto;
+    color: var(--text-strong);
+    font-size: 1.25em;
+    opacity: 1;
+  }
+
+  .Jump-railSettings > .EventPicker-preview .EventPicker-name {
+    display: block;
+    width: calc(6em * (1 - var(--rail-scroll-progress, 0)));
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 0.875em;
+    opacity: calc(1 - var(--rail-scroll-progress, 0));
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .Jump-resultTypeControl {
   position: relative;
   width: var(--result-type-width);
-  min-width: 40px;
+  min-width: 0;
+  height: var(--rail-control-height);
   flex: 0 0 var(--result-type-width);
-  transition: width 250ms var(--cubic-move), flex-basis 250ms var(--cubic-move);
+  border-right: 1px solid var(--border-subtle);
 }
 
-.Jump-resultTypeOptions {
+.Jump .Jump-resultTypeOptions {
   width: 100%;
-  opacity: 1;
+  height: var(--rail-control-height);
+  min-height: var(--rail-control-height);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  opacity: calc(1 - var(--rail-scroll-progress, 0));
   pointer-events: auto;
-  transform: scaleX(1);
-  transform-origin: center;
-  transition: opacity 150ms var(--cubic-move), transform 250ms var(--cubic-move);
+}
+
+.Jump .Jump-resultTypeOptions .rankingTypeOption {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 50%;
+  min-height: 0;
+  transition: none;
+}
+
+.Jump .Jump-resultTypeOptions .rankingTypeOption[data-result-type="single"] {
+  left: 1px;
+}
+
+.Jump .Jump-resultTypeOptions .rankingTypeOption[data-result-type="average"] {
+  left: 50%;
+}
+
+.Jump .Jump-resultTypeOptions .rankingTypeOption:not(.isSelected) {
+  opacity: calc(1 - var(--rail-scroll-progress, 0));
+}
+
+.Jump .Jump-resultTypeOptions .rankingTypeOption.isSelected {
+  width: calc(50% + (50% * var(--rail-scroll-progress, 0)));
+}
+
+.Jump .Jump-resultTypeOptions[data-ranking-type="average"] .rankingTypeOption.isSelected {
+  left: calc(50% * (1 - var(--rail-scroll-progress, 0)));
 }
 
 .Jump-resultTypeToggle,
@@ -89,27 +163,22 @@
   width: 100%;
   min-width: 0;
   flex: none;
-  border-right: 1px solid var(--border-subtle);
+  border-right: 0;
   color: var(--text-muted);
   font-size: 0.875em;
   font-weight: 500;
-  opacity: 0;
+  background: transparent;
+  opacity: var(--rail-scroll-progress, 0);
   pointer-events: none;
-  transform: scaleX(0.96);
-  transform-origin: center;
-  transition: background 150ms var(--cubic-move), color 150ms var(--cubic-move), opacity 150ms var(--cubic-move), transform 250ms var(--cubic-move);
+  transition: background 150ms var(--cubic-move), color 150ms var(--cubic-move);
 }
 
 .Jump--rankings[data-compact-result-type="true"] .Jump-resultTypeOptions {
-  opacity: 0;
   pointer-events: none;
-  transform: scaleX(0.96);
 }
 
 .Jump--rankings[data-compact-result-type="true"] .Jump-resultTypeToggle {
-  opacity: 1;
   pointer-events: auto;
-  transform: scaleX(1);
 }
 
 .Jump-resultTypeToggle:hover,
@@ -130,18 +199,19 @@
 
 .Jump-regionPicker {
   width: var(--rail-select-width);
-  min-width: 40px;
+  min-width: 0;
   flex: 0 0 var(--rail-select-width);
 }
 
-.Jump-regionPicker .regionPickerTrigger {
-  min-height: 40px;
+.Jump .Jump-regionPicker .regionPickerTrigger {
+  height: var(--rail-control-height);
+  min-height: var(--rail-control-height);
   padding: 0.5em 2.5em 0.5em 0.75em;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--text-muted);
-  cursor: text;
+  cursor: pointer;
   font-size: 0.875em;
   text-align: left;
   text-overflow: ellipsis;
@@ -151,7 +221,6 @@
   right: 0.75em;
 }
 
-.Jump-regionPicker .regionPickerTrigger:hover,
 .Jump-regionPicker .regionPickerTrigger:focus-visible,
 .Jump-regionPicker .regionPickerTrigger[aria-expanded="true"] {
   background: var(--surface-hover);
@@ -169,9 +238,9 @@
 }
 
 .Jump .findBar--rail {
-  width: 44px;
-  height: 40px;
-  flex: 0 0 auto;
+  width: var(--rail-control-height);
+  height: var(--rail-control-height);
+  flex: 0 0 var(--rail-control-height);
   overflow: hidden;
   padding: 0;
   border: 0;
@@ -200,11 +269,11 @@
 .Jump .findBar--rail .findClose {
   position: relative;
   display: grid;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
-  flex: 0 0 40px;
+  width: var(--rail-control-height);
+  height: var(--rail-control-height);
+  min-width: var(--rail-control-height);
+  min-height: var(--rail-control-height);
+  flex: 0 0 var(--rail-control-height);
   aspect-ratio: 1;
   padding: 0;
   place-items: center;
@@ -292,13 +361,14 @@
   pointer-events: auto;
 }
 
-@media only screen and (max-width: 480px) {
-  .Jump-railSettings {
+@media only screen and (max-width: 600px) {
+  .Jump--rankings {
+    --rail-control-height: 44px;
+    --rail-event-width: 44px;
     --rail-select-width: min(8.5em, calc((100vw - 88px) / 2));
-    --expanded-result-type-width: min(
-      10.5em,
-      calc(100vw - 88px - var(--rail-select-width))
-    );
+    --expanded-result-type-width: var(--rail-select-width);
+
+    font-size: 1rem;
   }
 
   .Jump-pagerButton,

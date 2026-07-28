@@ -117,7 +117,9 @@ export function EventPicker({
             setPickerOpen(true);
           }
         }}
-      />
+      >
+        <span className="EventPicker-name">{event.name}</span>
+      </button>
       <div
         ref={menuRef}
         className="EventPicker-menu"

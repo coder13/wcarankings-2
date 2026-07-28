@@ -22,6 +22,10 @@
   font-size: 1.25em;
 }
 
+.EventPicker-name {
+  display: none;
+}
+
 .EventPicker-menu {
   position: absolute;
   z-index: 2;

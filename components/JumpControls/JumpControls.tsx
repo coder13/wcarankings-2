@@ -213,6 +213,7 @@ export function RankingsJumpRail({
                   className={`rankingTypeOption${rankingType === option ? " isSelected" : ""}${
                     disabled ? " isDisabled" : ""
                   }`}
+                  data-result-type={option}
                   key={option}
                 >
                   <input

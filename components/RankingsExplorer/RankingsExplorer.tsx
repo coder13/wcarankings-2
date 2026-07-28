@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import {
   animateScrollTo,
@@ -58,6 +59,8 @@ const VIM_JUMP_PAGE_COUNT = 2;
 const VIM_JUMP_SIZE = PAGE_SIZE * VIM_JUMP_PAGE_COUNT;
 const ROW_HEIGHT = 65.45;
 const RAIL_REVEAL_DISTANCE = ROW_HEIGHT * 1.5;
+const TOP_RAIL_TRANSFORM_DISTANCE = ROW_HEIGHT * 2;
+const STICKY_RAIL_TOP_EM = 1;
 const END_MARKER_PEEK = ROW_HEIGHT + 40;
 
 export function centeredRowScrollTop(
@@ -69,6 +72,10 @@ export function centeredRowScrollTop(
     0,
     rowTop - Math.max(0, (viewportHeight - rowHeight) / 2)
   );
+}
+
+function easeInOut(progress: number) {
+  return progress * progress * (3 - 2 * progress);
 }
 
 export function getSearchScrollDirection(
@@ -514,15 +521,22 @@ export function RankingsExplorer({
   );
   const [jumpUpArmed, setJumpUpArmed] = useState(false);
   const [jumpDownArmed, setJumpDownArmed] = useState(false);
-  const [stickyRailFloating, setStickyRailFloating] = useState(false);
+  const [topRailProgress, setTopRailProgress] = useState(0);
+  const [topRailParallaxOffset, setTopRailParallaxOffset] = useState(0);
+  const [debugScrollY, setDebugScrollY] = useState(0);
   const [bottomRailProgress, setBottomRailProgress] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const stickyRankingsRailRef = useRef<HTMLDivElement>(null);
   const railFindInputRef = useRef<HTMLInputElement>(null);
   const setRailFindInputRef = useCallback((input: HTMLInputElement | null) => {
     railFindInputRef.current = input;
   }, []);
   const bottomRailProgressRef = useRef(0);
-  const stickyRailFloatingRef = useRef(false);
+  const topRailProgressRef = useRef(0);
+  const topRailParallaxOffsetRef = useRef(0);
+  const stickyRankingsRailOriginRef = useRef<number | null>(null);
+  const snapLastScrollYRef = useRef(0);
+  const snapScrollDirectionRef = useRef<-1 | 0 | 1>(0);
   const vimInputRef = useRef<HTMLInputElement>(null);
   const vimCommandRef = useRef(vimCommand);
   const moreRequestRef = useRef(false);
@@ -761,10 +775,46 @@ export function RankingsExplorer({
 
   useEffect(() => {
     const updateRailVisibility = () => {
-      const nextStickyRailFloating = window.scrollY > 0;
-      if (nextStickyRailFloating !== stickyRailFloatingRef.current) {
-        stickyRailFloatingRef.current = nextStickyRailFloating;
-        setStickyRailFloating(nextStickyRailFloating);
+      if (process.env.NODE_ENV !== "production") setDebugScrollY(window.scrollY);
+      const rawTopRailProgress = Math.max(
+        0,
+        Math.min(1, window.scrollY / TOP_RAIL_TRANSFORM_DISTANCE)
+      );
+      const nextTopRailProgress = easeInOut(rawTopRailProgress);
+      if (nextTopRailProgress !== topRailProgressRef.current) {
+        topRailProgressRef.current = nextTopRailProgress;
+        setTopRailProgress(nextTopRailProgress);
+      }
+      const stickyTop =
+        Number.parseFloat(getComputedStyle(document.documentElement).fontSize) *
+        STICKY_RAIL_TOP_EM;
+      const rail = stickyRankingsRailRef.current;
+      if (rail && stickyRankingsRailOriginRef.current === null) {
+        stickyRankingsRailOriginRef.current =
+          rail.getBoundingClientRect().top + window.scrollY;
+      }
+      const stickyThreshold = Math.max(
+        0,
+        (stickyRankingsRailOriginRef.current ?? 0) - stickyTop
+      );
+      const parallaxProgress =
+        stickyThreshold > 0
+          ? Math.max(0, Math.min(1, window.scrollY / (stickyThreshold * 2)))
+          : 1;
+      const desiredRailTop =
+        (stickyRankingsRailOriginRef.current ?? stickyTop) -
+        stickyThreshold * easeInOut(parallaxProgress);
+      const naturalRailTop = Math.max(
+        stickyTop,
+        (stickyRankingsRailOriginRef.current ?? stickyTop) - window.scrollY
+      );
+      const nextTopRailParallaxOffset = Math.max(
+        0,
+        desiredRailTop - naturalRailTop
+      );
+      if (nextTopRailParallaxOffset !== topRailParallaxOffsetRef.current) {
+        topRailParallaxOffsetRef.current = nextTopRailParallaxOffset;
+        setTopRailParallaxOffset(nextTopRailParallaxOffset);
       }
       const distanceToPageEnd = Math.max(
         0,
@@ -790,6 +840,53 @@ export function RankingsExplorer({
       window.removeEventListener("scroll", updateRailVisibility);
     };
   }, [entries.length, listOffset, loading]);
+
+  useEffect(() => {
+    if (findOpen || findQuery.trim()) return;
+
+    let idleTimer: number | null = null;
+    snapLastScrollYRef.current = window.scrollY;
+    snapScrollDirectionRef.current = 0;
+    const snapToTopOrFirstResult = () => {
+      if (idleTimer !== null) {
+        window.clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+      if (scrollAnimationStateRef.current.programmatic) return;
+      if (snapScrollDirectionRef.current !== 1) return;
+
+      const firstResultTop = listRef.current
+        ? listRef.current.getBoundingClientRect().top + window.scrollY
+        : null;
+      if (firstResultTop === null) return;
+
+      const firstResultSnapTop = Math.max(0, firstResultTop);
+      const currentTop = window.scrollY;
+      if (currentTop < 1 || currentTop > firstResultSnapTop) return;
+
+      if (currentTop < firstResultSnapTop / 2) return;
+      if (Math.abs(firstResultSnapTop - currentTop) < 1) return;
+      window.scrollTo({ top: firstResultSnapTop, behavior: "smooth" });
+    };
+    const queueSnap = () => {
+      const nextScrollY = window.scrollY;
+      if (nextScrollY !== snapLastScrollYRef.current) {
+        snapScrollDirectionRef.current =
+          nextScrollY > snapLastScrollYRef.current ? 1 : -1;
+        snapLastScrollYRef.current = nextScrollY;
+      }
+      if (idleTimer !== null) window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(snapToTopOrFirstResult, 140);
+    };
+
+    window.addEventListener("scroll", queueSnap, { passive: true });
+    window.addEventListener("scrollend", snapToTopOrFirstResult);
+    return () => {
+      if (idleTimer !== null) window.clearTimeout(idleTimer);
+      window.removeEventListener("scroll", queueSnap);
+      window.removeEventListener("scrollend", snapToTopOrFirstResult);
+    };
+  }, [findOpen, findQuery, listOffset]);
 
   useEffect(() => {
     const syncStateFromUrl = () => {
@@ -2436,7 +2533,7 @@ export function RankingsExplorer({
 
   return (
     <div
-      className={`app${vimMode || vimSearchActive ? " app--vimMode" : ""}${
+      className={`app app--topRankSnap${vimMode || vimSearchActive ? " app--vimMode" : ""}${
         findQuery.trim() ? " app--searching" : ""
       }`}
     >
@@ -2453,7 +2550,16 @@ export function RankingsExplorer({
         </div>
       </header>
 
-      <div className="stickyRankingsRail" data-floating={stickyRailFloating}>
+      <div
+        ref={stickyRankingsRailRef}
+        className="stickyRankingsRail"
+        style={
+          {
+            "--rail-scroll-progress": topRailProgress,
+            "--rail-parallax-offset": `${topRailParallaxOffset}px`,
+          } as CSSProperties
+        }
+      >
         <RankingsJumpRail
           event={currentEvent}
           onEventChange={changeEvent}
@@ -2465,7 +2571,7 @@ export function RankingsExplorer({
           onEventPickerTrigger={(trigger) => {
             railEventPickerTriggerRef.current = trigger;
           }}
-          compactResultType={stickyRailFloating}
+          compactResultType={topRailProgress >= 0.99}
           searchInputRef={setRailFindInputRef}
           findOpen={findOpen}
           findQuery={findQuery}
@@ -2560,6 +2666,9 @@ export function RankingsExplorer({
             ? `fetched ${formatFetchedAgo(fetchedAt)}`
             : "fetched time unavailable"}
         </span>
+        {process.env.NODE_ENV !== "production" && (
+          <span className="debugScrollY">scrollY: {Math.round(debugScrollY)}</span>
+        )}
       </footer>
     </div>
   );
