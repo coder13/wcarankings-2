@@ -82,6 +82,27 @@ export function getSearchScrollDirection(
   return targetMatch.subRank > currentMatch.subRank ? 1 : -1;
 }
 
+export function areRankingWindowsContiguous(
+  currentEntries: Array<Pick<RankingEntry, "subRank">>,
+  incomingEntries: Array<Pick<RankingEntry, "subRank">>,
+  direction: -1 | 1
+) {
+  const currentFirst = currentEntries[0]?.subRank;
+  const currentLast = currentEntries.at(-1)?.subRank;
+  const incomingFirst = incomingEntries[0]?.subRank;
+  const incomingLast = incomingEntries.at(-1)?.subRank;
+  if (
+    currentFirst === undefined ||
+    currentLast === undefined ||
+    incomingFirst === undefined ||
+    incomingLast === undefined
+  )
+    return false;
+  return direction === 1
+    ? currentLast + 1 === incomingFirst
+    : incomingLast + 1 === currentFirst;
+}
+
 function updateQueryParams(updates: Record<string, string | null>) {
   const url = new URL(window.location.href);
   Object.entries(updates).forEach(([key, value]) => {
@@ -989,12 +1010,20 @@ export function RankingsExplorer({
         const scrollToTop = pendingScrollToTopRef.current;
         const pendingDirection = pendingScrollDirectionRef.current;
         const rankForStep = pendingRankRef.current;
-        const appendNavigation =
+        const appendNavigationRequested =
           pendingNavigationAppendRef.current &&
           !scrollToTop &&
           !focusLast &&
           Boolean(pendingDirection);
         const previousEntries = entriesRef.current;
+        const appendNavigation =
+          appendNavigationRequested &&
+          pendingDirection !== null &&
+          areRankingWindowsContiguous(
+            previousEntries,
+            data.entries,
+            pendingDirection
+          );
         const previousStartPosition = startPositionRef.current;
         const previousListHeight = appendNavigation && pendingDirection === -1
           ? rowVirtualizerRef.current.getTotalSize()
@@ -1872,7 +1901,12 @@ export function RankingsExplorer({
   }, [entries.length, listOffset, loadPrevious]);
 
   useEffect(() => {
-    const cancelOnUserInput = () => {
+    const cancelOnUserInput = (event: Event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest(".Jump-button")
+      )
+        return;
       if (
         !scrollAnimationStateRef.current.active &&
         !scrollAnimationStateRef.current.programmatic &&
@@ -1991,12 +2025,15 @@ export function RankingsExplorer({
           : normalizedRank > currentRank
           ? 1
           : null;
-      // Rank values can be missing, so ask the API for the exact target and let
-      // its ordered query choose the first real result at or beyond that rank.
-      pendingNavigationAppendRef.current = Boolean(
-        pendingScrollDirectionRef.current
-      );
       const nextStart = pageStartForSubRank(normalizedRank) + 1;
+      // Only preserve a continuous list when the requested page is exactly
+      // adjacent. Distant navigation replaces the current page window.
+      let appendNavigation = false;
+      if (pendingScrollDirectionRef.current === 1)
+        appendNavigation = nextStart === nextPageStart;
+      else if (pendingScrollDirectionRef.current === -1)
+        appendNavigation = nextStart === previousPageStart;
+      pendingNavigationAppendRef.current = appendNavigation;
       const firstLoadedRank = entries[0]?.subRank ?? Number.POSITIVE_INFINITY;
       const lastLoadedRank = entries.at(-1)?.subRank ?? 0;
       if (
@@ -2035,9 +2072,10 @@ export function RankingsExplorer({
       entries,
       findQuery,
       lastRank,
+      nextPageStart,
+      previousPageStart,
       resetFind,
       rowVirtualizer,
-      startRank,
       total,
     ]
   );
@@ -2549,6 +2587,7 @@ export function RankingsExplorer({
         <JumpControlsVisibility visible={tableReachedTop || jumpUpArmed}>
           <JumpUpControls
           armed={jumpUpArmed}
+          navigationPending={preserveListDuringLoad}
           currentPosition={visibleSubRank}
           onJump={handleJumpUp}
           event={currentEvent}
@@ -2608,6 +2647,7 @@ export function RankingsExplorer({
         >
           <JumpDownControls
           armed={jumpDownArmed}
+          navigationPending={preserveListDuringLoad}
           currentPosition={visibleSubRank}
           total={total}
           onJump={handleJumpDown}

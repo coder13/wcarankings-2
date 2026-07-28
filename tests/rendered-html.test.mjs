@@ -125,9 +125,11 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
   assert.match(component, /shouldScrollToTarget = Boolean\([\s\S]*scrollToTop[\s\S]*pendingDirection[\s\S]*appendNavigation/);
   assert.match(component, /animateScrollTo\([\s\S]*?0,[\s\S]*?getScrollAnimationDuration\(currentPosition\)/);
   assert.match(component, /cancelOnUserInput/);
+  assert.match(component, /event\.target\.closest\("\.Jump-button"\)/);
   assert.match(component, /navigationEpochRef/);
   assert.match(component, /requestEpoch !== navigationEpochRef\.current/);
   assert.match(component, /pendingNavigationAppendRef/);
+  assert.match(component, /areRankingWindowsContiguous/);
   assert.match(component, /const loadedEntries/);
   assert.match(component, /if \(event\.ctrlKey \|\| event\.metaKey \|\| event\.altKey\) return/);
   assert.match(component, /vimSearchActive && key === "n"/);

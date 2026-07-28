@@ -10,6 +10,7 @@ test("renders a jump action with a useful label", () => {
     <JumpControlsVisibility visible>
       <JumpDownControls
       armed={false}
+      navigationPending={false}
       currentPosition={100}
       total={10_000}
       onJump={() => undefined}
@@ -23,11 +24,30 @@ test("renders a jump action with a useful label", () => {
   assert.match(markup, /data-direction="down"/);
 });
 
+test("disables jump navigation while a jump is pending", () => {
+  const markup = renderToStaticMarkup(
+    <JumpDownControls
+      armed={false}
+      navigationPending
+      currentPosition={100}
+      total={10_000}
+      onJump={() => undefined}
+      searchActive={false}
+      onSearchPrevious={() => undefined}
+      onSearchNext={() => undefined}
+    />,
+  );
+
+  assert.match(markup, /disabled=""/);
+  assert.match(markup, /aria-busy="true"/);
+});
+
 test("groups the upper jump and search actions in one rail", () => {
   const markup = renderToStaticMarkup(
     <JumpControlsVisibility visible>
       <JumpUpControls
       armed={false}
+      navigationPending={false}
       currentPosition={10_000}
       onJump={() => undefined}
       event={WCA_EVENTS[0]}
@@ -58,6 +78,7 @@ test("splits the lower search rail between previous and next people", () => {
     <JumpControlsVisibility visible>
       <JumpDownControls
       armed={false}
+      navigationPending={false}
       currentPosition={100}
       total={10_000}
       onJump={() => undefined}

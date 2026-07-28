@@ -14,6 +14,7 @@ import { WCA_EVENTS } from "@/lib/wca";
 
 export function JumpUpControls({
   armed,
+  navigationPending = false,
   currentPosition,
   onJump,
   event,
@@ -32,6 +33,7 @@ export function JumpUpControls({
   onSearchCycle,
 }: {
   armed: boolean;
+  navigationPending?: boolean;
   currentPosition: number;
   onJump: () => void;
   event: (typeof WCA_EVENTS)[number];
@@ -109,7 +111,13 @@ export function JumpUpControls({
       />
       <div className="Jump-buttonWrapper">
         <div className="Jump-buttonClip">
-          <button className="Jump-button" onClick={onJump} type="button">
+          <button
+            className="Jump-button"
+            onClick={onJump}
+            type="button"
+            disabled={navigationPending}
+            aria-busy={navigationPending}
+          >
             <ArrowUpIcon />
             <span>{label}</span>
             <ArrowUpIcon />
@@ -172,6 +180,7 @@ export function JumpUpControls({
 
 export function JumpDownControls({
   armed,
+  navigationPending = false,
   currentPosition,
   total,
   onJump,
@@ -180,6 +189,7 @@ export function JumpDownControls({
   onSearchNext,
 }: {
   armed: boolean;
+  navigationPending?: boolean;
   currentPosition: number;
   total: number;
   onJump: () => void;
@@ -203,7 +213,8 @@ export function JumpDownControls({
             className="Jump-button"
             onClick={onJump}
             type="button"
-            disabled={searchActive}
+            disabled={searchActive || navigationPending}
+            aria-busy={navigationPending}
             aria-hidden={searchActive}
           >
             <ArrowDownIcon />

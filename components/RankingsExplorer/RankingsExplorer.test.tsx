@@ -3,12 +3,14 @@ import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   centeredRowScrollTop,
+  areRankingWindowsContiguous,
   getSearchScrollDirection,
   orderSearchMatches,
   RankingsExplorer,
 } from "./RankingsExplorer";
+import type { RankingEntry } from "./types";
 
-const rankingEntry = {
+const rankingEntry: RankingEntry = {
   rank: 1,
   subRank: 1,
   personId: "2024AVERY01",
@@ -18,7 +20,7 @@ const rankingEntry = {
   best: 512,
   competitionId: "storybook-open",
   competitionName: "Storybook Open 2026",
-  recordBadges: ["NR"] as const,
+  recordBadges: ["NR"],
 };
 
 test("ignores empty search-result slots", () => {
@@ -41,6 +43,33 @@ test("uses the actual rank direction when search results wrap around", () => {
   assert.equal(
     getSearchScrollDirection({ subRank: 100 }, { subRank: 900 }, -1),
     1
+  );
+});
+
+test("only appends ranking windows with consecutive sub-ranks", () => {
+  assert.equal(
+    areRankingWindowsContiguous(
+      [{ subRank: 1 }, { subRank: 50 }],
+      [{ subRank: 51 }, { subRank: 100 }],
+      1
+    ),
+    true
+  );
+  assert.equal(
+    areRankingWindowsContiguous(
+      [{ subRank: 51 }, { subRank: 100 }],
+      [{ subRank: 1 }, { subRank: 50 }],
+      -1
+    ),
+    true
+  );
+  assert.equal(
+    areRankingWindowsContiguous(
+      [{ subRank: 1 }, { subRank: 50 }],
+      [{ subRank: 5001 }, { subRank: 5050 }],
+      1
+    ),
+    false
   );
 });
 
