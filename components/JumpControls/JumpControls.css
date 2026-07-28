@@ -40,7 +40,7 @@
   overflow: hidden;
 }
 
-.Jump[data-direction="up"] > .Jump-buttonWrapper {
+.Jump[data-direction="up"]:has(.EventPicker-preview) > .Jump-buttonWrapper {
   box-shadow: inset -1px 0 var(--border-subtle);
 }
 
@@ -55,12 +55,18 @@
   z-index: -1;
   top: 0;
   right: 0;
-  bottom: -36px;
+  bottom: 0;
   left: 0;
-  border-radius: 20px 20px 16px 16px;
+  border-radius: 20px;
   background: var(--rail-surface);
   box-shadow: 0 4px 16px var(--shadow);
   content: "";
+}
+
+.Jump--rankings::before,
+.Jump--matrix[data-expanded="true"]::before {
+  bottom: -36px;
+  border-radius: 20px 20px 16px 16px;
 }
 
 .Jump-secondaryControls {
@@ -76,6 +82,55 @@
   border-radius: 0 0 16px 16px;
   overflow: visible;
   transition: opacity 150ms var(--cubic-move);
+}
+
+.Jump--matrix .Jump-secondaryControls {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.25em);
+  transition: opacity 150ms var(--cubic-move), transform 150ms var(--cubic-move),
+    visibility 0s linear 150ms;
+}
+
+.Jump--matrix[data-expanded="true"] .Jump-secondaryControls {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition: opacity 150ms var(--cubic-move), transform 150ms var(--cubic-move);
+}
+
+.Jump-settingsButton {
+  display: grid;
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 150ms var(--cubic-move), color 150ms var(--cubic-move);
+}
+
+.Jump-settingsButton:hover,
+.Jump-settingsButton:focus-visible,
+.Jump-settingsButton[aria-expanded="true"] {
+  background: var(--surface-hover);
+  color: var(--focus);
+  outline: none;
+}
+
+.Jump-settingsButton:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+
+.Jump-settingsButton svg {
+  width: 19px;
+  height: 19px;
 }
 
 .Jump-resultTypeToggle {
@@ -97,6 +152,43 @@
   white-space: nowrap;
   transition: background 150ms var(--cubic-move), color 150ms var(--cubic-move),
     opacity 150ms var(--cubic-move);
+}
+
+.Jump-resultTypeSelect {
+  display: flex;
+  width: 50%;
+  min-width: 0;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.Jump-resultTypeSelect button {
+  min-width: 0;
+  flex: 1;
+  padding: 0.3em 0.45em 0.35em;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875em;
+  font-weight: 500;
+  transition: background 150ms var(--cubic-move), color 150ms var(--cubic-move);
+}
+
+.Jump-resultTypeSelect button + button {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.Jump-resultTypeSelect button:hover,
+.Jump-resultTypeSelect button:focus-visible,
+.Jump-resultTypeSelect button[aria-pressed="true"] {
+  background: var(--surface-hover);
+  color: var(--focus);
+  outline: none;
+}
+
+.Jump-resultTypeSelect button:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
 }
 
 .Jump-resultTypeToggle:hover,
@@ -252,14 +344,20 @@
 
 .Jump[data-direction="up"]:has(
     .findBar--rail:is([data-has-text="true"], :focus-within)
-  ) .Jump-secondaryControls {
+) .Jump-secondaryControls {
   opacity: 0;
   pointer-events: none;
 }
 
 .Jump[data-direction="up"]:has(
     .findBar--rail:is([data-has-text="true"], :focus-within)
-  )::before {
+  ) .Jump-settingsButton {
+  display: none;
+}
+
+.Jump[data-direction="up"]:has(
+    .findBar--rail:is([data-has-text="true"], :focus-within)
+)::before {
   bottom: 0;
   border-radius: 20px;
 }

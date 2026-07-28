@@ -250,46 +250,40 @@ html:has(.app--searching) {
 }
 
 .matrixMain {
-  width: min(100%, 1200px);
+  width: min(100%, 1000px);
   margin-inline: auto;
 }
 
-.matrixExplanation {
-  margin: 0 0 1em;
-  color: var(--text-muted);
-}
-
 .matrixScroll {
+  margin-inline: calc(-1 * var(--page-gutter));
   overflow: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.5em;
-  background: var(--surface);
 }
 
 .matrixTable {
   width: max-content;
   min-width: 100%;
   border-collapse: collapse;
-  font-size: 0.88em;
+  font-size: 1.0625em;
   font-variant-numeric: tabular-nums;
 }
 
 .matrixTable th,
 .matrixTable td {
   min-width: 5.2em;
-  padding: 0.65em;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 0.75em var(--page-gutter);
+  border: 0;
   text-align: right;
   white-space: nowrap;
 }
 
 .matrixTable thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--surface-muted);
   color: var(--text-muted);
-  font-weight: 600;
+  font-size: 0.75em;
+  font-weight: 400;
+}
+
+.matrixTable tbody tr:nth-child(even) {
+  background-color: var(--surface-muted);
 }
 
 .matrixTable tbody tr:hover {
@@ -297,17 +291,8 @@ html:has(.app--searching) {
 }
 
 .matrixTable .matrixPerson {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  min-width: 13em;
-  background: var(--surface);
+  min-width: 14em;
   text-align: left;
-}
-
-.matrixTable thead .matrixPerson {
-  z-index: 2;
-  background: var(--surface-muted);
 }
 
 .matrixTable .matrixPerson small {
@@ -318,5 +303,20 @@ html:has(.app--searching) {
 }
 
 .matrixTable .matrixOverall {
+  font-size: 1.1em;
   font-weight: 700;
+}
+
+@media only screen and (max-width: 1023px) {
+  .matrixTable {
+    width: 100%;
+  }
+
+  .matrixTable .matrixEvent {
+    display: none;
+  }
+
+  .matrixTable .matrixPerson {
+    min-width: 0;
+  }
 }

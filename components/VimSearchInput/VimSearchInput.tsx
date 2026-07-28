@@ -13,8 +13,10 @@ export function VimSearchInput({
   findQuery,
   activeFindMatch,
   findMatches,
+  findMatchCount,
   findIndex,
   vimHelpOpen,
+  searchLabel,
   onChange,
   onCycle,
   onToggleHelp,
@@ -28,8 +30,10 @@ export function VimSearchInput({
   findQuery: string;
   activeFindMatch: RankingEntry | null;
   findMatches: RankingEntry[];
+  findMatchCount?: number;
   findIndex?: number;
   vimHelpOpen: boolean;
+  searchLabel?: string;
   onChange: (value: string) => void;
   onCycle: (direction: -1 | 1) => void;
   onToggleHelp: () => void;
@@ -55,15 +59,16 @@ export function VimSearchInput({
       event.stopPropagation();
     }
   };
+  const matchCount = findMatchCount ?? findMatches.length;
   let matchStatus = "";
   if (findLoading || findPending) matchStatus = "Searching…";
   else if (findQuery.trim() && activeFindMatch) {
     matchStatus =
       typeof findIndex === "number"
-        ? `${findIndex + 1} of ${findMatches.length}`
+        ? `${findIndex + 1} of ${matchCount}`
         : `${activeFindMatch.personName} · rank ${formatRankingNumber(activeFindMatch.rank)}`;
   } else if (findQuery.trim()) {
-    matchStatus = `${findMatches.length} ${findMatches.length === 1 ? "match" : "matches"}`;
+    matchStatus = `${matchCount} ${matchCount === 1 ? "match" : "matches"}`;
   }
 
   return (
@@ -75,7 +80,7 @@ export function VimSearchInput({
           type="text"
           value={value}
           readOnly={!vimMode}
-          aria-label={vimSearchActive && !vimMode ? "Vim regex search" : "Vim command"}
+          aria-label={vimSearchActive && !vimMode ? searchLabel ?? "Vim regex search" : "Vim command"}
           onChange={(event) => {
             if (vimMode) onChange(event.target.value);
           }}

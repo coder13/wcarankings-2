@@ -167,15 +167,15 @@ export async function loadRankingMatrix({
       FROM scoped
       GROUP BY person_id
       HAVING COUNT(DISTINCT event_id) = ?
-    ), references AS (
+    ), event_references AS (
       SELECT event_id, MIN(best) AS reference_best
       FROM scoped
       GROUP BY event_id
     )
-    SELECT scoped.*, references.reference_best
+    SELECT scoped.*, event_references.reference_best
     FROM scoped
     INNER JOIN complete_people ON complete_people.person_id = scoped.person_id
-    INNER JOIN references ON references.event_id = scoped.event_id`,
+    INNER JOIN event_references ON event_references.event_id = scoped.event_id`,
     values,
   );
   const metadataResult = await query<{ key: string; value: string }>(

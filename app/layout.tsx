@@ -14,30 +14,6 @@ const themeInitScript = `
   } catch (error) {}
 `;
 
-const stylesReadyScript = `
-  var stableStylesFrames = 0;
-  function revealWhenRankingsStylesApply() {
-    var eventPickerMenus = document.querySelectorAll(".EventPicker-menu");
-    var menusAreHidden = eventPickerMenus.length > 0 && Array.prototype.every.call(
-      eventPickerMenus,
-      function (eventPickerMenu) {
-        return window.getComputedStyle(eventPickerMenu).visibility === "hidden";
-      },
-    );
-    if (window.location.pathname === "/" && menusAreHidden) {
-      stableStylesFrames += 1;
-    } else if (window.location.pathname === "/") {
-      stableStylesFrames = 0;
-    }
-    if (window.location.pathname === "/" && stableStylesFrames < 4) {
-      window.requestAnimationFrame(revealWhenRankingsStylesApply);
-      return;
-    }
-    document.documentElement.dataset.stylesReady = "true";
-  }
-  window.addEventListener("load", revealWhenRankingsStylesApply, { once: true });
-`;
-
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
@@ -84,14 +60,11 @@ export default function RootLayout({
         <style>{`
           html { background: #fffcff; }
           html[data-theme="dark"] { background: #121417; }
-          body { visibility: hidden; }
-          html[data-styles-ready="true"] body { visibility: visible; }
+          body { visibility: visible; }
         `}</style>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        <script dangerouslySetInnerHTML={{ __html: stylesReadyScript }} />
       </head>
       <body>
-        <noscript><style>{"body { visibility: visible; }"}</style></noscript>
         <PwaRegistration />
         {children}
       </body>

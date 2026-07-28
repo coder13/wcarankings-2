@@ -164,47 +164,50 @@ select {
 
 .viewSwitcher {
   display: flex;
-  width: min(100%, 36em);
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
   overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 0.5em;
-  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  column-gap: 0.15em;
+}
+
+.viewSwitcherLabel {
+  flex: 0 0 auto;
+  padding-right: 0.85em;
+  color: var(--text-muted);
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
 }
 
 .viewSwitcher a {
-  display: grid;
-  min-height: 44px;
-  flex: 1 0 max-content;
-  padding: 0.55em 0.75em;
-  place-items: center;
+  display: flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0.55em 0.7em 0.45em;
+  border-bottom: 2px solid transparent;
   color: var(--text-muted);
-  font-size: 0.85em;
-  text-align: center;
+  font-size: 0.9em;
   text-decoration: none;
 }
 
 .viewSwitcher a:hover,
 .viewSwitcher a:focus-visible {
   color: var(--text-strong);
-  outline: none;
+}
+
+.viewSwitcher a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 
 .viewSwitcher a.isSelected {
-  border-radius: 0.35em;
-  background: var(--surface-selected);
+  border-bottom-color: var(--focus);
   color: var(--text-strong);
   font-weight: 600;
-}
-
-.matrixSearch input {
-  width: min(100%, 36em);
-  min-height: 44px;
-  padding: 0.65em 0.85em;
-  border: 1px solid var(--border);
-  border-radius: 0.5em;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
 }
 
 .chooserEventPicker {

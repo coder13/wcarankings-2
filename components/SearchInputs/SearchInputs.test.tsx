@@ -11,9 +11,7 @@ test("renders the search input and result status", () => {
       findError=""
       findLoading={false}
       findPending={false}
-      findMatches={[]}
-      findIndex={-1}
-      activeFindMatch={null}
+      findMatchCount={0}
       onOpen={() => undefined}
       onClose={() => undefined}
       onQueryChange={() => undefined}

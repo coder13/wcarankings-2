@@ -34,7 +34,7 @@ import {
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import {
   JumpDownControls,
-  JumpUpControls,
+  RankingsJumpRail,
 } from "../JumpControls/JumpControls";
 import { JumpControlsVisibility } from "../JumpControlsVisibility/JumpControlsVisibility";
 import { RankingControls } from "../RankingControls/RankingControls";
@@ -2610,9 +2610,8 @@ export function RankingsExplorer({
               findError={findError}
               findLoading={findLoading}
               findPending={findPending}
-              findMatches={findMatches}
+              findMatchCount={findMatches.length}
               findIndex={findIndex}
-              activeFindMatch={activeFindMatch}
               onOpen={activateFind}
               onClose={closeFind}
               onQueryChange={changeFindQuery}
@@ -2640,7 +2639,7 @@ export function RankingsExplorer({
         <JumpControlsVisibility
           progress={jumpUpArmed ? 1 : topRailProgress}
         >
-          <JumpUpControls
+          <RankingsJumpRail
           armed={jumpUpArmed}
           currentPosition={visibleSubRank}
           onJump={handleJumpUp}
@@ -2659,7 +2658,7 @@ export function RankingsExplorer({
           findError={findError}
           findLoading={findLoading}
           findPending={findPending}
-          findMatches={findMatches}
+          findMatchCount={findMatches.length}
           findIndex={findIndex}
           onSearchOpen={activateFind}
           onSearchClose={closeFind}

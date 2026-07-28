@@ -1,6 +1,7 @@
 "use client";
 
-import type { RankingView } from "@/lib/ranking-views";
+import Link from "next/link";
+import { rankingViewPath, type RankingView } from "@/lib/ranking-views";
 import type { RankingType } from "@/lib/wca";
 import type { RegionSelection } from "../RankingsExplorer/types";
 
@@ -10,11 +11,11 @@ function hrefFor(
   region: RegionSelection,
 ) {
   const params = new URLSearchParams();
-  if (view !== "wca") params.set("view", view);
   if (rankingType !== "single") params.set("result", rankingType);
   if (region.scope !== "world") params.set("region", region.regionId);
   const query = params.toString();
-  return query ? `/?${query}` : "/";
+  const path = rankingViewPath(view);
+  return query ? `${path}?${query}` : path;
 }
 
 export function ViewSwitcher({
@@ -27,22 +28,23 @@ export function ViewSwitcher({
   region: RegionSelection;
 }) {
   const options: Array<{ view: RankingView; label: string }> = [
-    { view: "wca", label: "WCA Rankings" },
-    { view: "kinch", label: "Kinch Rankings" },
+    { view: "wca", label: "Rankings" },
+    { view: "kinch", label: "Kinch" },
     { view: "sor", label: "Sum of Ranks" },
   ];
 
   return (
     <nav className="viewSwitcher" aria-label="Ranking view">
+      <span className="viewSwitcherLabel">Explore</span>
       {options.map((option) => (
-        <a
+        <Link
           aria-current={option.view === view ? "page" : undefined}
           className={option.view === view ? "isSelected" : undefined}
           href={hrefFor(option.view, rankingType, region)}
           key={option.view}
         >
           {option.label}
-        </a>
+        </Link>
       ))}
     </nav>
   );

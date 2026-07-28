@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 import { WCA_EVENTS } from "@/lib/wca";
-import type { RankingEntry, RegionOption } from "../RankingsExplorer/types";
-import { JumpDownControls, JumpUpControls } from "./JumpControls";
+import type { RankingEntry, RegionOption, RegionSelection } from "../RankingsExplorer/types";
+import { JumpDownControls, MatrixJumpRail, RankingsJumpRail } from "./JumpControls";
 import { JumpControlsVisibility } from "../JumpControlsVisibility/JumpControlsVisibility";
 
 const matches: RankingEntry[] = [
@@ -25,17 +25,17 @@ const regions: RegionOption[] = [
   { key: "country:US", scope: "country", regionId: "US", label: "United States" },
 ];
 
-function InteractiveTopRail() {
+function InteractiveRankingsRail() {
   const [eventId, setEventId] =
     useState<(typeof WCA_EVENTS)[number]["id"]>("333");
   const [rankingType, setRankingType] = useState<"single" | "average">("single");
-  const [regionSelection, setRegionSelection] = useState({ scope: "world" as const, regionId: "" });
+  const [regionSelection, setRegionSelection] = useState<RegionSelection>({ scope: "world", regionId: "" });
   const [query, setQuery] = useState("");
   const event = WCA_EVENTS.find((candidate) => candidate.id === eventId)!;
 
   return (
     <JumpControlsVisibility visible>
-      <JumpUpControls
+      <RankingsJumpRail
       armed
       currentPosition={1}
       onJump={() => undefined}
@@ -50,7 +50,7 @@ function InteractiveTopRail() {
       findError=""
       findLoading={false}
       findPending={false}
-      findMatches={matches}
+      findMatchCount={matches.length}
       findIndex={0}
       onSearchOpen={() => undefined}
       onSearchClose={() => {
@@ -58,6 +58,37 @@ function InteractiveTopRail() {
       }}
       onSearchQueryChange={setQuery}
       onSearchCycle={() => undefined}
+      />
+    </JumpControlsVisibility>
+  );
+}
+
+function InteractiveMatrixRail() {
+  const [rankingType, setRankingType] = useState<"single" | "average">("single");
+  const [regionSelection, setRegionSelection] = useState<RegionSelection>({ scope: "world", regionId: "" });
+  const [query, setQuery] = useState("");
+
+  return (
+    <JumpControlsVisibility visible>
+      <MatrixJumpRail
+        armed
+        currentPosition={1}
+        jumpLabel="Back to top"
+        onJump={() => undefined}
+        rankingType={rankingType}
+        onRankingTypeChange={setRankingType}
+        regions={regions}
+        regionSelection={regionSelection}
+        onRegionChange={setRegionSelection}
+        findQuery={query}
+        findError=""
+        findLoading={false}
+        findPending={false}
+        findMatchCount={matches.length}
+        onSearchOpen={() => undefined}
+        onSearchClose={() => setQuery("")}
+        onSearchQueryChange={setQuery}
+        onSearchCycle={() => undefined}
       />
     </JumpControlsVisibility>
   );
@@ -81,8 +112,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Top: Story = {
-  render: () => <InteractiveTopRail />,
+export const RankingsRail: Story = {
+  render: () => <InteractiveRankingsRail />,
+};
+
+export const MatrixRail: Story = {
+  render: () => <InteractiveMatrixRail />,
 };
 
 export const Bottom: Story = {

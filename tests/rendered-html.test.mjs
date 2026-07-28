@@ -237,13 +237,8 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(page, /pages\.flatMap/);
   assert.match(layout, /title:\s*"WCA Rankings"/);
   assert.match(layout, /PwaRegistration/);
-  assert.match(layout, /window\.addEventListener\("load"/);
-  assert.match(layout, /data-styles-ready/);
-  assert.match(layout, /eventPickerMenus\.length > 0/);
-  assert.match(layout, /getComputedStyle\(eventPickerMenu\)\.visibility === "hidden"/);
-  assert.match(layout, /stableStylesFrames < 4/);
-  assert.match(layout, /body \{ visibility: hidden; \}/);
-  assert.match(layout, /<noscript>/);
+  assert.doesNotMatch(layout, /data-styles-ready|visibility: hidden|stableStylesFrames/);
+  assert.match(layout, /body \{ visibility: visible; \}/);
   assert.match(manifest, /display: "standalone"/);
   assert.match(manifest, /icon-192\.png/);
   assert.match(manifest, /icon-512\.png/);

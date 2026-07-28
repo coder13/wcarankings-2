@@ -31,9 +31,8 @@ function InteractiveSearchInputs({
       findError=""
       findLoading={false}
       findPending={false}
-      findMatches={matches}
+      findMatchCount={matches.length}
       findIndex={0}
-      activeFindMatch={query ? matches[0] : null}
       onOpen={() => setOpen(true)}
       onClose={() => setOpen(false)}
       onQueryChange={setQuery}
@@ -52,9 +51,8 @@ const meta = {
     findError: "",
     findLoading: false,
     findPending: false,
-    findMatches: matches,
+    findMatchCount: matches.length,
     findIndex: 0,
-    activeFindMatch: matches[0],
     onOpen: () => undefined,
     onClose: () => undefined,
     onQueryChange: () => undefined,
