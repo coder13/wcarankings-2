@@ -514,6 +514,7 @@ export function RankingsExplorer({
   );
   const [jumpUpArmed, setJumpUpArmed] = useState(false);
   const [jumpDownArmed, setJumpDownArmed] = useState(false);
+  const [stickyRailFloating, setStickyRailFloating] = useState(false);
   const [bottomRailProgress, setBottomRailProgress] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const railFindInputRef = useRef<HTMLInputElement>(null);
@@ -521,6 +522,7 @@ export function RankingsExplorer({
     railFindInputRef.current = input;
   }, []);
   const bottomRailProgressRef = useRef(0);
+  const stickyRailFloatingRef = useRef(false);
   const vimInputRef = useRef<HTMLInputElement>(null);
   const vimCommandRef = useRef(vimCommand);
   const moreRequestRef = useRef(false);
@@ -759,6 +761,11 @@ export function RankingsExplorer({
 
   useEffect(() => {
     const updateRailVisibility = () => {
+      const nextStickyRailFloating = window.scrollY > 0;
+      if (nextStickyRailFloating !== stickyRailFloatingRef.current) {
+        stickyRailFloatingRef.current = nextStickyRailFloating;
+        setStickyRailFloating(nextStickyRailFloating);
+      }
       const distanceToPageEnd = Math.max(
         0,
         document.documentElement.scrollHeight -
@@ -2446,7 +2453,7 @@ export function RankingsExplorer({
         </div>
       </header>
 
-      <div className="stickyRankingsRail">
+      <div className="stickyRankingsRail" data-floating={stickyRailFloating}>
         <RankingsJumpRail
           event={currentEvent}
           onEventChange={changeEvent}

@@ -129,6 +129,17 @@ select {
   justify-content: center;
 }
 
+.stickyRankingsRail > .Jump {
+  box-shadow: none;
+  transform: translateY(0);
+  transition: transform 180ms var(--cubic-move), box-shadow 180ms var(--cubic-move);
+}
+
+.stickyRankingsRail[data-floating="true"] > .Jump {
+  box-shadow: 0 4px 16px var(--shadow);
+  transform: translateY(-0.25em);
+}
+
 .themeToggle {
   display: inline-grid;
   width: 2.5em;
