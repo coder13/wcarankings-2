@@ -2465,6 +2465,7 @@ export function RankingsExplorer({
           onEventPickerTrigger={(trigger) => {
             railEventPickerTriggerRef.current = trigger;
           }}
+          compactResultType={stickyRailFloating}
           searchInputRef={setRailFindInputRef}
           findOpen={findOpen}
           findQuery={findQuery}

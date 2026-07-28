@@ -28,13 +28,15 @@ export const JumpRail = forwardRef<
     className?: string;
     direction: "up" | "down";
     searchNavigation?: boolean;
+    compactResultType?: boolean;
   }
->(({ children, className = "", direction, searchNavigation }, ref) => (
+>(({ children, className = "", direction, searchNavigation, compactResultType }, ref) => (
   <div
     ref={ref}
     className={`Jump JumpRail ${className}`}
     data-direction={direction}
     data-search-navigation={searchNavigation || undefined}
+    data-compact-result-type={compactResultType || undefined}
   >
     {children}
   </div>
@@ -169,6 +171,7 @@ export function RankingsJumpRail({
   regionSelection,
   onRegionChange,
   onEventPickerTrigger,
+  compactResultType = false,
   ...searchProps
 }: {
   event: (typeof WCA_EVENTS)[number];
@@ -179,31 +182,70 @@ export function RankingsJumpRail({
   regionSelection: RegionSelection;
   onRegionChange: (region: RegionOption) => void;
   onEventPickerTrigger?: (trigger: HTMLButtonElement | null) => void;
+  compactResultType?: boolean;
 } & Parameters<typeof RailSearch>[0]) {
   const nextRankingType = rankingType === "single" ? "average" : "single";
 
   return (
-    <JumpRail className="Jump--rankings" direction="up">
+    <JumpRail
+      className="Jump--rankings"
+      direction="up"
+      compactResultType={compactResultType}
+    >
       <div className="Jump-railSettings">
         <EventPicker
           event={event}
           onChange={onEventChange}
           onTriggerReady={onEventPickerTrigger}
         />
-        <button
-          className="Jump-resultTypeToggle"
-          type="button"
-          disabled={event.id === "333mbf"}
-          aria-label={`Switch to ${nextRankingType} rankings`}
-          title={
-            event.id === "333mbf"
-              ? "Multi-Blind has no average"
-              : `Switch to ${nextRankingType} rankings`
-          }
-          onClick={() => onRankingTypeChange(nextRankingType)}
-        >
-          {rankingType === "single" ? "Single" : "Average"}
-        </button>
+        <div className="Jump-resultTypeControl">
+          <fieldset
+            className="rankingTypeToggle Jump-resultTypeOptions"
+            data-ranking-type={rankingType}
+            aria-label="Ranking type"
+            aria-hidden={compactResultType}
+          >
+            <legend className="visuallyHidden">Ranking type</legend>
+            {(["single", "average"] as const).map((option) => {
+              const disabled = option === "average" && event.id === "333mbf";
+              return (
+                <label
+                  className={`rankingTypeOption${rankingType === option ? " isSelected" : ""}${
+                    disabled ? " isDisabled" : ""
+                  }`}
+                  key={option}
+                >
+                  <input
+                    type="radio"
+                    name="rail-ranking-type"
+                    value={option}
+                    checked={rankingType === option}
+                    disabled={disabled}
+                    tabIndex={compactResultType ? -1 : 0}
+                    onChange={() => onRankingTypeChange(option)}
+                  />
+                  <span>{option === "single" ? "Single" : "Average"}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+          <button
+            className="Jump-resultTypeToggle"
+            type="button"
+            tabIndex={compactResultType ? 0 : -1}
+            aria-hidden={!compactResultType}
+            disabled={event.id === "333mbf"}
+            aria-label={`Switch to ${nextRankingType} rankings`}
+            title={
+              event.id === "333mbf"
+                ? "Multi-Blind has no average"
+                : `Switch to ${nextRankingType} rankings`
+            }
+            onClick={() => onRankingTypeChange(nextRankingType)}
+          >
+            {rankingType === "single" ? "Single" : "Average"}
+          </button>
+        </div>
         <RegionPicker
           className="Jump-regionPicker"
           options={regions}

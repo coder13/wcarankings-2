@@ -24,8 +24,10 @@
 
 .Jump-railSettings {
   --rail-select-width: clamp(7.5em, 16vw, 8.5em);
+  --expanded-result-type-width: 10.5em;
+  --result-type-width: var(--expanded-result-type-width);
   --rail-settings-width: calc(
-    44px + var(--rail-select-width) + var(--rail-select-width)
+    44px + var(--result-type-width) + var(--rail-select-width)
   );
 
   display: flex;
@@ -37,8 +39,29 @@
   transition: flex-basis 250ms var(--cubic-move), opacity 150ms var(--cubic-move);
 }
 
+.Jump--rankings[data-compact-result-type="true"] .Jump-railSettings {
+  --result-type-width: var(--rail-select-width);
+}
+
 .Jump-railSettings > .EventPicker-preview {
   flex: 0 0 44px;
+}
+
+.Jump-resultTypeControl {
+  position: relative;
+  width: var(--result-type-width);
+  min-width: 40px;
+  flex: 0 0 var(--result-type-width);
+  transition: width 250ms var(--cubic-move), flex-basis 250ms var(--cubic-move);
+}
+
+.Jump-resultTypeOptions {
+  width: 100%;
+  opacity: 1;
+  pointer-events: auto;
+  transform: scaleX(1);
+  transform-origin: center;
+  transition: opacity 150ms var(--cubic-move), transform 250ms var(--cubic-move);
 }
 
 .Jump-resultTypeToggle,
@@ -61,13 +84,32 @@
 }
 
 .Jump-resultTypeToggle {
-  width: var(--rail-select-width);
-  min-width: 40px;
-  flex: 0 0 var(--rail-select-width);
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
+  flex: none;
   border-right: 1px solid var(--border-subtle);
   color: var(--text-muted);
   font-size: 0.875em;
   font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleX(0.96);
+  transform-origin: center;
+  transition: background 150ms var(--cubic-move), color 150ms var(--cubic-move), opacity 150ms var(--cubic-move), transform 250ms var(--cubic-move);
+}
+
+.Jump--rankings[data-compact-result-type="true"] .Jump-resultTypeOptions {
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleX(0.96);
+}
+
+.Jump--rankings[data-compact-result-type="true"] .Jump-resultTypeToggle {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scaleX(1);
 }
 
 .Jump-resultTypeToggle:hover,
@@ -253,6 +295,10 @@
 @media only screen and (max-width: 480px) {
   .Jump-railSettings {
     --rail-select-width: min(8.5em, calc((100vw - 88px) / 2));
+    --expanded-result-type-width: min(
+      10.5em,
+      calc(100vw - 88px - var(--rail-select-width))
+    );
   }
 
   .Jump-pagerButton,
