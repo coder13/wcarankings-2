@@ -13,7 +13,7 @@
     "start": "node dist/standalone/server.js",
     "db:migrate": "docker compose --env-file .env.local run --rm flyway migrate",
     "db:refresh-rankings": "node --env-file-if-exists=.env.local scripts/refresh-rankings.mjs",
-    "test": "npm run build && node --test tests/deploy-workflow.test.mjs tests/rendered-html.test.mjs tests/scroll-engine.test.mjs",
+    "test": "npm run build && node --test tests/deploy-workflow.test.mjs tests/rendered-html.test.mjs tests/scroll-engine.test.mjs tests/result-projections.test.mjs",
     "test:unit": "node --import ./tests/register-asset-loader.mjs --import tsx --test components/*/*.test.tsx tests/*.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern storybook-static",
     "sync:wca": "node scripts/sync-wca-export.mjs",

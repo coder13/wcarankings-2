@@ -67,7 +67,7 @@ jobs:
       - name: Validate Flyway image and migrations
         run: |
           docker run --rm --entrypoint sh wcarankings-flyway:pull-request -c \
-            'test -f /flyway/migrations/V1__export_metadata.sql && test -f /flyway/migrations/V2__import_health.sql && test -f /flyway/migrations/V3__projection_build_timing.sql'
+            'test -f /flyway/migrations/V1__export_metadata.sql && test -f /flyway/migrations/V2__import_health.sql && test -f /flyway/migrations/V3__projection_build_timing.sql && test -f /flyway/migrations/V4__result_projection_health.sql'
           docker tag wcarankings-flyway:pull-request wcarankings-flyway:latest
           docker compose up -d db
           docker compose run --rm flyway migrate
@@ -93,7 +93,7 @@ jobs:
       - name: Verify production image contents
         run: |
           docker run --rm --entrypoint sh wcarankings-app:pull-request -c \
-            'test -f /app/docker-entrypoint.sh && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs'
+            'test -f /app/docker-entrypoint.sh && test -f /app/scripts/backfill-result-entries.mjs && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs'
 
       - name: Seed visual smoke-test database
         run: |
@@ -102,6 +102,7 @@ jobs:
             --user="$MYSQL_USER" \
             --password="$MYSQL_PASSWORD" \
             "$MYSQL_DATABASE" < tests/fixtures/visual-smoke.sql
+          docker compose run --rm app node scripts/backfill-result-entries.mjs
           docker compose run --rm app node scripts/refresh-rankings.mjs
 
       - name: Start visual smoke-test app

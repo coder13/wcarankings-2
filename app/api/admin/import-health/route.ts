@@ -21,9 +21,11 @@ type ImportRunRow = {
   source_person_count: number | null;
   source_result_count: number | null;
   published_ranking_count: number | null;
+  published_result_count: number | null;
   event_count: number | null;
   region_count: number | null;
   aggregate_count: number | null;
+  result_aggregate_count: number | null;
 };
 
 type ProjectionTableRow = {
@@ -61,9 +63,11 @@ function serializeRun(run: ImportRunRow | null) {
       sourcePeople: run.source_person_count == null ? null : Number(run.source_person_count),
       sourceResults: run.source_result_count == null ? null : Number(run.source_result_count),
       publishedRankings: run.published_ranking_count == null ? null : Number(run.published_ranking_count),
+      publishedResults: run.published_result_count == null ? null : Number(run.published_result_count),
       events: run.event_count == null ? null : Number(run.event_count),
       regions: run.region_count == null ? null : Number(run.region_count),
       aggregates: run.aggregate_count == null ? null : Number(run.aggregate_count),
+      resultAggregates: run.result_aggregate_count == null ? null : Number(run.result_aggregate_count),
     },
   };
 }

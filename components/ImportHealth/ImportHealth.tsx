@@ -154,6 +154,17 @@ export function ImportHealth() {
             <Metric label="Duration" value={formatDuration(run.durationMs)} />
           </dl>
           {run.failureMessage && <p className={styles.failure}><strong>Failure:</strong> {run.failureMessage}</p>}
+           <h3>Coverage</h3>
+           <dl className={styles.grid}>
+             <Metric label="Source people" value={run.counts.sourcePeople} />
+            <Metric label="Source results" value={run.counts.sourceResults} />
+            <Metric label="Published rankings" value={run.counts.publishedRankings} />
+            <Metric label="Published result entries" value={run.counts.publishedResults} />
+            <Metric label="Events" value={run.counts.events} />
+            <Metric label="Regions" value={run.counts.regions} />
+            <Metric label="Aggregates" value={run.counts.aggregates} />
+             <Metric label="Result aggregates" value={run.counts.resultAggregates} />
+           </dl>
         </> : <p>No import run has been recorded yet.</p>}
       </section>
 

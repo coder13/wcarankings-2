@@ -117,6 +117,7 @@ async function dropRankingViews() {
       "ranking_entries_source",
       "ranking_entries_single_source",
       "ranking_entries_average_source",
+      "result_entries_single_source",
       "wca_best_single",
       "wca_best_average",
     ]) {
@@ -179,6 +180,7 @@ async function collectImportCounts() {
         (SELECT COUNT(*) FROM results) AS results,
         (SELECT COUNT(*) FROM ranking_entries_single_staging) +
           (SELECT COUNT(*) FROM ranking_entries_average_staging) AS rankings,
+        (SELECT COUNT(*) FROM result_entries_single_staging) AS result_entries,
         (SELECT COUNT(*) FROM (
           SELECT event_id FROM ranking_entries_single_staging
           UNION
@@ -189,15 +191,18 @@ async function collectImportCounts() {
           UNION
           SELECT country_id FROM ranking_entries_average_staging WHERE country_id <> ''
         ) AS ranking_regions) AS regions,
-        (SELECT COUNT(*) FROM ranking_counts_staging) AS aggregates
+        (SELECT COUNT(*) FROM ranking_counts_staging) AS aggregates,
+        (SELECT COUNT(*) FROM result_counts_staging) AS result_aggregates
     `);
     return {
       source_person_count: Number(coverage[0]?.people ?? 0),
       source_result_count: Number(coverage[0]?.results ?? 0),
       published_ranking_count: Number(coverage[0]?.rankings ?? 0),
+      published_result_count: Number(coverage[0]?.result_entries ?? 0),
       event_count: Number(coverage[0]?.events ?? 0),
       region_count: Number(coverage[0]?.regions ?? 0),
       aggregate_count: Number(coverage[0]?.aggregates ?? 0),
+      result_aggregate_count: Number(coverage[0]?.result_aggregates ?? 0),
     };
   } finally {
     await connection.end();
@@ -217,20 +222,37 @@ async function promoteRankings() {
   try {
     const hasPublished = await tableExists(connection, "ranking_entries_single");
     const hasLegacyProjection = await tableExists(connection, "ranking_entries");
-    await connection.beginTransaction();
+    const projections = [
+      ["ranking_entries_single", "ranking_entries_single_staging"],
+      ["ranking_entries_average", "ranking_entries_average_staging"],
+      ["ranking_counts", "ranking_counts_staging"],
+      ["result_entries_single", "result_entries_single_staging"],
+      ["result_counts", "result_counts_staging"],
+    ];
+    const renames = [];
+    const obsoleteTables = [];
     if (hasPublished) {
-      await connection.query("RENAME TABLE ranking_entries_single TO ranking_entries_single_previous, ranking_entries_single_staging TO ranking_entries_single, ranking_entries_average TO ranking_entries_average_previous, ranking_entries_average_staging TO ranking_entries_average, ranking_counts TO ranking_counts_previous, ranking_counts_staging TO ranking_counts");
-      await connection.query("DROP TABLE ranking_entries_single_previous, ranking_entries_average_previous, ranking_counts_previous");
+      for (const [published, staging] of projections) {
+        if (await tableExists(connection, published)) {
+          const previous = `${published}_previous`;
+          renames.push(`\`${published}\` TO \`${previous}\``);
+          obsoleteTables.push(`\`${previous}\``);
+        }
+        renames.push(`\`${staging}\` TO \`${published}\``);
+      }
     } else if (hasLegacyProjection) {
-      await connection.query("RENAME TABLE ranking_entries TO ranking_entries_legacy_previous, ranking_counts TO ranking_counts_legacy_previous, ranking_entries_single_staging TO ranking_entries_single, ranking_entries_average_staging TO ranking_entries_average, ranking_counts_staging TO ranking_counts");
-      await connection.query("DROP TABLE ranking_entries_legacy_previous, ranking_counts_legacy_previous");
+      renames.push("`ranking_entries` TO `ranking_entries_legacy_previous`");
+      obsoleteTables.push("`ranking_entries_legacy_previous`");
+      if (await tableExists(connection, "ranking_counts")) {
+        renames.push("`ranking_counts` TO `ranking_counts_legacy_previous`");
+        obsoleteTables.push("`ranking_counts_legacy_previous`");
+      }
+      for (const [published, staging] of projections) renames.push(`\`${staging}\` TO \`${published}\``);
     } else {
-      await connection.query("RENAME TABLE ranking_entries_single_staging TO ranking_entries_single, ranking_entries_average_staging TO ranking_entries_average, ranking_counts_staging TO ranking_counts");
+      for (const [published, staging] of projections) renames.push(`\`${staging}\` TO \`${published}\``);
     }
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-    throw error;
+    await connection.query(`RENAME TABLE ${renames.join(", ")}`);
+    if (obsoleteTables.length > 0) await connection.query(`DROP TABLE ${obsoleteTables.join(", ")}`);
   } finally {
     await connection.end();
   }

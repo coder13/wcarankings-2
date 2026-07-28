@@ -44,16 +44,24 @@ docker compose run --rm app node /app/scripts/sync-wca-export.mjs
 ```
 
 The import downloads one SQL archive per export date into the persistent cache,
-streams the SQL dump into MariaDB, and then creates the indexed ranking tables and
-competition-name lookups. Use `--force` to re-import an already recorded export.
+streams the SQL dump into MariaDB, and then creates the indexed ranking and
+result-level single tables with competition-name lookups. Result-level rows are
+every positive official round single, not just each competitor's personal best.
+Use `--force` to re-import an already recorded export.
 For a manually downloaded archive, set `WCA_SQL_EXPORT_PATH` in the environment or
 pass `--sql-path=/path/to/WCA_export.sql.zip`.
 
 Flyway migrations and ranking projection refreshes are separate operations. To
 inspect or validate app-owned migrations without importing WCA data, run
 `docker compose run --rm flyway info` or `docker compose run --rm flyway validate`.
-To rebuild ranking projections from raw WCA tables already present in MariaDB, run
-`docker compose run --rm app node /app/scripts/refresh-rankings.mjs`.
+To rebuild every ranking projection from raw WCA tables already present in MariaDB,
+run `docker compose run --rm app node /app/scripts/refresh-rankings.mjs`. The
+deployment workflow also performs a one-time, staged result-level backfill when
+`result_entries_single` is absent. It builds only that new projection from the
+existing raw WCA tables, adds its `(event_id, best, id)` source index if needed,
+and atomically publishes the result table and counts together. To run that
+operation manually, use `docker compose run --rm app node /app/scripts/backfill-result-entries.mjs`;
+add `--force` only when deliberately rebuilding that projection.
 
 To keep the self-hosted database current, install the included systemd timer and
 failure alert as root after copying the repository to the deployment directory:
@@ -103,16 +111,19 @@ The deployment workflow does the following:
    `docker save | gzip | ssh ... 'gzip -d | docker load'`. There is no container
    registry involved.
 7. Tags the loaded application and Flyway images, then runs `docker compose run --rm flyway migrate`.
-8. Starts the new application and proxy only after migrations succeed.
-9. Verifies the app locally on the server and through the configured public host.
-10. Rolls back to `wcarankings-app:previous` if deployment health checks or
+8. Backfills a missing result-level projection from the existing raw export, then
+   checks all candidate projections before switching traffic.
+9. Starts the new application and proxy only after migrations and projection checks succeed.
+10. Verifies the app locally on the server and through the configured public host.
+11. Rolls back to `wcarankings-app:previous` if deployment health checks or
     migrations fail; otherwise removes the previous image after success.
 
 The deployment server needs the Compose file, Caddyfile, and `.env`, but does not
 need a checkout of the application source. Deployments do not download or import
-WCA data and do not rebuild ranking projections. The daily systemd sync owns that
-slower data operation. The app entrypoint only starts the server, so a fresh host
-should be imported before it is considered ready for ranking traffic.
+WCA data. Other than a one-time backfill for a newly introduced derived table,
+the daily systemd sync owns projection rebuilds. The app entrypoint only starts
+the server, so a fresh host should be imported before it is considered ready for
+ranking traffic.
 
 ## Ranking performance verification
 
@@ -140,6 +151,17 @@ FROM ranking_entries_single
 WHERE event_id = '333' AND world_rank > 0
   AND world_sub_rank >= 5001 AND world_sub_rank < 5051
 ORDER BY world_sub_rank;
+```
+
+The result-level single projection is paged with the same keyset pattern. Do not
+query or offset-scan the raw `results` table for the top-results page:
+
+```sql
+SELECT result_id, world_rank, person_id, person_name, best, competition_id
+FROM result_entries_single
+WHERE event_id = '333' AND world_sub_rank > 5000
+ORDER BY world_sub_rank
+LIMIT 50;
 ```
 
 For a short slow-query observation, enable the MariaDB global log, inspect it

@@ -2,7 +2,7 @@
 
 CubeRanks is a fast, mobile-first browser for official [World Cube Association rankings](https://www.worldcubeassociation.org/results/rankings/333/single). It supports event and result-type filters, virtualized ranking pages, large rank jumps, WCA ID lookup, and optional WCA OAuth sign-in.
 
-The app runs as a self-hosted Node service backed by MariaDB/MySQL. The importer downloads the official WCA Results Export v2 SQL archive, loads the raw WCA tables, and builds indexed ranking projections with competition names for fast browsing.
+The app runs as a self-hosted Node service backed by MariaDB/MySQL. The importer downloads the official WCA Results Export v2 SQL archive, loads the raw WCA tables, and builds indexed personal-best and result-level single projections with competition names for fast browsing. The result-level projection contains every positive official round single, so a competitor can appear multiple times.
 
 ## Local development
 
