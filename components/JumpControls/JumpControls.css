@@ -24,12 +24,21 @@
 
 .Jump-railSettings {
   --rail-select-width: clamp(7.5em, 16vw, 8.5em);
+  --rail-settings-width: calc(
+    44px + var(--rail-select-width) + var(--rail-select-width)
+  );
 
   display: flex;
-  min-width: 0;
-  overflow: hidden;
+  width: var(--rail-settings-width);
+  min-width: var(--rail-settings-width);
+  flex: 0 0 var(--rail-settings-width);
+  overflow: visible;
   opacity: 1;
-  transition: width 250ms var(--cubic-move), opacity 150ms var(--cubic-move);
+  transition: flex-basis 250ms var(--cubic-move), opacity 150ms var(--cubic-move);
+}
+
+.Jump-railSettings > .EventPicker-preview {
+  flex: 0 0 44px;
 }
 
 .Jump-resultTypeToggle,
@@ -138,6 +147,9 @@
 
 .Jump--rankings:has(.findBar--rail:is([data-has-text="true"], :focus-within)) .Jump-railSettings {
   width: 0;
+  min-width: 0;
+  flex-basis: 0;
+  overflow: hidden;
   opacity: 0;
   pointer-events: none;
 }
