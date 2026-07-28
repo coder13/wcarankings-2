@@ -37,6 +37,7 @@ test("groups ranking controls and search in one rail", () => {
         regions={[{ key: "world", scope: "world", regionId: "", label: "World" }]}
         regionSelection={{ scope: "world", regionId: "" }}
         onRegionChange={() => undefined}
+        findOpen={false}
         findQuery=""
         findError=""
         findLoading={false}

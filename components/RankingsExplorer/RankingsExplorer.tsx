@@ -2459,6 +2459,7 @@ export function RankingsExplorer({
             railEventPickerTriggerRef.current = trigger;
           }}
           searchInputRef={setRailFindInputRef}
+          findOpen={findOpen}
           findQuery={findQuery}
           findError={findError}
           findLoading={findLoading}

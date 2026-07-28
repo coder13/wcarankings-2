@@ -141,11 +141,11 @@
 }
 
 .Jump .findBar--rail[data-has-text="true"],
-.Jump .findBar--rail:focus-within {
+.Jump .findBar--rail[data-open="true"] {
   width: min(22em, calc(100vw - 2em));
 }
 
-.Jump--rankings:has(.findBar--rail:is([data-has-text="true"], :focus-within)) .Jump-railSettings {
+.Jump--rankings:has(.findBar--rail:is([data-has-text="true"], [data-open="true"])) .Jump-railSettings {
   width: 0;
   min-width: 0;
   flex-basis: 0;

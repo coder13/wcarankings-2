@@ -44,6 +44,7 @@ JumpRail.displayName = "JumpRail";
 
 function RailSearch({
   searchInputRef,
+  findOpen,
   findQuery,
   findError,
   findLoading,
@@ -56,6 +57,7 @@ function RailSearch({
   onSearchCycle,
 }: {
   searchInputRef?: (input: HTMLInputElement | null) => void;
+  findOpen: boolean;
   findQuery: string;
   findError: string;
   findLoading: boolean;
@@ -110,13 +112,13 @@ function RailSearch({
     <div
       ref={searchBarRef}
       className="findBar findBar--rail"
+      data-open={findOpen}
       data-has-text={findQuery.length > 0}
       role="search"
     >
       <button
         className="findIcon"
         type="button"
-        tabIndex={-1}
         onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
         onClick={openSearch}
         aria-label="Search names or WCA IDs"
@@ -128,8 +130,8 @@ function RailSearch({
         ref={inputRef}
         className="findInput"
         type="text"
+        tabIndex={findOpen || findQuery ? 0 : -1}
         value={findQuery}
-        onFocus={onSearchOpen}
         onChange={(inputEvent) => onSearchQueryChange(inputEvent.target.value)}
         onKeyDown={(keyboardEvent: KeyboardEvent<HTMLInputElement>) => {
           if (keyboardEvent.key !== "Enter") return;
@@ -144,6 +146,7 @@ function RailSearch({
       <button
         className="findClose"
         type="button"
+        tabIndex={findOpen || findQuery ? 0 : -1}
         onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
         onClick={() => {
           inputRef.current?.blur();

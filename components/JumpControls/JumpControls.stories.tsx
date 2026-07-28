@@ -30,6 +30,7 @@ function InteractiveTopRail() {
     useState<(typeof WCA_EVENTS)[number]["id"]>("333");
   const [rankingType, setRankingType] = useState<"single" | "average">("single");
   const [regionSelection, setRegionSelection] = useState({ scope: "world" as const, regionId: "" });
+  const [findOpen, setFindOpen] = useState(false);
   const [query, setQuery] = useState("");
   const event = WCA_EVENTS.find((candidate) => candidate.id === eventId)!;
 
@@ -43,14 +44,16 @@ function InteractiveTopRail() {
         regions={regions}
         regionSelection={regionSelection}
         onRegionChange={setRegionSelection}
+        findOpen={findOpen}
         findQuery={query}
         findError=""
         findLoading={false}
         findPending={false}
         findMatches={matches}
         findIndex={0}
-        onSearchOpen={() => undefined}
+        onSearchOpen={() => setFindOpen(true)}
         onSearchClose={() => {
+          setFindOpen(false);
           setQuery("");
         }}
         onSearchQueryChange={setQuery}
