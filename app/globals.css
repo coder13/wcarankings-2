@@ -130,9 +130,14 @@ select {
 }
 
 .stickyRankingsRail > .Jump {
+  background: var(--surface);
   box-shadow: none;
   transform: translateY(0);
   transition: transform 180ms var(--cubic-move), box-shadow 180ms var(--cubic-move);
+}
+
+.stickyRankingsRail .findBar--rail {
+  background: var(--surface);
 }
 
 .stickyRankingsRail[data-floating="true"] > .Jump {
