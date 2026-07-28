@@ -19,6 +19,7 @@ test("builds deploy images from main when PR images are unavailable", () => {
     /if: steps\.pull-images\.outputs\.available != 'true'[\s\S]*tags: wcarankings-app:\$\{\{ github\.sha \}\}/,
   );
   assert.match(workflow, /V3__projection_build_timing\.sql/);
+  assert.match(workflow, /V4__result_projection_health\.sql/);
 });
 
 test("reclaims obsolete deployment images before loading a new release", () => {

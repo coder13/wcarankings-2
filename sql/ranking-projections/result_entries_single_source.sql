@@ -11,7 +11,10 @@ SELECT
   r.best,
   r.competition_id,
   COALESCE(comp.name, r.competition_id) AS competition_name,
-  comp.start_date AS competition_date,
+  STR_TO_DATE(
+    CONCAT(comp.year, '-', LPAD(comp.month, 2, '0'), '-', LPAD(comp.day, 2, '0')),
+    '%Y-%m-%d'
+  ) AS competition_date,
   r.round_type_id,
   COALESCE(r.regional_single_record, '') AS regional_single_record,
   DENSE_RANK() OVER (

@@ -16,7 +16,9 @@ CREATE TABLE persons (
 CREATE TABLE competitions (
   id VARCHAR(50) NOT NULL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
-  start_date DATE NOT NULL
+  year SMALLINT NOT NULL,
+  month TINYINT NOT NULL,
+  day TINYINT NOT NULL
 );
 
 CREATE TABLE ranks_single (
@@ -55,8 +57,8 @@ VALUES ('USA', 'United States', 'US', '_North America');
 INSERT INTO persons (wca_id, sub_id, name, country_id)
 VALUES ('2026TEST01', 1, 'Visual Test Cuber', 'USA');
 
-INSERT INTO competitions (id, name, start_date)
-VALUES ('VisualSmoke2026', 'Visual Smoke Test 2026', '2026-01-01');
+INSERT INTO competitions (id, name, year, month, day)
+VALUES ('VisualSmoke2026', 'Visual Smoke Test 2026', 2026, 1, 1);
 
 INSERT INTO ranks_single (event_id, person_id, best, world_rank, continent_rank, country_rank)
 VALUES ('333', '2026TEST01', 1234, 1, 1, 1);

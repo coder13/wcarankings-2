@@ -36,6 +36,8 @@ const expectedProjectionTables = [
   "ranking_entries_single",
   "ranking_entries_average",
   "ranking_counts",
+  "result_entries_single",
+  "result_counts",
 ] as const;
 
 function serializeRun(run: ImportRunRow | null) {
@@ -83,7 +85,13 @@ export async function GET() {
         SELECT table_name AS name
         FROM information_schema.tables
         WHERE table_schema = DATABASE()
-          AND table_name IN ('ranking_entries_single', 'ranking_entries_average', 'ranking_counts')
+          AND table_name IN (
+            'ranking_entries_single',
+            'ranking_entries_average',
+            'ranking_counts',
+            'result_entries_single',
+            'result_counts'
+          )
       `),
     ]);
     const currentExport = Object.fromEntries(metadata.rows.map((row) => [row.key, row.value]));

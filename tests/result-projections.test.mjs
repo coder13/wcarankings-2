@@ -20,6 +20,10 @@ test("builds an indexed, result-level single projection for cursor paging", asyn
   assert.match(source, /FROM results r/);
   assert.match(source, /WHERE r\.best > 0/);
   assert.match(source, /r\.id AS result_id/);
+  assert.match(source, /comp\.year/);
+  assert.match(source, /comp\.month/);
+  assert.match(source, /comp\.day/);
+  assert.doesNotMatch(source, /comp\.start_date/);
   assert.match(source, /DENSE_RANK\(\) OVER \(/);
   assert.match(source, /ROW_NUMBER\(\) OVER \(/);
   assert.match(source, /PARTITION BY r\.event_id, COALESCE\(c\.continent_id, ''\)/);
@@ -42,6 +46,8 @@ test("builds an indexed, result-level single projection for cursor paging", asyn
   assert.match(backfill, /refreshResultEntriesSchema/);
   assert.match(backfill, /promoteResultEntriesSchema/);
   assert.match(deploy, /backfill-result-entries\.mjs/);
-  assert.match(fixture, /start_date DATE/);
+  assert.match(fixture, /year SMALLINT/);
+  assert.match(fixture, /month TINYINT/);
+  assert.match(fixture, /day TINYINT/);
   assert.match(fixture, /regional_single_record/);
 });
