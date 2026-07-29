@@ -2,15 +2,17 @@ export const SYSTEM_LIST_DEFINITIONS = [
   {
     key: "given-name-max",
     alias: "max",
-    version: 1,
-    name: "People named Max",
+    version: 2,
+    name: "Max",
+    description: null,
     token: "max",
   },
   {
     key: "given-name-luke",
     alias: "luke",
-    version: 1,
-    name: "People named Luke",
+    version: 2,
+    name: "Luke",
+    description: null,
     token: "luke",
   },
 ];

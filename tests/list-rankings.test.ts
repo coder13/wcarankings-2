@@ -16,9 +16,10 @@ test("normalizes list ranking query parameters", () => {
     eventId: "444",
     type: "average",
     start: 25,
-    limit: 100,
+    limit: 50,
     search: "Max",
     locate: "",
+    region: { scope: "world", regionId: "" },
   });
 });
 

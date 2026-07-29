@@ -4,6 +4,7 @@ import {
   getScrollAnimationDuration,
   getEndSubRank,
   clampTargetSubRank,
+  getPagerJumpTarget,
   getSearchAnimationDuration,
   getSearchBridgePageStarts,
   getSearchJumpMode,
@@ -65,6 +66,13 @@ test("clamps jumps against the ranking total instead of the loaded page", () => 
   assert.equal(clampTargetSubRank(5_001, 280_935, 50), 5_001);
   assert.equal(clampTargetSubRank(300_000, 280_935, 50), 280_935);
   assert.equal(clampTargetSubRank(5_001, Number.POSITIVE_INFINITY, 50), 50);
+});
+
+test("derives each pager jump from the settled ranking position", () => {
+  assert.equal(getPagerJumpTarget(10_000, -1, 291_763), 5_000);
+  assert.equal(getPagerJumpTarget(10_000, 1, 291_763), 15_000);
+  assert.equal(getPagerJumpTarget(5_000, -1, 291_763), 1);
+  assert.equal(getPagerJumpTarget(288_000, 1, 291_763), 291_763);
 });
 
 test("extends the page prefetch buffer for fast downward scrolling", () => {
