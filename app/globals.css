@@ -37,7 +37,7 @@
 .listRemovalActions button:disabled{cursor:wait;opacity:.6}
 .Jump--listAdd{--rail-control-height:52px}
 .Jump--listAdd .listAddComposer{height:var(--rail-control-height)}
-.Jump--listAdd .listAddComposer>.listAddSubmit{position:absolute;z-index:3;right:.25rem;width:auto;min-width:var(--rail-control-height);height:max(40px,calc(var(--rail-control-height) - .5rem));margin:.25rem 0;padding-inline:.7rem;border-inline:1px solid color-mix(in srgb,var(--text-on-strong) 55%,var(--focus));border-radius:calc(var(--rail-control-height) / 2 - .25rem);background:var(--focus);color:var(--text-on-strong);font-size:.875rem;font-weight:600}
+.Jump--listAdd .listAddComposer>.listAddSubmit{position:absolute;z-index:3;right:.25rem;width:auto;min-width:var(--rail-control-height);height:max(40px,calc(var(--rail-control-height) - .5rem));margin:.25rem 0;padding-inline:.7rem;border-inline:1px solid color-mix(in srgb,var(--text-on-strong) 55%,var(--focus));border-radius:16px;background:var(--focus);color:var(--text-on-strong);font-size:.875rem;font-weight:600}
 .Jump--listAdd .listAddTokens{padding-right:calc(var(--rail-control-height) + 1rem)}
 .Jump--listAdd .listAddComposer>.listAddSubmit:hover,.Jump--listAdd .listAddComposer>.listAddSubmit:focus-visible{background:var(--primary-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
 .Jump--listAdd .listAddComposer>.listAddSubmit:disabled{cursor:wait;opacity:.65}
