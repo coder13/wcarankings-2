@@ -48,6 +48,7 @@
   margin-bottom: 0;
   border: 0;
   border-radius: 0;
+  background-color: var(--surface);
   font-size: 1.0625em;
   font-weight: 300;
   transition: opacity var(--t-duration) ease var(--t-animation-delay), background-color 40ms ease;
