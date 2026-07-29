@@ -16,6 +16,8 @@
 @import "./styles/rankings.css";
 @import "./styles/vim.css";
 
+.listPersonAvatar{font-size:.875rem}
+
 ::-webkit-scrollbar {
   display: none;
 }
