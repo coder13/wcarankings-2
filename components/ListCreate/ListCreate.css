@@ -1,14 +1,7 @@
 .listCreate {
   width: min(100% - 2rem, 34rem);
-  margin: 2rem auto;
-}
-
-.listCreateCard {
-  padding: 1.5rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
-  background: var(--surface);
-  box-shadow: 0 4px 16px var(--shadow);
+  margin: 2.5rem auto;
+  padding-inline: 0.5rem;
 }
 
 .listCreateBack { color: var(--text-muted); font-size: 0.9rem; text-decoration: none; }
@@ -56,6 +49,5 @@
 .listCreateLoading { margin: 1.5rem 0 0; color: var(--text-subtle); }
 
 @media only screen and (max-width: 600px) {
-  .listCreate { width: min(100% - 1.5rem, 34rem); margin-top: 1rem; }
-  .listCreateCard { padding: 1.25rem; }
+  .listCreate { width: min(100% - 1.5rem, 34rem); margin-top: 1.25rem; padding-inline: 0; }
 }

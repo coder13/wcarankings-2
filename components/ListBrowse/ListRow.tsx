@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { PublicListSummary } from "@/lib/lists";
 import "./ListBrowse.css";
 
-export function ListRow({ list, alternate = false }: { list: PublicListSummary; alternate?: boolean }) {
+export function ListRow({ list, alternate = false, subtitle }: { list: PublicListSummary; alternate?: boolean; subtitle?: string | null }) {
   const listId = list.systemAlias ?? list.publicId;
   if (!listId) return null;
   return (
@@ -10,7 +10,7 @@ export function ListRow({ list, alternate = false }: { list: PublicListSummary; 
       <Link href={`/lists/${listId}`} className="listBrowseLink">
         <span className="listBrowseDetails">
           <span className="listBrowseName">{list.name}</span>
-          {list.createdBy && <span className="listBrowseCreator">{list.createdBy}</span>}
+          {(subtitle ?? list.createdBy) && <span className="listBrowseCreator">{subtitle ?? list.createdBy}</span>}
         </span>
         <span className="listBrowseCount">{new Intl.NumberFormat().format(list.memberCount)} people</span>
       </Link>

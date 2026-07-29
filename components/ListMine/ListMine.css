@@ -1,0 +1,16 @@
+.listMineHeading {
+  display: flex;
+  min-height: 65px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+}
+
+.listMineHeading h2, .listMineHeading p { margin: 0; }
+.listMineHeading h2 { font-size: 1.1rem; font-weight: 500; }
+.listMineHeading p { margin-top: 0.2rem; color: var(--text-subtle); font-size: 0.9rem; }
+.listMineHeading > a, .listMineEmpty a { color: var(--focus); text-decoration: none; }
+.listMineHeading > a:hover, .listMineHeading > a:focus-visible, .listMineEmpty a:hover, .listMineEmpty a:focus-visible { color: var(--text-strong); text-decoration: underline; }
+.listMineEmpty { padding: 2rem 1.25rem; color: var(--text-subtle); text-align: center; }
+.listMineEmpty p { margin-top: 0; }

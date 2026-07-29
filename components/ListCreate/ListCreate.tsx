@@ -91,11 +91,10 @@ export function ListCreate({ signedIn: initialSignedIn }: { signedIn?: boolean }
         <ExplorerSubjectSwitch subject="lists" onChange={changeSubject} variant="text" />
       </AppHeader>
       <main className="listCreate">
-        <div className="listCreateCard">
-          <Link className="listCreateBack" href="/lists">‹ All lists</Link>
-          <h2>Create a list</h2>
-          <p className="listCreateIntro">Make a list of WCA competitors, then add people by WCA ID.</p>
-          {signedIn === null ? <p className="listCreateLoading" role="status">Loading your account…</p> : signedIn ? (
+        <Link className="listCreateBack" href="/lists">‹ All lists</Link>
+        <h2>Create a list</h2>
+        <p className="listCreateIntro">Make a list of WCA competitors, then add people by WCA ID.</p>
+        {signedIn === null ? <p className="listCreateLoading" role="status">Loading your account…</p> : signedIn ? (
             <form className="listCreateForm" onSubmit={submit}>
               <label>
                 <span>Name</span>
@@ -128,8 +127,7 @@ export function ListCreate({ signedIn: initialSignedIn }: { signedIn?: boolean }
               <p>Sign in with your WCA account to create and manage a list.</p>
               <a href="/api/auth/wca">Sign in with WCA</a>
             </div>
-          )}
-        </div>
+        )}
       </main>
     </div>
   );
