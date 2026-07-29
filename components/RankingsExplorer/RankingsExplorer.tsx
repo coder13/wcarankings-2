@@ -610,7 +610,6 @@ export function RankingsExplorer({
   const [memberRemovalPersonIds, setMemberRemovalPersonIds] = useState<string[]>([]);
   const [memberContextMenu, setMemberContextMenu] = useState<{
     personId: string;
-    personName: string;
     x: number;
     y: number;
   } | null>(null);
@@ -2868,7 +2867,6 @@ export function RankingsExplorer({
                 onMemberContextMenu={listOwner ? (entry, position) => {
                   setMemberContextMenu({
                     personId: entry.personId,
-                    personName: entry.personName,
                     x: Math.max(8, Math.min(position.x, window.innerWidth - 176)),
                     y: Math.max(8, Math.min(position.y, window.innerHeight - 56)),
                   });
@@ -2897,7 +2895,7 @@ export function RankingsExplorer({
         </JumpControlsVisibility>}
       </main>
       {memberSelectionMode && <div className="listMemberSelectionRail"><button type="button" onClick={() => setMemberSelectionMode(false)}>Cancel</button><span>{selectedMemberIds.size} selected</span><button type="button" disabled={!selectedMemberIds.size} onClick={() => { setMemberRemovalError(""); setMemberRemovalPersonIds([...selectedMemberIds]); setMemberRemovalOpen(true); }}>Remove</button></div>}
-      {memberContextMenu && <div className="listMemberContextMenu" role="menu" style={{ left: memberContextMenu.x, top: memberContextMenu.y }} onPointerDown={(event) => event.stopPropagation()}><button type="button" role="menuitem" onClick={() => { setMemberContextMenu(null); setMemberRemovalError(""); setMemberRemovalPersonIds([memberContextMenu.personId]); setMemberRemovalOpen(true); }}>Remove {memberContextMenu.personName}</button></div>}
+      {memberContextMenu && <div className="listMemberContextMenu" role="menu" style={{ left: memberContextMenu.x, top: memberContextMenu.y }} onPointerDown={(event) => event.stopPropagation()}><button type="button" role="menuitem" onClick={() => { setMemberContextMenu(null); setMemberRemovalError(""); setMemberRemovalPersonIds([memberContextMenu.personId]); setMemberRemovalOpen(true); }}>Remove</button></div>}
       {memberRemovalOpen && <div className="listModalBackdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !memberRemovalBusy) setMemberRemovalOpen(false); }}><section className="listModal listRemovalDialog" role="dialog" aria-modal="true" aria-label="Remove people"><h2>Remove people?</h2><p>Remove {memberRemovalPersonIds.length} {memberRemovalPersonIds.length === 1 ? "person" : "people"} from this list?</p>{memberRemovalError && <p className="listModalError" role="alert">{memberRemovalError}</p>}<div className="listRemovalActions"><button type="button" disabled={memberRemovalBusy} onClick={() => setMemberRemovalOpen(false)}>Cancel</button><button type="button" disabled={memberRemovalBusy} onClick={() => void removeSelectedMembers()}>{memberRemovalBusy ? "Removing…" : "Remove"}</button></div></section></div>}
       {(vimMode || vimSearchActive) && (
         <VimSearchInput
