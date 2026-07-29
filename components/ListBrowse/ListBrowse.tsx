@@ -1,6 +1,7 @@
 "use client";
 
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
 import { ExplorerSubjectSwitch, type NavigationSubject } from "@/components/ExplorerSubjectSwitch/ExplorerSubjectSwitch";
@@ -34,6 +35,9 @@ export function ListBrowse({ lists }: { lists: PublicListSummary[] }) {
       </AppHeader>
       <div className="stickyRankingsRail"><ListBrowseControlsRail query={query} onQueryChange={setQuery} /></div>
       <main className="listBrowse">
+        <div className="listBrowseActions">
+          <Link href="/lists/new">Create a list</Link>
+        </div>
         {filtered.length ? (
           <ol ref={listRef} className="listBrowseList" style={{ height: `${virtualizer.getTotalSize()}px` }}>
             {virtualRows.map((row) => (

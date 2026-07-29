@@ -84,6 +84,7 @@ export function ProfileMenu() {
           <strong>{profile.name}</strong>
           <span>{profile.wcaId}</span>
         </div>
+        <a role="menuitem" href="/lists/new">Create a list</a>
         <a role="menuitem" href="/settings">Settings</a>
         <form action="/api/auth/wca/logout" method="post">
           <button role="menuitem" type="submit">Sign out</button>
