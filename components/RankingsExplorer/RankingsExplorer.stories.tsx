@@ -74,49 +74,19 @@ function makeMockRankings(): RankingEntry[] {
 
 const allEntries = makeMockRankings();
 const entries = allEntries.slice(0, 100);
-const countryContinents: Record<string, string> = {
-  US: "_North America",
-  CA: "_North America",
-  JP: "_Asia",
-  DE: "_Europe",
-};
-const countryIds: Record<string, string> = {
-  USA: "US",
-  Canada: "CA",
-  Japan: "JP",
-  Germany: "DE",
-};
-
-function entriesForRequest(url: URL) {
-  const region = url.searchParams.get("region");
-  const scopedEntries = !region
-    ? allEntries
-    : allEntries.filter((entry) =>
-      region.startsWith("_")
-        ? countryContinents[entry.countryIso2] === region
-        : entry.countryIso2 === countryIds[region] || entry.countryName === region
-    );
-
-  return scopedEntries.map((entry, index) => ({
-    ...entry,
-    rank: index + 1,
-    subRank: index + 1,
-  }));
-}
 
 function makeMockResponse(url: URL, init?: RequestInit) {
   if (init?.signal?.aborted) {
     return Promise.reject(new DOMException("Request aborted", "AbortError"));
   }
 
-  const scopedEntries = entriesForRequest(url);
   const search = url.searchParams.get("search")?.trim().toLocaleLowerCase();
   if (search) {
     const searchLimit = Number(url.searchParams.get("searchLimit")) || 500;
     return Promise.resolve(
       new Response(
         JSON.stringify({
-          entries: scopedEntries
+          entries: allEntries
             .filter(
               (entry) =>
                 entry.personName.toLocaleLowerCase().includes(search) ||
@@ -136,25 +106,25 @@ function makeMockResponse(url: URL, init?: RequestInit) {
   const limit = Math.max(1, Number(url.searchParams.get("limit")) || 100);
   const focusPersonId = url.searchParams.get("focus");
   const focusIndex = focusPersonId
-    ? scopedEntries.findIndex((entry) => entry.personId === focusPersonId)
+    ? allEntries.findIndex((entry) => entry.personId === focusPersonId)
     : -1;
   const focusBefore = Number(url.searchParams.get("focusBefore")) || 50;
   const start = focusIndex >= 0 ? Math.max(1, focusIndex + 1 - focusBefore) : requestedStart;
-  const pageEntries = scopedEntries.slice(start - 1, start - 1 + limit);
+  const pageEntries = allEntries.slice(start - 1, start - 1 + limit);
 
   return Promise.resolve(
     new Response(
       JSON.stringify({
         entries: pageEntries,
-        hasMore: start - 1 + pageEntries.length < scopedEntries.length,
+        hasMore: start - 1 + pageEntries.length < allEntries.length,
         nextPageStart:
-          start - 1 + pageEntries.length < scopedEntries.length
+          start - 1 + pageEntries.length < allEntries.length
             ? start + pageEntries.length
             : null,
         previousPageStart: start > 1 ? Math.max(1, start - limit) : null,
         startPosition: start - 1,
         lastRank: pageEntries.at(-1)?.rank ?? null,
-        total: scopedEntries.length,
+        total: allEntries.length,
       }),
       { headers: { "Content-Type": "application/json" } }
     )
@@ -205,16 +175,6 @@ const initialData = {
   initialMatchPersonId: "",
 };
 
-const activeSearch = "Avery";
-const activeSearchMatches = allEntries.filter((entry) =>
-  entry.personName.toLocaleLowerCase().includes(activeSearch.toLocaleLowerCase())
-);
-const activeSearchInitialData = {
-  ...initialData,
-  searchMatches: activeSearchMatches,
-  initialMatchPersonId: activeSearchMatches[0]?.personId ?? "",
-};
-
 const meta = {
   title: "Pages/RankingsExplorer",
   component: RankingsExplorer,
@@ -263,23 +223,6 @@ export const PersonsInfiniteScroll: Story = {
     docs: {
       description: {
         story: "Scroll through this 10,000-person fixture to exercise virtual rendering, page prefetching, and infinite loading.",
-      },
-    },
-  },
-};
-
-export const SearchAcrossFilters: Story = {
-  args: {
-    ...sharedArgs,
-    initialData: activeSearchInitialData,
-    initialEventId: "333",
-    initialRankingType: "single",
-    initialSearch: activeSearch,
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: "Change Single/Average or choose a region while the Avery search remains open. The mocked search responds to the active region, making it easy to review query persistence and refreshed match navigation.",
       },
     },
   },
