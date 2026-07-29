@@ -3,6 +3,11 @@
   flex: 1 1 0;
 }
 
+.regionPicker.isDisabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .regionPickerTrigger {
   display: flex;
   align-items: center;

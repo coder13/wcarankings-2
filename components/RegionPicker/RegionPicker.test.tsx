@@ -29,6 +29,7 @@ test("can remain visible but disabled for a single list region", () => {
   );
 
   assert.match(markup, /disabled=""/);
+  assert.match(markup, /regionPicker isDisabled/);
   assert.match(markup, /aria-label="Region"/);
 });
 

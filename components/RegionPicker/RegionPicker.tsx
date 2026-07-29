@@ -121,7 +121,7 @@ export function RegionPicker({
 
   return (
     <Dropdown
-      className={`regionPicker${className ? ` ${className}` : ""}`}
+      className={`regionPicker${disabled ? " isDisabled" : ""}${className ? ` ${className}` : ""}`}
       open={open}
       onOpenChange={setPickerOpen}
     >
