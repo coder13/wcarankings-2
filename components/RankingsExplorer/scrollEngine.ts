@@ -118,12 +118,16 @@ export function cancelScrollAnimation(state: ScrollAnimationState) {
   state.settleTimer = null;
 }
 
-function finishProgrammaticScroll(state: ScrollAnimationState) {
+function finishProgrammaticScroll(
+  state: ScrollAnimationState,
+  onComplete?: () => void
+) {
   state.active = false;
   state.frame = null;
   state.clearProgrammaticTimer = window.setTimeout(() => {
     state.programmatic = false;
     state.clearProgrammaticTimer = null;
+    onComplete?.();
   }, 0);
 }
 
@@ -135,7 +139,8 @@ export function animateScrollTo(
   state: ScrollAnimationState,
   targetTop: number,
   requestedBehavior: ScrollBehavior,
-  durationMs = DISTANT_SCROLL_DURATION_MS
+  durationMs = DISTANT_SCROLL_DURATION_MS,
+  onComplete?: () => void
 ) {
   cancelScrollAnimation(state);
   state.programmatic = true;
@@ -144,13 +149,13 @@ export function animateScrollTo(
   ).matches;
   if (requestedBehavior !== "smooth" || reducedMotion) {
     window.scrollTo({ top: targetTop, behavior: "auto" });
-    finishProgrammaticScroll(state);
+    finishProgrammaticScroll(state, onComplete);
     return;
   }
 
   const distance = Math.abs(targetTop - window.scrollY);
   if (distance < 1) {
-    finishProgrammaticScroll(state);
+    finishProgrammaticScroll(state, onComplete);
     return;
   }
 
@@ -158,7 +163,7 @@ export function animateScrollTo(
     const startTop = window.scrollY;
     const signedDistance = targetTop - startTop;
     if (Math.abs(signedDistance) < 1) {
-      finishProgrammaticScroll(state);
+      finishProgrammaticScroll(state, onComplete);
       return;
     }
     const startedAt = performance.now();
@@ -171,7 +176,7 @@ export function animateScrollTo(
         behavior: "auto",
       });
       if (progress < 1) state.frame = window.requestAnimationFrame(animate);
-      else finishProgrammaticScroll(state);
+      else finishProgrammaticScroll(state, onComplete);
     };
     state.frame = window.requestAnimationFrame(animate);
   };
@@ -190,6 +195,7 @@ export function scrollToEntry({
   requestedDuration = DISTANT_SCROLL_DURATION_MS,
   targetOffset,
   rowHeight = DEFAULT_ROW_HEIGHT,
+  onComplete,
 }: {
   state: ScrollAnimationState;
   list: HTMLDivElement | null;
@@ -201,6 +207,7 @@ export function scrollToEntry({
   requestedDuration?: number;
   targetOffset?: () => number | undefined;
   rowHeight?: number;
+  onComplete?: () => void;
 }) {
   const scroll = () => {
     const listTop = list?.getBoundingClientRect().top ?? 0;
@@ -222,7 +229,13 @@ export function scrollToEntry({
       0,
       (measuredTargetTop ?? fallbackRowTop) - viewportOffset
     );
-    animateScrollTo(state, targetTop, requestedBehavior, requestedDuration);
+    animateScrollTo(
+      state,
+      targetTop,
+      requestedBehavior,
+      requestedDuration,
+      onComplete
+    );
   };
   if (schedule) {
     cancelScrollAnimation(state);
@@ -289,4 +302,16 @@ export function clampTargetSubRank(
     ? total
     : lastLoadedSubRank ?? targetSubRank;
   return Math.max(1, Math.min(targetSubRank, maximumSubRank));
+}
+
+export function getPagerJumpTarget(
+  currentSubRank: number,
+  direction: -1 | 1,
+  total: number
+) {
+  if (direction === -1)
+    return currentSubRank <= 5_000 ? 1 : currentSubRank - 5_000;
+  if (Number.isFinite(total) && currentSubRank >= total - 5_000)
+    return total;
+  return currentSubRank + 5_000;
 }

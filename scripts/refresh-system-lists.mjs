@@ -96,9 +96,18 @@ export async function refreshSystemLists(connection) {
            ),
            membership_version = membership_version + ?,
            system_definition_version = ?,
+           name = ?,
+           description = ?,
            updated_at = CURRENT_TIMESTAMP(6)
          WHERE id = ?`,
-        [listId, changed ? 1 : 0, definition.version, listId],
+        [
+          listId,
+          changed ? 1 : 0,
+          definition.version,
+          definition.name,
+          definition.description,
+          listId,
+        ],
       );
     }
     await connection.commit();

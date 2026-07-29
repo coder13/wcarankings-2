@@ -10,7 +10,6 @@ import { isEventId, isRankingEventId, isRankingType, isValidRegexPattern, parseR
 import { getRegions } from "@/lib/regions";
 import { loadRankings } from "@/lib/rankings";
 import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
-import { projectionBrowsingEnabled } from "@/lib/feature-flags";
 import { getAuthUser } from "@/lib/auth";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
@@ -318,7 +317,7 @@ export async function RankingsPage({
       initialSubject={initialSubject}
       initialCompetitionRanking={initialCompetitionRanking}
       initialLatitudeHemisphere={latitudeHemisphere}
-      showSubjectSwitch={projectionBrowsingEnabled}
+      showSubjectSwitch
       showAllEventRankingOptions
     />
   );

@@ -375,6 +375,35 @@ export async function listOwnedLists(user: AuthUser) {
   return result.rows.map(toListSummary);
 }
 
+export type PublicListSummary = Pick<
+  ListSummary,
+  "publicId" | "systemAlias" | "name" | "memberCount" | "kind"
+> & {
+  createdBy: string | null;
+};
+
+export async function listPublicLists() {
+  const result = await query<ListRow>(
+    `SELECT ${LIST_COLUMNS}
+     FROM lists AS l
+     LEFT JOIN app_users AS owner ON owner.id = l.owner_user_id
+     WHERE l.visibility = 'public'
+       AND l.deleted_at IS NULL
+     ORDER BY l.kind = 'system' DESC, l.name ASC, l.id ASC`,
+  );
+  return result.rows.map((row): PublicListSummary => {
+    const list = toListSummary(row);
+    return {
+      publicId: list.publicId,
+      systemAlias: list.systemAlias,
+      name: list.name,
+      memberCount: list.memberCount,
+      kind: list.kind,
+      createdBy: list.kind === "system" ? null : list.owner?.name ?? "WCA member",
+    };
+  });
+}
+
 export async function listContainingUser(user: AuthUser) {
   const result = await query<ListRow>(
     `SELECT ${LIST_COLUMNS}

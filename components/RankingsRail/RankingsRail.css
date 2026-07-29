@@ -34,6 +34,46 @@
   --rail-event-width: 7.25em;
 }
 
+.Jump--listBrowse {
+  --rail-control-height: 52px;
+  min-width: min(34rem, calc(100vw - 2rem));
+  border-radius: calc(var(--rail-control-height) / 2);
+}
+
+.Jump--listBrowse .findBar--rail {
+  display: flex;
+  align-items: center;
+}
+
+.listBrowseSearchIcon {
+  display: grid;
+  width: var(--rail-control-height);
+  height: var(--rail-control-height);
+  flex: 0 0 var(--rail-control-height);
+  place-items: center;
+}
+
+.listBrowseSearchIcon svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.Jump--listBrowse .findInput {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+}
+
+.Jump--listBrowse .findInput:focus { outline: none; }
+
+@media only screen and (max-width: 600px) {
+  .Jump--listBrowse { --rail-control-height: 44px; }
+}
+
 .Jump-railSettings {
   display: flex;
   width: var(--rail-settings-width);
