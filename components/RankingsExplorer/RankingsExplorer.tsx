@@ -607,6 +607,13 @@ export function RankingsExplorer({
   const [memberRemovalOpen, setMemberRemovalOpen] = useState(false);
   const [memberRemovalBusy, setMemberRemovalBusy] = useState(false);
   const [memberRemovalError, setMemberRemovalError] = useState("");
+  const [memberRemovalPersonIds, setMemberRemovalPersonIds] = useState<string[]>([]);
+  const [memberContextMenu, setMemberContextMenu] = useState<{
+    personId: string;
+    personName: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const { topProgress: topRailProgress, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
   const [debugScrollY, setDebugScrollY] = useState(0);
   const activeListKey = [
@@ -701,12 +708,12 @@ export function RankingsExplorer({
     setPagerNavigationBusy(false);
   }, []);
   const removeSelectedMembers = async () => {
-    if (!listOwner || selectedMemberIds.size === 0) return;
+    if (!listOwner || memberRemovalPersonIds.length === 0) return;
     setMemberRemovalBusy(true);
     setMemberRemovalError("");
     try {
       const responses = await Promise.all(
-        [...selectedMemberIds].map((personId) =>
+        memberRemovalPersonIds.map((personId) =>
           fetch(`/api/lists/${listOwner.listId}/members/${personId}`, {
             method: "DELETE",
           }),
@@ -725,6 +732,19 @@ export function RankingsExplorer({
       setMemberRemovalBusy(false);
     }
   };
+  useEffect(() => {
+    if (!memberContextMenu) return;
+    const closeContextMenu = () => setMemberContextMenu(null);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeContextMenu();
+    };
+    window.addEventListener("pointerdown", closeContextMenu);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeContextMenu);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [memberContextMenu]);
   const queuePersonFocus = useCallback((personId: string, animate: boolean) => {
     setHighlightedPersonId(personId);
     pendingPersonFocusRef.current = { personId, animate };
@@ -2845,6 +2865,14 @@ export function RankingsExplorer({
                 memberSelectionMode={memberSelectionMode}
                 selectedMemberIds={selectedMemberIds}
                 onMemberToggle={(personId) => setSelectedMemberIds((current) => { const next = new Set(current); next.has(personId) ? next.delete(personId) : next.add(personId); return next; })}
+                onMemberContextMenu={listOwner ? (entry, position) => {
+                  setMemberContextMenu({
+                    personId: entry.personId,
+                    personName: entry.personName,
+                    x: Math.max(8, Math.min(position.x, window.innerWidth - 176)),
+                    y: Math.max(8, Math.min(position.y, window.innerHeight - 56)),
+                  });
+                } : undefined}
               />
             )}
           </div>
@@ -2868,8 +2896,9 @@ export function RankingsExplorer({
           />
         </JumpControlsVisibility>}
       </main>
-      {memberSelectionMode && <div className="listMemberSelectionRail"><button type="button" onClick={() => setMemberSelectionMode(false)}>Cancel</button><span>{selectedMemberIds.size} selected</span><button type="button" disabled={!selectedMemberIds.size} onClick={() => { setMemberRemovalError(""); setMemberRemovalOpen(true); }}>Remove</button></div>}
-      {memberRemovalOpen && <div className="listModalBackdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !memberRemovalBusy) setMemberRemovalOpen(false); }}><section className="listModal listRemovalDialog" role="dialog" aria-modal="true" aria-label="Remove people"><h2>Remove people?</h2><p>Remove {selectedMemberIds.size} {selectedMemberIds.size === 1 ? "person" : "people"} from this list?</p>{memberRemovalError && <p className="listModalError" role="alert">{memberRemovalError}</p>}<div className="listRemovalActions"><button type="button" disabled={memberRemovalBusy} onClick={() => setMemberRemovalOpen(false)}>Cancel</button><button type="button" disabled={memberRemovalBusy} onClick={() => void removeSelectedMembers()}>{memberRemovalBusy ? "Removing…" : "Remove"}</button></div></section></div>}
+      {memberSelectionMode && <div className="listMemberSelectionRail"><button type="button" onClick={() => setMemberSelectionMode(false)}>Cancel</button><span>{selectedMemberIds.size} selected</span><button type="button" disabled={!selectedMemberIds.size} onClick={() => { setMemberRemovalError(""); setMemberRemovalPersonIds([...selectedMemberIds]); setMemberRemovalOpen(true); }}>Remove</button></div>}
+      {memberContextMenu && <div className="listMemberContextMenu" role="menu" style={{ left: memberContextMenu.x, top: memberContextMenu.y }} onPointerDown={(event) => event.stopPropagation()}><button type="button" role="menuitem" onClick={() => { setMemberContextMenu(null); setMemberRemovalError(""); setMemberRemovalPersonIds([memberContextMenu.personId]); setMemberRemovalOpen(true); }}>Remove {memberContextMenu.personName}</button></div>}
+      {memberRemovalOpen && <div className="listModalBackdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !memberRemovalBusy) setMemberRemovalOpen(false); }}><section className="listModal listRemovalDialog" role="dialog" aria-modal="true" aria-label="Remove people"><h2>Remove people?</h2><p>Remove {memberRemovalPersonIds.length} {memberRemovalPersonIds.length === 1 ? "person" : "people"} from this list?</p>{memberRemovalError && <p className="listModalError" role="alert">{memberRemovalError}</p>}<div className="listRemovalActions"><button type="button" disabled={memberRemovalBusy} onClick={() => setMemberRemovalOpen(false)}>Cancel</button><button type="button" disabled={memberRemovalBusy} onClick={() => void removeSelectedMembers()}>{memberRemovalBusy ? "Removing…" : "Remove"}</button></div></section></div>}
       {(vimMode || vimSearchActive) && (
         <VimSearchInput
           inputRef={vimInputRef}

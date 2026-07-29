@@ -21,7 +21,11 @@
 .listSettingsMenu>button{min-height:40px;padding:.4rem .55rem;border:0;border-radius:.4rem;background:transparent;color:var(--text-strong);cursor:pointer;font:inherit;text-align:left;white-space:nowrap}
 .listSettingsMenu>button:hover,.listSettingsMenu>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 6%,transparent);outline:2px solid var(--focus-ring);outline-offset:-2px}
 .row:has(.memberSelectionToggle){cursor:pointer;user-select:none}
+.row--contextMenu{cursor:context-menu;user-select:none;-webkit-user-select:none}
 .memberSelectionToggle{width:36px;height:36px;font-size:1.125rem;line-height:1}
+.listMemberContextMenu{position:fixed;z-index:40;min-width:11rem;padding:.3rem;border:1px solid var(--border-subtle);border-radius:.6rem;background:var(--surface);box-shadow:0 8px 24px var(--shadow)}
+.listMemberContextMenu button{display:block;width:100%;min-height:40px;padding:.45rem .65rem;border:0;border-radius:.35rem;background:transparent;color:var(--text-strong);font:inherit;text-align:left;cursor:pointer}
+.listMemberContextMenu button:hover,.listMemberContextMenu button:focus-visible{background:var(--surface-muted)}
 .listMemberSelectionRail{bottom:calc(1rem + 3.5rem)}
 .listRemovalDialog{max-width:28rem}
 .listRemovalDialog h2{margin:0;font-size:1.2rem}

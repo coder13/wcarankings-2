@@ -29,6 +29,7 @@ export function ResultsTable({
   memberSelectionMode,
   selectedMemberIds,
   onMemberToggle,
+  onMemberContextMenu,
 }: {
   entries: RankingEntry[];
   listRef?: Ref<HTMLOListElement>;
@@ -50,6 +51,7 @@ export function ResultsTable({
   memberSelectionMode?: boolean;
   selectedMemberIds?: ReadonlySet<string>;
   onMemberToggle?: (personId: string) => void;
+  onMemberContextMenu?: (entry: RankingEntry, position: { x: number; y: number }) => void;
 }) {
   if (loading && showLoading && !preserveListDuringLoad && entries.length === 0) {
     return <div className="listMessage">Loading rankings…</div>;
@@ -84,6 +86,7 @@ export function ResultsTable({
               selectionMode={memberSelectionMode}
               selected={selectedMemberIds?.has(entry.personId)}
               onToggleSelected={onMemberToggle}
+              onMemberContextMenu={onMemberContextMenu}
             />
           );
         } else if (hasMore) {
