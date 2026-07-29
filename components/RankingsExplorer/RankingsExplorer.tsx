@@ -587,6 +587,9 @@ export function RankingsExplorer({
     initialRegexSearch ? initialSearch : ""
   );
   const [pagerNavigationBusy, setPagerNavigationBusy] = useState(false);
+  const [memberRemovalOpen, setMemberRemovalOpen] = useState(false);
+  const [memberRemovalBusy, setMemberRemovalBusy] = useState(false);
+  const [memberRemovalError, setMemberRemovalError] = useState("");
   const { topProgress: topRailProgress, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
   const [debugScrollY, setDebugScrollY] = useState(0);
   const activeListKey = [
@@ -680,6 +683,31 @@ export function RankingsExplorer({
     pagerNavigationBusyRef.current = false;
     setPagerNavigationBusy(false);
   }, []);
+  const removeSelectedMembers = async () => {
+    if (!listOwner || selectedMemberIds.size === 0) return;
+    setMemberRemovalBusy(true);
+    setMemberRemovalError("");
+    try {
+      const responses = await Promise.all(
+        [...selectedMemberIds].map((personId) =>
+          fetch(`/api/lists/${listOwner.listId}/members/${personId}`, {
+            method: "DELETE",
+          }),
+        ),
+      );
+      if (responses.some((response) => !response.ok)) {
+        throw new Error("Could not remove every selected person.");
+      }
+      setSelectedMemberIds(new Set());
+      setMemberSelectionMode(false);
+      window.location.reload();
+    } catch (error) {
+      setMemberRemovalError(
+        error instanceof Error ? error.message : "Could not remove people.",
+      );
+      setMemberRemovalBusy(false);
+    }
+  };
   const queuePersonFocus = useCallback((personId: string, animate: boolean) => {
     setHighlightedPersonId(personId);
     pendingPersonFocusRef.current = { personId, animate };
@@ -2823,7 +2851,8 @@ export function RankingsExplorer({
           />
         </JumpControlsVisibility>
       </main>
-      {memberSelectionMode && <div className="listMemberSelectionRail"><button type="button" onClick={() => setMemberSelectionMode(false)}>Cancel</button><span>{selectedMemberIds.size} selected</span><button type="button" disabled={!selectedMemberIds.size} onClick={async () => { if (!window.confirm(`Remove ${selectedMemberIds.size} people from this list?`)) return; await Promise.all([...selectedMemberIds].map((personId) => fetch(`/api/lists/${listOwner?.listId}/members/${personId}`, { method: "DELETE" }))); setSelectedMemberIds(new Set()); setMemberSelectionMode(false); window.location.reload(); }}>Remove</button></div>}
+      {memberSelectionMode && <div className="listMemberSelectionRail"><button type="button" onClick={() => setMemberSelectionMode(false)}>Cancel</button><span>{selectedMemberIds.size} selected</span><button type="button" disabled={!selectedMemberIds.size} onClick={() => { setMemberRemovalError(""); setMemberRemovalOpen(true); }}>Remove</button></div>}
+      {memberRemovalOpen && <div className="listModalBackdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !memberRemovalBusy) setMemberRemovalOpen(false); }}><section className="listModal listRemovalDialog" role="dialog" aria-modal="true" aria-label="Remove people"><h2>Remove people?</h2><p>Remove {selectedMemberIds.size} {selectedMemberIds.size === 1 ? "person" : "people"} from this list?</p>{memberRemovalError && <p className="listModalError" role="alert">{memberRemovalError}</p>}<div className="listRemovalActions"><button type="button" disabled={memberRemovalBusy} onClick={() => setMemberRemovalOpen(false)}>Cancel</button><button type="button" disabled={memberRemovalBusy} onClick={() => void removeSelectedMembers()}>{memberRemovalBusy ? "Removing…" : "Remove"}</button></div></section></div>}
       {(vimMode || vimSearchActive) && (
         <VimSearchInput
           inputRef={vimInputRef}

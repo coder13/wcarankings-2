@@ -21,8 +21,15 @@
 .listSettingsMenu>button{min-height:36px;padding:.4rem .55rem;border:0;border-radius:.4rem;background:transparent;color:var(--text-strong);cursor:pointer;font:inherit;text-align:left;white-space:nowrap}
 .listSettingsMenu>button:hover,.listSettingsMenu>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 6%,transparent);outline:2px solid var(--focus-ring);outline-offset:-2px}
 .row:has(.memberSelectionToggle){cursor:pointer}
-.memberSelectionToggle{width:40px;height:40px;font-size:1.25rem;line-height:1}
+.memberSelectionToggle{width:36px;height:36px;font-size:1.125rem;line-height:1}
 .listMemberSelectionRail{bottom:calc(1rem + 3.5rem)}
+.listRemovalDialog{max-width:28rem}
+.listRemovalDialog h2{margin:0;font-size:1.2rem}
+.listRemovalDialog p{margin:.8rem 0 0}
+.listRemovalActions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.25rem}
+.listRemovalActions button{min-height:40px;padding:0 .9rem;border:1px solid var(--border-subtle);border-radius:.5rem;background:var(--surface);color:var(--text-strong);cursor:pointer;font:inherit;font-weight:600}
+.listRemovalActions button:last-child{border-color:var(--record-world);background:var(--record-world);color:#fff}
+.listRemovalActions button:disabled{cursor:wait;opacity:.6}
 
 ::-webkit-scrollbar {
   display: none;
