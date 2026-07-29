@@ -7,24 +7,29 @@ export const EXPLORER_SUBJECTS = [
   { id: "results", label: "Results" },
   { id: "competitions", label: "Competitions" },
 ] as const;
+export const NAVIGATION_SUBJECTS = [
+  ...EXPLORER_SUBJECTS,
+  { id: "lists", label: "Lists" },
+] as const;
 
-export type ExplorerSubject = "people" | "results" | "competitions";
+export type ExplorerSubject = (typeof EXPLORER_SUBJECTS)[number]["id"];
+export type NavigationSubject = (typeof NAVIGATION_SUBJECTS)[number]["id"];
 
 export function ExplorerSubjectSwitch({
   subject,
   onChange,
   variant = "segmented",
 }: {
-  subject: ExplorerSubject;
-  onChange: (subject: ExplorerSubject) => void;
+  subject: NavigationSubject;
+  onChange: (subject: NavigationSubject) => void;
   variant?: "segmented" | "select" | "text";
 }) {
   if (variant === "text") {
     return (
       <TextDropdown
-        options={EXPLORER_SUBJECTS.map((option) => ({ value: option.id, label: option.label }))}
+        options={NAVIGATION_SUBJECTS.map((option) => ({ value: option.id, label: option.label }))}
         value={subject}
-        onChange={onChange}
+        onChange={(value) => onChange(value as NavigationSubject)}
         ariaLabel="Browse"
       />
     );
@@ -37,9 +42,9 @@ export function ExplorerSubjectSwitch({
         <select
           value={subject}
           aria-label="Browse"
-          onChange={(event) => onChange(event.target.value as ExplorerSubject)}
+          onChange={(event) => onChange(event.target.value as NavigationSubject)}
         >
-          {EXPLORER_SUBJECTS.map((option) => (
+          {NAVIGATION_SUBJECTS.map((option) => (
             <option key={option.id} value={option.id}>{option.label}</option>
           ))}
         </select>
@@ -49,7 +54,7 @@ export function ExplorerSubjectSwitch({
 
   return (
     <div className="ExplorerSubjectSwitch" role="tablist" aria-label="Browse">
-      {EXPLORER_SUBJECTS.map((option) => (
+      {NAVIGATION_SUBJECTS.map((option) => (
         <button
           key={option.id}
           type="button"

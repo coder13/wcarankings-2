@@ -4,6 +4,7 @@ import {
   getRecordBadges,
   isEventId,
   isRankingType,
+  parseRegionQuery,
   type RankingType,
 } from "@/lib/wca";
 import type { ListSummary } from "@/lib/lists";
@@ -40,13 +41,19 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
   if (eventId !== "333mbf" && isRankingType(rawType)) type = rawType;
   const rawStart = Number(searchParams.get("start"));
   const start = Number.isFinite(rawStart) ? Math.max(0, Math.floor(rawStart)) : 0;
-  const limit = Math.max(
+  const pageLimit = Math.max(
     1,
     Math.min(100, Math.floor(Number(searchParams.get("limit")) || 50)),
   );
   const search = (searchParams.get("search") ?? "").trim().slice(0, 80);
   const locate = (searchParams.get("locate") ?? "").trim().toUpperCase();
-  return { eventId, type, start, limit, search, locate };
+  const searchLimit = Math.max(
+    1,
+    Math.min(500, Math.floor(Number(searchParams.get("searchLimit")) || 50)),
+  );
+  const limit = search && !locate ? searchLimit : pageLimit;
+  const region = parseRegionQuery(searchParams.get("region"));
+  return { eventId, type, start, limit, search, locate, region };
 }
 
 export async function loadListRankings(
@@ -55,8 +62,17 @@ export async function loadListRankings(
 ) {
   const input = parseListRankingInput(searchParams);
   const source = rankingTable(input.type);
+  const scopedConditions = ["member.list_id = ?", "ranking.world_rank > 0"];
+  const scopedValues: unknown[] = [list.id];
+  if (input.region.scope === "continent") {
+    scopedConditions.push("ranking.continent_id = ?");
+    scopedValues.push(input.region.regionId);
+  } else if (input.region.scope === "country") {
+    scopedConditions.push("ranking.country_id = ?");
+    scopedValues.push(input.region.regionId);
+  }
   const conditions = ["sub_rank > ?"];
-  const values: unknown[] = [list.id, input.eventId, input.start];
+  const values: unknown[] = [input.start];
   if (input.locate) {
     conditions.push("person_id = ?");
     values.push(input.locate);
@@ -90,15 +106,14 @@ export async function loadListRankings(
        JOIN ${source} AS ranking
          ON ranking.person_id = member.person_id
         AND ranking.event_id = ?
-       WHERE member.list_id = ?
-         AND ranking.world_rank > 0
+       WHERE ${scopedConditions.join("\n         AND ")}
      )
      SELECT *
      FROM scoped_rankings
      WHERE ${conditions.join(" AND ")}
      ORDER BY sub_rank
      LIMIT ?`,
-    [input.eventId, list.id, ...values.slice(2)],
+    [input.eventId, ...scopedValues, ...values],
     { rankingStatementTimeout: true },
   );
 

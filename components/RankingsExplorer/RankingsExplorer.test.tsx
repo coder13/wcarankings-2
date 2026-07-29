@@ -57,7 +57,7 @@ test("keeps event and result-type changes on the current page", () => {
   assert.equal(pageStartForViewportSubRank(98), 51);
 });
 
-test("falls back to the first region page only when the current page is absent", () => {
+test("falls back to the first page only when a preserved page is absent", () => {
   assert.equal(shouldFallbackToFirstPage(51, 0), true);
   assert.equal(shouldFallbackToFirstPage(51, 1), false);
   assert.equal(shouldFallbackToFirstPage(1, 0), false);

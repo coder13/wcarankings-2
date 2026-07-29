@@ -1,7 +1,6 @@
 "use client";
 
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -19,6 +18,7 @@ import {
   getCurrentViewportPosition,
   getCurrentViewportSubRank,
   getEndSubRank,
+  getPagerJumpTarget,
   getPrefetchRowCount,
   shouldPrefetchExtraPage,
   getScrollAnimationDuration,
@@ -49,18 +49,17 @@ import {
 import { JumpControlsVisibility } from "../JumpControlsVisibility/JumpControlsVisibility";
 import { ResultsTable } from "../ResultsTable/ResultsTable";
 import { SubjectMockRows } from "./SubjectMockRows";
-import { ThemeToggle } from "../ThemeToggle/ThemeToggle";
-import { ProfileMenu } from "../ProfileMenu/ProfileMenu";
+import { AppHeader } from "../AppHeader/AppHeader";
 import { VimHelp } from "../VimHelp/VimHelp";
 import { VimSearchInput } from "../VimSearchInput/VimSearchInput";
 import {
   ExplorerSubjectSwitch,
   type ExplorerSubject,
+  type NavigationSubject,
 } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { TextDropdown } from "../Dropdown/TextDropdown";
 import {
   formatRankingsFreshness,
-  rankingEntryKey,
   type InitialRankingData,
   type RankingEntry,
   type RankingPage,
@@ -88,12 +87,15 @@ const COMPETITION_RANKING_OPTIONS = [
 type CompetitionRanking = (typeof COMPETITION_RANKING_OPTIONS)[number]["value"];
 type RankingResource =
   | "people"
-  | "results"
   | "competitions"
   | "podiums"
   | "competitor-count"
   | "latitude-north"
   | "latitude-south";
+type RankingSource = {
+  listId: string;
+  listName: string;
+};
 type VinextNavigationWindow = Window & {
   __VINEXT_RSC_PENDING__?: Promise<unknown> | null;
 };
@@ -117,8 +119,7 @@ function rankingResource(
   competitionRanking: CompetitionRanking,
   latitudeHemisphere: "north" | "south" = "north",
 ): RankingResource {
-  if (subject === "people") return "people";
-  if (subject === "results") return "results";
+  if (subject !== "competitions") return "people";
   if (competitionRanking === "latitude") return `latitude-${latitudeHemisphere}`;
   if (competitionRanking === "competitor-count") return "competitor-count";
   return competitionRanking === "podiums" ? "podiums" : "competitions";
@@ -176,7 +177,7 @@ function setSearchQueryParam(value: string) {
 
 type SearchLayoutAnchor = {
   requestEpoch: number;
-  entryKey: string;
+  personId: string;
   viewportTop: number;
 };
 
@@ -283,17 +284,13 @@ export function orderSearchMatches(
   );
 }
 
-function activeYear() {
-  return window.location.pathname.match(/^\/persons\/year\/(\d{4})$/)?.[1]
-    ?? new URLSearchParams(window.location.search).get("year");
-}
-
 function getPage(
   eventId: string,
   rankingType: "single" | "average",
   start: number,
   selection: RegionSelection,
   resource: RankingResource = "people",
+  source?: RankingSource,
 ) {
   const pageStart = pageStartForSubRank(start);
   const params = new URLSearchParams({
@@ -303,8 +300,7 @@ function getPage(
     limit: String(PAGE_SIZE),
     paged: "1",
   });
-  const year = activeYear();
-  if (resource === "people" && year) params.set("year", year);
+  if (source) params.set("list", source.listId);
   if (selection.scope !== "world") params.set("region", selection.regionId);
   if (resource === "podiums") params.set("ranking", "podium");
   if (resource === "competitor-count") params.set("ranking", "competitor-count");
@@ -313,23 +309,19 @@ function getPage(
     params.set("hemisphere", resource.slice("latitude-".length));
   }
   const cacheKey = params.toString();
-  const cachePool = `${resource}:${eventId}`;
+  const cachePool = `${source?.listId ?? resource}:${eventId}`;
   const cached = pageCache.get(cachePool, cacheKey);
   if (cached) return cached;
 
-  const endpoint = resource === "people"
-    ? "/api/rankings"
-    : resource === "results"
-      ? "/api/rankings/results"
-      : "/api/rankings/competitions";
+  const endpoint = resource !== "people"
+    ? "/api/rankings/competitions"
+    : "/api/rankings";
   const request = fetchRankingPage(`${endpoint}?${params}`).then(async (response) => {
     if (!response.ok) {
       const body = (await response.json()) as { error?: string };
       throw new Error(body.error ?? "Rankings are unavailable.");
     }
-    const data = (await response.json()) as RankingPage & {
-      snapshot?: { exportDate?: string | null };
-    };
+    const data = (await response.json()) as RankingPage;
     return {
       entries: data.entries,
       hasMore: data.hasMore,
@@ -338,12 +330,12 @@ function getPage(
       startPosition: data.startPosition,
       lastRank: data.lastRank,
       total: data.total,
-      exportDate: data.exportDate ?? data.snapshot?.exportDate ?? null,
+      exportDate: data.exportDate ?? null,
       offlineStale: response.headers.get("X-Rankings-Offline-Stale") === "1",
     };
   });
 
-  pageCache.set(cachePool, cacheKey, request, selection.scope === "world" && pageStart === 0);
+  pageCache.set(cachePool, cacheKey, request, !source && selection.scope === "world" && pageStart === 0);
   request.catch(() => pageCache.delete(cachePool, cacheKey));
   return request;
 }
@@ -354,6 +346,7 @@ async function getEndWindow(
   selection: RegionSelection,
   endSubRank: number,
   resource: RankingResource = "people",
+  source?: RankingSource,
 ) {
   const finalPageStart = pageStartForSubRank(endSubRank);
   const pageStarts = [
@@ -362,20 +355,19 @@ async function getEndWindow(
   ].filter((start, index, starts) => starts.indexOf(start) === index);
   const pages = await Promise.all(
     pageStarts.map((start) =>
-      getPage(eventId, rankingType, start + 1, selection, resource)
+      getPage(eventId, rankingType, start + 1, selection, resource, source)
     )
   );
   const firstPage = pages[0];
   const lastPage = pages.at(-1) ?? firstPage;
-  const seenEntryKeys = new Set<string>();
+  const seenPersonIds = new Set<string>();
 
   return {
     ...lastPage,
     entries: pages.flatMap((page) =>
       page.entries.filter((entry) => {
-        const entryKey = rankingEntryKey(entry);
-        if (seenEntryKeys.has(entryKey)) return false;
-        seenEntryKeys.add(entryKey);
+        if (seenPersonIds.has(entry.personId)) return false;
+        seenPersonIds.add(entry.personId);
         return true;
       })
     ),
@@ -384,12 +376,12 @@ async function getEndWindow(
   };
 }
 
-async function getSearchWindow(
+async function getPersonWindow(
   eventId: string,
   rankingType: "single" | "average",
   selection: RegionSelection,
   match: Pick<RankingEntry, "personId" | "subRank">,
-  resource: RankingResource = "people",
+  source?: RankingSource,
 ) {
   const targetPageStart = pageStartForSubRank(match.subRank);
   const pageFirstSubRanks = Array.from(
@@ -401,11 +393,11 @@ async function getSearchWindow(
     .filter((start, index, starts) => starts.indexOf(start) === index);
   const pages = await Promise.all(
     pageFirstSubRanks.map((start) =>
-      getPage(eventId, rankingType, start, selection, resource)
+      getPage(eventId, rankingType, start, selection, "people", source)
     )
   );
   const entries = pages.flatMap((page) => page.entries);
-  if (!entries.some((entry) => rankingEntryKey(entry) === rankingEntryKey(match)))
+  if (!entries.some((entry) => entry.personId === match.personId))
     throw new Error("Could not locate the selected ranking result.");
 
   const firstPage = pages[0];
@@ -426,7 +418,7 @@ async function getDistantSearchWindow(
   currentPageStart: number,
   match: RankingEntry,
   direction: -1 | 1,
-  resource: RankingResource = "people",
+  source?: RankingSource,
 ) {
   const targetPageStart = pageStartForSubRank(match.subRank);
   const pageStarts = [
@@ -447,12 +439,12 @@ async function getDistantSearchWindow(
   const pages = (
     await Promise.all(
       pageStarts.map((start) =>
-        getPage(eventId, rankingType, start + 1, selection, resource)
+        getPage(eventId, rankingType, start + 1, selection, "people", source)
       )
     )
   ).filter((page) => page.entries.length > 0);
   const entries = pages.flatMap((page) => page.entries);
-  if (!entries.some((entry) => rankingEntryKey(entry) === rankingEntryKey(match)))
+  if (!entries.some((entry) => entry.personId === match.personId))
     throw new Error("Could not locate the selected ranking result.");
 
   const firstPage = pages[0];
@@ -472,7 +464,7 @@ function prefetchSearchResultPages(
   selection: RegionSelection,
   matches: Array<RankingEntry | null | undefined>,
   currentMatchIndex: number,
-  resource: RankingResource = "people",
+  source?: RankingSource,
 ) {
   if (matches.length < 2 || currentMatchIndex < 0) return;
   const requested = new Set<number>();
@@ -487,7 +479,7 @@ function prefetchSearchResultPages(
       const requestKey = pageStartForSubRank(match.subRank);
       if (requested.has(requestKey)) continue;
       requested.add(requestKey);
-      void getSearchWindow(eventId, rankingType, selection, match, resource).catch(
+      void getPersonWindow(eventId, rankingType, selection, match, source).catch(
         () => undefined
       );
     }
@@ -501,7 +493,7 @@ function searchRankings(
   search: string,
   regexSearch: boolean,
   signal: AbortSignal,
-  resource: RankingResource = "people",
+  source?: RankingSource,
 ) {
   const params = new URLSearchParams({
     eventId,
@@ -510,14 +502,10 @@ function searchRankings(
     searchLimit: "500",
   });
   if (regexSearch) params.set("mode", "vim");
-  const year = activeYear();
-  if (resource === "people" && year) params.set("year", year);
+  if (source) params.set("list", source.listId);
   if (selection.scope !== "world") params.set("region", selection.regionId);
 
-  const endpoint = resource === "results"
-    ? "/api/rankings/results"
-    : "/api/rankings";
-  return fetch(`${endpoint}?${params}`, { signal }).then(async (response) => {
+  return fetch(`/api/rankings?${params}`, { signal }).then(async (response) => {
     if (!response.ok) {
       const body = (await response.json()) as { error?: string };
       throw new Error(body.error ?? "Search is unavailable.");
@@ -531,14 +519,14 @@ function locateRanking(
   rankingType: "single" | "average",
   selection: RegionSelection,
   wcaId: string,
+  source?: RankingSource,
 ) {
   const params = new URLSearchParams({
     eventId,
     result: rankingType,
     locate: wcaId,
   });
-  const year = activeYear();
-  if (year) params.set("year", year);
+  if (source) params.set("list", source.listId);
   if (selection.scope !== "world") params.set("region", selection.regionId);
   return fetch(`/api/rankings?${params}`).then(async (response) => {
     if (!response.ok) {
@@ -555,7 +543,6 @@ export function RankingsExplorer({
   initialRegexSearch = initialData?.regexSearch ?? false,
   initialEventId = "333",
   initialRankingType = "single",
-  initialYear = null,
   initialRegionSelection = { scope: "world", regionId: "" },
   showAllEventRankingOptions = false,
   showSubjectSwitch = false,
@@ -563,6 +550,7 @@ export function RankingsExplorer({
   initialCompetitionRanking = "best-result",
   initialLatitudeHemisphere = "north",
   mockSubjectRows = false,
+  rankingSource,
   initialRegions = {
     continents: FALLBACK_CONTINENTS,
     countries: FALLBACK_COUNTRIES,
@@ -573,7 +561,6 @@ export function RankingsExplorer({
   initialRegexSearch?: boolean;
   initialEventId?: (typeof WCA_EVENTS)[number]["id"] | "SOR" | "sor-kinch";
   initialRankingType?: "single" | "average";
-  initialYear?: number | null;
   initialRegionSelection?: RegionSelection;
   showAllEventRankingOptions?: boolean;
   showSubjectSwitch?: boolean;
@@ -581,6 +568,7 @@ export function RankingsExplorer({
   initialCompetitionRanking?: CompetitionRanking;
   initialLatitudeHemisphere?: "north" | "south";
   mockSubjectRows?: boolean;
+  rankingSource?: RankingSource;
   initialRegions?: {
     continents: Array<{ id: string; name: string }>;
     countries: Array<{ id: string; name: string; iso2?: string }>;
@@ -598,7 +586,6 @@ export function RankingsExplorer({
   const [regionSelection, setRegionSelection] = useState<RegionSelection>(
     initialRegionSelection
   );
-  const availableYears = initialData?.availableYears ?? [];
   const navigateToPage = useCallback((path: string) => {
     const navigate = () => router.push(path);
     const reduceMotion = window.matchMedia(
@@ -690,8 +677,7 @@ export function RankingsExplorer({
   const [vimSearchQuery, setVimSearchQuery] = useState(
     initialRegexSearch ? initialSearch : ""
   );
-  const [jumpUpArmed, setJumpUpArmed] = useState(false);
-  const [jumpDownArmed, setJumpDownArmed] = useState(false);
+  const [pagerNavigationBusy, setPagerNavigationBusy] = useState(false);
   const [topRailProgress, setTopRailProgress] = useState(0);
   const [bottomRailProgress, setBottomRailProgress] = useState(0);
   const [debugScrollY, setDebugScrollY] = useState(0);
@@ -728,10 +714,7 @@ export function RankingsExplorer({
   const pendingScrollDirectionRef = useRef<-1 | 1 | null>(null);
   const pendingNavigationAppendRef = useRef(false);
   const navigationTargetRankRef = useRef<number | null>(null);
-  const jumpUpTimerRef = useRef<number | null>(null);
-  const jumpDownTimerRef = useRef<number | null>(null);
-  const jumpUpArmedRef = useRef(false);
-  const jumpDownArmedRef = useRef(false);
+  const pagerNavigationBusyRef = useRef(false);
   const preserveListDuringLoadRef = useRef(false);
   const initialPageKeyRef = useRef(
     initialData
@@ -750,7 +733,7 @@ export function RankingsExplorer({
   const forcePageLoadRef = useRef(false);
   const skipNextFindResetRef = useRef(false);
   const skipPageLoadStartRef = useRef<number | null>(null);
-  const pendingRegionFallbackPageKeyRef = useRef<string | null>(null);
+  const pendingFirstPageFallbackRef = useRef(false);
   const initialScrollRef = useRef(
     Boolean(
       initialData && initialData.initialMatchPersonId
@@ -769,7 +752,7 @@ export function RankingsExplorer({
   const rankingListRef = useRef<HTMLOListElement>(null);
   const railEventPickerTriggerRef = useRef<HTMLButtonElement>(null);
   const pendingRowFocusRef = useRef<{
-    anchorEntryKey: string;
+    anchorPersonId: string;
     direction: -1 | 1;
   } | null>(null);
   const rowFocusFrameRef = useRef<number | null>(null);
@@ -787,6 +770,10 @@ export function RankingsExplorer({
     settleTimer: null,
   });
   const scrollVelocityRef = useRef({ top: 0, timestamp: 0, downwardPixelsPerMs: 0 });
+  const finishPagerNavigation = useCallback(() => {
+    pagerNavigationBusyRef.current = false;
+    setPagerNavigationBusy(false);
+  }, []);
   const queuePersonFocus = useCallback((personId: string, animate: boolean) => {
     setHighlightedPersonId(personId);
     pendingPersonFocusRef.current = { personId, animate };
@@ -811,7 +798,7 @@ export function RankingsExplorer({
     pendingSearchLayoutAnchorRef.current = null;
     if (anchor.requestEpoch !== navigationEpochRef.current) return;
     const anchoredIndex = entries.findIndex(
-      (entry) => rankingEntryKey(entry) === anchor.entryKey
+      (entry) => entry.personId === anchor.personId
     );
     if (anchoredIndex < 0) return;
     const list = rankingListRef.current;
@@ -850,12 +837,25 @@ export function RankingsExplorer({
     return () => window.clearTimeout(timer);
   }, [loading]);
 
-  useEffect(() => {
-    const measure = () => setListOffset(listRef.current?.offsetTop ?? 0);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const wrapperTop = listRef.current
+        ? listRef.current.getBoundingClientRect().top + window.scrollY
+        : 0;
+      const listTop = rankingListRef.current?.offsetTop ?? 0;
+      setListOffset(wrapperTop + listTop);
+      rowVirtualizerRef.current.measure();
+    };
     measure();
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [eventId, rankingType, loading, regionSelection]);
+    window.addEventListener("orientationchange", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
+  }, [entries.length, eventId, loading, loadingPrevious, rankingType, regionSelection]);
 
   useEffect(() => {
     if (
@@ -865,7 +865,7 @@ export function RankingsExplorer({
     )
       return;
     const targetIndex = entries.findIndex(
-      (entry) => rankingEntryKey(entry) === initialData.initialMatchPersonId
+      (entry) => entry.personId === initialData.initialMatchPersonId
     );
     if (targetIndex < 0) return;
     let secondFrame: number | null = null;
@@ -1012,8 +1012,7 @@ export function RankingsExplorer({
     let active = true;
     let redirectedToFirstPage = false;
     const requestNavigationEpoch = navigationEpochRef.current;
-    const shouldFallbackToTop =
-      pendingRegionFallbackPageKeyRef.current === pageKey;
+    const shouldFallbackToTop = pendingFirstPageFallbackRef.current;
     const preserveList = preserveListDuringLoadRef.current;
     // This reset is coupled to the request started immediately below.
     setLoading(true);
@@ -1034,10 +1033,10 @@ export function RankingsExplorer({
       : null;
     const resource = rankingResource(subject, competitionRanking, latitudeHemisphere);
     const pageRequest = focusLast
-      ? getEndWindow(eventId, rankingType, regionSelection, startRank, resource)
+      ? getEndWindow(eventId, rankingType, regionSelection, startRank, resource, rankingSource)
       : focusMatch
-        ? getSearchWindow(eventId, rankingType, regionSelection, focusMatch)
-      : getPage(eventId, rankingType, startRank, regionSelection, resource);
+        ? getPersonWindow(eventId, rankingType, regionSelection, focusMatch, rankingSource)
+      : getPage(eventId, rankingType, startRank, regionSelection, resource, rankingSource);
     pageRequest
       .then((data) => {
         if (
@@ -1050,7 +1049,7 @@ export function RankingsExplorer({
           shouldFallbackToFirstPage(startRank, data.entries.length)
         ) {
           redirectedToFirstPage = true;
-          pendingRegionFallbackPageKeyRef.current = null;
+          pendingFirstPageFallbackRef.current = false;
           pendingRankRef.current = 1;
           pendingScrollToTopRef.current = true;
           pendingScrollDirectionRef.current = null;
@@ -1060,7 +1059,7 @@ export function RankingsExplorer({
           setStartRank(1);
           return;
         }
-        if (shouldFallbackToTop) pendingRegionFallbackPageKeyRef.current = null;
+        if (shouldFallbackToTop) pendingFirstPageFallbackRef.current = false;
         const currentPosition = getCurrentViewportPosition(
           listRef.current,
           entriesRef.current,
@@ -1094,16 +1093,16 @@ export function RankingsExplorer({
                 ...data.entries.filter(
                   (entry) =>
                     !previousEntries.some(
-                      (currentEntry) => rankingEntryKey(currentEntry) === rankingEntryKey(entry)
+                      (currentEntry) => currentEntry.personId === entry.personId
                     )
                 ),
               ]
             : [
                 ...data.entries.filter(
                   (entry) =>
-                  !previousEntries.some(
-                    (currentEntry) => rankingEntryKey(currentEntry) === rankingEntryKey(entry)
-                  )
+                    !previousEntries.some(
+                      (currentEntry) => currentEntry.personId === entry.personId
+                    )
                 ),
                 ...previousEntries,
               ]
@@ -1160,7 +1159,10 @@ export function RankingsExplorer({
             scrollAnimationStateRef.current,
             0,
             "smooth",
-            getScrollAnimationDuration(currentPosition)
+            getScrollAnimationDuration(currentPosition),
+            pagerNavigationBusyRef.current
+              ? finishPagerNavigation
+              : undefined
           );
         } else if (shouldScrollToTarget) {
           if (previousListHeight !== null) {
@@ -1201,6 +1203,9 @@ export function RankingsExplorer({
                       targetIndex,
                       "start"
                     )?.[0],
+              onComplete: pagerNavigationBusyRef.current
+                ? finishPagerNavigation
+                : undefined,
             });
           });
 
@@ -1211,12 +1216,13 @@ export function RankingsExplorer({
           active &&
           requestNavigationEpoch === navigationEpochRef.current
         ) {
-          if (shouldFallbackToTop) pendingRegionFallbackPageKeyRef.current = null;
+          if (shouldFallbackToTop) pendingFirstPageFallbackRef.current = false;
           setError(
             requestError instanceof Error
               ? requestError.message
               : "Rankings are unavailable."
           );
+          finishPagerNavigation();
         }
       })
       .finally(() => {
@@ -1243,6 +1249,8 @@ export function RankingsExplorer({
     pageReloadNonce,
     startRank,
     subject,
+    finishPagerNavigation,
+    rankingSource,
   ]);
 
   const jumpToMatch = useCallback(
@@ -1271,14 +1279,14 @@ export function RankingsExplorer({
         if (!currentMatch) return null;
         const mountedRow = Array.from(
           document.querySelectorAll<HTMLElement>(
-            ".listItem[data-entry-key]"
+            ".listItem[data-person-id]"
           )
         ).find(
-          (row) => row.dataset.entryKey === rankingEntryKey(currentMatch)
+          (row) => row.dataset.personId === currentMatch.personId
         );
         if (mountedRow) return mountedRow.getBoundingClientRect().top;
         const currentEntryIndex = entriesRef.current.findIndex(
-          (entry) => rankingEntryKey(entry) === rankingEntryKey(currentMatch)
+          (entry) => entry.personId === currentMatch.personId
         );
         if (currentEntryIndex < 0) return null;
         const measuredTop =
@@ -1299,7 +1307,7 @@ export function RankingsExplorer({
         regionSelection,
         findMatchesRef.current,
         findIndexRef.current,
-        rankingResource(subject, competitionRanking, latitudeHemisphere),
+        rankingSource,
       );
       setError("");
       setLoading(true);
@@ -1350,28 +1358,22 @@ export function RankingsExplorer({
               currentPageStart,
               match,
               scrollDirection,
-              rankingResource(subject, competitionRanking, latitudeHemisphere),
+              rankingSource,
             )
-          : getSearchWindow(
-              eventId,
-              rankingType,
-              regionSelection,
-              match,
-              rankingResource(subject, competitionRanking, latitudeHemisphere),
-            );
+          : getPersonWindow(eventId, rankingType, regionSelection, match, rankingSource);
 
       void pageRequest
         .then((data) => {
           if (navigationEpochRef.current !== requestEpoch) return;
           const targetIndex = data.entries.findIndex(
-            (entry) => rankingEntryKey(entry) === rankingEntryKey(match)
+            (entry) => entry.personId === match.personId
           );
           if (targetIndex < 0)
             throw new Error("Could not locate the selected ranking result.");
 
           const currentIndex = currentMatch
             ? data.entries.findIndex(
-                (entry) => rankingEntryKey(entry) === rankingEntryKey(currentMatch)
+                (entry) => entry.personId === currentMatch.personId
               )
             : -1;
           if (
@@ -1381,13 +1383,13 @@ export function RankingsExplorer({
           ) {
             pendingSearchLayoutAnchorRef.current = {
               requestEpoch,
-              entryKey: rankingEntryKey(currentMatch),
+              personId: currentMatch.personId,
               viewportTop: currentMatchViewportTop,
             };
           }
 
           const nextSearchStart = data.entries[0]?.subRank ?? 1;
-          setHighlightedPersonId(rankingEntryKey(match));
+          setHighlightedPersonId(match.personId);
           setEntries(data.entries);
           if (nextSearchStart !== startRankRef.current) {
             skipPageLoadStartRef.current = nextSearchStart;
@@ -1430,9 +1432,9 @@ export function RankingsExplorer({
               const centerRenderedMatch = () => {
                 const targetRow = Array.from(
                   document.querySelectorAll<HTMLElement>(
-                    ".listItem[data-entry-key]"
+                    ".listItem[data-person-id]"
                   )
-                ).find((row) => row.dataset.entryKey === rankingEntryKey(match));
+                ).find((row) => row.dataset.personId === match.personId);
                 if (!targetRow) return false;
                 const targetRect = targetRow.getBoundingClientRect();
                 window.scrollTo({
@@ -1523,14 +1525,7 @@ export function RankingsExplorer({
           finishSearchNavigation();
         });
     },
-    [
-      competitionRanking,
-      eventId,
-      latitudeHemisphere,
-      rankingType,
-      regionSelection,
-      subject,
-    ]
+    [eventId, rankingType, regionSelection, rankingSource]
   );
 
   const cycleFind = useCallback(
@@ -1597,7 +1592,15 @@ export function RankingsExplorer({
     const isInitialFocus = initialFocusRef.current && !normalizedQuery;
     const skipNavigationReset = skipNextFindResetRef.current;
     skipNextFindResetRef.current = false;
-    if (!isInitialSearch && !isInitialFocus && !skipNavigationReset) {
+    const hasActiveOrResolvedSearch = Boolean(
+      normalizedQuery || findResolvedQuery || findMatchesRef.current.length,
+    );
+    if (
+      hasActiveOrResolvedSearch &&
+      !isInitialSearch &&
+      !isInitialFocus &&
+      !skipNavigationReset
+    ) {
       navigationEpochRef.current += 1;
       pendingSearchLayoutAnchorRef.current = null;
       cancelScrollAnimation(scrollAnimationStateRef.current);
@@ -1653,7 +1656,7 @@ export function RankingsExplorer({
           normalizedQuery,
           regexSearch,
           controller.signal,
-          rankingResource(subject, competitionRanking, latitudeHemisphere),
+          rankingSource,
         )
           .then((data) => {
             if (controller.signal.aborted) return;
@@ -1693,13 +1696,13 @@ export function RankingsExplorer({
     competitionRanking,
     eventId,
     findQuery,
+    findResolvedQuery,
     normalizedInitialSearch,
     rankingType,
     regionSelection,
     regexSearch,
     jumpToMatch,
-    latitudeHemisphere,
-    subject,
+    rankingSource,
   ]);
 
   useEffect(() => {
@@ -1813,6 +1816,7 @@ export function RankingsExplorer({
           followingPageStart,
           regionSelection,
           rankingResource(subject, competitionRanking, latitudeHemisphere),
+          rankingSource,
         ).catch(() => undefined);
       }
       const data = await getPage(
@@ -1821,6 +1825,7 @@ export function RankingsExplorer({
         nextPageStart,
         regionSelection,
         rankingResource(subject, competitionRanking, latitudeHemisphere),
+        rankingSource,
       );
       if (
         requestEpoch !== navigationEpochRef.current ||
@@ -1832,9 +1837,7 @@ export function RankingsExplorer({
       setEntries((current) => [
         ...current,
         ...data.entries.filter(
-          (entry) => !current.some(
-            (item) => rankingEntryKey(item) === rankingEntryKey(entry)
-          )
+          (entry) => !current.some((item) => item.personId === entry.personId)
         ),
       ]);
       setNextPageStart(data.nextPageStart);
@@ -1853,7 +1856,7 @@ export function RankingsExplorer({
       moreRequestRef.current = false;
       setLoadingMore(false);
     }
-  }, [competitionRanking, eventId, hasMore, latitudeHemisphere, loading, nextPageStart, rankingType, regionSelection, subject, total]);
+  }, [competitionRanking, eventId, hasMore, latitudeHemisphere, loading, nextPageStart, rankingSource, rankingType, regionSelection, subject, total]);
 
   const loadPrevious = useCallback(async () => {
     if (
@@ -1876,6 +1879,7 @@ export function RankingsExplorer({
         previousPageStart,
         regionSelection,
         rankingResource(subject, competitionRanking, latitudeHemisphere),
+        rankingSource,
       );
       if (
         requestEpoch !== navigationEpochRef.current ||
@@ -1886,9 +1890,7 @@ export function RankingsExplorer({
         return;
       const newEntries = data.entries.filter(
         (entry) =>
-          !entriesRef.current.some(
-            (item) => rankingEntryKey(item) === rankingEntryKey(entry)
-          )
+          !entriesRef.current.some((item) => item.personId === entry.personId)
       );
       setEntries((current) => [...newEntries, ...current]);
       setStartPosition(data.startPosition);
@@ -1923,6 +1925,7 @@ export function RankingsExplorer({
     rankingType,
     regionSelection,
     rowVirtualizer,
+    rankingSource,
     subject,
   ]);
 
@@ -1967,7 +1970,7 @@ export function RankingsExplorer({
       if (direction === 1 && !hasMore) return;
 
       pendingRowFocusRef.current = {
-        anchorEntryKey: rankingEntryKey(anchor),
+        anchorPersonId: anchor.personId,
         direction,
       };
       if (direction === -1) void loadPrevious();
@@ -1987,7 +1990,7 @@ export function RankingsExplorer({
     const pending = pendingRowFocusRef.current;
     if (!pending) return;
     const anchorIndex = entries.findIndex(
-      (entry) => rankingEntryKey(entry) === pending.anchorEntryKey,
+      (entry) => entry.personId === pending.anchorPersonId,
     );
     const targetIndex = anchorIndex + pending.direction;
     if (anchorIndex < 0 || targetIndex < 0 || targetIndex >= entries.length)
@@ -2079,6 +2082,7 @@ export function RankingsExplorer({
       setLoading(false);
       preserveListDuringLoadRef.current = false;
       setPreserveListDuringLoad(false);
+      finishPagerNavigation();
     };
     window.addEventListener("wheel", cancelOnUserInput, { passive: true });
     window.addEventListener("touchstart", cancelOnUserInput, { passive: true });
@@ -2090,7 +2094,7 @@ export function RankingsExplorer({
       window.removeEventListener("touchstart", cancelOnUserInput);
       window.removeEventListener("pointerdown", cancelOnUserInput);
     };
-  }, []);
+  }, [finishPagerNavigation]);
 
   useEffect(
     () => () => {
@@ -2223,6 +2227,9 @@ export function RankingsExplorer({
               ? getRenderedPersonTop(focusedPersonId)
               : undefined) ??
             rowVirtualizer.getOffsetForIndex(targetIndex, "start")?.[0],
+          onComplete: pagerNavigationBusyRef.current
+            ? finishPagerNavigation
+            : undefined,
         });
         pendingPersonFocusRef.current = null;
         pendingScrollDirectionRef.current = null;
@@ -2241,6 +2248,7 @@ export function RankingsExplorer({
       rowVirtualizer,
       startRank,
       total,
+      finishPagerNavigation,
     ]
   );
 
@@ -2249,7 +2257,7 @@ export function RankingsExplorer({
     const resolutionEpoch = focusResolutionEpochRef.current + 1;
     focusResolutionEpochRef.current = resolutionEpoch;
     setError("");
-    void locateRanking(eventId, rankingType, regionSelection, wcaId)
+    void locateRanking(eventId, rankingType, regionSelection, wcaId, rankingSource)
       .then(({ located }) => {
         if (resolutionEpoch !== focusResolutionEpochRef.current) return;
         if (!located) {
@@ -2266,7 +2274,7 @@ export function RankingsExplorer({
         if (resolutionEpoch !== focusResolutionEpochRef.current) return;
         setError(requestError instanceof Error ? requestError.message : "Could not find this person in the rankings.");
       });
-  }, [eventId, rankingType, regionSelection, resetToRank, subject]);
+  }, [eventId, rankingType, rankingSource, regionSelection, resetToRank, subject]);
 
   const focusMyRanking = useCallback((wcaId: string) => {
     focusedWcaIdRef.current = wcaId;
@@ -2338,6 +2346,7 @@ export function RankingsExplorer({
       1,
       regionSelection,
       rankingResource(subject, competitionRanking, latitudeHemisphere),
+      rankingSource,
     )
       .then((boundaryPage) => {
         if (requestEpoch !== navigationEpochRef.current) return;
@@ -2392,6 +2401,7 @@ export function RankingsExplorer({
     latitudeHemisphere,
     lastRank,
     rankingType,
+    rankingSource,
     regionSelection,
     subject,
     visibleSubRank,
@@ -2412,84 +2422,20 @@ export function RankingsExplorer({
   }, []);
 
   const handleJumpUp = () => {
-    if (visibleSubRank <= 5000) {
-      if (jumpUpTimerRef.current !== null)
-        window.clearTimeout(jumpUpTimerRef.current);
-      jumpUpTimerRef.current = null;
-      jumpUpArmedRef.current = false;
-      setJumpUpArmed(false);
-      resetToRank(1);
-      return;
-    }
-    if (jumpUpArmedRef.current) {
-      if (jumpUpTimerRef.current !== null)
-        window.clearTimeout(jumpUpTimerRef.current);
-      jumpUpTimerRef.current = null;
-      jumpUpArmedRef.current = false;
-      setJumpUpArmed(false);
-      resetToRank(1);
-      return;
-    }
-    jumpDownArmedRef.current = false;
-    setJumpDownArmed(false);
-    if (jumpDownTimerRef.current !== null)
-      window.clearTimeout(jumpDownTimerRef.current);
-    jumpDownTimerRef.current = null;
-    jumpUpArmedRef.current = true;
-    jumpUpTimerRef.current = window.setTimeout(() => {
-      jumpUpTimerRef.current = null;
-      jumpUpArmedRef.current = false;
-      setJumpUpArmed(false);
-    }, 500);
-    setJumpUpArmed(true);
-    resetToRank(getNavigationBaseSubRank() - 5000);
+    if (pagerNavigationBusyRef.current) return;
+    pagerNavigationBusyRef.current = true;
+    setPagerNavigationBusy(true);
+    const baseRank = getNavigationBaseSubRank();
+    resetToRank(getPagerJumpTarget(baseRank, -1, total));
   };
 
   const handleJumpDown = () => {
-    if (Number.isFinite(total) && visibleSubRank >= total - 5000) {
-      if (jumpDownTimerRef.current !== null)
-        window.clearTimeout(jumpDownTimerRef.current);
-      jumpDownTimerRef.current = null;
-      jumpDownArmedRef.current = false;
-      setJumpDownArmed(false);
-      jumpToEnd();
-      return;
-    }
-    if (jumpDownArmedRef.current) {
-      if (jumpDownTimerRef.current !== null)
-        window.clearTimeout(jumpDownTimerRef.current);
-      jumpDownTimerRef.current = null;
-      jumpDownArmedRef.current = false;
-      setJumpDownArmed(false);
-      jumpToEnd();
-      return;
-    }
-    jumpUpArmedRef.current = false;
-    setJumpUpArmed(false);
-    if (jumpUpTimerRef.current !== null)
-      window.clearTimeout(jumpUpTimerRef.current);
-    jumpUpTimerRef.current = null;
-    jumpDownArmedRef.current = true;
-    jumpDownTimerRef.current = window.setTimeout(() => {
-      jumpDownTimerRef.current = null;
-      jumpDownArmedRef.current = false;
-      setJumpDownArmed(false);
-    }, 500);
-    setJumpDownArmed(true);
-    resetToRank(getNavigationBaseSubRank() + 5000);
+    if (pagerNavigationBusyRef.current) return;
+    pagerNavigationBusyRef.current = true;
+    setPagerNavigationBusy(true);
+    const baseRank = getNavigationBaseSubRank();
+    resetToRank(getPagerJumpTarget(baseRank, 1, total));
   };
-
-  useEffect(
-    () => () => {
-      if (jumpUpTimerRef.current !== null)
-        window.clearTimeout(jumpUpTimerRef.current);
-      if (jumpDownTimerRef.current !== null)
-        window.clearTimeout(jumpDownTimerRef.current);
-      jumpUpArmedRef.current = false;
-      jumpDownArmedRef.current = false;
-    },
-    []
-  );
 
   const resetToRankRef = useRef(resetToRank);
   const jumpToEndRef = useRef(jumpToEnd);
@@ -2729,6 +2675,7 @@ export function RankingsExplorer({
     pendingRankRef.current = viewportSubRank;
     pendingScrollToTopRef.current = false;
     pendingScrollDirectionRef.current = null;
+    pendingFirstPageFallbackRef.current = true;
     skipNextFindResetRef.current = true;
     preserveListDuringLoadRef.current = true;
     setPreserveListDuringLoad(true);
@@ -2746,19 +2693,20 @@ export function RankingsExplorer({
   const changeEvent = (
     nextEventId: (typeof WCA_EVENTS)[number]["id"] | "SOR" | "sor-kinch"
   ) => {
-    const viewportSubRank = getCurrentViewportSubRank(
-      listRef.current,
-      entriesRef.current,
-      startRankRef.current
-    );
-    const nextStartRank = pageStartForViewportSubRank(viewportSubRank);
-    pendingRankRef.current = viewportSubRank;
-    pendingScrollToTopRef.current = false;
+    pendingRankRef.current = 1;
+    pendingScrollToTopRef.current = true;
     pendingScrollDirectionRef.current = null;
+    pendingFirstPageFallbackRef.current = false;
     skipNextFindResetRef.current = true;
     preserveListDuringLoadRef.current = true;
     setPreserveListDuringLoad(true);
-    setStartRank(nextStartRank);
+    animateScrollTo(
+      scrollAnimationStateRef.current,
+      0,
+      "smooth",
+      getScrollAnimationDuration(Math.max(1, Math.round(window.scrollY / ROW_HEIGHT))),
+    );
+    setStartRank(1);
     setEventId(nextEventId);
     const nextRankingType =
       subject === "competitions" && competitionRanking === "podiums"
@@ -2786,13 +2734,7 @@ export function RankingsExplorer({
     );
     const nextStartRank = pageStartForViewportSubRank(viewportSubRank);
     const nextSelection = { scope: option.scope, regionId: option.regionId };
-    pendingRegionFallbackPageKeyRef.current = [
-      eventId,
-      rankingType,
-      nextSelection.scope,
-      nextSelection.regionId,
-      nextStartRank,
-    ].join(":");
+    pendingFirstPageFallbackRef.current = true;
     pendingRankRef.current = viewportSubRank;
     pendingScrollToTopRef.current = false;
     pendingScrollDirectionRef.current = null;
@@ -2811,7 +2753,11 @@ export function RankingsExplorer({
     });
   };
 
-  const changeSubject = (nextSubject: ExplorerSubject) => {
+  const changeSubject = (nextSubject: NavigationSubject) => {
+    if (nextSubject === "lists") {
+      navigateToPage("/lists");
+      return;
+    }
     if (nextSubject === subject) return;
     navigateToPage(subjectPath(nextSubject));
   };
@@ -2848,7 +2794,7 @@ export function RankingsExplorer({
     () =>
       new Set(
         findResolvedQuery
-          ? findMatches.map((match) => rankingEntryKey(match))
+          ? findMatches.map((match) => match.personId)
           : []
       ),
     [findMatches, findResolvedQuery]
@@ -2866,6 +2812,13 @@ export function RankingsExplorer({
         | "sor-kinch"
     );
   };
+  const changeListSubject = (nextSubject: NavigationSubject) => {
+    if (nextSubject === "lists") {
+      navigateToPage("/lists");
+      return;
+    }
+    changeSubject(nextSubject);
+  };
 
   return (
     <div
@@ -2873,60 +2826,34 @@ export function RankingsExplorer({
         findQuery.trim() ? " app--searching" : ""
       }`}
     >
-      <header className={`header${showSubjectSwitch ? " header--subjectMenu" : ""}`}>
-        <div className="headerTopRow">
-          <div className="headerTitle">
-            <h1 className="title">
-              <Link href="/">WCA Rankings</Link>
-            </h1>
-            {showSubjectSwitch && (
-              <>
-                <ExplorerSubjectSwitch
-                  subject={subject}
-                  onChange={changeSubject}
-                  variant="text"
-                />
-                {subject === "people" && availableYears.length > 0 && (
-                  <TextDropdown
-                    options={[
-                      { value: "", label: "All time" },
-                      ...availableYears.map((year) => ({ value: String(year), label: String(year) })),
-                    ]}
-                    value={initialYear ? String(initialYear) : ""}
-                    onChange={(year) => {
-                      const params = new URLSearchParams(window.location.search);
-                      params.delete("search");
-                      params.delete("wcaId");
-                      params.delete("focus");
-                      navigateToPage(year
-                        ? `/persons/year/${year}${params.size ? `?${params}` : ""}`
-                        : `/${params.size ? `?${params}` : ""}`);
-                    }}
-                    ariaLabel="Person ranking period"
-                    className="personYearDropdown"
-                  />
-                )}
-                {subject === "competitions" && (
-                  <TextDropdown
-                    options={COMPETITION_RANKING_OPTIONS}
-                    value={competitionRanking}
-                    onChange={(nextRanking) => {
-                      if (nextRanking === competitionRanking) return;
-                      navigateToPage(competitionRankingPath(nextRanking));
-                    }}
-                    ariaLabel="Competition ranking"
-                    className="competitionRankingDropdown"
-                  />
-                )}
-              </>
+      <AppHeader>
+        {rankingSource ? (
+          <>
+            <ExplorerSubjectSwitch subject="lists" onChange={changeListSubject} variant="text" />
+            <span className="listRankingName">{rankingSource.listName}</span>
+          </>
+        ) : showSubjectSwitch && (
+          <>
+            <ExplorerSubjectSwitch
+              subject={subject}
+              onChange={changeSubject}
+              variant="text"
+            />
+            {subject === "competitions" && (
+              <TextDropdown
+                options={COMPETITION_RANKING_OPTIONS}
+                value={competitionRanking}
+                onChange={(nextRanking) => {
+                  if (nextRanking === competitionRanking) return;
+                  navigateToPage(competitionRankingPath(nextRanking));
+                }}
+                ariaLabel="Competition ranking"
+                className="competitionRankingDropdown"
+              />
             )}
-          </div>
-          <div className="headerActions">
-            <ThemeToggle />
-            <ProfileMenu />
-          </div>
-        </div>
-      </header>
+          </>
+        )}
+      </AppHeader>
 
       <div
         ref={stickyRankingsRailRef}
@@ -3013,11 +2940,12 @@ export function RankingsExplorer({
         </div>
 
         <JumpControlsVisibility
-          progress={jumpUpArmed || jumpDownArmed ? 1 : bottomRailProgress}
+          progress={pagerNavigationBusy ? 1 : bottomRailProgress}
         >
           <RankingsPagerRail
-            upArmed={jumpUpArmed}
-            downArmed={jumpDownArmed}
+            upArmed={false}
+            downArmed={false}
+            busy={pagerNavigationBusy}
             currentPosition={visibleSubRank}
             total={total}
             onJumpUp={handleJumpUp}

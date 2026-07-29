@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
 import type {
@@ -9,7 +10,6 @@ import { isEventId, isRankingEventId, isRankingType, isValidRegexPattern, parseR
 import { getRegions } from "@/lib/regions";
 import { loadRankings } from "@/lib/rankings";
 import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
-import { loadResultRankings } from "@/lib/semantic-result-rankings";
 import { getAuthUser } from "@/lib/auth";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
@@ -90,17 +90,12 @@ async function fetchRegions(kind: RegionKind): Promise<RegionRecord[]> {
 async function getInitialRankings(
   searchParams: Record<string, string | string[] | undefined>,
   focusedWcaId = "",
-  yearOverride: number | null = null,
 ) {
   const rawEventId = getSearchParamWithLegacyKey(searchParams, "eventId", "event");
   const rawRankingType = getSearchParamWithLegacyKey(searchParams, "result", "type");
   const eventId = isRankingEventId(rawEventId) ? rawEventId : "333";
   const rankingType = eventId === "333mbf" ? "single" : isRankingType(rawRankingType) ? rawRankingType : "single";
   const { scope, regionId } = parseRegionQuery(getSearchParam(searchParams, "region"));
-  const year = yearOverride === null
-  ? getSearchParam(searchParams, "year")
-  : String(yearOverride);
-  const yearParams = /^\d{4}$/.test(year) ? { year } : {};
   const search = getSearchParam(searchParams, "search").trim().slice(0, 80);
   const regexSearch = getSearchParam(searchParams, "mode") === "vim" && isValidRegexPattern(search);
   const searchResult = search
@@ -112,7 +107,6 @@ async function getInitialRankings(
           searchLimit: "500",
           ...(regexSearch ? { mode: "vim" } : {}),
           ...(scope === "world" ? {} : { region: regionId }),
-          ...yearParams,
         }),
       )
     : null;
@@ -123,7 +117,6 @@ async function getInitialRankings(
           result: rankingType,
           locate: focusedWcaId,
           ...(scope === "world" ? {} : { region: regionId }),
-          ...yearParams,
         }),
       ) as unknown as { located: RankingEntry | null }
     : null;
@@ -146,7 +139,6 @@ async function getInitialRankings(
           limit: String(PAGE_SIZE),
           paged: "1",
           ...(scope === "world" ? {} : { region: regionId }),
-          ...yearParams,
         }),
       ),
     ),
@@ -170,7 +162,6 @@ async function getInitialRankings(
     lastRank: lastPage.lastRank ?? null,
     total: lastPage.total ?? 0,
     exportDate: lastPage.exportDate ?? null,
-    availableYears: lastPage.availableYears ?? [],
     startRank,
     searchMatches,
     initialMatchPersonId: firstMatch?.personId ?? "",
@@ -217,73 +208,16 @@ async function getInitialCompetitionRankings(
   };
 }
 
-async function getInitialResultRankings(
-  searchParams: Record<string, string | string[] | undefined>,
-  eventId: (typeof WCA_EVENTS)[number]["id"],
-  rankingType: "single" | "average",
-  regionId: string,
-) {
-  const search = getSearchParam(searchParams, "search").trim().slice(0, 80);
-  const regexSearch = getSearchParam(searchParams, "mode") === "vim" && isValidRegexPattern(search);
-  const common = {
-    eventId,
-    result: rankingType,
-    ...(regionId ? { region: regionId } : {}),
-  };
-  const searched = search
-    ? await loadResultRankings(new URLSearchParams({
-        ...common,
-        search,
-        searchLimit: "500",
-        ...(regexSearch ? { mode: "vim" } : {}),
-      }))
-    : null;
-  const searchMatches = searched
-    ? (searched.data.entries as RankingEntry[])
-    : [];
-  const firstMatch = searchMatches[0];
-  const targetPageStart = pageFirstSubRank(firstMatch?.subRank ?? 1);
-  const pageStarts = firstMatch
-    ? [targetPageStart - PAGE_SIZE, targetPageStart, targetPageStart + PAGE_SIZE]
-        .filter((start) => start > 0)
-    : [1];
-  const pages = await Promise.all(pageStarts.map((startRank) =>
-    loadResultRankings(new URLSearchParams({
-      ...common,
-      start: String(startRank - 1),
-      limit: String(PAGE_SIZE),
-    }))));
-  const pageData = pages.map((page) => page.data as RankingsResponse);
-  const firstPage = pageData[0];
-  const lastPage = pageData.at(-1) ?? firstPage;
-  return {
-    entries: pageData.flatMap((page) => page.entries),
-    hasMore: lastPage.hasMore ?? false,
-    nextPageStart: lastPage.nextPageStart ?? null,
-    previousPageStart: firstPage.previousPageStart ?? null,
-    startPosition: firstPage.startPosition ?? Math.max(0, pageStarts[0] - 1),
-    lastRank: lastPage.lastRank ?? null,
-    total: lastPage.total ?? 0,
-    exportDate: lastPage.exportDate ?? null,
-    startRank: pageStarts[0],
-    searchMatches,
-    initialMatchPersonId: firstMatch?.entryKey ?? firstMatch?.personId ?? "",
-    regexSearch,
-  };
-}
-
 export type SearchParams = Record<string, string | string[] | undefined>;
 
 export async function RankingsPage({
   searchParams,
   pathname = "/",
-  initialYearOverride,
   initialSubject = "people",
   initialCompetitionRanking = "best-result",
 }: {
   searchParams: Promise<SearchParams>;
   pathname?: string;
-  initialYearOverride?: number | null;
   initialSubject?: "people" | "results" | "competitions";
   initialCompetitionRanking?: "best-result" | "podiums" | "competitor-count" | "latitude";
 }) {
@@ -311,9 +245,6 @@ export async function RankingsPage({
       ? "single"
       : isRankingType(rawRankingType) ? rawRankingType : "single";
   const { scope, regionId } = parseRegionQuery(getSearchParam(resolvedSearchParams, "region"));
-  const initialYear = initialYearOverride ?? (/^\d{4}$/.test(getSearchParam(resolvedSearchParams, "year"))
-    ? Number(getSearchParam(resolvedSearchParams, "year"))
-    : null);
   const requestedWcaId = getSearchParam(resolvedSearchParams, "wcaId")
     .trim()
     .toUpperCase();
@@ -353,19 +284,8 @@ export async function RankingsPage({
     const query = canonicalParams.toString();
     redirect(query ? `${pathname}?${query}` : pathname);
   }
-  const initialRankingsRequest = initialSubject === "people"
-    ? getInitialRankings(
-      resolvedSearchParams,
-      focusedWcaId,
-      initialYear,
-    )
-    : initialSubject === "results"
-      ? getInitialResultRankings(
-          resolvedSearchParams,
-          eventId as (typeof WCA_EVENTS)[number]["id"],
-          rankingType,
-          regionId,
-        )
+  const initialRankingsRequest = initialSubject !== "competitions"
+    ? getInitialRankings(resolvedSearchParams, focusedWcaId)
     : initialSubject === "competitions"
       ? getInitialCompetitionRankings(
           eventId as (typeof WCA_EVENTS)[number]["id"],
@@ -386,13 +306,12 @@ export async function RankingsPage({
   const initialRegexSearch = getSearchParam(resolvedSearchParams, "mode") === "vim" && isValidRegexPattern(initialSearch);
   return (
     <RankingsExplorer
-      key={`${initialSubject}:${initialCompetitionRanking}:${initialYear ?? "all"}`}
+      key={`${initialSubject}:${initialCompetitionRanking}`}
       initialData={initialRankings}
       initialSearch={initialSearch}
       initialRegexSearch={initialRegexSearch}
       initialEventId={eventId}
       initialRankingType={rankingType}
-      initialYear={initialYear}
       initialRegionSelection={{ scope, regionId }}
       initialRegions={{ continents, countries }}
       initialSubject={initialSubject}

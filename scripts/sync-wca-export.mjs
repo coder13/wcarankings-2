@@ -7,6 +7,7 @@ import mysql from "mysql2/promise";
 import * as unzipper from "unzipper";
 import { dropManagedObject, promoteProjectionTables, refreshMysqlSchema } from "./mysql-schema.mjs";
 import { refreshSystemLists } from "./refresh-system-lists.mjs";
+import { refreshBoardList, refreshDelegatesList } from "./refresh-board-list.mjs";
 
 const EXPORT_API = "https://www.worldcubeassociation.org/api/v0/export/public";
 const force = process.argv.includes("--force");
@@ -349,6 +350,8 @@ async function main() {
     const systemListConnection = await mysql.createConnection(databaseOptions());
     try {
       await refreshSystemLists(systemListConnection);
+      await refreshBoardList(systemListConnection);
+      await refreshDelegatesList(systemListConnection);
     } finally {
       await systemListConnection.end();
     }
