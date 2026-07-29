@@ -17,6 +17,8 @@
 @import "./styles/vim.css";
 
 :root,:root[data-theme="light"],:root[data-theme="dark"],:root:not([data-theme]){--surface-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--search-match-hover:var(--search-match)}
+:root[data-theme="dark"]{--surface-hover:color-mix(in srgb,var(--text-strong) 8%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 8%,transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme]){--surface-hover:color-mix(in srgb,var(--text-strong) 8%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 8%,transparent)}}
 .listPersonAvatar{font-size:.875rem}
 .listSettingsMenu{min-width:10.5rem}
 .listSettingsMenu>button{min-height:40px;padding:.4rem .55rem;border:0;border-radius:.4rem;background:transparent;color:var(--text-strong);cursor:pointer;font:inherit;text-align:left;white-space:nowrap}
@@ -50,6 +52,8 @@
 .listMemberSelectionRail span{order:2}
 .listMemberSelectionRail button:nth-of-type(2){order:1;background:var(--record-world);color:#fff}
 @media (hover:hover){:where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(.97);outline:0}}
+@media (hover:hover){:root[data-theme="dark"] :where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(1.08)}}
+@media (prefers-color-scheme:dark){@media (hover:hover){:root:not([data-theme]) :where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(1.08)}}}
 .stickyRankingsRail{--list-owner-control-height:calc(52px - (12px * var(--rail-scroll-progress, 0)))}
 .stickyRankingsRail>.listOwnerControls{top:0}
 .stickyRankingsRail>.listOwnerControls>button{display:grid;width:var(--list-owner-control-height);height:var(--list-owner-control-height);min-height:var(--list-owner-control-height);padding:0;place-items:center;border-radius:50%;background:transparent;box-shadow:none}

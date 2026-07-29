@@ -84,6 +84,16 @@
   filter: brightness(0.97);
 }
 
+:root[data-theme="dark"] .listItem:hover .row {
+  filter: brightness(1.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .listItem:hover .row {
+    filter: brightness(1.08);
+  }
+}
+
 .listItem:focus-visible .row--searchMatch {
   background-color: var(--search-match-hover);
 }
