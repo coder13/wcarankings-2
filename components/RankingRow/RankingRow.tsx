@@ -12,6 +12,9 @@ export function RankingRow({
   hideIdentityId = false,
   rowIndex,
   onNavigate,
+  selectionMode = false,
+  selected = false,
+  onToggleSelected,
 }: {
   entry: RankingEntry;
   eventId: string;
@@ -23,6 +26,9 @@ export function RankingRow({
   hideIdentityId?: boolean;
   rowIndex?: number;
   onNavigate?: (rowIndex: number, direction: -1 | 1) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelected?: (personId: string) => void;
 }) {
   const style = {
     "--t-animation-delay": `${animationIndex * 10}ms`,
@@ -64,6 +70,7 @@ export function RankingRow({
           highlighted ? " row--searchMatch" : ""
         }`}
       >
+        {selectionMode && <button className="memberSelectionToggle" type="button" aria-label={`Select ${name}`} aria-pressed={selected} onClick={() => onToggleSelected?.(entry.personId)}>{selected ? "✓" : ""}</button>}
         <span className={`rank${rankIsDuplicate ? " rank--duplicate" : ""}`}>
           {formatRankingNumber(rank)}
         </span>

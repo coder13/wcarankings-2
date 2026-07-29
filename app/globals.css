@@ -9,6 +9,8 @@
 @import "../components/PwaUpdatePrompt/PwaUpdatePrompt.css";
 @import "../components/PlaceholderPage/PlaceholderPage.css";
 @import "../components/ListBrowse/ListBrowse.css";
+@import "../components/ListMine/ListMine.css";
+@import "../components/ListOwnerControls/ListOwnerControls.css";
 @import "./styles/search.css";
 @import "./styles/controls.css";
 @import "./styles/rankings.css";

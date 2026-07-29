@@ -377,7 +377,7 @@ export async function listOwnedLists(user: AuthUser) {
 
 export type PublicListSummary = Pick<
   ListSummary,
-  "publicId" | "systemAlias" | "name" | "memberCount" | "kind"
+  "publicId" | "systemAlias" | "slug" | "name" | "memberCount" | "kind"
 > & {
   createdBy: string | null;
 };
@@ -396,6 +396,7 @@ export async function listPublicLists() {
     return {
       publicId: list.publicId,
       systemAlias: list.systemAlias,
+      slug: list.slug,
       name: list.name,
       memberCount: list.memberCount,
       kind: list.kind,

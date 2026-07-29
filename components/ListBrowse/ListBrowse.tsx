@@ -1,13 +1,13 @@
 "use client";
 
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
 import { ExplorerSubjectSwitch, type NavigationSubject } from "@/components/ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { ListBrowseControlsRail, ListBrowsePagerRail } from "@/components/RankingsRail/RankingsRail";
 import type { PublicListSummary } from "@/lib/lists";
 import { ListRow } from "./ListRow";
+import { ListCreateTrigger } from "@/components/ListOwnerControls/ListOwnerControls";
 import "./ListBrowse.css";
 
 const ROW_HEIGHT = 65;
@@ -36,7 +36,7 @@ export function ListBrowse({ lists }: { lists: PublicListSummary[] }) {
       <div className="stickyRankingsRail"><ListBrowseControlsRail query={query} onQueryChange={setQuery} /></div>
       <main className="listBrowse">
         <div className="listBrowseActions">
-          <Link href="/lists/new">Create a list</Link>
+          <ListCreateTrigger />
         </div>
         {filtered.length ? (
           <ol ref={listRef} className="listBrowseList" style={{ height: `${virtualizer.getTotalSize()}px` }}>

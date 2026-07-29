@@ -50,5 +50,6 @@ export function slugifyListName(value: string) {
 }
 
 export function normalizeListLookup(value: string) {
-  return normalizeListPublicId(value) ?? normalizeSystemAlias(value);
+  const [publicId] = value.split("--", 1);
+  return normalizeListPublicId(publicId) ?? normalizeSystemAlias(value);
 }

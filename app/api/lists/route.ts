@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         status: 201,
         headers: {
           "Cache-Control": "private, no-store",
-          Location: `/lists/${list.publicId}/${list.slug}`,
+          Location: `/lists/${list.publicId}--${list.slug}`,
         },
       },
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { ListCreateTrigger } from "@/components/ListOwnerControls/ListOwnerControls";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
 import {
   ExplorerSubjectSwitch,
@@ -9,7 +9,6 @@ import {
 import { ListRow } from "@/components/ListBrowse/ListRow";
 import type { ListSummary, PublicListSummary } from "@/lib/lists";
 import "@/components/ListBrowse/ListBrowse.css";
-import "./ListMine.css";
 
 function changeSubject(value: NavigationSubject) {
   window.location.assign(
@@ -27,6 +26,7 @@ function asRow(list: ListSummary): PublicListSummary {
   return {
     publicId: list.publicId,
     systemAlias: list.systemAlias,
+    slug: list.slug,
     name: list.name,
     memberCount: list.memberCount,
     kind: list.kind,
@@ -46,7 +46,7 @@ export function ListMine({ lists }: { lists: ListSummary[] }) {
             <h2>My lists</h2>
             <p>Lists you created.</p>
           </div>
-          <Link href="/lists/new">Create a list</Link>
+          {lists.length > 0 && <ListCreateTrigger />}
         </div>
         {lists.length ? (
           <ol className="listBrowseList">
@@ -62,7 +62,7 @@ export function ListMine({ lists }: { lists: ListSummary[] }) {
         ) : (
           <div className="listMineEmpty">
             <p>You have not created any lists yet.</p>
-            <Link href="/lists/new">Create your first list</Link>
+            <ListCreateTrigger />
           </div>
         )}
       </main>

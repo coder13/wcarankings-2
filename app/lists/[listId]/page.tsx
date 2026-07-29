@@ -21,7 +21,7 @@ async function getListPageData(listId: string, rankingParams: URLSearchParams) {
     ]);
     assertCanViewList(list, user);
     const rankings = await loadListRankings(list, rankingParams);
-    return { list, rankings };
+    return { list, rankings, user };
   } catch (error) {
     if (error instanceof ListNotFoundError) notFound();
     throw error;
@@ -51,7 +51,7 @@ export default async function ListPage({
     limit: "50",
   });
   if (regionSelection.scope !== "world") rankingParams.set("region", regionSelection.regionId);
-  const { list, rankings } = await getListPageData(listId, rankingParams);
+  const { list, rankings, user } = await getListPageData(listId, rankingParams);
   const rankingListId = list.systemAlias ?? list.publicId;
   if (!rankingListId) notFound();
   return (
@@ -70,6 +70,7 @@ export default async function ListPage({
         initialMatchPersonId: "",
       }}
       rankingSource={{ listId: rankingListId, listName: list.name }}
+      listOwner={list.kind === "user" && list.owner?.id === user?.id && list.publicId ? { listId: list.publicId, visibility: list.visibility } : undefined}
       initialEventId={eventId}
       initialRankingType={rankingType}
       initialRegionSelection={regionSelection}
