@@ -16,6 +16,7 @@
 @import "./styles/rankings.css";
 @import "./styles/vim.css";
 
+:root,:root[data-theme="light"],:root[data-theme="dark"],:root:not([data-theme]){--surface-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--search-match-hover:var(--search-match)}
 .listPersonAvatar{font-size:.875rem}
 .listSettingsMenu{min-width:10.5rem}
 .listSettingsMenu>button{min-height:40px;padding:.4rem .55rem;border:0;border-radius:.4rem;background:transparent;color:var(--text-strong);cursor:pointer;font:inherit;text-align:left;white-space:nowrap}
@@ -25,7 +26,7 @@
 .memberSelectionToggle{width:36px;height:36px;font-size:1.125rem;line-height:1}
 .listMemberContextMenu{position:fixed;z-index:40;min-width:11rem;padding:.3rem;border:1px solid var(--border-subtle);border-radius:.6rem;background:var(--surface);box-shadow:0 8px 24px var(--shadow)}
 .listMemberContextMenu button{display:block;width:100%;min-height:40px;padding:.45rem .65rem;border:0;border-radius:.35rem;background:transparent;color:var(--text-strong);font:inherit;text-align:left;cursor:pointer}
-.listMemberContextMenu button:hover,.listMemberContextMenu button:focus-visible{background:var(--surface-muted)}
+.listMemberContextMenu button:hover,.listMemberContextMenu button:focus-visible{background:var(--surface-hover)}
 .listMemberContextMenuBackdrop{display:none}
 .listMemberSelectionRail{bottom:calc(1rem + 3.5rem)}
 .listRemovalDialog{max-width:28rem}

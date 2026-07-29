@@ -88,7 +88,10 @@
   text-align: left;
 }
 
-.TextDropdown-options button:hover,
+.TextDropdown-options button:hover {
+  background: var(--surface-hover);
+}
+
 .TextDropdown-options button.isSelected {
   background: var(--surface-selected);
 }
