@@ -40,17 +40,21 @@
 .Jump--listAdd .listAddComposer>.listAddSubmit{position:absolute;z-index:3;right:.5rem;width:auto;min-width:var(--rail-control-height);height:max(40px,calc(var(--rail-control-height) - .5rem));margin:.25rem 0;padding-inline:.7rem;border:0;border-radius:16px;background:transparent;color:var(--focus);font-size:.875rem;font-weight:600}
 .Jump--listAdd .listAddTokens{padding-right:calc(var(--rail-control-height) + 1rem)}
 .Jump--listAdd .listAddError{display:none}
+.Jump--listAdd .listAddCancel{border-radius:16px}
+.Jump--listAdd .listAddCancel:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent)}
 .Jump--listAdd .listAddComposer>.listAddSubmit:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:0}
 .Jump--listAdd .listAddComposer>.listAddSubmit:focus-visible{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
 .Jump--listAdd .listAddComposer>.listAddSubmit:disabled{cursor:wait;opacity:.65}
 .listMemberSelectionRail button:first-child{order:3;background:transparent;color:var(--text-strong)}
 .listMemberSelectionRail span{order:2}
 .listMemberSelectionRail button:nth-of-type(2){order:1;background:var(--record-world);color:#fff}
-@media (hover:hover){:where(button,a[href],input,select,textarea,[role="button"],.listItem):not(:disabled):hover:not(:focus-visible){filter:brightness(.97);outline:0}}
+@media (hover:hover){:where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(.97);outline:0}}
 .stickyRankingsRail{--list-owner-control-height:calc(52px - (12px * var(--rail-scroll-progress, 0)))}
 .stickyRankingsRail>.listOwnerControls{top:0}
-.stickyRankingsRail>.listOwnerControls>button{display:grid;width:var(--list-owner-control-height);height:var(--list-owner-control-height);min-height:var(--list-owner-control-height);padding:0;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--text-strong) 4%,transparent);box-shadow:inset 0 0 0 1px var(--border-subtle)}
-.stickyRankingsRail>.listOwnerControls>button:hover,.stickyRankingsRail>.listOwnerControls>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 8%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
+.stickyRankingsRail>.listOwnerControls>button{display:grid;width:var(--list-owner-control-height);height:var(--list-owner-control-height);min-height:var(--list-owner-control-height);padding:0;place-items:center;border-radius:50%;background:transparent;box-shadow:none}
+.stickyRankingsRail>.listOwnerControls>button:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:0}
+.stickyRankingsRail>.listOwnerControls>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
+.TextDropdown-trigger:hover:not(:focus-visible){background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong)}
 .listSettingsMenu label{min-height:40px}
 
 @media (max-width:600px){.stickyRankingsRail{--list-owner-control-height:44px}.stickyRankingsRail>.listOwnerControls{right:.35rem}.Jump--listAdd{--rail-control-height:44px}.Jump--rankings.Jump--withListAdd{--result-type-width:5.25rem;--rail-select-width:min(8.5em,max(40px,calc(100vw - 1rem - 44px - 5.25rem - 4.75rem - 44px)));--rail-settings-width:calc(44px + var(--result-type-width) + var(--rail-select-width) + 4.75rem);min-width:calc(var(--rail-settings-width) + var(--rail-control-height))}.listMemberContextMenuBackdrop{position:fixed;z-index:39;inset:0;display:block;background:color-mix(in srgb,#000 42%,transparent);animation:listMemberContextBackdropIn 160ms ease-out}.listMemberContextMenu{z-index:40;right:0;bottom:0;left:0;min-width:0;padding:.75rem 1rem calc(.75rem + env(safe-area-inset-bottom));border:0;border-radius:1.2rem 1.2rem 0 0;box-shadow:0 -8px 24px var(--shadow);animation:listMemberContextSheetIn 220ms var(--cubic-enter, ease-out)}.listMemberContextMenu::before{display:block;width:2.5rem;height:.25rem;margin:0 auto .65rem;border-radius:999px;background:var(--border-strong);content:""}.listMemberContextMenu button{min-height:48px;padding:.65rem .75rem;font-size:1rem;font-weight:600}.listMemberContextMenu button:hover,.listMemberContextMenu button:focus-visible{background:var(--surface-hover)}@keyframes listMemberContextBackdropIn{from{opacity:0}to{opacity:1}}@keyframes listMemberContextSheetIn{from{transform:translateY(100%)}to{transform:translateY(0)}}}

@@ -58,7 +58,7 @@
 }
 
 .listItem:hover .row {
-  background-color: var(--surface-hover);
+  filter: brightness(0.97);
 }
 
 .listItem:focus-visible {
@@ -80,7 +80,7 @@
 }
 
 .listItem:hover .row--searchMatch {
-  background-color: var(--search-match-hover);
+  filter: brightness(0.97);
 }
 
 .listItem:focus-visible .row--searchMatch {

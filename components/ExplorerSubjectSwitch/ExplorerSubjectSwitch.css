@@ -21,7 +21,10 @@
   transition: background-color 150ms var(--cubic-move), color 150ms var(--cubic-move);
 }
 
-.ExplorerSubjectSwitch button:hover,
+.ExplorerSubjectSwitch button:hover {
+  color: var(--text-strong);
+}
+
 .ExplorerSubjectSwitch button.isSelected {
   background: var(--surface);
   color: var(--text-strong);
