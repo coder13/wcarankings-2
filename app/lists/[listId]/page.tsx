@@ -9,6 +9,7 @@ import {
 } from "@/lib/list-regions";
 import {
   assertCanViewList,
+  getListMembershipState,
   ListNotFoundError,
   resolveList,
 } from "@/lib/lists";
@@ -25,8 +26,11 @@ async function getListPageData(listId: string) {
       getAuthUser(request),
     ]);
     assertCanViewList(list, user);
-    const regions = await getListRegions(list);
-    return { list, regions, user };
+    const [regions, membershipState] = await Promise.all([
+      getListRegions(list),
+      getListMembershipState(list, user),
+    ]);
+    return { list, regions, user, membershipState };
   } catch (error) {
     if (error instanceof ListNotFoundError) notFound();
     throw error;
@@ -50,7 +54,7 @@ export default async function ListPage({
     : resultValue;
   const regionValue = typeof query.region === "string" ? query.region : null;
   const requestedRegionSelection = parseRegionQuery(regionValue);
-  const { list, regions, user } = await getListPageData(listId);
+  const { list, regions, user, membershipState } = await getListPageData(listId);
   const regionSelection = normalizeListRegionSelection(
     requestedRegionSelection,
     regions,
@@ -80,7 +84,15 @@ export default async function ListPage({
         initialMatchPersonId: "",
       }}
       rankingSource={{ listId: rankingListId, listName: list.name }}
-      listOwner={list.kind === "user" && list.owner?.id === user?.id && list.publicId ? { listId: list.publicId, visibility: list.visibility } : undefined}
+      listOwner={list.kind === "user" && list.owner?.id === user?.id && list.publicId ? { listId: list.publicId, visibility: list.visibility, joinPolicy: list.joinPolicy } : undefined}
+      listMembership={
+        list.kind === "user" &&
+        list.owner?.id !== user?.id &&
+        list.publicId &&
+        membershipState
+          ? { listId: list.publicId, joinPolicy: list.joinPolicy, state: membershipState }
+          : undefined
+      }
       initialEventId={eventId}
       initialRankingType={rankingType}
       initialRegionSelection={regionSelection}

@@ -33,9 +33,9 @@ export async function POST(request: Request, context: RouteContext) {
     assertSameOrigin(request);
     const user = await requireAuthUser(request);
     const { listId } = await context.params;
-    await requestListMembership(user, listId);
+    const result = await requestListMembership(user, listId);
     return Response.json(
-      { status: "pending" },
+      result,
       {
         status: 201,
         headers: { "Cache-Control": "private, no-store" },

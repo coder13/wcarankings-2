@@ -26,6 +26,7 @@ function list(visibility: "public" | "private"): ListSummary {
     slug: "friends",
     description: null,
     visibility,
+    joinPolicy: "closed",
     memberCount: 0,
     membershipVersion: 1,
     systemDefinitionVersion: null,

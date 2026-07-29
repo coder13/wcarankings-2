@@ -9,6 +9,7 @@ import {
 } from "@/lib/list-identifiers";
 
 export type ListVisibility = "public" | "private";
+export type ListJoinPolicy = "open" | "closed";
 export type ListKind = "user" | "system";
 
 export type ListSummary = {
@@ -20,6 +21,7 @@ export type ListSummary = {
   slug: string;
   description: string | null;
   visibility: ListVisibility;
+  joinPolicy: ListJoinPolicy;
   memberCount: number;
   membershipVersion: number;
   systemDefinitionVersion: number | null;
@@ -44,6 +46,7 @@ type ListRow = {
   slug: string;
   description: string | null;
   visibility: ListVisibility;
+  join_policy: ListJoinPolicy;
   member_count: number;
   membership_version: number;
   system_definition_version: number | null;
@@ -117,6 +120,7 @@ function toListSummary(row: ListRow): ListSummary {
     slug: row.slug,
     description: row.description,
     visibility: row.visibility,
+    joinPolicy: row.join_policy,
     memberCount: Number(row.member_count),
     membershipVersion: Number(row.membership_version),
     systemDefinitionVersion:
@@ -148,6 +152,7 @@ const LIST_COLUMNS = `
   l.slug,
   l.description,
   l.visibility,
+  l.join_policy,
   l.member_count,
   l.membership_version,
   l.system_definition_version,
@@ -177,6 +182,13 @@ function validateDescription(value: unknown) {
 function validateVisibility(value: unknown): ListVisibility {
   if (value !== "public" && value !== "private") {
     throw new ListValidationError("Choose public or private visibility.");
+  }
+  return value;
+}
+
+function validateJoinPolicy(value: unknown): ListJoinPolicy {
+  if (value !== "open" && value !== "closed") {
+    throw new ListValidationError("Choose open or closed membership.");
   }
   return value;
 }
@@ -277,11 +289,14 @@ export async function createList(
     name: unknown;
     description?: unknown;
     visibility: unknown;
+    joinPolicy?: unknown;
   },
 ) {
   const name = validateName(input.name);
   const description = validateDescription(input.description);
   const visibility = validateVisibility(input.visibility);
+  const joinPolicy =
+    input.joinPolicy === undefined ? "closed" : validateJoinPolicy(input.joinPolicy);
   const slug = slugifyListName(name);
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -290,15 +305,15 @@ export async function createList(
       await withTransaction(async (connection) => {
         const [result] = await connection.execute<ResultSetHeader>(
           `INSERT INTO lists
-            (kind, public_id, owner_user_id, name, slug, description, visibility)
-           VALUES ('user', ?, ?, ?, ?, ?, ?)`,
-          [publicId, user.id, name, slug, description, visibility],
+            (kind, public_id, owner_user_id, name, slug, description, visibility, join_policy)
+           VALUES ('user', ?, ?, ?, ?, ?, ?, ?)`,
+          [publicId, user.id, name, slug, description, visibility, joinPolicy],
         );
         await activity(connection, {
           listId: Number(result.insertId),
           actorUserId: user.id,
           eventType: "list.created",
-          eventData: { visibility },
+          eventData: { visibility, joinPolicy },
         });
       });
       return resolveList(publicId);
@@ -316,6 +331,7 @@ export async function updateList(
     name?: unknown;
     description?: unknown;
     visibility?: unknown;
+    joinPolicy?: unknown;
   },
 ) {
   await withTransaction(async (connection) => {
@@ -330,17 +346,21 @@ export async function updateList(
       input.visibility === undefined
         ? row.visibility
         : validateVisibility(input.visibility);
+    const joinPolicy =
+      input.joinPolicy === undefined
+        ? row.join_policy
+        : validateJoinPolicy(input.joinPolicy);
     await connection.execute(
       `UPDATE lists
-       SET name = ?, slug = ?, description = ?, visibility = ?
+       SET name = ?, slug = ?, description = ?, visibility = ?, join_policy = ?
        WHERE id = ?`,
-      [name, slugifyListName(name), description, visibility, row.id],
+      [name, slugifyListName(name), description, visibility, joinPolicy, row.id],
     );
     await activity(connection, {
       listId: Number(row.id),
       actorUserId: user.id,
       eventType: "list.updated",
-      eventData: { visibility },
+      eventData: { visibility, joinPolicy },
     });
   });
   return resolveList(lookup);
@@ -417,6 +437,32 @@ export async function listContainingUser(user: AuthUser) {
     [user.wcaId],
   );
   return result.rows.map(toListSummary);
+}
+
+export type ListMembershipState = "member" | "pending" | "not_member";
+
+export async function getListMembershipState(
+  list: ListSummary,
+  user: AuthUser | null,
+): Promise<ListMembershipState | null> {
+  if (!user || list.kind !== "user") return null;
+  const membership = await query<RowDataPacket>(
+    `SELECT 1
+     FROM list_members
+     WHERE list_id = ? AND person_id = ?
+     LIMIT 1`,
+    [list.id, user.wcaId],
+  );
+  if (membership.rows.length > 0) return "member";
+
+  const request = await query<RowDataPacket>(
+    `SELECT 1
+     FROM list_membership_requests
+     WHERE list_id = ? AND person_id = ? AND status = 'pending'
+     LIMIT 1`,
+    [list.id, user.wcaId],
+  );
+  return request.rows.length > 0 ? "pending" : "not_member";
 }
 
 export async function listMembers(
@@ -659,6 +705,34 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
     if (memberRows.length > 0) {
       throw new ListConflictError("You are already included in this list.");
     }
+    if (row.join_policy === "open") {
+      await connection.execute(
+        "DELETE FROM list_exclusions WHERE list_id = ? AND person_id = ?",
+        [row.id, user.wcaId],
+      );
+      const [insert] = await connection.execute<ResultSetHeader>(
+        `INSERT IGNORE INTO list_members
+          (list_id, person_id, added_by_user_id, source)
+         VALUES (?, ?, ?, 'self_request')`,
+        [row.id, user.wcaId, user.id],
+      );
+      if (insert.affectedRows > 0) {
+        await connection.execute(
+          `UPDATE lists
+           SET member_count = member_count + 1,
+               membership_version = membership_version + 1
+           WHERE id = ?`,
+          [row.id],
+        );
+      }
+      await activity(connection, {
+        listId: Number(row.id),
+        actorUserId: user.id,
+        eventType: "membership.joined",
+        personId: user.wcaId,
+      });
+      return { status: "joined" as const };
+    }
     await connection.execute(
       `INSERT INTO list_membership_requests
         (list_id, requester_user_id, person_id, status, created_at, resolved_at, resolved_by_user_id)
@@ -677,6 +751,7 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
       eventType: "membership.requested",
       personId: user.wcaId,
     });
+    return { status: "pending" as const };
   });
 }
 

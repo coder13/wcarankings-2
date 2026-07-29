@@ -59,7 +59,7 @@ import {
   type NavigationSubject,
 } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { TextDropdown } from "../Dropdown/TextDropdown";
-import { ListAddPeopleRail, ListOwnerControls } from "../ListOwnerControls/ListOwnerControls";
+import { ListAddPeopleRail, ListMembershipControls, ListOwnerControls } from "../ListOwnerControls/ListOwnerControls";
 import { useRailScrollProgress } from "./useRailScrollProgress";
 import { fetchRankingPage, RankingsPageCache } from "./rankingsPageCache";
 import { useScrollVelocity } from "./useScrollVelocity";
@@ -466,6 +466,7 @@ export function RankingsExplorer({
   mockSubjectRows = false,
   rankingSource,
   listOwner,
+  listMembership,
   regionSelectionDisabled = false,
   initialRegions = {
     continents: FALLBACK_CONTINENTS,
@@ -485,7 +486,16 @@ export function RankingsExplorer({
   initialLatitudeHemisphere?: "north" | "south";
   mockSubjectRows?: boolean;
   rankingSource?: RankingSource;
-  listOwner?: { listId: string; visibility: "public" | "private" };
+  listOwner?: {
+    listId: string;
+    visibility: "public" | "private";
+    joinPolicy: "open" | "closed";
+  };
+  listMembership?: {
+    listId: string;
+    joinPolicy: "open" | "closed";
+    state: "member" | "pending" | "not_member";
+  };
   regionSelectionDisabled?: boolean;
   initialRegions?: {
     continents: Array<{ id: string; name: string }>;
@@ -2784,7 +2794,8 @@ export function RankingsExplorer({
         className="stickyRankingsRail"
         style={{ "--rail-scroll-progress": topRailProgress } as CSSProperties}
       >
-        {listOwner && <ListOwnerControls listId={listOwner.listId} initialVisibility={listOwner.visibility} onManageMembers={() => { setMemberSelectionMode(true); setSelectedMemberIds(new Set()); }} />}
+        {listOwner && <ListOwnerControls listId={listOwner.listId} initialVisibility={listOwner.visibility} initialJoinPolicy={listOwner.joinPolicy} onManageMembers={() => { setMemberSelectionMode(true); setSelectedMemberIds(new Set()); }} />}
+        {listMembership && <ListMembershipControls listId={listMembership.listId} joinPolicy={listMembership.joinPolicy} initialState={listMembership.state} />}
         {listAddOpen && listOwner ? <ListAddPeopleRail listId={listOwner.listId} onCancel={() => setListAddOpen(false)} onAdded={() => { forcePageLoadRef.current = true; setStartRank(1); setStartPosition(0); setPageReloadNonce((nonce) => nonce + 1); }} /> : <RankingsControlsRail
           event={currentEvent}
           eventOptions={competitionRanking === "podiums"

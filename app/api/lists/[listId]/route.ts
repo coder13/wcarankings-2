@@ -51,6 +51,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       name: body.name,
       description: body.description,
       visibility: body.visibility,
+      joinPolicy: body.joinPolicy,
     });
     return Response.json(
       { list },
