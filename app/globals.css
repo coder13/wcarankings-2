@@ -36,7 +36,7 @@
 .stickyRankingsRail>.listOwnerControls>button:hover,.stickyRankingsRail>.listOwnerControls>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 8%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
 .listSettingsMenu label{min-height:40px}
 
-@media (max-width:600px){.stickyRankingsRail>.listOwnerControls{right:.35rem}}
+@media (max-width:600px){.stickyRankingsRail>.listOwnerControls{right:.35rem}.Jump--listAdd{--rail-control-height:44px}}
 
 ::-webkit-scrollbar {
   display: none;
