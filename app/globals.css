@@ -40,7 +40,7 @@
 .stickyRankingsRail>.listOwnerControls>button:hover,.stickyRankingsRail>.listOwnerControls>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 8%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
 .listSettingsMenu label{min-height:40px}
 
-@media (max-width:600px){.stickyRankingsRail>.listOwnerControls{right:.35rem}.Jump--listAdd{--rail-control-height:44px}}
+@media (max-width:600px){.stickyRankingsRail>.listOwnerControls{right:.35rem}.Jump--listAdd{--rail-control-height:44px}.Jump--rankings.Jump--withListAdd{--result-type-width:5.25rem;--rail-select-width:min(8.5em,max(40px,calc(100vw - 1rem - 44px - 5.25rem - 4.75rem - 44px)));--rail-settings-width:calc(44px + var(--result-type-width) + var(--rail-select-width) + 4.75rem);min-width:calc(var(--rail-settings-width) + var(--rail-control-height))}}
 
 ::-webkit-scrollbar {
   display: none;

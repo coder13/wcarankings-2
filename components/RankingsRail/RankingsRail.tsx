@@ -108,7 +108,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
 } & Parameters<typeof RailSearch>[0]) {
   const nextType = rankingType === "single" ? "average" : "single";
   return (
-    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}`} direction="up" compactResultType={compactResultType}>
+    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType}>
       <div className="Jump-railSettings">
         {showEventPicker ? (
           <EventPicker event={event} options={eventOptions} additionalOptions={additionalEventOptions} onChange={onEventChange} onTriggerReady={onEventPickerTrigger} />

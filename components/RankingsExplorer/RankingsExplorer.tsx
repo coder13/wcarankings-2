@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
 } from "react";
 import {
@@ -82,6 +83,17 @@ const SEARCH_ANIMATION_ROWS = 3;
 const VIM_JUMP_PAGE_COUNT = 2;
 const VIM_JUMP_SIZE = PAGE_SIZE * VIM_JUMP_PAGE_COUNT;
 const ROW_HEIGHT = 65.45;
+const MOBILE_CONTROLS_QUERY = "(max-width: 600px)";
+
+function subscribeMobileControls(listener: () => void) {
+  const media = window.matchMedia(MOBILE_CONTROLS_QUERY);
+  media.addEventListener("change", listener);
+  return () => media.removeEventListener("change", listener);
+}
+
+function getMobileControlsSnapshot() {
+  return window.matchMedia(MOBILE_CONTROLS_QUERY).matches;
+}
 const RAIL_REVEAL_DISTANCE = ROW_HEIGHT * 1.5;
 const TOP_RAIL_TRANSFORM_DISTANCE = ROW_HEIGHT * 2;
 const END_MARKER_PEEK = ROW_HEIGHT + 40;
@@ -481,6 +493,11 @@ export function RankingsExplorer({
   };
 }) {
   const router = useRouter();
+  const isMobileControls = useSyncExternalStore(
+    subscribeMobileControls,
+    getMobileControlsSnapshot,
+    () => false,
+  );
   const normalizedInitialSearch = initialSearch.trim();
   const {
     eventId, setEventId, rankingType, setRankingType, regionSelection, setRegionSelection,
@@ -2762,7 +2779,7 @@ export function RankingsExplorer({
           regionSelection={regionSelection}
           onRegionChange={changeRegion}
           onEventPickerTrigger={(trigger) => { railEventPickerTriggerRef.current = trigger; }}
-          compactResultType={topRailProgress >= 1}
+          compactResultType={topRailProgress >= 1 || Boolean(rankingSource) && isMobileControls}
           showResultType={!(subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
           showEventPicker={!(subject === "competitions" && (competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
           showRegion
