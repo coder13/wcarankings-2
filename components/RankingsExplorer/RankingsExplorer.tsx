@@ -2833,7 +2833,7 @@ export function RankingsExplorer({
           </div>
         </div>
 
-        <JumpControlsVisibility
+        {!memberSelectionMode && (!rankingSource || total > PAGE_SIZE) && <JumpControlsVisibility
           progress={pagerNavigationBusy ? 1 : bottomRailProgress}
         >
           <RankingsPagerRail
@@ -2849,7 +2849,7 @@ export function RankingsExplorer({
             onSearchPrevious={() => cycleFind(-1)}
             onSearchNext={() => cycleFind(1)}
           />
-        </JumpControlsVisibility>
+        </JumpControlsVisibility>}
       </main>
       {memberSelectionMode && <div className="listMemberSelectionRail"><button type="button" onClick={() => setMemberSelectionMode(false)}>Cancel</button><span>{selectedMemberIds.size} selected</span><button type="button" disabled={!selectedMemberIds.size} onClick={() => { setMemberRemovalError(""); setMemberRemovalOpen(true); }}>Remove</button></div>}
       {memberRemovalOpen && <div className="listModalBackdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !memberRemovalBusy) setMemberRemovalOpen(false); }}><section className="listModal listRemovalDialog" role="dialog" aria-modal="true" aria-label="Remove people"><h2>Remove people?</h2><p>Remove {selectedMemberIds.size} {selectedMemberIds.size === 1 ? "person" : "people"} from this list?</p>{memberRemovalError && <p className="listModalError" role="alert">{memberRemovalError}</p>}<div className="listRemovalActions"><button type="button" disabled={memberRemovalBusy} onClick={() => setMemberRemovalOpen(false)}>Cancel</button><button type="button" disabled={memberRemovalBusy} onClick={() => void removeSelectedMembers()}>{memberRemovalBusy ? "Removing…" : "Remove"}</button></div></section></div>}

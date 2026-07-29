@@ -32,6 +32,8 @@
 .listRemovalActions button:disabled{cursor:wait;opacity:.6}
 .Jump--listAdd .listAddComposer{height:var(--rail-control-height)}
 .Jump--listAdd .listAddComposer>button{width:var(--rail-control-height);height:var(--rail-control-height)}
+.stickyRankingsRail>.listOwnerControls>button{display:grid;width:40px;height:40px;min-height:40px;padding:0;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--text-strong) 4%,transparent);box-shadow:inset 0 0 0 1px var(--border-subtle)}
+.stickyRankingsRail>.listOwnerControls>button:hover,.stickyRankingsRail>.listOwnerControls>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 8%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
 
 ::-webkit-scrollbar {
   display: none;
