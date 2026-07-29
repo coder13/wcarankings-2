@@ -55,7 +55,7 @@
 }
 
 .row--alternate {
-  background-color: var(--surface-muted);
+  background-color: color-mix(in srgb, var(--primary) 8%, var(--surface));
 }
 
 .listItem:hover .row {
