@@ -3,6 +3,24 @@
   margin-inline: auto;
 }
 
+.listBrowseActions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem 1.25rem;
+}
+
+.listBrowseActions a {
+  color: var(--focus);
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.listBrowseActions a:hover,
+.listBrowseActions a:focus-visible {
+  color: var(--text-strong);
+  text-decoration: underline;
+}
+
 .listBrowseList {
   position: relative;
   margin: 0;

@@ -30,6 +30,7 @@ export function TextDropdown<T extends string>({
       <button
         className="TextDropdown-trigger"
         type="button"
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
