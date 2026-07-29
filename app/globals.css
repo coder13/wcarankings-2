@@ -35,8 +35,11 @@
 .listRemovalActions button:last-child{border-color:var(--record-world);background:var(--record-world);color:#fff}
 .listRemovalActions button:disabled{cursor:wait;opacity:.6}
 .Jump--listAdd .listAddComposer{height:var(--rail-control-height)}
-.Jump--listAdd .listAddComposer>button{position:absolute;right:0;z-index:3;width:var(--rail-control-height);height:var(--rail-control-height)}
-.Jump--listAdd .listAddTokens{padding-right:var(--rail-control-height)}
+.Jump--listAdd .listAddComposer>.listAddSubmit{position:absolute;right:0;z-index:3;min-width:var(--rail-control-height);height:var(--rail-control-height);padding-inline:.7rem}
+.Jump--listAdd .listAddTokens{padding-right:calc(var(--rail-control-height) + 1.5rem)}
+.Jump--listAdd .listAddComposer>.listAddSubmit{border-radius:.45rem;background:var(--focus);color:var(--text-on-strong);font-size:.875rem;font-weight:600}
+.Jump--listAdd .listAddComposer>.listAddSubmit:hover,.Jump--listAdd .listAddComposer>.listAddSubmit:focus-visible{background:var(--primary-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
+.Jump--listAdd .listAddComposer>.listAddSubmit:disabled{cursor:wait;opacity:.65}
 .listMemberSelectionRail button:first-child{order:3;background:transparent;color:var(--text-strong)}
 .listMemberSelectionRail span{order:2}
 .listMemberSelectionRail button:nth-of-type(2){order:1;background:var(--record-world);color:#fff}
