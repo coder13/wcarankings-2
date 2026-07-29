@@ -18,7 +18,7 @@
 
 .listPersonAvatar{font-size:.875rem}
 .listSettingsMenu{min-width:10.5rem}
-.listSettingsMenu>button{min-height:36px;padding:.4rem .55rem;border:0;border-radius:.4rem;background:transparent;color:var(--text-strong);cursor:pointer;font:inherit;text-align:left;white-space:nowrap}
+.listSettingsMenu>button{min-height:40px;padding:.4rem .55rem;border:0;border-radius:.4rem;background:transparent;color:var(--text-strong);cursor:pointer;font:inherit;text-align:left;white-space:nowrap}
 .listSettingsMenu>button:hover,.listSettingsMenu>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 6%,transparent);outline:2px solid var(--focus-ring);outline-offset:-2px}
 .row:has(.memberSelectionToggle){cursor:pointer;user-select:none}
 .memberSelectionToggle{width:36px;height:36px;font-size:1.125rem;line-height:1}
@@ -34,6 +34,9 @@
 .Jump--listAdd .listAddComposer>button{width:var(--rail-control-height);height:var(--rail-control-height)}
 .stickyRankingsRail>.listOwnerControls>button{display:grid;width:40px;height:40px;min-height:40px;padding:0;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--text-strong) 4%,transparent);box-shadow:inset 0 0 0 1px var(--border-subtle)}
 .stickyRankingsRail>.listOwnerControls>button:hover,.stickyRankingsRail>.listOwnerControls>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 8%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
+.listSettingsMenu label{min-height:40px}
+
+@media (max-width:600px){.stickyRankingsRail>.listOwnerControls{right:.35rem}}
 
 ::-webkit-scrollbar {
   display: none;

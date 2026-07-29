@@ -27,7 +27,8 @@ export function ListCreateTrigger() {
 }
 
 export function ListOwnerControls({ listId, initialVisibility, onManageMembers }: { listId: string; initialVisibility: "public" | "private"; onManageMembers?: () => void }) {
-  const [mode, setMode] = useState<"add" | "settings" | null>(null), [visibility, setVisibility] = useState(initialVisibility), [query, setQuery] = useState(""), [entries, setEntries] = useState<Person[]>([]), [selected, setSelected] = useState<Person[]>([]), [ids, setIds] = useState(""), [error, setError] = useState(""), [busy, setBusy] = useState(false);
+  const [mode, setModeState] = useState<"add" | "settings" | null>(null), [visibility, setVisibility] = useState(initialVisibility), [query, setQuery] = useState(""), [entries, setEntries] = useState<Person[]>([]), [selected, setSelected] = useState<Person[]>([]), [ids, setIds] = useState(""), [error, setError] = useState(""), [busy, setBusy] = useState(false);
+  const setMode = (next: "add" | "settings" | null) => setModeState((current) => next === "settings" && current === "settings" ? null : next);
   useEffect(() => { if (mode !== "add" || query.trim().length < 2) return; const controller = new AbortController(); const timer = window.setTimeout(() => fetch(`/api/people/search?q=${encodeURIComponent(query)}&limit=12`, { signal: controller.signal }).then((response) => response.json()).then((body: SearchResponse) => setEntries(body.entries ?? [])).catch(() => setEntries([])), 180); return () => { window.clearTimeout(timer); controller.abort(); }; }, [mode, query]);
   const selectedIds = useMemo(() => selected.map((person) => person.personId), [selected]);
   const settingsRef = useRef<HTMLDivElement>(null);
