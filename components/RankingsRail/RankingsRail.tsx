@@ -85,7 +85,7 @@ function RailSearch({ searchInputRef, findOpen, findQuery, findError, findLoadin
   );
 }
 
-export function RankingsControlsRail<T extends EventPickerOption>({ event, eventOptions, additionalEventOptions, onEventChange, rankingType, onRankingTypeChange, regions, regionSelection, onRegionChange, onEventPickerTrigger, compactResultType = false, showResultType = true, showEventPicker = true, showRegion = true, showSearch = true, hemisphere, onHemisphereChange, listAddAction, ...searchProps }: {
+export function RankingsControlsRail<T extends EventPickerOption>({ event, eventOptions, additionalEventOptions, onEventChange, rankingType, onRankingTypeChange, regions, regionSelection, onRegionChange, onEventPickerTrigger, compactResultType = false, showResultType = true, showEventPicker = true, showRegion = true, showSearch = true, hemisphere, onHemisphereChange, listAddAction, regionDisabled = false, ...searchProps }: {
   event: T;
   eventOptions?: readonly T[];
   additionalEventOptions?: readonly T[];
@@ -104,6 +104,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
   hemisphere?: "north" | "south";
   onHemisphereChange?: (hemisphere: "north" | "south") => void;
   listAddAction?: () => void;
+  regionDisabled?: boolean;
 } & Parameters<typeof RailSearch>[0]) {
   const nextType = rankingType === "single" ? "average" : "single";
   return (
@@ -130,7 +131,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
           </fieldset>
           <button className="Jump-resultTypeToggle" type="button" tabIndex={compactResultType ? 0 : -1} aria-hidden={!compactResultType} disabled={event.id === "333mbf"} aria-label={`Switch to ${nextType} rankings`} onClick={() => onRankingTypeChange(nextType)}>{rankingType === "single" ? "Single" : "Average"}</button>
         </div>}
-        {showRegion && <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} />}
+        {showRegion && <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} disabled={regionDisabled} />}
         {listAddAction && <button className="Jump-listAddButton" type="button" onClick={listAddAction}>+ Add</button>}
       </div>
       {showSearch && <RailSearch {...searchProps} />}

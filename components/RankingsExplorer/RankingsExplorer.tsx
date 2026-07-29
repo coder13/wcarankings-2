@@ -454,6 +454,7 @@ export function RankingsExplorer({
   mockSubjectRows = false,
   rankingSource,
   listOwner,
+  regionSelectionDisabled = false,
   initialRegions = {
     continents: FALLBACK_CONTINENTS,
     countries: FALLBACK_COUNTRIES,
@@ -473,6 +474,7 @@ export function RankingsExplorer({
   mockSubjectRows?: boolean;
   rankingSource?: RankingSource;
   listOwner?: { listId: string; visibility: "public" | "private" };
+  regionSelectionDisabled?: boolean;
   initialRegions?: {
     continents: Array<{ id: string; name: string }>;
     countries: Array<{ id: string; name: string; iso2?: string }>;
@@ -2746,6 +2748,7 @@ export function RankingsExplorer({
             });
           }}
           listAddAction={listOwner ? () => setListAddOpen(true) : undefined}
+          regionDisabled={regionSelectionDisabled}
           searchInputRef={setRailFindInputRef}
           findOpen={findOpen}
           findQuery={findQuery}

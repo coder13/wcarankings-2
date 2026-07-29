@@ -3,6 +3,11 @@ import { headers } from "next/headers";
 import { getAuthUser } from "@/lib/auth";
 import { loadListRankings } from "@/lib/list-rankings";
 import {
+  getListRegions,
+  hasMultipleListCountries,
+  normalizeListRegionSelection,
+} from "@/lib/list-regions";
+import {
   assertCanViewList,
   ListNotFoundError,
   resolveList,
@@ -12,7 +17,7 @@ import { isEventId, isRankingType, parseRegionQuery } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
 
-async function getListPageData(listId: string, rankingParams: URLSearchParams) {
+async function getListPageData(listId: string) {
   try {
     const request = new Request("http://localhost", { headers: await headers() });
     const [list, user] = await Promise.all([
@@ -20,8 +25,8 @@ async function getListPageData(listId: string, rankingParams: URLSearchParams) {
       getAuthUser(request),
     ]);
     assertCanViewList(list, user);
-    const rankings = await loadListRankings(list, rankingParams);
-    return { list, rankings, user };
+    const regions = await getListRegions(list);
+    return { list, regions, user };
   } catch (error) {
     if (error instanceof ListNotFoundError) notFound();
     throw error;
@@ -44,14 +49,19 @@ export default async function ListPage({
     ? "single"
     : resultValue;
   const regionValue = typeof query.region === "string" ? query.region : null;
-  const regionSelection = parseRegionQuery(regionValue);
+  const requestedRegionSelection = parseRegionQuery(regionValue);
+  const { list, regions, user } = await getListPageData(listId);
+  const regionSelection = normalizeListRegionSelection(
+    requestedRegionSelection,
+    regions,
+  );
   const rankingParams = new URLSearchParams({
     eventId,
     result: rankingType,
     limit: "50",
   });
   if (regionSelection.scope !== "world") rankingParams.set("region", regionSelection.regionId);
-  const { list, rankings, user } = await getListPageData(listId, rankingParams);
+  const rankings = await loadListRankings(list, rankingParams);
   const rankingListId = list.systemAlias ?? list.publicId;
   if (!rankingListId) notFound();
   return (
@@ -74,6 +84,8 @@ export default async function ListPage({
       initialEventId={eventId}
       initialRankingType={rankingType}
       initialRegionSelection={regionSelection}
+      initialRegions={regions}
+      regionSelectionDisabled={!hasMultipleListCountries(regions)}
     />
   );
 }

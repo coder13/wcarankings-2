@@ -69,8 +69,11 @@ export function RankingRow({
         }${
           highlighted ? " row--searchMatch" : ""
         }`}
+        onClick={() => {
+          if (selectionMode) onToggleSelected?.(entry.personId);
+        }}
       >
-        {selectionMode && <button className="memberSelectionToggle" type="button" aria-label={`Select ${name}`} aria-pressed={selected} onClick={() => onToggleSelected?.(entry.personId)}>{selected ? "✓" : ""}</button>}
+        {selectionMode && <button className="memberSelectionToggle" type="button" aria-label={`Select ${name}`} aria-pressed={selected} onClick={(event) => { event.stopPropagation(); onToggleSelected?.(entry.personId); }}>{selected ? "✓" : ""}</button>}
         <span className={`rank${rankIsDuplicate ? " rank--duplicate" : ""}`}>
           {formatRankingNumber(rank)}
         </span>
