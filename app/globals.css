@@ -30,6 +30,8 @@
 .listRemovalActions button{min-height:40px;padding:0 .9rem;border:1px solid var(--border-subtle);border-radius:.5rem;background:var(--surface);color:var(--text-strong);cursor:pointer;font:inherit;font-weight:600}
 .listRemovalActions button:last-child{border-color:var(--record-world);background:var(--record-world);color:#fff}
 .listRemovalActions button:disabled{cursor:wait;opacity:.6}
+.Jump--listAdd .listAddComposer{height:var(--rail-control-height)}
+.Jump--listAdd .listAddComposer>button{width:var(--rail-control-height);height:var(--rail-control-height)}
 
 ::-webkit-scrollbar {
   display: none;
