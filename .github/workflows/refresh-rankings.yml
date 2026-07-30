@@ -3,16 +3,8 @@ name: Refresh Ranking Data
 on:
   workflow_dispatch:
     inputs:
-      force:
-        description: Re-import the current WCA export and rebuild projections even when production is already current.
-        required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
       dry_run:
-        description: Download/cache the latest WCA export without importing or rebuilding projections.
+        description: Download/cache the latest WCA export without importing or rebuilding production data.
         required: false
         default: "false"
         type: choice
@@ -26,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: production-ranking-refresh
+  group: production-data-update
   cancel-in-progress: false
 
 jobs:
@@ -35,8 +27,29 @@ jobs:
     env:
       SERVER_IP: ${{ secrets.SERVER_IP }}
       SERVER_USER: www
+      MYSQL_DATABASE: wcarankings
+      MYSQL_USER: wcarankings
+      MYSQL_PASSWORD: projection-build
+      MYSQL_ROOT_PASSWORD: projection-build-root
+      DATABASE_URL: mysql://wcarankings:projection-build@127.0.0.1:13307/wcarankings
+      WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
 
     steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies and MariaDB client
+        run: |
+          npm ci
+          sudo apt-get update
+          sudo apt-get install -y mariadb-client
+
       - name: Configure deployment SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -47,40 +60,166 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
 
-      - name: Refresh production ranking data
-        env:
-          FORCE_REFRESH: ${{ inputs.force || 'false' }}
-          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+      - name: Resolve target WCA export
+        id: wca-export
         run: |
-          sync_args=""
-          if [ "$FORCE_REFRESH" = "true" ]; then
-            sync_args="$sync_args --force"
+          node scripts/resolve-wca-export.mjs > /tmp/wca-export.json
+          export_date=$(jq -r '.date' /tmp/wca-export.json)
+          export_value=$(jq -r '.exportDate' /tmp/wca-export.json)
+          export_version=$(jq -r '.version' /tmp/wca-export.json)
+          if [ -z "$export_date" ] || [ "$export_date" = "null" ] || [ -z "$export_value" ] || [ "$export_value" = "null" ]; then
+            echo "The WCA export API did not return an export date." >&2
+            exit 1
           fi
-          if [ "$DRY_RUN" = "true" ]; then
-            sync_args="$sync_args --dry-run"
-          fi
+          echo "date=$export_date" >> "$GITHUB_OUTPUT"
+          echo "value=$export_value" >> "$GITHUB_OUTPUT"
+          echo "version=$export_version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore WCA SQL export
+        id: wca-export-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/wca-export-cache
+          key: wca-sql-export-${{ steps.wca-export.outputs.date }}
+
+      - name: Populate WCA SQL export cache
+        if: steps.wca-export-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/wca-export-cache
+          WCA_EXPORT_CACHE_DIR=/tmp/wca-export-cache node scripts/sync-wca-export.mjs --dry-run
+          test -s "/tmp/wca-export-cache/wca-export-${{ steps.wca-export.outputs.date }}.sql.zip"
+
+      - name: Save WCA SQL export
+        if: steps.wca-export-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/wca-export-cache
+          key: wca-sql-export-${{ steps.wca-export.outputs.date }}
+
+      - name: Build Flyway image
+        if: inputs.dry_run != 'true'
+        run: docker build -f Dockerfile.flyway -t wcarankings-flyway:latest .
+
+      - name: Build and export fresh projection generation
+        if: inputs.dry_run != 'true'
+        id: projection-build
+        run: |
+          started_at=$(date +%s)
+          docker compose up -d db
+          docker compose run --rm flyway migrate
+          groups_csv="core,sum-of-ranks,yearly-person-rankings"
+          node scripts/projection-build-plan.mjs --groups="$groups_csv" > /tmp/projection-build-plan.json
+          projection_names_csv=$(jq -r '.projectionNames | join(",")' /tmp/projection-build-plan.json)
+          WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/sync-wca-export.mjs --force --sql-path="/tmp/wca-export-cache/wca-export-${{ steps.wca-export.outputs.date }}.sql.zip" --projection-names="$projection_names_csv"
+          mapfile -t planned_groups < <(jq -r '.groups[]' /tmp/projection-build-plan.json)
+          for group in "${planned_groups[@]}"; do
+            case "$group" in
+              yearly-person-rankings) prefix=yearly ;;
+              *) prefix=$group ;;
+            esac
+            node scripts/prepare-projection-transfer.mjs --group="$group" > "/tmp/${prefix}-projection-transfer.json"
+            mapfile -t transfer_tables < <(jq -r '.tables[]' "/tmp/${prefix}-projection-transfer.json")
+            MYSQL_PWD="$MYSQL_PASSWORD" mariadb-dump --protocol=TCP --host=127.0.0.1 --port=13307 --user="$MYSQL_USER" --single-transaction --skip-lock-tables "$MYSQL_DATABASE" "${transfer_tables[@]}" | gzip -1 > "/tmp/${prefix}-projection-transfer.sql.gz"
+          done
+          completed_at=$(date +%s)
+          duration=$((completed_at - started_at))
+          bytes=$(du -bc /tmp/core-projection-transfer.sql.gz /tmp/sum-of-ranks-projection-transfer.sql.gz /tmp/yearly-projection-transfer.sql.gz | tail -1 | cut -f1)
+          echo "duration_seconds=$duration" >> "$GITHUB_OUTPUT"
+          echo "archive_bytes=$bytes" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Projection build"
+            echo "- WCA export: ${{ steps.wca-export.outputs.value }}"
+            echo "- Built groups: ${groups_csv}"
+            echo "- Cache restore: intentionally skipped for refresh"
+            echo "- Build and dump: ${duration}s"
+            echo "- Compressed transfer: ${bytes} bytes"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save fresh core projection transfer
+        if: inputs.dry_run != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: |
+            /tmp/core-projection-transfer.sql.gz
+            /tmp/core-projection-transfer.json
+          key: projection-transfer-core-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/wca_best_single.sql', 'sql/ranking-projections/wca_best_average.sql', 'sql/ranking-projections/ranking_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_average_source.sql', 'sql/ranking-projections/result_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_indexes.sql', 'sql/ranking-projections/result_entries_single_indexes.sql', 'sql/ranking-projections/ranking_counts.sql', 'sql/ranking-projections/result_counts.sql', 'sql/ranking-projections/competition_podium_members.sql', 'sql/ranking-projections/competition_event_stats.sql', 'sql/ranking-projections/result_facts.sql', 'sql/ranking-projections/result_rankings_single.sql', 'sql/ranking-projections/result_rankings_average.sql', 'sql/ranking-projections/result_ranking_counts.sql', 'sql/ranking-projections/competition_stats.sql', 'scripts/prepare-projection-transfer.mjs') }}
+
+      - name: Save fresh Sum of Ranks projection transfer
+        if: inputs.dry_run != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: |
+            /tmp/sum-of-ranks-projection-transfer.sql.gz
+            /tmp/sum-of-ranks-projection-transfer.json
+          key: projection-transfer-sum-of-ranks-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_sum_of_ranks_scores.sql', 'scripts/prepare-projection-transfer.mjs') }}
+
+      - name: Save fresh yearly projection transfer
+        if: inputs.dry_run != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: |
+            /tmp/yearly-projection-transfer.sql.gz
+            /tmp/yearly-projection-transfer.json
+          key: projection-transfer-yearly-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/prepare-projection-transfer.mjs') }}
+
+      - name: Import and publish production ranking data
+        if: inputs.dry_run != 'true'
+        id: projection-import
+        env:
+          WCA_EXPORT_DATE: ${{ steps.wca-export.outputs.date }}
+          WCA_EXPORT_VALUE: ${{ steps.wca-export.outputs.value }}
+          CORE_PROJECTION_FINGERPRINT: projection-transfer-core-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/wca_best_single.sql', 'sql/ranking-projections/wca_best_average.sql', 'sql/ranking-projections/ranking_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_average_source.sql', 'sql/ranking-projections/result_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_indexes.sql', 'sql/ranking-projections/result_entries_single_indexes.sql', 'sql/ranking-projections/ranking_counts.sql', 'sql/ranking-projections/result_counts.sql', 'sql/ranking-projections/competition_podium_members.sql', 'sql/ranking-projections/competition_event_stats.sql', 'sql/ranking-projections/result_facts.sql', 'sql/ranking-projections/result_rankings_single.sql', 'sql/ranking-projections/result_rankings_average.sql', 'sql/ranking-projections/result_ranking_counts.sql', 'sql/ranking-projections/competition_stats.sql', 'scripts/prepare-projection-transfer.mjs') }}
+          SUM_OF_RANKS_PROJECTION_FINGERPRINT: projection-transfer-sum-of-ranks-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_sum_of_ranks_scores.sql', 'scripts/prepare-projection-transfer.mjs') }}
+          YEARLY_PROJECTION_FINGERPRINT: projection-transfer-yearly-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/prepare-projection-transfer.mjs') }}
+        run: |
+          started_at=$(date +%s)
+          for group in core sum-of-ranks yearly; do
+            scp -q -o BatchMode=yes "/tmp/${group}-projection-transfer.sql.gz" "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-${group}-projection-transfer.sql.gz"
+          done
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "SYNC_ARGS='$sync_args' sh -s" <<'REMOTE'
+            "cd /srv/wcarankings && docker compose run --rm -T app sh -c 'cat > /var/cache/wcarankings/wca-export-${WCA_EXPORT_DATE}.sql.zip'" \
+            < "/tmp/wca-export-cache/wca-export-${WCA_EXPORT_DATE}.sql.zip"
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "WCA_EXPORT_DATE='$WCA_EXPORT_DATE' CORE_PROJECTION_FINGERPRINT='$CORE_PROJECTION_FINGERPRINT' SUM_OF_RANKS_PROJECTION_FINGERPRINT='$SUM_OF_RANKS_PROJECTION_FINGERPRINT' YEARLY_PROJECTION_FINGERPRINT='$YEARLY_PROJECTION_FINGERPRINT' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
-            if ! command -v flock >/dev/null 2>&1; then
-              echo "flock is required to serialize ranking refreshes." >&2
-              exit 1
-            fi
-            flock -n /tmp/wcarankings-sync.lock sh -c '
-              set -eu
-              docker compose run --rm flyway migrate
-              docker compose run --rm app node /app/scripts/sync-wca-export.mjs $SYNC_ARGS
-              docker compose run --rm app node /app/scripts/check-ranking-projections.mjs
-            '
+            (while sleep 30; do echo "Projection transfer import is still running…"; done) &
+            heartbeat_pid=$!
+            trap 'kill "$heartbeat_pid" 2>/dev/null || true; rm -f /tmp/wcarankings-core-projection-transfer.sql.gz /tmp/wcarankings-sum-of-ranks-projection-transfer.sql.gz /tmp/wcarankings-yearly-projection-transfer.sql.gz' EXIT
+            docker compose run --rm flyway migrate
+            docker compose run --rm app node /app/scripts/sync-wca-export.mjs --force --raw-only --sql-path="/var/cache/wcarankings/wca-export-${WCA_EXPORT_DATE}.sql.zip"
+            for group in core sum-of-ranks yearly; do gzip -dc "/tmp/wcarankings-${group}-projection-transfer.sql.gz" | docker compose exec -T db sh -c 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE"'; done
+            docker compose run --rm app node /app/scripts/publish-projection-transfer.mjs --groups="core,sum-of-ranks,yearly-person-rankings"
+            docker compose run --rm app node /app/scripts/check-ranking-projections.mjs
+            jq -n \
+              --arg core "$CORE_PROJECTION_FINGERPRINT" \
+              --arg sumOfRanks "$SUM_OF_RANKS_PROJECTION_FINGERPRINT" \
+              --arg yearly "$YEARLY_PROJECTION_FINGERPRINT" \
+              '{core: $core, sumOfRanks: $sumOfRanks, yearly: $yearly}' > /srv/wcarankings/projection-transfer-state.json.tmp
+            mv /srv/wcarankings/projection-transfer-state.json.tmp /srv/wcarankings/projection-transfer-state.json
           REMOTE
+          completed_at=$(date +%s)
+          duration=$((completed_at - started_at))
+          echo "duration_seconds=$duration" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Production transfer"
+            echo "- Upload, raw import, projection import, validation, and publish: ${duration}s"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summarize refresh
         if: always()
         run: |
           {
             echo "### Ranking refresh"
-            echo "- Force refresh: ${{ inputs.force || 'false' }}"
+            echo "- WCA export: ${{ steps.wca-export.outputs.value }}"
             echo "- Dry run: ${{ inputs.dry_run || 'false' }}"
             echo "- Schedule runs at 05:17 UTC daily."
+            echo "- Projection transfer restore caches are intentionally not used by this workflow."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up projection build database
+        if: always()
+        run: docker compose down --volumes --remove-orphans

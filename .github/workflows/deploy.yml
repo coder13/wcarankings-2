@@ -11,7 +11,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: production-deploy
+  group: production-data-update
   cancel-in-progress: false
 
 jobs:
@@ -54,8 +54,23 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
 
-      - name: Resolve production WCA export
+      - name: Resolve target WCA export
         id: wca-export
+        run: |
+          node scripts/resolve-wca-export.mjs > /tmp/wca-export.json
+          export_date=$(jq -r '.date' /tmp/wca-export.json)
+          export_value=$(jq -r '.exportDate' /tmp/wca-export.json)
+          export_version=$(jq -r '.version' /tmp/wca-export.json)
+          if [ -z "$export_date" ] || [ "$export_date" = "null" ] || [ -z "$export_value" ] || [ "$export_value" = "null" ]; then
+            echo "The WCA export API did not return an export date." >&2
+            exit 1
+          fi
+          echo "date=$export_date" >> "$GITHUB_OUTPUT"
+          echo "value=$export_value" >> "$GITHUB_OUTPUT"
+          echo "version=$export_version" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve production WCA export
+        id: production-wca-export
         run: |
           export_value=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             'cd /srv/wcarankings && docker compose exec -T db sh -c '"'"'mariadb --batch --skip-column-names --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="SELECT value FROM export_metadata WHERE \`key\` = 0x6578706f72745f64617465 LIMIT 1"'"'"'')
@@ -78,12 +93,8 @@ jobs:
         if: steps.wca-export-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p /tmp/wca-export-cache
-          destination="/tmp/wca-export-cache/wca-export-${{ steps.wca-export.outputs.date }}.sql.zip"
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "cd /srv/wcarankings && docker compose run --rm -T app sh -c 'cat /var/cache/wcarankings/wca-export-${{ steps.wca-export.outputs.date }}.sql.zip'" \
-            > "${destination}.part"
-          test -s "${destination}.part"
-          mv "${destination}.part" "$destination"
+          WCA_EXPORT_CACHE_DIR=/tmp/wca-export-cache node scripts/sync-wca-export.mjs --dry-run
+          test -s "/tmp/wca-export-cache/wca-export-${{ steps.wca-export.outputs.date }}.sql.zip"
 
       - name: Save current WCA SQL export
         if: steps.wca-export-cache.outputs.cache-hit != 'true'
@@ -149,7 +160,7 @@ jobs:
       - name: Verify production image contents
         run: |
           docker run --rm --entrypoint sh "wcarankings-app:${GITHUB_SHA}" -c \
-            'test -f /app/scripts/backfill-result-entries.mjs && test -f /app/scripts/backfill-result-rankings.mjs && test -f /app/scripts/backfill-person-year-rankings.mjs && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs && test -f /app/scripts/refresh-system-lists.mjs && test -f /app/scripts/system-list-definitions.mjs && test -f /app/scripts/publish-projection-transfer.mjs && test -f /app/scripts/projection-transfer-date.mjs && css=$(find /app/dist/standalone/dist/client -name "*.css" -type f -print -quit) && test -n "$css" && test -s "$css"'
+            'test -f /app/scripts/backfill-result-entries.mjs && test -f /app/scripts/backfill-result-rankings.mjs && test -f /app/scripts/backfill-person-year-rankings.mjs && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs && test -f /app/scripts/refresh-board-list.mjs && test -f /app/scripts/refresh-system-lists.mjs && test -f /app/scripts/system-list-definitions.mjs && test -f /app/scripts/publish-projection-transfer.mjs && test -f /app/scripts/projection-transfer-date.mjs && test -f /app/scripts/resolve-wca-export.mjs && css=$(find /app/dist/standalone/dist/client -name "*.css" -type f -print -quit) && test -n "$css" && test -s "$css"'
 
       - name: Verify Flyway image contents
         run: |
@@ -218,7 +229,7 @@ jobs:
           groups_csv=$(IFS=,; echo "${build_groups[*]}")
           node scripts/projection-build-plan.mjs --groups="$groups_csv" > /tmp/projection-build-plan.json
           projection_names_csv=$(jq -r '.projectionNames | join(",")' /tmp/projection-build-plan.json)
-          WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/sync-wca-export.mjs --force --projection-names="$projection_names_csv"
+          WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/sync-wca-export.mjs --force --sql-path="/tmp/wca-export-cache/wca-export-${{ steps.wca-export.outputs.date }}.sql.zip" --projection-names="$projection_names_csv"
           mapfile -t planned_groups < <(jq -r '.groups[]' /tmp/projection-build-plan.json)
           for group in "${planned_groups[@]}"; do
             case "$group" in
@@ -236,7 +247,7 @@ jobs:
           echo "archive_bytes=$bytes" >> "$GITHUB_OUTPUT"
           {
             echo "### Projection build"
-            echo "- WCA export: ${{ steps.wca-export.outputs.date }}"
+            echo "- WCA export: ${{ steps.wca-export.outputs.value }}"
             echo "- Built groups: ${groups_csv}"
             echo "- Build and dump: ${duration}s"
             echo "- Compressed transfer: ${bytes} bytes"
@@ -275,7 +286,7 @@ jobs:
           bytes=$(du -bc /tmp/core-projection-transfer.sql.gz /tmp/sum-of-ranks-projection-transfer.sql.gz /tmp/yearly-projection-transfer.sql.gz | tail -1 | cut -f1)
           {
             echo "### Projection build"
-            echo "- WCA export: ${{ steps.wca-export.outputs.date }}"
+            echo "- WCA export: ${{ steps.wca-export.outputs.value }}"
             echo "- Reused validated projection artifact from Actions cache"
             echo "- Compressed transfer: ${bytes} bytes"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -339,6 +350,9 @@ jobs:
           CORE_PROJECTION_FINGERPRINT: projection-transfer-core-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/wca_best_single.sql', 'sql/ranking-projections/wca_best_average.sql', 'sql/ranking-projections/ranking_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_average_source.sql', 'sql/ranking-projections/result_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_indexes.sql', 'sql/ranking-projections/result_entries_single_indexes.sql', 'sql/ranking-projections/ranking_counts.sql', 'sql/ranking-projections/result_counts.sql', 'sql/ranking-projections/competition_podium_members.sql', 'sql/ranking-projections/competition_event_stats.sql', 'sql/ranking-projections/result_facts.sql', 'sql/ranking-projections/result_rankings_single.sql', 'sql/ranking-projections/result_rankings_average.sql', 'sql/ranking-projections/result_ranking_counts.sql', 'sql/ranking-projections/competition_stats.sql', 'scripts/prepare-projection-transfer.mjs') }}
           SUM_OF_RANKS_PROJECTION_FINGERPRINT: projection-transfer-sum-of-ranks-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_sum_of_ranks_scores.sql', 'scripts/prepare-projection-transfer.mjs') }}
           YEARLY_PROJECTION_FINGERPRINT: projection-transfer-yearly-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/prepare-projection-transfer.mjs') }}
+          WCA_EXPORT_DATE: ${{ steps.wca-export.outputs.date }}
+          WCA_EXPORT_VALUE: ${{ steps.wca-export.outputs.value }}
+          PRODUCTION_WCA_EXPORT_VALUE: ${{ steps.production-wca-export.outputs.value }}
         run: |
           started_at=$(date +%s)
           groups=()
@@ -346,14 +360,22 @@ jobs:
           if [ '${{ steps.projection-transfer.outputs.sum_of_ranks_required }}' = true ]; then groups+=(sum-of-ranks); fi
           if [ '${{ steps.projection-transfer.outputs.yearly_required }}' = true ]; then groups+=(yearly); fi
           groups_csv=$(IFS=,; echo "${groups[*]}")
+          if [ "$WCA_EXPORT_VALUE" != "$PRODUCTION_WCA_EXPORT_VALUE" ]; then
+            ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+              "cd /srv/wcarankings && docker compose run --rm -T app sh -c 'cat > /var/cache/wcarankings/wca-export-${WCA_EXPORT_DATE}.sql.zip'" \
+              < "/tmp/wca-export-cache/wca-export-${WCA_EXPORT_DATE}.sql.zip"
+          fi
           for group in "${groups[@]}"; do scp -q -o BatchMode=yes "/tmp/${group}-projection-transfer.sql.gz" "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-${group}-projection-transfer.sql.gz"; done
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "CORE_PROJECTION_FINGERPRINT='$CORE_PROJECTION_FINGERPRINT' SUM_OF_RANKS_PROJECTION_FINGERPRINT='$SUM_OF_RANKS_PROJECTION_FINGERPRINT' YEARLY_PROJECTION_FINGERPRINT='$YEARLY_PROJECTION_FINGERPRINT' PROJECTION_GROUPS='$groups_csv' sh -s" <<'REMOTE'
+            "CORE_PROJECTION_FINGERPRINT='$CORE_PROJECTION_FINGERPRINT' SUM_OF_RANKS_PROJECTION_FINGERPRINT='$SUM_OF_RANKS_PROJECTION_FINGERPRINT' YEARLY_PROJECTION_FINGERPRINT='$YEARLY_PROJECTION_FINGERPRINT' WCA_EXPORT_DATE='$WCA_EXPORT_DATE' WCA_EXPORT_VALUE='$WCA_EXPORT_VALUE' PRODUCTION_WCA_EXPORT_VALUE='$PRODUCTION_WCA_EXPORT_VALUE' PROJECTION_GROUPS='$groups_csv' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
             (while sleep 30; do echo "Projection transfer import is still running…"; done) &
             heartbeat_pid=$!
             trap 'kill "$heartbeat_pid" 2>/dev/null || true; rm -f /tmp/wcarankings-core-projection-transfer.sql.gz /tmp/wcarankings-sum-of-ranks-projection-transfer.sql.gz /tmp/wcarankings-yearly-projection-transfer.sql.gz' EXIT
+            if [ "$WCA_EXPORT_VALUE" != "$PRODUCTION_WCA_EXPORT_VALUE" ]; then
+              docker compose run --rm app node /app/scripts/sync-wca-export.mjs --force --raw-only --sql-path="/var/cache/wcarankings/wca-export-${WCA_EXPORT_DATE}.sql.zip"
+            fi
             for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do gzip -dc "/tmp/wcarankings-${group}-projection-transfer.sql.gz" | docker compose exec -T db sh -c 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE"'; done
             publish_groups=$(printf '%s' "$PROJECTION_GROUPS" | sed 's/yearly/yearly-person-rankings/g')
             docker compose run --rm app node /app/scripts/publish-projection-transfer.mjs --groups="$publish_groups"

@@ -43,6 +43,8 @@ test("rejects missing and invalid export dates", () => {
 
 test("packages the export-date normalizer with the publisher", () => {
   assert.match(dockerfile, /projection-transfer-date\.mjs/);
+  assert.match(dockerfile, /refresh-board-list\.mjs/);
+  assert.match(dockerfile, /resolve-wca-export\.mjs/);
 });
 
 test("publishes result facts with the core runtime transfer", () => {

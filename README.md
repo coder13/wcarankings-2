@@ -55,7 +55,7 @@ each component folder contains its source, Storybook stories, and colocated unit
 tests.
 
 See [docs/deployment.md](docs/deployment.md) for Docker Compose setup, server
-prerequisites, the scheduled WCA import, and the GitHub Actions deployment flow.
+prerequisites, the GitHub Actions-owned WCA refresh flow, and deployment flow.
 
 ## WCA sign-in
 

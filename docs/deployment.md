@@ -36,65 +36,44 @@ starts the application and proxy after loading that image.
 The app listens on `127.0.0.1:3000` on the host. Caddy publishes ports 80 and 443
 and obtains certificates automatically. MariaDB has no public network port.
 
-Apply app-owned schema migrations, then run the initial WCA import from the app image:
+Apply app-owned schema migrations, then run the initial WCA import through the
+`Refresh Ranking Data` GitHub Actions workflow. Production raw WCA tables and
+ranking projections should not be refreshed from a server-local cron, timer, or
+manual SSH command.
 
-```bash
-docker compose run --rm flyway migrate
-docker compose run --rm app node /app/scripts/sync-wca-export.mjs
-```
-
-The import downloads one SQL archive per export date into the persistent cache,
-streams the SQL dump into MariaDB, and then builds the compatibility rankings
-plus the active Sum of Ranks projection documented in
-`docs/projection-architecture.md`. Other registered semantic projections are
-inactive and do not extend the default import.
-Use `--force` to re-import an already recorded export.
-For a manually downloaded archive, set `WCA_SQL_EXPORT_PATH` in the environment or
-pass `--sql-path=/path/to/WCA_export.sql.zip`.
+The Actions workflow downloads one SQL archive per export date, builds projection
+transfer artifacts on the GitHub runner, uploads the exact raw archive and
+projection transfers to the production host, imports the raw archive, then
+atomically publishes the matching projections.
 
 Flyway migrations and ranking projection refreshes are separate operations. To
 inspect or validate app-owned migrations without importing WCA data, run
 `docker compose run --rm flyway info` or `docker compose run --rm flyway validate`.
-To rebuild the compatibility and active ranking projections from raw WCA tables already present in MariaDB,
-run `docker compose run --rm app node /app/scripts/refresh-rankings.mjs`. The
-deployment workflow backfills missing active groups before checking readiness.
-To build or replace only Sum of Ranks against the current imported export, run
-`docker compose run --rm app node /app/scripts/backfill-sum-of-ranks.mjs`;
-add `--force` to replace an existing Sum of Ranks generation. This targeted
-operation does not import or replace raw WCA tables.
+Do not run importer, backfill, or projection rebuild scripts on production by
+SSH. Those scripts remain packaged for GitHub Actions-controlled deploy/refresh
+commands and local development only.
 
 To keep the self-hosted database current, use the `Refresh Ranking Data` GitHub
 Actions workflow. It runs daily at 05:17 UTC and can also be started manually
-from the Actions tab. The manual run has two controls:
+from the Actions tab. The manual run has one control:
 
-- `force=true` re-imports the current WCA export and rebuilds projections even
-  when production already has that export date.
 - `dry_run=true` downloads or verifies the latest export archive in production's
-  persistent cache without importing or rebuilding projections.
+  Actions cache without importing or rebuilding production data.
 
-The workflow runs Flyway, executes `sync-wca-export.mjs`, validates the published
-ranking projections, and uses `/tmp/wcarankings-sync.lock` on the production host
-so two refreshes do not run at the same time.
+Deploys and refreshes share the `production-data-update` GitHub Actions
+concurrency group so only one workflow can update production data at a time.
+Deploys may reuse projection-transfer caches for the target WCA export. Manual
+and scheduled refreshes intentionally rebuild all projection-transfer groups and
+then save fresh caches for later deploys when the cache key is not already
+present.
 
-The included systemd timer is an optional server-local fallback. Do not enable it
-alongside the scheduled GitHub workflow unless both paths use the same lock and
-the additional redundant daily run is intentional. To install the fallback timer
-and failure alert as root after copying the repository to the deployment
-directory:
+The included `ops/wcarankings-sync.service` and `.timer` files are deprecated
+stubs. They are retained only to prevent older operational notes from silently
+installing a live server-side data updater. Do not enable them for production DB
+refreshes.
 
-```bash
-install -m 0644 ops/wcarankings-sync.service /etc/systemd/system/
-install -m 0644 ops/wcarankings-sync.timer /etc/systemd/system/
-install -m 0644 ops/wcarankings-sync-alert.service /etc/systemd/system/
-install -m 0755 ops/wcarankings-sync-alert.sh /usr/local/bin/wcarankings-sync-alert
-# Create a root-owned, mode-0700 directory for server-only notification settings.
-# Store the notification environment file there with mode 0600.
-systemctl daemon-reload
-systemctl enable --now wcarankings-sync.timer
-```
-
-The sync service triggers the alert service on failure. Its notification destination
-is configured only on the server.
+If an older production host has the timer installed, disable it as part of host
+maintenance and rely on the daily GitHub Actions schedule instead.
 
 ## GitHub Actions deployment
 
@@ -117,11 +96,11 @@ The deployment workflow does the following:
 
 1. Checks out the merged commit and calculates its Git tree SHA.
 2. Pulls the matching prebuilt application and Flyway images from GitHub Container Registry.
-3. Reads the production database's published WCA export date, then restores
-   that dated SQL archive and any matching completed projection artifact from
-   GitHub Actions caches. On an archive-cache miss, Actions streams the matching
-   ZIP from production's persistent export cache. Projection artifacts are
-   keyed by export date and projection-schema hash.
+3. Resolves the latest WCA export from the WCA export API, then restores that
+   dated SQL archive and any matching completed projection artifact from GitHub
+   Actions caches. On an archive-cache miss, Actions downloads the export into
+   the Actions cache. Projection artifacts are keyed by export date and
+   projection-schema hash.
 4. On a projection-cache miss, imports the WCA archive into ephemeral MariaDB
    and builds and validates the complete generation. Secondary indexes are
    recorded and removed before the logical dump.
@@ -137,10 +116,12 @@ The deployment workflow does the following:
    `docker save | gzip | ssh ... 'gzip -d | docker load'`. There is no container
    registry involved.
 10. Tags the loaded application and Flyway images, then runs `docker compose run --rm flyway migrate`.
-11. Uploads and bulk-imports transfer tables without secondary indexes beside
-    the live projections. Production verifies the manifest date, builds each
-    table's deferred indexes in one alter operation, then publishes the entire
-    projection generation with one atomic table rename.
+11. Uploads the exact raw WCA archive when production is behind the target
+    export, imports raw tables with `--raw-only`, then bulk-imports transfer
+    tables without secondary indexes beside the live projections. Production
+    verifies the manifest date, builds each table's deferred indexes in one
+    alter operation, then publishes the entire projection generation with one
+    atomic table rename.
 12. Starts the new application and proxy only after projection publication and
     readiness checks succeed.
 13. Verifies readiness, SOR, Kinch, competition rankings, SSR assets, and the
@@ -149,11 +130,10 @@ The deployment workflow does the following:
     migrations fail; otherwise removes the previous image after success.
 
 The deployment server needs the Compose file, Caddyfile, and `.env`, but does not
-need a checkout of the application source. Deployments do not replace production
-raw WCA tables; transferred projections are accepted only when their source
-export date matches those tables. The daily systemd sync remains responsible for
-updating raw production data. The app entrypoint only starts the server, so a
-fresh host should be imported before it is considered ready for ranking traffic.
+need a checkout of the application source. Deployments and the refresh workflow
+are the only supported production raw/projection update paths. The app entrypoint
+only starts the server, so a fresh host should be imported through GitHub Actions
+before it is considered ready for ranking traffic.
 
 ### Production projection-transfer benchmark
 

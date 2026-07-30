@@ -1,10 +1,11 @@
 [Unit]
-Description=Daily CubeRanks WCA ranking sync
+Description=Deprecated CubeRanks server-local WCA ranking sync timer
+Documentation=https://github.com/coder13/wcarankings-2/actions/workflows/refresh-rankings.yml
 
 [Timer]
 OnCalendar=*-*-* 04:00:00 UTC
-Persistent=true
-RandomizedDelaySec=15m
+Persistent=false
+RandomizedDelaySec=0
 
 [Install]
 WantedBy=timers.target

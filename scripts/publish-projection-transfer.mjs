@@ -5,6 +5,8 @@ import {
   promoteProjectionTables,
 } from "./mysql-schema.mjs";
 import { normalizeExportDate } from "./projection-transfer-date.mjs";
+import { refreshBoardList, refreshDelegatesList } from "./refresh-board-list.mjs";
+import { refreshSystemLists } from "./refresh-system-lists.mjs";
 
 const selectedNames = (process.argv.find((value) => value.startsWith("--groups="))?.slice("--groups=".length) || "")
   .split(",").filter(Boolean);
@@ -100,6 +102,9 @@ try {
   }
   await connection.query(`RENAME TABLE ${renames.join(", ")}`);
   await promoteProjectionTables(connection, { tables: transferTables });
+  await refreshSystemLists(connection);
+  await refreshBoardList(connection);
+  await refreshDelegatesList(connection);
   for (const table of [...indexesTables, ...manifestTables]) await dropManagedObject(connection, table);
   process.stdout.write(`Published transferred projection generation for ${normalizedTransferDate}.\n`);
 } finally {

@@ -16,6 +16,7 @@ const syncService = await readFile(
 );
 
 test("builds deploy images from main when PR images are unavailable", () => {
+  assert.match(workflow, /group: production-data-update/);
   assert.match(workflow, /id: pull-images/);
   assert.match(workflow, /echo "available=false" >> "\$GITHUB_OUTPUT"/);
   assert.match(
@@ -47,20 +48,21 @@ test("reclaims obsolete deployment images before loading a new release", () => {
 test("builds projection transfers on Actions before publishing them atomically", () => {
   assert.match(workflow, /uses: actions\/cache\/restore@v4[\s\S]*wca-sql-export-/);
   assert.match(workflow, /uses: actions\/cache\/save@v4[\s\S]*wca-sql-export-/);
+  assert.match(workflow, /Resolve target WCA export/);
   assert.match(workflow, /Resolve production WCA export/);
   assert.match(workflow, /0x6578706f72745f64617465/);
-  assert.match(workflow, /cat \/var\/cache\/wcarankings\/wca-export-/);
-  assert.doesNotMatch(workflow, /worldcubeassociation\.org\/api\/v0\/export\/public/);
+  assert.match(workflow, /resolve-wca-export\.mjs/);
+  assert.match(workflow, /sync-wca-export\.mjs --dry-run/);
   assert.match(workflow, /key: projection-transfer-core-v2-/);
   assert.match(workflow, /key: projection-transfer-sum-of-ranks-v1-/);
   assert.match(workflow, /key: projection-transfer-yearly-v2-/);
   assert.match(workflow, /projection-build-plan\.mjs --groups="\$groups_csv"/);
   assert.match(workflow, /projection_names_csv=\$\(jq -r '\.projectionNames \| join\(","\)' \/tmp\/projection-build-plan\.json\)/);
-  assert.match(workflow, /WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts\/sync-wca-export\.mjs --force --projection-names="\$projection_names_csv"/);
+  assert.match(workflow, /WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts\/sync-wca-export\.mjs --force --sql-path="\/tmp\/wca-export-cache\/wca-export-\$\{\{ steps\.wca-export\.outputs\.date \}\}\.sql\.zip" --projection-names="\$projection_names_csv"/);
   assert.match(workflow, /mapfile -t planned_groups/);
   assert.match(workflow, /sum_of_ranks_required/);
   assert.match(workflow, /publish_groups=.*yearly-person-rankings/);
-  assert.match(workflow, /node scripts\/sync-wca-export\.mjs --force/);
+  assert.match(workflow, /sync-wca-export\.mjs --force --raw-only --sql-path/);
   assert.match(workflow, /node scripts\/prepare-projection-transfer\.mjs/);
   assert.match(workflow, /mariadb-dump[\s\S]*projection-transfer\.sql\.gz/);
   assert.match(workflow, /publish-projection-transfer\.mjs/);
@@ -82,12 +84,15 @@ test("supports manual and scheduled production ranking refreshes", () => {
   assert.match(refreshWorkflow, /workflow_dispatch:/);
   assert.match(refreshWorkflow, /schedule:/);
   assert.match(refreshWorkflow, /cron: "17 5 \* \* \*"/);
-  assert.match(refreshWorkflow, /force:/);
   assert.match(refreshWorkflow, /dry_run:/);
-  assert.match(refreshWorkflow, /flock -n \/tmp\/wcarankings-sync\.lock/);
-  assert.match(refreshWorkflow, /docker compose run --rm flyway migrate/);
-  assert.match(refreshWorkflow, /sync-wca-export\.mjs \$SYNC_ARGS/);
+  assert.match(refreshWorkflow, /group: production-data-update/);
+  assert.match(refreshWorkflow, /Resolve target WCA export/);
+  assert.match(refreshWorkflow, /Build and export fresh projection generation/);
+  assert.match(refreshWorkflow, /Cache restore: intentionally skipped for refresh/);
+  assert.match(refreshWorkflow, /sync-wca-export\.mjs --force --sql-path/);
+  assert.match(refreshWorkflow, /sync-wca-export\.mjs --force --raw-only --sql-path/);
   assert.match(refreshWorkflow, /check-ranking-projections\.mjs/);
-  assert.match(syncService, /flock -n \/tmp\/wcarankings-sync\.lock/);
-  assert.match(syncService, /check-ranking-projections\.mjs/);
+  assert.match(syncService, /Deprecated/);
+  assert.match(syncService, /ConditionPathExists=\/srv\/wcarankings\/ENABLE_DEPRECATED_SERVER_REFRESH/);
+  assert.doesNotMatch(syncService, /sync-wca-export\.mjs/);
 });

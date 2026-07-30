@@ -12,6 +12,7 @@ import { refreshBoardList, refreshDelegatesList } from "./refresh-board-list.mjs
 const EXPORT_API = "https://www.worldcubeassociation.org/api/v0/export/public";
 const force = process.argv.includes("--force");
 const dryRun = process.argv.includes("--dry-run");
+const rawOnly = process.argv.includes("--raw-only");
 
 function argumentValue(name) {
   const prefix = `--${name}=`;
@@ -303,6 +304,7 @@ async function refreshRankingsSchema() {
 }
 
 async function main() {
+  if (dryRun && rawOnly) throw new Error("--dry-run and --raw-only cannot be used together.");
   const suppliedPath = argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH;
   let latest;
   if (suppliedPath) {
@@ -331,6 +333,18 @@ async function main() {
     await dropRankingViews();
     process.stdout.write("Importing WCA SQL tables into MariaDB…\n");
     await importSqlExport(zipPath);
+    if (rawOnly) {
+      const completedAt = now();
+      await writeExportMetadata(latest);
+      await updateImportRun(runId, {
+        status: "succeeded",
+        projection_swap_status: "not_applicable",
+        completed_at: completedAt,
+        duration_ms: elapsedMilliseconds(startedAt, completedAt),
+      });
+      process.stdout.write(`WCA raw tables are current through ${latest.exportDate}; projection publication skipped by --raw-only.\n`);
+      return;
+    }
     const projectionBuildStartedAt = now();
     await updateImportRun(runId, {
       fetched_at: projectionBuildStartedAt,
