@@ -13,25 +13,30 @@ jobs:
   monitor:
     runs-on: ubuntu-latest
     steps:
-      - name: Report merged deployment
+      - name: Configure deployment SSH
         env:
-          GH_TOKEN: ${{ github.token }}
-          TARGET_SHA: 18ed20ccb38a72261b72cf46400fca834872ed77
-          REPOSITORY: ${{ github.repository }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
-          set -euo pipefail
-          api="https://api.github.com/repos/${REPOSITORY}/actions/runs?head_sha=${TARGET_SHA}&event=push&per_page=20"
-          response=$(curl --fail --silent --show-error \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "$api")
-          run=$(jq -c '.workflow_runs | map(select(.name == "Deploy CubeRanks")) | sort_by(.created_at) | last // empty' <<<"$response")
-          if [ -z "$run" ]; then
-            echo "Deploy run has not appeared yet." >&2
-            exit 1
-          fi
-          echo "DEPLOY_RUN_ID=$(jq -r '.id' <<<"$run")"
-          echo "DEPLOY_STATUS=$(jq -r '.status' <<<"$run")"
-          echo "DEPLOY_CONCLUSION=$(jq -r '.conclusion // ""' <<<"$run")"
-          echo "DEPLOY_URL=$(jq -r '.html_url' <<<"$run")"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Inspect production projection import
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USER: www
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" 'set -eu
+            cd /srv/wcarankings
+            echo "=== containers ==="
+            docker compose ps
+            echo "=== MariaDB process list ==="
+            docker compose exec -T db sh -c '\''mariadb --batch --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="SHOW FULL PROCESSLIST"'\''
+            echo "=== transfer files ==="
+            ls -lh /tmp/wcarankings-*-projection-transfer.sql.gz 2>/dev/null || true
+            echo "=== container resource use ==="
+            docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.BlockIO}}"
+            echo "=== disk ==="
+            df -h /srv/wcarankings'
