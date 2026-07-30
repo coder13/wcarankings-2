@@ -2,10 +2,13 @@ import { DatabaseOverloadedError } from "@/db";
 import { getCurrentRankingsMetadata } from "@/lib/rankings-metadata";
 import {
   isEventId,
+  isGenderFilter,
+  normalizeGenderFilters,
   isRankingType,
   parseRegionQuery,
   type RankingType,
   type RegionScope,
+  type GenderFilter,
 } from "@/lib/wca";
 
 export const DEFAULT_PAGE_SIZE = 50;
@@ -43,6 +46,15 @@ export function parseLimit(params: URLSearchParams) {
     throw new ApiInputError(`limit must be between 1 and ${MAX_PAGE_SIZE}.`);
   }
   return parsed;
+}
+
+export function parseGender(params: URLSearchParams) {
+  const values = params.getAll("gender").flatMap((value) => value.split(",")).filter(Boolean);
+  const unique = [...new Set(values)];
+  if (unique.some((value) => !isGenderFilter(value))) {
+    throw new ApiInputError("gender must contain only m, f, or o.");
+  }
+  return normalizeGenderFilters(unique.filter(isGenderFilter));
 }
 
 export function parseStart(params: URLSearchParams) {

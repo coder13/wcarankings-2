@@ -6,7 +6,7 @@ import type {
   RankingPage,
 } from "@/components/RankingsExplorer/types";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
-import { isEventId, isRankingEventId, isRankingType, isValidRegexPattern, parseRegionQuery, WCA_EVENTS } from "@/lib/wca";
+import { isEventId, isRankingEventId, isRankingType, isValidRegexPattern, normalizeGenderFilters, parseRegionQuery, type GenderFilter, WCA_EVENTS } from "@/lib/wca";
 import { getRegions } from "@/lib/regions";
 import { loadRankings } from "@/lib/rankings";
 import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
@@ -37,11 +37,18 @@ function getSearchParamWithLegacyKey(
   return getSearchParam(searchParams, key) || getSearchParam(searchParams, legacyKey);
 }
 
+function getGenderFilters(searchParams: Record<string, string | string[] | undefined>): GenderFilter[] {
+  const raw = searchParams.gender;
+  const values = (Array.isArray(raw) ? raw : raw ? [raw] : []).flatMap((value) => value.split(","));
+  return normalizeGenderFilters(values.filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"));
+}
+
 function getCanonicalSearchParams(
   searchParams: Record<string, string | string[] | undefined>,
   eventId: string,
   rankingType: "single" | "average",
   regionId: string,
+  gender: readonly GenderFilter[],
   allEventRankingId: "SOR" | null,
 ) {
   const params = new URLSearchParams();
@@ -60,6 +67,8 @@ function getCanonicalSearchParams(
   else params.set("result", rankingType);
   if (regionId) params.set("region", regionId);
   else params.delete("region");
+  if (gender.length) params.set("gender", gender.join(","));
+  else params.delete("gender");
   const search = getSearchParam(searchParams, "search").trim();
   if (getSearchParam(searchParams, "mode") === "vim" && search) params.set("mode", "vim");
   else params.delete("mode");
@@ -98,6 +107,7 @@ async function getInitialRankings(
   const eventId = isRankingEventId(rawEventId) ? rawEventId : "333";
   const rankingType = eventId === "333mbf" ? "single" : isRankingType(rawRankingType) ? rawRankingType : "single";
   const { scope, regionId } = parseRegionQuery(getSearchParam(searchParams, "region"));
+  const gender = getGenderFilters(searchParams);
   const year = yearOverride === null ? getSearchParam(searchParams, "year") : String(yearOverride);
   const yearParams: Record<string, string> = /^\d{4}$/.test(year) ? { year } : {};
   const search = getSearchParam(searchParams, "search").trim().slice(0, 80);
@@ -111,6 +121,7 @@ async function getInitialRankings(
           searchLimit: "500",
           ...(regexSearch ? { mode: "vim" } : {}),
           ...(scope === "world" ? {} : { region: regionId }),
+          ...(gender.length ? { gender: gender.join(",") } : {}),
           ...yearParams,
         }),
       )
@@ -122,6 +133,7 @@ async function getInitialRankings(
           result: rankingType,
           locate: focusedWcaId,
           ...(scope === "world" ? {} : { region: regionId }),
+          ...(gender.length ? { gender: gender.join(",") } : {}),
           ...yearParams,
         }),
       ) as unknown as { located: RankingEntry | null }
@@ -145,6 +157,7 @@ async function getInitialRankings(
           limit: String(PAGE_SIZE),
           paged: "1",
           ...(scope === "world" ? {} : { region: regionId }),
+          ...(gender.length ? { gender: gender.join(",") } : {}),
           ...yearParams,
         }),
       ),
@@ -174,6 +187,7 @@ async function getInitialRankings(
     searchMatches,
     initialMatchPersonId: firstMatch?.personId ?? "",
     regexSearch,
+    gender,
   };
 }
 
@@ -183,6 +197,7 @@ async function getInitialCompetitionRankings(
   competitionRanking: "best-result" | "podiums" | "competitor-count" | "latitude",
   latitudeHemisphere: "north" | "south",
   regionId: string,
+  gender: readonly GenderFilter[],
 ) {
   const loaded = await loadCompetitionRankings(new URLSearchParams({
     eventId,
@@ -221,10 +236,11 @@ async function getInitialResultRankings(
   eventId: (typeof WCA_EVENTS)[number]["id"],
   rankingType: "single" | "average",
   regionId: string,
+  gender: readonly GenderFilter[],
 ) {
   const search = getSearchParam(searchParams, "search").trim().slice(0, 80);
   const regexSearch = getSearchParam(searchParams, "mode") === "vim" && isValidRegexPattern(search);
-  const common = { eventId, result: rankingType, ...(regionId ? { region: regionId } : {}) };
+  const common = { eventId, result: rankingType, ...(regionId ? { region: regionId } : {}), ...(gender.length ? { gender: gender.join(",") } : {}) };
   const searched = search ? await loadResultRankings(new URLSearchParams({ ...common, search, searchLimit: "500", ...(regexSearch ? { mode: "vim" } : {}) })) : null;
   const searchMatches = searched ? searched.data.entries as RankingEntry[] : [];
   const firstMatch = searchMatches[0];
@@ -289,6 +305,7 @@ export async function RankingsPage({
       ? "single"
       : isRankingType(rawRankingType) ? rawRankingType : "single";
   const { scope, regionId } = parseRegionQuery(getSearchParam(resolvedSearchParams, "region"));
+  const gender = (initialSubject === "people" || initialSubject === "results") ? getGenderFilters(resolvedSearchParams) : [];
   const initialYear = initialYearOverride ?? (/^\d{4}$/.test(getSearchParam(resolvedSearchParams, "year")) ? Number(getSearchParam(resolvedSearchParams, "year")) : null);
   const requestedWcaId = getSearchParam(resolvedSearchParams, "wcaId")
     .trim()
@@ -303,6 +320,7 @@ export async function RankingsPage({
     eventId,
     rankingType,
     regionId,
+    gender,
     initialAllEventRankingId,
   );
   if (initialSubject === "competitions" && initialCompetitionRanking === "podiums") {
@@ -336,7 +354,7 @@ export async function RankingsPage({
       initialYear,
     )
     : initialSubject === "results"
-      ? getInitialResultRankings(resolvedSearchParams, eventId as (typeof WCA_EVENTS)[number]["id"], rankingType, regionId)
+      ? getInitialResultRankings(resolvedSearchParams, eventId as (typeof WCA_EVENTS)[number]["id"], rankingType, regionId, gender)
     : initialSubject === "competitions"
       ? getInitialCompetitionRankings(
           eventId as (typeof WCA_EVENTS)[number]["id"],
@@ -363,6 +381,7 @@ export async function RankingsPage({
       initialRegexSearch={initialRegexSearch}
       initialEventId={eventId}
       initialRankingType={rankingType}
+      initialGender={gender}
       initialYear={initialYear}
       initialRegionSelection={{ scope, regionId }}
       initialRegions={{ continents, countries }}

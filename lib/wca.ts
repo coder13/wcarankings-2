@@ -1,4 +1,6 @@
 export type RankingType = "single" | "average";
+export type GenderFilter = "m" | "f" | "o";
+export type GenderFilters = readonly GenderFilter[];
 export type RegionScope = "world" | "continent" | "country";
 export type RecordBadgeCode = "WR" | "AfR" | "AsR" | "ER" | "NaR" | "OcR" | "SaR" | "NR";
 
@@ -83,6 +85,29 @@ export const FALLBACK_COUNTRIES = [
 
 export function isRankingType(value: string | null): value is RankingType {
   return value === "single" || value === "average";
+}
+
+export function isGenderFilter(value: string | null): value is GenderFilter {
+  return value === "m" || value === "f" || value === "o";
+}
+
+export function normalizeGenderFilters(values: readonly GenderFilter[]) {
+  const normalized = (["m", "f", "o"] as const).filter((value) => values.includes(value));
+  return normalized.length === 3 ? [] : normalized;
+}
+
+export function genderFiltersLabel(values: GenderFilters) {
+  const normalized = normalizeGenderFilters(values);
+  if (normalized.length === 0) return genderLabel(null);
+  if (normalized.length === 1) return genderLabel(normalized[0]);
+  return normalized.map((value) => value.toUpperCase()).join(", ");
+}
+
+export function genderLabel(value: GenderFilter | null) {
+  if (value === "m") return "Men";
+  if (value === "f") return "Women";
+  if (value === "o") return "Other";
+  return "All";
 }
 
 export function isRegionScope(value: string | null): value is RegionScope {

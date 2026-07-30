@@ -35,6 +35,8 @@ function TopRail({ scrollProgress = 0 }: { scrollProgress?: number }) {
       onEventChange={setEventId}
       rankingType={rankingType}
       onRankingTypeChange={setRankingType}
+      gender={[]}
+      onGenderChange={() => undefined}
       regions={regions}
       regionSelection={regionSelection}
       onRegionChange={setRegionSelection}

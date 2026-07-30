@@ -1,0 +1,37 @@
+@font-face {
+  font-family: cubing-icons;
+  src: url("/assets/cubing-icons-C_h-EdVe.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
+.cubing-icon::before {
+  vertical-align: -15%;
+  font-variant: normal;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: cubing-icons !important;
+  font-style: normal;
+  font-weight: 400 !important;
+  line-height: 1;
+}
+
+.cubing-icon.event-444::before { content: "\f101"; }
+.cubing-icon.event-sq1::before { content: "\f102"; }
+.cubing-icon.event-minx::before { content: "\f103"; }
+.cubing-icon.event-444bf::before { content: "\f104"; }
+.cubing-icon.event-skewb::before { content: "\f105"; }
+.cubing-icon.event-333::before { content: "\f106"; }
+.cubing-icon.event-333bf::before { content: "\f107"; }
+.cubing-icon.event-clock::before { content: "\f108"; }
+.cubing-icon.event-222::before { content: "\f10a"; }
+.cubing-icon.event-555::before { content: "\f10c"; }
+.cubing-icon.event-333fm::before { content: "\f10d"; }
+.cubing-icon.event-333mbf::before { content: "\f10e"; }
+.cubing-icon.event-777::before { content: "\f111"; }
+.cubing-icon.event-pyram::before { content: "\f112"; }
+.cubing-icon.event-666::before { content: "\f113"; }
+.cubing-icon.event-555bf::before { content: "\f114"; }
+.cubing-icon.event-333oh::before { content: "\f115"; }

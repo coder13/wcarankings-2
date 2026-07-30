@@ -4,7 +4,9 @@ import {
   getRecordBadges,
   isEventId,
   isRankingType,
+  normalizeGenderFilters,
   parseRegionQuery,
+  type GenderFilter,
   type RankingType,
 } from "@/lib/wca";
 import type { ListSummary } from "@/lib/lists";
@@ -53,7 +55,12 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
   );
   const limit = search && !locate ? searchLimit : pageLimit;
   const region = parseRegionQuery(searchParams.get("region"));
-  return { eventId, type, start, limit, search, locate, region };
+  const gender = normalizeGenderFilters(
+    searchParams.getAll("gender")
+      .flatMap((value) => value.split(","))
+      .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
+  );
+  return { eventId, type, start, limit, search, locate, region, gender };
 }
 
 type ScopedRankingSource = {
@@ -76,6 +83,12 @@ async function loadScopedRankings(
   } else if (input.region.scope === "country") {
     scopedConditions.push("ranking.country_id = ?");
     scopedValues.push(input.region.regionId);
+  }
+  if (input.gender.length) {
+    scopedConditions.push(
+      `(${input.gender.map(() => "(? = 'o' AND (person_gender.gender = 'o' OR person_gender.gender IS NULL)) OR person_gender.gender = ?").join(" OR ")})`,
+    );
+    scopedValues.push(...input.gender.flatMap((gender) => [gender, gender]));
   }
   const conditions = ["sub_rank > ?"];
   const values: unknown[] = [input.start];
@@ -109,6 +122,9 @@ async function loadScopedRankings(
          ranking.is_continent_record,
          ranking.is_country_record
        FROM ${scopedSource.from(source)}
+       JOIN persons AS person_gender
+         ON person_gender.wca_id = ranking.person_id
+        AND person_gender.sub_id = 1
        WHERE ${scopedConditions.join("\n         AND ")}
      )
      SELECT *

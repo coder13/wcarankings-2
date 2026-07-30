@@ -8,7 +8,7 @@ import {
 import { getDynamicListRegions, hasMultipleListCountries, normalizeListRegionSelection } from "@/lib/list-regions";
 import { loadDynamicListRankings } from "@/lib/list-rankings";
 import { getAuthUser } from "@/lib/auth";
-import { isEventId, isRankingType, parseRegionQuery } from "@/lib/wca";
+import { isEventId, isRankingType, normalizeGenderFilters, parseRegionQuery, type GenderFilter } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +29,11 @@ export default async function DynamicListPage({ searchParams }: {
   const resultValue = typeof query.result === "string" ? query.result : "single";
   const rankingType = eventId === "333mbf" || !isRankingType(resultValue) ? "single" : resultValue;
   const requestedRegion = parseRegionQuery(typeof query.region === "string" ? query.region : null);
+  const gender = normalizeGenderFilters(
+    (Array.isArray(query.gender) ? query.gender : query.gender ? [query.gender] : [])
+      .flatMap((value) => value.split(","))
+      .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
+  );
   let personIds: string[] = [];
   let notice = "";
   try {
@@ -41,17 +46,17 @@ export default async function DynamicListPage({ searchParams }: {
   }
   const [regions, rankings, user] = await Promise.all([
     getDynamicListRegions(personIds),
-    loadDynamicListRankings(personIds, new URLSearchParams({ eventId, result: rankingType, limit: "50" })),
+    loadDynamicListRankings(personIds, new URLSearchParams({ eventId, result: rankingType, limit: "50", ...(gender.length ? { gender: gender.join(",") } : {}) })),
     getAuthUser(new Request("http://localhost", { headers: await headers() })),
   ]);
   const regionSelection = normalizeListRegionSelection(requestedRegion, regions);
   if (regionSelection.scope !== "world") {
-    const filtered = await loadDynamicListRankings(personIds, new URLSearchParams({ eventId, result: rankingType, region: regionSelection.regionId, limit: "50" }));
+    const filtered = await loadDynamicListRankings(personIds, new URLSearchParams({ eventId, result: rankingType, region: regionSelection.regionId, limit: "50", ...(gender.length ? { gender: gender.join(",") } : {}) }));
     rankings.entries = filtered.entries;
     rankings.hasMore = filtered.hasMore;
     rankings.nextStart = filtered.nextStart;
     rankings.total = filtered.total;
   }
   const emptyNotice = !personIds.length && !notice ? "Add comma-separated WCA IDs with the wca_ids query parameter." : notice;
-  return <RankingsExplorer initialData={{ entries: rankings.entries, hasMore: rankings.hasMore, nextPageStart: rankings.nextStart === null ? null : rankings.nextStart + 1, previousPageStart: null, startPosition: 0, lastRank: rankings.entries.at(-1)?.subRank ?? null, total: rankings.total, exportDate: rankings.exportDate, startRank: 1, searchMatches: [], initialMatchPersonId: "" }} rankingSource={{ kind: "dynamic", personIds, listName: "Dynamic list" }} dynamicList={personIds.length ? { personIds } : undefined} listNotice={emptyNotice || undefined} showMyRank={Boolean(user && personIds.includes(user.wcaId))} initialEventId={eventId} initialRankingType={rankingType} initialRegionSelection={regionSelection} initialRegions={regions} regionSelectionDisabled={!hasMultipleListCountries(regions)} />;
+  return <RankingsExplorer initialData={{ entries: rankings.entries, hasMore: rankings.hasMore, nextPageStart: rankings.nextStart === null ? null : rankings.nextStart + 1, previousPageStart: null, startPosition: 0, lastRank: rankings.entries.at(-1)?.subRank ?? null, total: rankings.total, exportDate: rankings.exportDate, startRank: 1, searchMatches: [], initialMatchPersonId: "" }} rankingSource={{ kind: "dynamic", personIds, listName: "Dynamic list" }} dynamicList={personIds.length ? { personIds } : undefined} listNotice={emptyNotice || undefined} showMyRank={Boolean(user && personIds.includes(user.wcaId))} initialEventId={eventId} initialRankingType={rankingType} initialGender={gender} initialRegionSelection={regionSelection} initialRegions={regions} regionSelectionDisabled={!hasMultipleListCountries(regions)} />;
 }

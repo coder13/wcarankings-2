@@ -33,8 +33,10 @@ import {
 import {
   FALLBACK_CONTINENTS,
   FALLBACK_COUNTRIES,
+  type GenderFilter,
   isRankingEventId,
   isRankingType,
+  normalizeGenderFilters,
   parseRegionQuery,
   WCA_EVENTS,
 } from "@/lib/wca";
@@ -223,6 +225,7 @@ function getPage(
   selection: RegionSelection,
   resource: RankingResource = "people",
   source?: RankingSource,
+  gender: readonly GenderFilter[] = [],
 ) {
   const pageStart = pageStartForSubRank(start);
   const params = new URLSearchParams({
@@ -235,6 +238,7 @@ function getPage(
   const year = activeYear();
   if (resource === "people" && year) params.set("year", year);
   addRankingSourceParams(params, source);
+  if ((resource === "people" || resource === "results") && gender.length) params.set("gender", gender.join(","));
   if (selection.scope !== "world") params.set("region", selection.regionId);
   if (resource === "podiums") params.set("ranking", "podium");
   if (resource === "competitor-count") params.set("ranking", "competitor-count");
@@ -283,6 +287,7 @@ async function getEndWindow(
   endSubRank: number,
   resource: RankingResource = "people",
   source?: RankingSource,
+  gender: readonly GenderFilter[] = [],
 ) {
   const finalPageStart = pageStartForSubRank(endSubRank);
   const pageStarts = [
@@ -291,7 +296,7 @@ async function getEndWindow(
   ].filter((start, index, starts) => starts.indexOf(start) === index);
   const pages = await Promise.all(
     pageStarts.map((start) =>
-      getPage(eventId, rankingType, start + 1, selection, resource, source)
+      getPage(eventId, rankingType, start + 1, selection, resource, source, gender)
     )
   );
   const firstPage = pages[0];
@@ -318,6 +323,7 @@ async function getPersonWindow(
   selection: RegionSelection,
   match: Pick<RankingEntry, "personId" | "subRank">,
   source?: RankingSource,
+  gender: readonly GenderFilter[] = [],
 ) {
   const targetPageStart = pageStartForSubRank(match.subRank);
   const pageFirstSubRanks = Array.from(
@@ -329,7 +335,7 @@ async function getPersonWindow(
     .filter((start, index, starts) => starts.indexOf(start) === index);
   const pages = await Promise.all(
     pageFirstSubRanks.map((start) =>
-      getPage(eventId, rankingType, start, selection, "people", source)
+      getPage(eventId, rankingType, start, selection, "people", source, gender)
     )
   );
   const entries = pages.flatMap((page) => page.entries);
@@ -355,6 +361,7 @@ async function getDistantSearchWindow(
   match: RankingEntry,
   direction: -1 | 1,
   source?: RankingSource,
+  gender: readonly GenderFilter[] = [],
 ) {
   const targetPageStart = pageStartForSubRank(match.subRank);
   const pageStarts = [
@@ -375,7 +382,7 @@ async function getDistantSearchWindow(
   const pages = (
     await Promise.all(
       pageStarts.map((start) =>
-        getPage(eventId, rankingType, start + 1, selection, "people", source)
+        getPage(eventId, rankingType, start + 1, selection, "people", source, gender)
       )
     )
   ).filter((page) => page.entries.length > 0);
@@ -401,6 +408,7 @@ function prefetchSearchResultPages(
   matches: Array<RankingEntry | null | undefined>,
   currentMatchIndex: number,
   source?: RankingSource,
+  gender: readonly GenderFilter[] = [],
 ) {
   if (matches.length < 2 || currentMatchIndex < 0) return;
   const requested = new Set<number>();
@@ -415,7 +423,7 @@ function prefetchSearchResultPages(
       const requestKey = pageStartForSubRank(match.subRank);
       if (requested.has(requestKey)) continue;
       requested.add(requestKey);
-      void getPersonWindow(eventId, rankingType, selection, match, source).catch(
+      void getPersonWindow(eventId, rankingType, selection, match, source, gender).catch(
         () => undefined
       );
     }
@@ -431,6 +439,7 @@ function searchRankings(
   signal: AbortSignal,
   source?: RankingSource,
   resource: RankingResource = "people",
+  gender: readonly GenderFilter[] = [],
 ) {
   const params = new URLSearchParams({
     eventId,
@@ -442,6 +451,7 @@ function searchRankings(
   addRankingSourceParams(params, source);
   const year = activeYear();
   if (resource === "people" && year) params.set("year", year);
+  if ((resource === "people" || resource === "results") && gender.length) params.set("gender", gender.join(","));
   if (selection.scope !== "world") params.set("region", selection.regionId);
 
   const endpoint = resource === "results" ? "/api/rankings/results" : "/api/rankings";
@@ -460,6 +470,7 @@ function locateRanking(
   selection: RegionSelection,
   wcaId: string,
   source?: RankingSource,
+  gender: readonly GenderFilter[] = [],
 ) {
   const params = new URLSearchParams({
     eventId,
@@ -467,6 +478,7 @@ function locateRanking(
     locate: wcaId,
   });
   addRankingSourceParams(params, source);
+  if (gender.length) params.set("gender", gender.join(","));
   if (selection.scope !== "world") params.set("region", selection.regionId);
   return fetch(`/api/rankings?${params}`).then(async (response) => {
     if (!response.ok) {
@@ -483,6 +495,7 @@ export function RankingsExplorer({
   initialRegexSearch = initialData?.regexSearch ?? false,
   initialEventId = "333",
   initialRankingType = "single",
+  initialGender = [],
   initialYear: _initialYear = null,
   initialRegionSelection = { scope: "world", regionId: "" },
   showAllEventRankingOptions = false,
@@ -510,6 +523,7 @@ export function RankingsExplorer({
   initialRegexSearch?: boolean;
   initialEventId?: (typeof WCA_EVENTS)[number]["id"] | "SOR" | "sor-kinch";
   initialRankingType?: "single" | "average";
+  initialGender?: readonly GenderFilter[];
   initialYear?: number | null;
   initialRegionSelection?: RegionSelection;
   showAllEventRankingOptions?: boolean;
@@ -563,6 +577,7 @@ export function RankingsExplorer({
     competitionRanking: initialCompetitionRanking,
     latitudeHemisphere: initialLatitudeHemisphere,
   });
+  const [gender, setGender] = useState<readonly GenderFilter[]>(initialGender);
   const navigateToPage = useCallback((path: string) => {
     const navigate = () => router.push(path);
     const reduceMotion = window.matchMedia(
@@ -672,6 +687,7 @@ export function RankingsExplorer({
     latitudeHemisphere,
     eventId,
     rankingType,
+    gender.join(","),
     regionSelection.scope,
     regionSelection.regionId,
   ].join(":");
@@ -1026,10 +1042,10 @@ export function RankingsExplorer({
       : null;
     const resource = rankingResource(subject, competitionRanking, latitudeHemisphere);
     const pageRequest = focusLast
-      ? getEndWindow(eventId, rankingType, regionSelection, startRank, resource, rankingSource)
+      ? getEndWindow(eventId, rankingType, regionSelection, startRank, resource, rankingSource, gender)
       : focusMatch
-        ? getPersonWindow(eventId, rankingType, regionSelection, focusMatch, rankingSource)
-      : getPage(eventId, rankingType, startRank, regionSelection, resource, rankingSource);
+        ? getPersonWindow(eventId, rankingType, regionSelection, focusMatch, rankingSource, gender)
+      : getPage(eventId, rankingType, startRank, regionSelection, resource, rankingSource, gender);
     pageRequest
       .then((data) => {
         if (
@@ -1244,6 +1260,7 @@ export function RankingsExplorer({
     subject,
     finishPagerNavigation,
     rankingSource,
+    gender,
   ]);
 
   const jumpToMatch = useCallback(
@@ -1301,6 +1318,7 @@ export function RankingsExplorer({
         findMatchesRef.current,
         findIndexRef.current,
         rankingSource,
+        gender,
       );
       setError("");
       setLoading(true);
@@ -1352,8 +1370,9 @@ export function RankingsExplorer({
               match,
               scrollDirection,
               rankingSource,
+              gender,
             )
-          : getPersonWindow(eventId, rankingType, regionSelection, match, rankingSource);
+          : getPersonWindow(eventId, rankingType, regionSelection, match, rankingSource, gender);
 
       void pageRequest
         .then((data) => {
@@ -1518,7 +1537,7 @@ export function RankingsExplorer({
           finishSearchNavigation();
         });
     },
-    [eventId, rankingType, regionSelection, rankingSource]
+    [eventId, gender, rankingType, regionSelection, rankingSource]
   );
 
   const cycleFind = useCallback(
@@ -1651,6 +1670,7 @@ export function RankingsExplorer({
           controller.signal,
           rankingSource,
           rankingResource(subject, competitionRanking, latitudeHemisphere),
+          gender,
         )
           .then((data) => {
             if (controller.signal.aborted) return;
@@ -1697,6 +1717,7 @@ export function RankingsExplorer({
     regexSearch,
     jumpToMatch,
     rankingSource,
+    gender,
   ]);
 
   useEffect(() => {
@@ -1811,6 +1832,7 @@ export function RankingsExplorer({
           regionSelection,
           rankingResource(subject, competitionRanking, latitudeHemisphere),
           rankingSource,
+          gender,
         ).catch(() => undefined);
       }
       const data = await getPage(
@@ -1820,6 +1842,7 @@ export function RankingsExplorer({
         regionSelection,
         rankingResource(subject, competitionRanking, latitudeHemisphere),
         rankingSource,
+        gender,
       );
       if (
         requestEpoch !== navigationEpochRef.current ||
@@ -1850,7 +1873,7 @@ export function RankingsExplorer({
       moreRequestRef.current = false;
       setLoadingMore(false);
     }
-  }, [competitionRanking, eventId, hasMore, latitudeHemisphere, loading, nextPageStart, rankingSource, rankingType, regionSelection, subject, total]);
+  }, [competitionRanking, eventId, gender, hasMore, latitudeHemisphere, loading, nextPageStart, rankingSource, rankingType, regionSelection, subject, total]);
 
   const loadPrevious = useCallback(async () => {
     if (
@@ -1874,6 +1897,7 @@ export function RankingsExplorer({
         regionSelection,
         rankingResource(subject, competitionRanking, latitudeHemisphere),
         rankingSource,
+        gender,
       );
       if (
         requestEpoch !== navigationEpochRef.current ||
@@ -1920,6 +1944,7 @@ export function RankingsExplorer({
     regionSelection,
     rowVirtualizer,
     rankingSource,
+    gender,
     subject,
   ]);
 
@@ -2233,7 +2258,7 @@ export function RankingsExplorer({
     const resolutionEpoch = focusResolutionEpochRef.current + 1;
     focusResolutionEpochRef.current = resolutionEpoch;
     setError("");
-    void locateRanking(eventId, rankingType, regionSelection, wcaId, rankingSource)
+    void locateRanking(eventId, rankingType, regionSelection, wcaId, rankingSource, gender)
       .then(({ located }) => {
         if (resolutionEpoch !== focusResolutionEpochRef.current) return;
         if (!located) {
@@ -2250,7 +2275,7 @@ export function RankingsExplorer({
         if (resolutionEpoch !== focusResolutionEpochRef.current) return;
         setError(requestError instanceof Error ? requestError.message : "Could not find this person in the rankings.");
       });
-  }, [eventId, rankingType, rankingSource, regionSelection, resetToRank, subject]);
+  }, [eventId, gender, rankingType, rankingSource, regionSelection, resetToRank, subject]);
 
   const focusMyRanking = useCallback((wcaId: string) => {
     focusedWcaIdRef.current = wcaId;
@@ -2323,6 +2348,7 @@ export function RankingsExplorer({
       regionSelection,
       rankingResource(subject, competitionRanking, latitudeHemisphere),
       rankingSource,
+      gender,
     )
       .then((boundaryPage) => {
         if (requestEpoch !== navigationEpochRef.current) return;
@@ -2378,6 +2404,7 @@ export function RankingsExplorer({
     lastRank,
     rankingType,
     rankingSource,
+    gender,
     regionSelection,
     subject,
     visibleSubRank,
@@ -2729,6 +2756,23 @@ export function RankingsExplorer({
     });
   };
 
+  const changeGender = (nextGender: GenderFilter[]) => {
+    const normalizedGender = normalizeGenderFilters(nextGender);
+    if (normalizedGender.join(",") === gender.join(",")) return;
+    pendingRankRef.current = 1;
+    pendingScrollToTopRef.current = true;
+    pendingScrollDirectionRef.current = null;
+    pendingNavigationAppendRef.current = false;
+    preserveListDuringLoadRef.current = false;
+    setPreserveListDuringLoad(false);
+    setStartRank(1);
+    setGender(normalizedGender);
+    updateQueryParams({ gender: normalizedGender.length ? normalizedGender.join(",") : null });
+    trackGoogleAnalyticsEvent("ranking_gender_changed", {
+      gender: normalizedGender.length ? normalizedGender.join(",") : "any",
+    });
+  };
+
   const changeSubject = (nextSubject: NavigationSubject) => {
     if (nextSubject === "lists") {
       navigateToPage("/lists");
@@ -2849,6 +2893,8 @@ export function RankingsExplorer({
           onEventChange={changeRailEvent}
           rankingType={rankingType}
           onRankingTypeChange={changeRankingType}
+          gender={gender}
+          onGenderChange={changeGender}
           regions={regions}
           regionSelection={regionSelection}
           onRegionChange={changeRegion}
@@ -2857,6 +2903,7 @@ export function RankingsExplorer({
           showResultType={!(subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
           showEventPicker={!(subject === "competitions" && (competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
           showRegion
+          showGender={subject === "people" || subject === "results"}
           showSearch
           hemisphere={subject === "competitions" && competitionRanking === "latitude" ? latitudeHemisphere : undefined}
           onHemisphereChange={(nextHemisphere) => {

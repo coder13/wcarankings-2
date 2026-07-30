@@ -8,10 +8,12 @@ test("renders event and ranking type controls", () => {
     <RankingControls
       eventId="333"
       rankingType="single"
+      gender={[]}
       regions={[{ key: "world", scope: "world", regionId: "", label: "World" }]}
       regionSelection={{ scope: "world", regionId: "" }}
       onEventChange={() => undefined}
       onRankingTypeChange={() => undefined}
+      onGenderChange={() => undefined}
       onRegionChange={() => undefined}
     />,
   );
@@ -22,4 +24,5 @@ test("renders event and ranking type controls", () => {
   assert.match(markup, /Single/);
   assert.match(markup, /Average/);
   assert.match(markup, /aria-label="Region"/);
+  assert.match(markup, /aria-label="Gender"/);
 });

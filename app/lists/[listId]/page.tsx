@@ -15,7 +15,7 @@ import {
   resolveList,
 } from "@/lib/lists";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
-import { isEventId, isRankingType, parseRegionQuery } from "@/lib/wca";
+import { isEventId, isRankingType, normalizeGenderFilters, parseRegionQuery, type GenderFilter } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +57,11 @@ export default async function ListPage({
     : resultValue;
   const regionValue = typeof query.region === "string" ? query.region : null;
   const requestedRegionSelection = parseRegionQuery(regionValue);
+  const gender = normalizeGenderFilters(
+    (Array.isArray(query.gender) ? query.gender : query.gender ? [query.gender] : [])
+      .flatMap((value) => value.split(","))
+      .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
+  );
   const { list, regions, user, isOwner, membershipState, membershipRequests } = await getListPageData(listId);
   const regionSelection = normalizeListRegionSelection(
     requestedRegionSelection,
@@ -68,6 +73,7 @@ export default async function ListPage({
     limit: "50",
   });
   if (regionSelection.scope !== "world") rankingParams.set("region", regionSelection.regionId);
+  if (gender.length) rankingParams.set("gender", gender.join(","));
   const rankings = await loadListRankings(list, rankingParams);
   const rankingListId = list.systemAlias ?? list.publicId;
   if (!rankingListId) notFound();
@@ -105,6 +111,7 @@ export default async function ListPage({
       listActions={list.publicId ? { listId: list.publicId, isOwner } : undefined}
       initialEventId={eventId}
       initialRankingType={rankingType}
+      initialGender={gender}
       initialRegionSelection={regionSelection}
       initialRegions={regions}
       regionSelectionDisabled={!hasMultipleListCountries(regions)}

@@ -20,6 +20,7 @@ test("normalizes list ranking query parameters", () => {
     search: "Max",
     locate: "",
     region: { scope: "world", regionId: "" },
+    gender: [],
   });
 });
 
