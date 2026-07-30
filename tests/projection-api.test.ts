@@ -4,6 +4,7 @@ import {
   ApiInputError,
   optionalInteger,
   parseEvent,
+  parseGender,
   parseLimit,
   parsePersonId,
   parseResultType,
@@ -28,10 +29,17 @@ test("parses bounded semantic ranking parameters", () => {
   assert.equal(parseStart(params), 101);
   assert.equal(parseLimit(params), 50);
   assert.equal(parseYear(new URLSearchParams({ year: "2025" })), 2025);
+  assert.deepEqual(parseGender(new URLSearchParams({ gender: "m,f" })), ["m", "f"]);
+  assert.deepEqual(parseGender(new URLSearchParams({ gender: "o" })), ["o"]);
+  assert.deepEqual(parseGender(new URLSearchParams()), []);
 });
 
 test("rejects malformed yearly ranking parameters", () => {
   assert.throws(() => parseYear(new URLSearchParams({ year: "25" })), ApiInputError);
+});
+
+test("rejects unsupported gender filters", () => {
+  assert.throws(() => parseGender(new URLSearchParams({ gender: "x" })), ApiInputError);
 });
 
 test("rejects invalid limits and unsupported Multi-Blind averages", () => {

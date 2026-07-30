@@ -16,9 +16,9 @@
   --rail-control-height: calc(52px - (12px * var(--rail-scroll-progress, 0)));
   --rail-event-width: calc(44px + ((9em - 44px) * (1 - var(--rail-scroll-progress, 0))));
   --rail-select-width: calc(9.25em - (1.5em * var(--rail-scroll-progress, 0)));
-  --expanded-result-type-width: calc(var(--rail-select-width) + (2.75em * (1 - var(--rail-scroll-progress, 0))));
-  --result-type-width: var(--expanded-result-type-width);
-  --rail-settings-width: calc(var(--rail-event-width) + var(--result-type-width) + var(--rail-select-width));
+  --rail-gender-width: 5.5em;
+  --result-type-width: 5.5em;
+  --rail-settings-width: calc(var(--rail-event-width) + var(--result-type-width) + var(--rail-gender-width) + var(--rail-select-width));
   min-height: var(--rail-control-height);
   min-width: calc(var(--rail-settings-width) + var(--rail-control-height));
   border-radius: calc(var(--rail-control-height) / 2);
@@ -28,6 +28,10 @@
 
 .Jump--rankings.Jump--withoutResultType {
   --result-type-width: 0px;
+}
+
+.Jump--rankings.Jump--withoutResultType {
+  --rail-gender-width: 0px;
 }
 
 .Jump--rankings.Jump--withHemisphere {
@@ -91,24 +95,22 @@
   .Jump-railSettings > .EventPicker-preview .EventPicker-name { display: block; width: calc(6em * (1 - var(--rail-scroll-progress, 0))); min-width: 0; overflow: hidden; color: var(--text-muted); font-size: .875em; opacity: calc(1 - var(--rail-scroll-progress, 0)); text-overflow: ellipsis; white-space: nowrap; }
 }
 
-.Jump-resultTypeControl { position: relative; width: var(--result-type-width); min-width: 0; height: var(--rail-control-height); flex: 0 0 var(--result-type-width); border-right: 1px solid var(--border-subtle); }
-.Jump .Jump-resultTypeOptions { width: 100%; height: var(--rail-control-height); min-height: var(--rail-control-height); border: 0; border-radius: 0; background: transparent; opacity: 1; pointer-events: auto; }
-.Jump .Jump-resultTypeOptions .rankingTypeOption { position: absolute; top: 1px; bottom: 1px; width: 50%; min-height: 0; transition: none; }
-.Jump .Jump-resultTypeOptions .rankingTypeOption[data-result-type="single"] { left: 1px; }
-.Jump .Jump-resultTypeOptions .rankingTypeOption[data-result-type="average"] { left: 50%; }
-.Jump .Jump-resultTypeOptions .rankingTypeOption:not(.isSelected) { opacity: calc(1 - var(--rail-scroll-progress, 0)); }
-.Jump .Jump-resultTypeOptions .rankingTypeOption.isSelected { width: calc(50% + (50% * var(--rail-scroll-progress, 0))); }
-.Jump .Jump-resultTypeOptions[data-ranking-type="average"] .rankingTypeOption.isSelected { left: calc(50% * (1 - var(--rail-scroll-progress, 0))); }
-
+.Jump-resultTypeControl { position: relative; width: var(--result-type-width); min-width: 0; height: var(--rail-control-height); flex: 0 0 var(--result-type-width); }
 .Jump-resultTypeToggle, .Jump-pagerButton, .Jump-searchNavigationButton {
   display: flex; min-width: 40px; min-height: 40px; align-items: center; justify-content: center; gap: .5em; padding: .5em .75em; border: 0; background: transparent; color: var(--text-strong); cursor: pointer; font: inherit; white-space: nowrap; transition: background 150ms var(--cubic-move), color 150ms var(--cubic-move);
 }
-.Jump-resultTypeToggle { position: absolute; inset: 0; width: 100%; min-width: 0; flex: none; color: var(--text-muted); font-size: .875em; font-weight: 500; opacity: 0; pointer-events: none; }
-.Jump--rankings[data-compact-result-type="true"] .Jump-resultTypeOptions { opacity: 0; pointer-events: none; }
-.Jump--rankings[data-compact-result-type="true"] .Jump-resultTypeToggle { opacity: 1; pointer-events: auto; }
+.Jump-resultTypeToggle { position: absolute; inset: 0; width: 100%; min-width: 0; flex: none; justify-content: flex-start; padding-inline: .75em; color: var(--text-muted); font-size: .875em; font-weight: 500; }
 .Jump-resultTypeToggle:hover, .Jump-resultTypeToggle:focus-visible { background: transparent; color: var(--focus); outline: none; }
 .Jump-resultTypeToggle:focus-visible { box-shadow: inset 0 0 0 2px var(--focus-ring); }
 .Jump-resultTypeToggle:disabled { cursor: not-allowed; opacity: .45; }
+
+.genderPicker { position: relative; min-width: 5.5em; }
+.genderPicker svg { position: absolute; top: 50%; right: .55em; width: 1em; height: 1em; pointer-events: none; transform: translateY(-50%); }
+.Jump .genderPickerTrigger { height: var(--rail-control-height); min-height: var(--rail-control-height); padding: .5em 1.8em .5em .65em; border: 0; border-left: 1px solid var(--border-subtle); border-right: 1px solid var(--border-subtle); border-radius: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .875em; text-align: left; }
+.genderPickerMenu { z-index: 3; min-width: 8em; }
+.Jump-genderPicker { width: 5.5em; flex: 0 0 5.5em; }
+.Jump--rankings.Jump--withoutResultType .Jump-genderPicker { display: none; }
+.Jump .genderPickerTrigger:focus-visible { background: transparent; box-shadow: inset 0 0 0 2px var(--focus-ring); color: var(--text-muted); outline: none; }
 
 .Jump-regionPicker { width: var(--rail-select-width); min-width: 0; flex: 0 0 var(--rail-select-width); }
 .Jump .Jump-regionPicker .regionPickerTrigger { height: var(--rail-control-height); min-height: var(--rail-control-height); padding: .5em 2.5em .5em .75em; border: 0; border-radius: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .875em; text-align: left; text-overflow: ellipsis; }
@@ -145,7 +147,7 @@
 .Jump--pager:has(.Jump-pagerActions[aria-hidden="true"]) .Jump-searchNavigation { opacity: 1; pointer-events: auto; }
 
 @media only screen and (max-width: 600px) {
-  .Jump--rankings { --rail-control-height: 44px; --rail-event-width: 44px; --rail-select-width: min(8.5em, calc((100vw - 88px) / 2)); --expanded-result-type-width: var(--rail-select-width); font-size: 1rem; }
+  .Jump--rankings { --rail-control-height: 44px; --rail-event-width: 44px; --rail-gender-width: 5em; --rail-select-width: min(8.5em, calc((100vw - 88px - var(--rail-gender-width) - var(--result-type-width)) / 1)); font-size: 1rem; }
   .Jump-pagerButton, .Jump-searchNavigationButton { padding-inline: .5em; }
   .Jump--rankings.Jump--withHemisphere { --rail-event-width: min(7.25em, calc(100vw - 88px)); }
 }

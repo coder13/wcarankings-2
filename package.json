@@ -15,6 +15,7 @@
     "db:refresh-rankings": "node --env-file-if-exists=.env.local scripts/refresh-rankings.mjs",
     "db:refresh-system-lists": "node --env-file-if-exists=.env.local scripts/refresh-system-lists.mjs",
     "db:backfill-result-rankings": "node --env-file-if-exists=.env.local scripts/backfill-result-rankings.mjs",
+    "db:build-gender-result-rankings": "node --env-file-if-exists=.env.local scripts/build-gender-result-rankings.mjs",
     "db:backfill-person-year-rankings": "node --env-file-if-exists=.env.local scripts/backfill-person-year-rankings.mjs",
     "test": "npm run build && node --test tests/deploy-workflow.test.mjs tests/projection-transfer.test.mjs tests/rendered-html.test.mjs tests/scroll-engine.test.mjs tests/result-projections.test.mjs",
     "test:unit": "node --import ./tests/register-asset-loader.mjs --import tsx --test components/*/*.test.tsx tests/*.test.ts",

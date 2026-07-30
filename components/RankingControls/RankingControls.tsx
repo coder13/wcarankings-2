@@ -5,23 +5,29 @@ import { EventPicker } from "../EventPicker/EventPicker";
 import SelectChevronIcon from "../Icon/select-chevron.svg?react";
 import { RegionPicker } from "../RegionPicker/RegionPicker";
 import type { RegionOption, RegionSelection } from "../RankingsExplorer/types";
+import { GenderPicker } from "../GenderPicker/GenderPicker";
+import type { GenderFilter } from "@/lib/wca";
 
 export function RankingControls({
   eventId,
   rankingType,
+  gender,
   regions,
   regionSelection,
   onEventChange,
   onRankingTypeChange,
+  onGenderChange,
   onRegionChange,
   onEventPickerTrigger,
 }: {
   eventId: (typeof WCA_EVENTS)[number]["id"];
   rankingType: "single" | "average";
+  gender: readonly GenderFilter[];
   regions: RegionOption[];
   regionSelection: RegionSelection;
   onEventChange: (eventId: (typeof WCA_EVENTS)[number]["id"]) => void;
   onRankingTypeChange: (rankingType: "single" | "average") => void;
+  onGenderChange: (gender: GenderFilter[]) => void;
   onRegionChange: (region: RegionOption) => void;
   onEventPickerTrigger?: (trigger: HTMLButtonElement | null) => void;
 }) {
@@ -77,6 +83,7 @@ export function RankingControls({
           </label>
         ))}
       </fieldset>
+      <GenderPicker value={gender} onChange={onGenderChange} />
       {regions.length > 0 && (
         <RegionPicker
           options={regions}

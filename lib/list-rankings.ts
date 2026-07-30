@@ -46,7 +46,8 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
   );
   const search = (searchParams.get("search") ?? "").trim().slice(0, 80);
   const locate = (searchParams.get("locate") ?? "").trim().toUpperCase();
-  return { eventId, type, start, limit, search, locate };
+  const gender = searchParams.getAll("gender").flatMap((value) => value.split(",")).filter((value, index, values) => ["m", "f", "o"].includes(value) && values.indexOf(value) === index);
+  return { eventId, type, start, limit, search, locate, gender };
 }
 
 export async function loadListRankings(
@@ -90,15 +91,19 @@ export async function loadListRankings(
        JOIN ${source} AS ranking
          ON ranking.person_id = member.person_id
         AND ranking.event_id = ?
+       JOIN persons AS person_gender
+         ON person_gender.wca_id = ranking.person_id
+        AND person_gender.sub_id = 1
        WHERE member.list_id = ?
          AND ranking.world_rank > 0
+         AND (${input.gender.length ? input.gender.map(() => "(? = 'o' AND (person_gender.gender = 'o' OR person_gender.gender IS NULL)) OR person_gender.gender = ?").join(" OR ") : "1 = 1"})
      )
      SELECT *
      FROM scoped_rankings
      WHERE ${conditions.join(" AND ")}
      ORDER BY sub_rank
      LIMIT ?`,
-    [input.eventId, list.id, ...values.slice(2)],
+    [input.eventId, list.id, ...input.gender.flatMap((gender) => gender === "o" ? [gender, gender] : [gender, gender]), ...values.slice(2)],
     { rankingStatementTimeout: true },
   );
 

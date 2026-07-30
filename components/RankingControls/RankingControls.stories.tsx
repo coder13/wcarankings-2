@@ -32,10 +32,12 @@ const meta = {
   args: {
     eventId: "333",
     rankingType: "single",
+    gender: [],
     regions,
     regionSelection: { scope: "world", regionId: "" },
     onEventChange: () => undefined,
     onRankingTypeChange: () => undefined,
+    onGenderChange: () => undefined,
     onRegionChange: () => undefined,
   },
 } satisfies Meta<typeof RankingControls>;

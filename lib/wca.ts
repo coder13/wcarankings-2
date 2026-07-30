@@ -1,4 +1,6 @@
 export type RankingType = "single" | "average";
+export type GenderFilter = "m" | "f" | "o";
+export type GenderFilters = readonly GenderFilter[];
 export type RegionScope = "world" | "continent" | "country";
 export type RecordBadgeCode = "WR" | "AfR" | "AsR" | "ER" | "NaR" | "OcR" | "SaR" | "NR";
 
@@ -83,6 +85,23 @@ export const FALLBACK_COUNTRIES = [
 
 export function isRankingType(value: string | null): value is RankingType {
   return value === "single" || value === "average";
+}
+
+export function isGenderFilter(value: string | null): value is GenderFilter {
+  return value === "m" || value === "f" || value === "o";
+}
+
+export function genderFiltersLabel(values: GenderFilters) {
+  if (values.length === 0) return genderLabel(null);
+  if (values.length === 1) return genderLabel(values[0]);
+  return `${values.length} genders`;
+}
+
+export function genderLabel(value: GenderFilter | null) {
+  if (value === "m") return "Men";
+  if (value === "f") return "Women";
+  if (value === "o") return "Other";
+  return "Any";
 }
 
 export function isRegionScope(value: string | null): value is RegionScope {

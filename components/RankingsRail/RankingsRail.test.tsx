@@ -15,12 +15,13 @@ test("renders paired pager actions with useful labels", () => {
 });
 
 test("renders the ranking settings and search in one rail", () => {
-  const markup = renderToStaticMarkup(<RankingsControlsRail event={WCA_EVENTS[0]} onEventChange={() => undefined} rankingType="single" onRankingTypeChange={() => undefined} regions={regions} regionSelection={{ scope: "world", regionId: "" }} onRegionChange={() => undefined} compactResultType={false} findOpen={false} findQuery="" findError="" findLoading={false} findPending={false} findMatches={[]} findIndex={0} onSearchOpen={() => undefined} onSearchClose={() => undefined} onSearchQueryChange={() => undefined} onSearchCycle={() => undefined} />);
+  const markup = renderToStaticMarkup(<RankingsControlsRail event={WCA_EVENTS[0]} onEventChange={() => undefined} rankingType="single" onRankingTypeChange={() => undefined} gender={[]} onGenderChange={() => undefined} regions={regions} regionSelection={{ scope: "world", regionId: "" }} onRegionChange={() => undefined} compactResultType={false} findOpen={false} findQuery="" findError="" findLoading={false} findPending={false} findMatches={[]} findIndex={0} onSearchOpen={() => undefined} onSearchClose={() => undefined} onSearchQueryChange={() => undefined} onSearchCycle={() => undefined} />);
   assert.match(markup, /class="Jump RankingsRail Jump--rankings"/);
   assert.match(markup, /cubing-icon event-333/);
   assert.match(markup, /aria-label="3x3x3 Cube"/);
   assert.match(markup, /Single/);
   assert.match(markup, /Search names or WCA IDs/);
+  assert.match(markup, /aria-label="Gender"/);
 });
 
 test("shows previous and next person actions while searching", () => {

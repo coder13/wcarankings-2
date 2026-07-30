@@ -1,4 +1,4 @@
-@import "@cubing/icons/css";
+@import "../components/EventPicker/cubing-icons.css";
 @import "./theme.css";
 @import "../components/EventPicker/EventPicker.css";
 @import "../components/Dropdown/Dropdown.css";
@@ -521,11 +521,15 @@ main {
   }
 
   .selectInput select,
+  .genderPickerTrigger,
   .rankingTypeToggle,
   .regionPickerTrigger {
     height: 44px;
     min-height: 44px;
   }
+
+  .genderPicker { min-width: 0; flex: 0 1 5.5em; }
+  .genderPickerTrigger { min-height: 40px; padding-inline: .45em 1.5em; font-size: .75em; }
 
   .regionPickerTrigger {
     height: 44px;

@@ -9,7 +9,8 @@ import CloseIcon from "../Icon/close.svg?react";
 import CompassIcon from "../Icon/compass.svg?react";
 import SearchIcon from "../Icon/search.svg?react";
 import { formatRankingNumber, type RankingEntry, type RegionOption, type RegionSelection } from "../RankingsExplorer/types";
-import { WCA_EVENTS } from "@/lib/wca";
+import type { GenderFilter } from "@/lib/wca";
+import { GenderPicker } from "../GenderPicker/GenderPicker";
 
 type AuthProfileResponse = {
   profile: { wcaId: string } | null;
@@ -85,13 +86,15 @@ function RailSearch({ searchInputRef, findOpen, findQuery, findError, findLoadin
   );
 }
 
-export function RankingsControlsRail<T extends EventPickerOption>({ event, eventOptions, additionalEventOptions, onEventChange, rankingType, onRankingTypeChange, regions, regionSelection, onRegionChange, onEventPickerTrigger, compactResultType = false, showResultType = true, showEventPicker = true, showRegion = true, showSearch = true, hemisphere, onHemisphereChange, ...searchProps }: {
+export function RankingsControlsRail<T extends EventPickerOption>({ event, eventOptions, additionalEventOptions, onEventChange, rankingType, onRankingTypeChange, gender, onGenderChange, regions, regionSelection, onRegionChange, onEventPickerTrigger, compactResultType = false, showResultType = true, showEventPicker = true, showRegion = true, showGender = true, showSearch = true, hemisphere, onHemisphereChange, ...searchProps }: {
   event: T;
   eventOptions?: readonly T[];
   additionalEventOptions?: readonly T[];
   onEventChange: (eventId: T["id"]) => void;
   rankingType: "single" | "average";
   onRankingTypeChange: (rankingType: "single" | "average") => void;
+  gender: readonly GenderFilter[];
+  onGenderChange: (gender: GenderFilter[]) => void;
   regions: RegionOption[];
   regionSelection: RegionSelection;
   onRegionChange: (region: RegionOption) => void;
@@ -100,6 +103,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
   showResultType?: boolean;
   showEventPicker?: boolean;
   showRegion?: boolean;
+  showGender?: boolean;
   showSearch?: boolean;
   hemisphere?: "north" | "south";
   onHemisphereChange?: (hemisphere: "north" | "south") => void;
@@ -117,18 +121,9 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
           </button>
         ) : null}
         {showResultType && <div className="Jump-resultTypeControl">
-          <fieldset className="rankingTypeToggle Jump-resultTypeOptions" data-ranking-type={rankingType} aria-label="Ranking type" aria-hidden={compactResultType}>
-            <legend className="visuallyHidden">Ranking type</legend>
-            {(["single", "average"] as const).map((option) => {
-              const disabled = option === "average" && event.id === "333mbf";
-              return <label className={`rankingTypeOption${rankingType === option ? " isSelected" : ""}${disabled ? " isDisabled" : ""}`} data-result-type={option} key={option}>
-                <input type="radio" name="rail-ranking-type" value={option} checked={rankingType === option} disabled={disabled} tabIndex={compactResultType ? -1 : 0} onChange={() => onRankingTypeChange(option)} />
-                <span>{option === "single" ? "Single" : "Average"}</span>
-              </label>;
-            })}
-          </fieldset>
-          <button className="Jump-resultTypeToggle" type="button" tabIndex={compactResultType ? 0 : -1} aria-hidden={!compactResultType} disabled={event.id === "333mbf"} aria-label={`Switch to ${nextType} rankings`} onClick={() => onRankingTypeChange(nextType)}>{rankingType === "single" ? "Single" : "Average"}</button>
+          <button className="Jump-resultTypeToggle" type="button" aria-label={`Switch to ${nextType} rankings`} disabled={event.id === "333mbf"} onClick={() => onRankingTypeChange(nextType)}>{rankingType === "single" ? "Single" : "Average"}</button>
         </div>}
+        {showGender && <GenderPicker className="Jump-genderPicker" value={gender} onChange={onGenderChange} />}
         {showRegion && <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} />}
       </div>
       {showSearch && <RailSearch {...searchProps} />}

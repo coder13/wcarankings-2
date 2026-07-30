@@ -19,6 +19,7 @@ test("normalizes list ranking query parameters", () => {
     limit: 100,
     search: "Max",
     locate: "",
+    gender: [],
   });
 });
 
@@ -30,4 +31,5 @@ test("forces Multi-Blind to single rankings", () => {
     }),
   );
   assert.equal(input.type, "single");
+  assert.deepEqual(input.gender, []);
 });
