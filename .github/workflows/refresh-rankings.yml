@@ -1,0 +1,86 @@
+name: Refresh Ranking Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Re-import the current WCA export and rebuild projections even when production is already current.
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      dry_run:
+        description: Download/cache the latest WCA export without importing or rebuilding projections.
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+  schedule:
+    - cron: "17 5 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-ranking-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      SERVER_IP: ${{ secrets.SERVER_IP }}
+      SERVER_USER: www
+
+    steps:
+      - name: Configure deployment SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Refresh production ranking data
+        env:
+          FORCE_REFRESH: ${{ inputs.force || 'false' }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          sync_args=""
+          if [ "$FORCE_REFRESH" = "true" ]; then
+            sync_args="$sync_args --force"
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            sync_args="$sync_args --dry-run"
+          fi
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "SYNC_ARGS='$sync_args' sh -s" <<'REMOTE'
+            set -eu
+            cd /srv/wcarankings
+            if ! command -v flock >/dev/null 2>&1; then
+              echo "flock is required to serialize ranking refreshes." >&2
+              exit 1
+            fi
+            flock -n /tmp/wcarankings-sync.lock sh -c '
+              set -eu
+              docker compose run --rm flyway migrate
+              docker compose run --rm app node /app/scripts/sync-wca-export.mjs $SYNC_ARGS
+              docker compose run --rm app node /app/scripts/check-ranking-projections.mjs
+            '
+          REMOTE
+
+      - name: Summarize refresh
+        if: always()
+        run: |
+          {
+            echo "### Ranking refresh"
+            echo "- Force refresh: ${{ inputs.force || 'false' }}"
+            echo "- Dry run: ${{ inputs.dry_run || 'false' }}"
+            echo "- Schedule runs at 05:17 UTC daily."
+          } >> "$GITHUB_STEP_SUMMARY"

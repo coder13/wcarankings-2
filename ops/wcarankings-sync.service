@@ -8,5 +8,4 @@ OnFailure=wcarankings-sync-alert.service
 Type=oneshot
 User=www
 WorkingDirectory=/srv/wcarankings
-ExecStartPre=/usr/bin/docker compose run --rm flyway migrate
-ExecStart=/usr/bin/docker compose run --rm app node /app/scripts/sync-wca-export.mjs
+ExecStart=/usr/bin/flock -n /tmp/wcarankings-sync.lock /bin/sh -lc '/usr/bin/docker compose run --rm flyway migrate && /usr/bin/docker compose run --rm app node /app/scripts/sync-wca-export.mjs && /usr/bin/docker compose run --rm app node /app/scripts/check-ranking-projections.mjs'

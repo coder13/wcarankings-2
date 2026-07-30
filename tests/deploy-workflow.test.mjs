@@ -6,6 +6,14 @@ const workflow = await readFile(
   new URL("../.github/workflows/deploy.yml", import.meta.url),
   "utf8",
 );
+const refreshWorkflow = await readFile(
+  new URL("../.github/workflows/refresh-rankings.yml", import.meta.url),
+  "utf8",
+);
+const syncService = await readFile(
+  new URL("../ops/wcarankings-sync.service", import.meta.url),
+  "utf8",
+);
 
 test("builds deploy images from main when PR images are unavailable", () => {
   assert.match(workflow, /id: pull-images/);
@@ -60,4 +68,18 @@ test("builds projection transfers on Actions before publishing them atomically",
     workflow,
     /docker compose run --rm app node \/app\/scripts\/backfill-result-entries\.mjs/,
   );
+});
+
+test("supports manual and scheduled production ranking refreshes", () => {
+  assert.match(refreshWorkflow, /workflow_dispatch:/);
+  assert.match(refreshWorkflow, /schedule:/);
+  assert.match(refreshWorkflow, /cron: "17 5 \* \* \*"/);
+  assert.match(refreshWorkflow, /force:/);
+  assert.match(refreshWorkflow, /dry_run:/);
+  assert.match(refreshWorkflow, /flock -n \/tmp\/wcarankings-sync\.lock/);
+  assert.match(refreshWorkflow, /docker compose run --rm flyway migrate/);
+  assert.match(refreshWorkflow, /sync-wca-export\.mjs \$SYNC_ARGS/);
+  assert.match(refreshWorkflow, /check-ranking-projections\.mjs/);
+  assert.match(syncService, /flock -n \/tmp\/wcarankings-sync\.lock/);
+  assert.match(syncService, /check-ranking-projections\.mjs/);
 });
