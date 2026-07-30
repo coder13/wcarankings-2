@@ -18,6 +18,21 @@ test("renders the selected region input", () => {
   assert.doesNotMatch(markup, /aria-label="Clear region"/);
 });
 
+test("can remain visible but disabled for a single list region", () => {
+  const markup = renderToStaticMarkup(
+    <RegionPicker
+      disabled
+      options={[{ key: "world", scope: "world", regionId: "", label: "World" }]}
+      selected={{ scope: "world", regionId: "" }}
+      onChange={() => undefined}
+    />,
+  );
+
+  assert.match(markup, /disabled=""/);
+  assert.match(markup, /regionPicker isDisabled/);
+  assert.match(markup, /aria-label="Region"/);
+});
+
 test("renders a clear button in place of the chevron for a specific region", () => {
   const markup = renderToStaticMarkup(
     <RegionPicker

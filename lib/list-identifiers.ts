@@ -5,6 +5,7 @@ export const LIST_PUBLIC_ID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 export const RESERVED_LIST_ALIASES = new Set([
   "api",
+  "dynamic",
   "luke",
   "max",
   "me",
@@ -50,5 +51,6 @@ export function slugifyListName(value: string) {
 }
 
 export function normalizeListLookup(value: string) {
-  return normalizeListPublicId(value) ?? normalizeSystemAlias(value);
+  const [publicId] = value.split("--", 1);
+  return normalizeListPublicId(publicId) ?? normalizeSystemAlias(value);
 }

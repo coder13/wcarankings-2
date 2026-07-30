@@ -48,17 +48,18 @@
   margin-bottom: 0;
   border: 0;
   border-radius: 0;
+  background-color: var(--surface);
   font-size: 1.0625em;
   font-weight: 300;
   transition: opacity var(--t-duration) ease var(--t-animation-delay), background-color 40ms ease;
 }
 
 .row--alternate {
-  background-color: var(--surface-muted);
+  background-color: color-mix(in srgb, var(--primary) 8%, var(--surface));
 }
 
 .listItem:hover .row {
-  background-color: var(--surface-hover);
+  filter: brightness(0.97);
 }
 
 .listItem:focus-visible {
@@ -80,7 +81,17 @@
 }
 
 .listItem:hover .row--searchMatch {
-  background-color: var(--search-match-hover);
+  filter: brightness(0.97);
+}
+
+:root[data-theme="dark"] .listItem:hover .row {
+  filter: brightness(1.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .listItem:hover .row {
+    filter: brightness(1.08);
+  }
 }
 
 .listItem:focus-visible .row--searchMatch {

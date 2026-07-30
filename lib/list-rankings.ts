@@ -4,6 +4,9 @@ import {
   getRecordBadges,
   isEventId,
   isRankingType,
+  normalizeGenderFilters,
+  parseRegionQuery,
+  type GenderFilter,
   type RankingType,
 } from "@/lib/wca";
 import type { ListSummary } from "@/lib/lists";
@@ -40,24 +43,55 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
   if (eventId !== "333mbf" && isRankingType(rawType)) type = rawType;
   const rawStart = Number(searchParams.get("start"));
   const start = Number.isFinite(rawStart) ? Math.max(0, Math.floor(rawStart)) : 0;
-  const limit = Math.max(
+  const pageLimit = Math.max(
     1,
     Math.min(100, Math.floor(Number(searchParams.get("limit")) || 50)),
   );
   const search = (searchParams.get("search") ?? "").trim().slice(0, 80);
   const locate = (searchParams.get("locate") ?? "").trim().toUpperCase();
-  const gender = searchParams.getAll("gender").flatMap((value) => value.split(",")).filter((value, index, values) => ["m", "f", "o"].includes(value) && values.indexOf(value) === index);
-  return { eventId, type, start, limit, search, locate, gender };
+  const searchLimit = Math.max(
+    1,
+    Math.min(500, Math.floor(Number(searchParams.get("searchLimit")) || 50)),
+  );
+  const limit = search && !locate ? searchLimit : pageLimit;
+  const region = parseRegionQuery(searchParams.get("region"));
+  const gender = normalizeGenderFilters(
+    searchParams.getAll("gender")
+      .flatMap((value) => value.split(","))
+      .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
+  );
+  return { eventId, type, start, limit, search, locate, region, gender };
 }
 
-export async function loadListRankings(
-  list: ListSummary,
+type ScopedRankingSource = {
+  from: (rankingTable: string) => string;
+  conditions: string[];
+  values: unknown[];
+};
+
+async function loadScopedRankings(
+  scopedSource: ScopedRankingSource,
   searchParams: URLSearchParams,
 ) {
   const input = parseListRankingInput(searchParams);
   const source = rankingTable(input.type);
+  const scopedConditions = [...scopedSource.conditions, "ranking.world_rank > 0"];
+  const scopedValues = [...scopedSource.values];
+  if (input.region.scope === "continent") {
+    scopedConditions.push("ranking.continent_id = ?");
+    scopedValues.push(input.region.regionId);
+  } else if (input.region.scope === "country") {
+    scopedConditions.push("ranking.country_id = ?");
+    scopedValues.push(input.region.regionId);
+  }
+  if (input.gender.length) {
+    scopedConditions.push(
+      `(${input.gender.map(() => "(? = 'o' AND (person_gender.gender = 'o' OR person_gender.gender IS NULL)) OR person_gender.gender = ?").join(" OR ")})`,
+    );
+    scopedValues.push(...input.gender.flatMap((gender) => [gender, gender]));
+  }
   const conditions = ["sub_rank > ?"];
-  const values: unknown[] = [list.id, input.eventId, input.start];
+  const values: unknown[] = [input.start];
   if (input.locate) {
     conditions.push("person_id = ?");
     values.push(input.locate);
@@ -87,23 +121,18 @@ export async function loadListRankings(
          ranking.is_world_record,
          ranking.is_continent_record,
          ranking.is_country_record
-       FROM list_members AS member
-       JOIN ${source} AS ranking
-         ON ranking.person_id = member.person_id
-        AND ranking.event_id = ?
+       FROM ${scopedSource.from(source)}
        JOIN persons AS person_gender
          ON person_gender.wca_id = ranking.person_id
         AND person_gender.sub_id = 1
-       WHERE member.list_id = ?
-         AND ranking.world_rank > 0
-         AND (${input.gender.length ? input.gender.map(() => "(? = 'o' AND (person_gender.gender = 'o' OR person_gender.gender IS NULL)) OR person_gender.gender = ?").join(" OR ") : "1 = 1"})
+       WHERE ${scopedConditions.join("\n         AND ")}
      )
      SELECT *
      FROM scoped_rankings
      WHERE ${conditions.join(" AND ")}
      ORDER BY sub_rank
      LIMIT ?`,
-    [input.eventId, list.id, ...input.gender.flatMap((gender) => gender === "o" ? [gender, gender] : [gender, gender]), ...values.slice(2)],
+    [input.eventId, ...scopedValues, ...values],
     { rankingStatementTimeout: true },
   );
 
@@ -111,14 +140,6 @@ export async function loadListRankings(
   const total = Number(result.rows[0]?.total ?? 0);
   const metadata = await getCurrentRankingsMetadata();
   return {
-    list: {
-      publicId: list.publicId,
-      systemAlias: list.systemAlias,
-      name: list.name,
-      kind: list.kind,
-      memberCount: list.memberCount,
-      membershipVersion: list.membershipVersion,
-    },
     entries: selectedRows.map((row) => ({
       rank: Number(row.rank),
       subRank: Number(row.sub_rank),
@@ -146,4 +167,45 @@ export async function loadListRankings(
     total,
     exportDate: metadata.exportDate,
   };
+}
+
+export async function loadListRankings(
+  list: ListSummary,
+  searchParams: URLSearchParams,
+) {
+  const rankings = await loadScopedRankings({
+    from: (source) => `list_members AS member
+       JOIN ${source} AS ranking
+         ON ranking.person_id = member.person_id
+        AND ranking.event_id = ?`,
+    conditions: ["member.list_id = ?"],
+    values: [list.id],
+  }, searchParams);
+  return {
+    list: {
+      publicId: list.publicId,
+      systemAlias: list.systemAlias,
+      name: list.name,
+      kind: list.kind,
+      memberCount: list.memberCount,
+      membershipVersion: list.membershipVersion,
+    },
+    ...rankings,
+  };
+}
+
+export async function loadDynamicListRankings(
+  personIds: string[],
+  searchParams: URLSearchParams,
+) {
+  if (!personIds.length) {
+    const metadata = await getCurrentRankingsMetadata();
+    return { entries: [], hasMore: false, nextStart: null, total: 0, exportDate: metadata.exportDate };
+  }
+  const placeholders = personIds.map(() => "?").join(",");
+  return loadScopedRankings({
+    from: (source) => `${source} AS ranking`,
+    conditions: ["ranking.event_id = ?", `ranking.person_id IN (${placeholders})`],
+    values: [...personIds],
+  }, searchParams);
 }

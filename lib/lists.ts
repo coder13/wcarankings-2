@@ -9,6 +9,7 @@ import {
 } from "@/lib/list-identifiers";
 
 export type ListVisibility = "public" | "private";
+export type ListJoinPolicy = "open" | "closed";
 export type ListKind = "user" | "system";
 
 export type ListSummary = {
@@ -20,6 +21,7 @@ export type ListSummary = {
   slug: string;
   description: string | null;
   visibility: ListVisibility;
+  joinPolicy: ListJoinPolicy;
   memberCount: number;
   membershipVersion: number;
   systemDefinitionVersion: number | null;
@@ -44,6 +46,7 @@ type ListRow = {
   slug: string;
   description: string | null;
   visibility: ListVisibility;
+  join_policy: ListJoinPolicy;
   member_count: number;
   membership_version: number;
   system_definition_version: number | null;
@@ -117,6 +120,7 @@ function toListSummary(row: ListRow): ListSummary {
     slug: row.slug,
     description: row.description,
     visibility: row.visibility,
+    joinPolicy: row.join_policy,
     memberCount: Number(row.member_count),
     membershipVersion: Number(row.membership_version),
     systemDefinitionVersion:
@@ -148,6 +152,7 @@ const LIST_COLUMNS = `
   l.slug,
   l.description,
   l.visibility,
+  l.join_policy,
   l.member_count,
   l.membership_version,
   l.system_definition_version,
@@ -177,6 +182,13 @@ function validateDescription(value: unknown) {
 function validateVisibility(value: unknown): ListVisibility {
   if (value !== "public" && value !== "private") {
     throw new ListValidationError("Choose public or private visibility.");
+  }
+  return value;
+}
+
+function validateJoinPolicy(value: unknown): ListJoinPolicy {
+  if (value !== "open" && value !== "closed") {
+    throw new ListValidationError("Choose open or closed membership.");
   }
   return value;
 }
@@ -225,10 +237,11 @@ export async function resolveList(lookup: string) {
   return toListSummary(result.rows[0]);
 }
 
-export function assertCanViewList(list: ListSummary, user: AuthUser | null) {
-  if (list.visibility === "public") return;
-  if (user && list.owner?.id === user.id) return;
-  throw new ListNotFoundError();
+export function assertCanViewList(_list: ListSummary, _user: AuthUser | null) {
+  // Visibility only controls whether a user-created list is shown in the
+  // public directory. Every list can be opened through its direct URL.
+  void _list;
+  void _user;
 }
 
 function assertOwner(row: ListRow, user: AuthUser) {
@@ -236,7 +249,6 @@ function assertOwner(row: ListRow, user: AuthUser) {
     throw new ListForbiddenError("System lists are read-only.");
   }
   if (Number(row.owner_user_id) !== user.id) {
-    if (row.visibility === "private") throw new ListNotFoundError();
     throw new ListForbiddenError();
   }
 }
@@ -276,29 +288,115 @@ export async function createList(
   input: {
     name: unknown;
     description?: unknown;
-    visibility: unknown;
+    visibility?: unknown;
+    joinPolicy?: unknown;
+    personIds?: unknown;
   },
 ) {
   const name = validateName(input.name);
   const description = validateDescription(input.description);
-  const visibility = validateVisibility(input.visibility);
+  const visibility =
+    input.visibility === undefined ? "private" : validateVisibility(input.visibility);
+  const joinPolicy =
+    input.joinPolicy === undefined ? "closed" : validateJoinPolicy(input.joinPolicy);
   const slug = slugifyListName(name);
+  const rawPersonIds = Array.isArray(input.personIds) ? input.personIds : [];
+  const normalizedPersonIds = [...new Set(rawPersonIds.map(normalizeWcaId).filter(Boolean))] as string[];
+  const invalid = rawPersonIds
+    .filter((personId) => !normalizeWcaId(personId))
+    .map((personId) => String(personId).slice(0, 40));
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const publicId = generateListPublicId();
     try {
-      await withTransaction(async (connection) => {
+      const membership = await withTransaction(async (connection) => {
         const [result] = await connection.execute<ResultSetHeader>(
           `INSERT INTO lists
-            (kind, public_id, owner_user_id, name, slug, description, visibility)
-           VALUES ('user', ?, ?, ?, ?, ?, ?)`,
-          [publicId, user.id, name, slug, description, visibility],
+            (kind, public_id, owner_user_id, name, slug, description, visibility, join_policy)
+           VALUES ('user', ?, ?, ?, ?, ?, ?, ?)`,
+          [publicId, user.id, name, slug, description, visibility, joinPolicy],
         );
+        const listId = Number(result.insertId);
+        const valid = new Set<string>();
+        const blocked = new Set<string>();
+        if (normalizedPersonIds.length) {
+          const placeholders = normalizedPersonIds.map(() => "?").join(",");
+          const [people] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
+            `SELECT wca_id FROM persons WHERE sub_id = 1 AND wca_id IN (${placeholders})`,
+            normalizedPersonIds,
+          );
+          people.forEach((person) => valid.add(person.wca_id));
+          const validIds = normalizedPersonIds.filter((personId) => valid.has(personId));
+          if (validIds.length) {
+            const validPlaceholders = validIds.map(() => "?").join(",");
+            const [optedOut] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
+              `SELECT wca_id FROM app_users WHERE allow_list_inclusion = FALSE AND wca_id IN (${validPlaceholders})`,
+              validIds,
+            );
+            optedOut.forEach((person) => blocked.add(person.wca_id));
+            const added = validIds.filter((personId) => !blocked.has(personId));
+            if (added.length) {
+              await connection.execute(
+                `INSERT INTO list_members (list_id, person_id, added_by_user_id, source)
+                 VALUES ${added.map(() => "(?, ?, ?, 'bulk_import')").join(",")}`,
+                added.flatMap((personId) => [listId, personId, user.id]),
+              );
+              await connection.execute(
+                "UPDATE lists SET member_count = ?, membership_version = membership_version + 1 WHERE id = ?",
+                [added.length, listId],
+              );
+            }
+          }
+        }
         await activity(connection, {
-          listId: Number(result.insertId),
+          listId,
           actorUserId: user.id,
           eventType: "list.created",
-          eventData: { visibility },
+          eventData: { visibility, joinPolicy, memberCount: normalizedPersonIds.length },
+        });
+        return {
+          invalid: [...invalid, ...normalizedPersonIds.filter((personId) => !valid.has(personId))],
+          blocked: [...blocked],
+        };
+      });
+      return { list: await resolveList(publicId), ...membership };
+    } catch (error) {
+      if (!isDuplicateKey(error)) throw error;
+    }
+  }
+  throw new Error("Could not allocate a unique list ID.");
+}
+
+export async function cloneList(user: AuthUser, source: ListSummary) {
+  const name = validateName(`${source.name.slice(0, 95)} copy`);
+  const slug = slugifyListName(name);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const publicId = generateListPublicId();
+    try {
+      await withTransaction(async (connection) => {
+        const [created] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO lists
+            (kind, public_id, owner_user_id, name, slug, description, visibility, join_policy)
+           VALUES ('user', ?, ?, ?, ?, ?, 'private', 'closed')`,
+          [publicId, user.id, name, slug, source.description],
+        );
+        const listId = Number(created.insertId);
+        const [members] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO list_members (list_id, person_id, added_by_user_id, source)
+           SELECT ?, person_id, ?, 'bulk_import'
+           FROM list_members
+           WHERE list_id = ?`,
+          [listId, user.id, source.id],
+        );
+        await connection.execute(
+          "UPDATE lists SET member_count = ?, membership_version = membership_version + 1 WHERE id = ?",
+          [members.affectedRows, listId],
+        );
+        await activity(connection, {
+          listId,
+          actorUserId: user.id,
+          eventType: "list.cloned",
+          eventData: { sourceListId: source.publicId ?? source.systemAlias, memberCount: members.affectedRows },
         });
       });
       return resolveList(publicId);
@@ -309,6 +407,14 @@ export async function createList(
   throw new Error("Could not allocate a unique list ID.");
 }
 
+export async function listMemberIds(list: ListSummary) {
+  const result = await query<RowDataPacket & { person_id: string }>(
+    "SELECT person_id FROM list_members WHERE list_id = ? ORDER BY person_id",
+    [list.id],
+  );
+  return result.rows.map((row) => row.person_id);
+}
+
 export async function updateList(
   user: AuthUser,
   lookup: string,
@@ -316,6 +422,7 @@ export async function updateList(
     name?: unknown;
     description?: unknown;
     visibility?: unknown;
+    joinPolicy?: unknown;
   },
 ) {
   await withTransaction(async (connection) => {
@@ -330,17 +437,21 @@ export async function updateList(
       input.visibility === undefined
         ? row.visibility
         : validateVisibility(input.visibility);
+    const joinPolicy =
+      input.joinPolicy === undefined
+        ? row.join_policy
+        : validateJoinPolicy(input.joinPolicy);
     await connection.execute(
       `UPDATE lists
-       SET name = ?, slug = ?, description = ?, visibility = ?
+       SET name = ?, slug = ?, description = ?, visibility = ?, join_policy = ?
        WHERE id = ?`,
-      [name, slugifyListName(name), description, visibility, row.id],
+      [name, slugifyListName(name), description, visibility, joinPolicy, row.id],
     );
     await activity(connection, {
       listId: Number(row.id),
       actorUserId: user.id,
       eventType: "list.updated",
-      eventData: { visibility },
+      eventData: { visibility, joinPolicy },
     });
   });
   return resolveList(lookup);
@@ -375,6 +486,36 @@ export async function listOwnedLists(user: AuthUser) {
   return result.rows.map(toListSummary);
 }
 
+export type PublicListSummary = Pick<
+  ListSummary,
+  "publicId" | "systemAlias" | "slug" | "name" | "memberCount" | "kind"
+> & {
+  createdBy: string | null;
+};
+
+export async function listPublicLists() {
+  const result = await query<ListRow>(
+    `SELECT ${LIST_COLUMNS}
+     FROM lists AS l
+     LEFT JOIN app_users AS owner ON owner.id = l.owner_user_id
+     WHERE l.visibility = 'public'
+       AND l.deleted_at IS NULL
+     ORDER BY l.kind = 'system' DESC, l.name ASC, l.id ASC`,
+  );
+  return result.rows.map((row): PublicListSummary => {
+    const list = toListSummary(row);
+    return {
+      publicId: list.publicId,
+      systemAlias: list.systemAlias,
+      slug: list.slug,
+      name: list.name,
+      memberCount: list.memberCount,
+      kind: list.kind,
+      createdBy: list.kind === "system" ? null : list.owner?.name ?? "WCA member",
+    };
+  });
+}
+
 export async function listContainingUser(user: AuthUser) {
   const result = await query<ListRow>(
     `SELECT ${LIST_COLUMNS}
@@ -387,6 +528,36 @@ export async function listContainingUser(user: AuthUser) {
     [user.wcaId],
   );
   return result.rows.map(toListSummary);
+}
+
+export type ListMembershipState = "member" | "pending" | "not_member";
+
+export async function getListMembershipState(
+  list: ListSummary,
+  user: AuthUser | null,
+): Promise<ListMembershipState | null> {
+  if (!user) return null;
+  const membership = await query<RowDataPacket>(
+    `SELECT 1
+     FROM list_members
+     WHERE list_id = ? AND person_id = ?
+     LIMIT 1`,
+    [list.id, user.wcaId],
+  );
+  if (membership.rows.length > 0) return "member";
+
+  // System lists do not accept membership requests, but their membership is
+  // still useful for list-scoped UI such as the "My rank" action.
+  if (list.kind !== "user") return "not_member";
+
+  const request = await query<RowDataPacket>(
+    `SELECT 1
+     FROM list_membership_requests
+     WHERE list_id = ? AND person_id = ? AND status = 'pending'
+     LIMIT 1`,
+    [list.id, user.wcaId],
+  );
+  return request.rows.length > 0 ? "pending" : "not_member";
 }
 
 export async function listMembers(
@@ -583,12 +754,6 @@ export async function removeSelfFromList(user: AuthUser, lookup: string) {
       [row.id, user.wcaId],
     );
     if (result.affectedRows === 0) {
-      if (
-        row.visibility === "private" &&
-        Number(row.owner_user_id) !== user.id
-      ) {
-        throw new ListNotFoundError();
-      }
       throw new ListConflictError("You are not currently included in this list.");
     }
     await connection.execute(
@@ -629,6 +794,34 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
     if (memberRows.length > 0) {
       throw new ListConflictError("You are already included in this list.");
     }
+    if (row.join_policy === "open") {
+      await connection.execute(
+        "DELETE FROM list_exclusions WHERE list_id = ? AND person_id = ?",
+        [row.id, user.wcaId],
+      );
+      const [insert] = await connection.execute<ResultSetHeader>(
+        `INSERT IGNORE INTO list_members
+          (list_id, person_id, added_by_user_id, source)
+         VALUES (?, ?, ?, 'self_request')`,
+        [row.id, user.wcaId, user.id],
+      );
+      if (insert.affectedRows > 0) {
+        await connection.execute(
+          `UPDATE lists
+           SET member_count = member_count + 1,
+               membership_version = membership_version + 1
+           WHERE id = ?`,
+          [row.id],
+        );
+      }
+      await activity(connection, {
+        listId: Number(row.id),
+        actorUserId: user.id,
+        eventType: "membership.joined",
+        personId: user.wcaId,
+      });
+      return { status: "joined" as const };
+    }
     await connection.execute(
       `INSERT INTO list_membership_requests
         (list_id, requester_user_id, person_id, status, created_at, resolved_at, resolved_by_user_id)
@@ -647,13 +840,13 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
       eventType: "membership.requested",
       personId: user.wcaId,
     });
+    return { status: "pending" as const };
   });
 }
 
 export async function listMembershipRequests(user: AuthUser, lookup: string) {
   const list = await resolveList(lookup);
   if (list.kind !== "user" || list.owner?.id !== user.id) {
-    if (list.visibility === "private") throw new ListNotFoundError();
     throw new ListForbiddenError();
   }
   const result = await query<RequestRow>(
@@ -669,8 +862,8 @@ export async function listMembershipRequests(user: AuthUser, lookup: string) {
      FROM list_membership_requests AS request
      JOIN app_users AS requester ON requester.id = request.requester_user_id
      WHERE request.list_id = ?
+       AND request.status = 'pending'
      ORDER BY
-      request.status = 'pending' DESC,
       request.created_at`,
     [list.id],
   );

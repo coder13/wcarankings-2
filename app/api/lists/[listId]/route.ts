@@ -6,7 +6,9 @@ import {
 } from "@/lib/api";
 import {
   assertCanViewList,
+  cloneList,
   deleteList,
+  listMemberIds,
   resolveList,
   updateList,
 } from "@/lib/lists";
@@ -25,6 +27,17 @@ export async function GET(request: Request, context: RouteContext) {
       getAuthUser(request),
     ]);
     assertCanViewList(list, user);
+    if (new URL(request.url).searchParams.get("format") === "csv") {
+      const personIds = await listMemberIds(list);
+      const filename = `${list.publicId ?? list.systemAlias ?? "list"}.csv`;
+      return new Response(`${personIds.join("\n")}${personIds.length ? "\n" : ""}`, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Cache-Control": "private, no-store",
+        },
+      });
+    }
     return Response.json(
       { list },
       {
@@ -41,6 +54,20 @@ export async function GET(request: Request, context: RouteContext) {
   }
 }
 
+export async function POST(request: Request, context: RouteContext) {
+  try {
+    assertSameOrigin(request);
+    const user = await requireAuthUser(request);
+    const { listId } = await context.params;
+    const source = await resolveList(listId);
+    assertCanViewList(source, user);
+    const list = await cloneList(user, source);
+    return Response.json({ list }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    return apiError(error);
+  }
+}
+
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     assertSameOrigin(request);
@@ -51,6 +78,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       name: body.name,
       description: body.description,
       visibility: body.visibility,
+      joinPolicy: body.joinPolicy,
     });
     return Response.json(
       { list },

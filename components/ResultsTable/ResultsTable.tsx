@@ -26,6 +26,10 @@ export function ResultsTable({
   searchMatchPersonIds,
   measureElement,
   onRowNavigate,
+  memberSelectionMode,
+  selectedMemberIds,
+  onMemberToggle,
+  onMemberContextMenu,
 }: {
   entries: RankingEntry[];
   listRef?: Ref<HTMLOListElement>;
@@ -44,6 +48,10 @@ export function ResultsTable({
   searchMatchPersonIds?: ReadonlySet<string>;
   measureElement: (element: Element | null) => void;
   onRowNavigate: (rowIndex: number, direction: -1 | 1) => void;
+  memberSelectionMode?: boolean;
+  selectedMemberIds?: ReadonlySet<string>;
+  onMemberToggle?: (personId: string) => void;
+  onMemberContextMenu?: (entry: RankingEntry, position: { x: number; y: number }) => void;
 }) {
   if (loading && showLoading && !preserveListDuringLoad && entries.length === 0) {
     return <div className="listMessage">Loading rankings…</div>;
@@ -75,6 +83,10 @@ export function ResultsTable({
               }
               rowIndex={virtualRow.index}
               onNavigate={onRowNavigate}
+              selectionMode={memberSelectionMode}
+              selected={selectedMemberIds?.has(entry.personId)}
+              onToggleSelected={onMemberToggle}
+              onMemberContextMenu={onMemberContextMenu}
             />
           );
         } else if (hasMore) {

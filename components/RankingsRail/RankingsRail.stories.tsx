@@ -4,7 +4,7 @@ import { WCA_EVENTS } from "@/lib/wca";
 import { ALL_EVENT_RANKING_OPTIONS } from "../EventPicker/allEventRankingOptions";
 import type { EventPickerOption } from "../EventPicker/EventPicker";
 import type { RankingEntry, RegionOption } from "../RankingsExplorer/types";
-import { RankingsControlsRail, RankingsPagerRail } from "./RankingsRail";
+import { ListBrowseControlsRail, ListBrowsePagerRail, RankingsControlsRail, RankingsPagerRail } from "./RankingsRail";
 import { JumpControlsVisibility } from "../JumpControlsVisibility/JumpControlsVisibility";
 
 const eventOptions = WCA_EVENTS satisfies readonly EventPickerOption[];
@@ -124,3 +124,6 @@ export const Bottom: Story = {
     </div>
   ),
 };
+
+export const ListBrowseControls: Story = { render: () => <ListBrowseControlsRail query="" onQueryChange={() => undefined} /> };
+export const ListBrowsePager: Story = { render: () => <ListBrowsePagerRail onJumpUp={() => undefined} onJumpDown={() => undefined} /> };

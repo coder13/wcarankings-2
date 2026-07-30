@@ -34,6 +34,8 @@ COPY --from=build --chown=app:app /app/scripts/backfill-person-year-rankings.mjs
 COPY --from=build --chown=app:app /app/scripts/backfill-sum-of-ranks.mjs ./scripts/backfill-sum-of-ranks.mjs
 COPY --from=build --chown=app:app /app/scripts/mysql-schema.mjs ./scripts/mysql-schema.mjs
 COPY --from=build --chown=app:app /app/scripts/refresh-rankings.mjs ./scripts/refresh-rankings.mjs
+COPY --from=build --chown=app:app /app/scripts/refresh-system-lists.mjs ./scripts/refresh-system-lists.mjs
+COPY --from=build --chown=app:app /app/scripts/system-list-definitions.mjs ./scripts/system-list-definitions.mjs
 COPY --from=build --chown=app:app /app/scripts/check-ranking-projections.mjs ./scripts/check-ranking-projections.mjs
 COPY --from=build --chown=app:app /app/scripts/publish-projection-transfer.mjs ./scripts/publish-projection-transfer.mjs
 COPY --from=build --chown=app:app /app/scripts/projection-transfer-date.mjs ./scripts/projection-transfer-date.mjs

@@ -15,7 +15,9 @@ function InteractiveSwitch({ variant }: { variant: "segmented" | "select" }) {
   const [subject, setSubject] = useState<ExplorerSubject>("people");
   return (
     <div style={{ display: "grid", gap: "1rem", minWidth: "min(100%, 30rem)" }}>
-      <ExplorerSubjectSwitch subject={subject} onChange={setSubject} variant={variant} />
+      <ExplorerSubjectSwitch subject={subject} onChange={(nextSubject) => {
+        if (nextSubject !== "lists") setSubject(nextSubject);
+      }} variant={variant} />
       <p style={{ margin: 0, color: "var(--text-muted)" }}>{description[subject]}</p>
     </div>
   );
@@ -36,4 +38,8 @@ export const Segmented: Story = {
 
 export const CompactSelect: Story = {
   render: () => <InteractiveSwitch variant="select" />,
+};
+
+export const HeaderNavigation: Story = {
+  render: () => <ExplorerSubjectSwitch subject="people" onChange={() => undefined} variant="text" />,
 };

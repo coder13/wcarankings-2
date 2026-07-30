@@ -11,11 +11,13 @@ export function RegionPicker({
   selected,
   onChange,
   className,
+  disabled = false,
 }: {
   options: RegionOption[];
   selected: RegionSelection;
   onChange: (option: RegionOption) => void;
   className?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -119,7 +121,7 @@ export function RegionPicker({
 
   return (
     <Dropdown
-      className={`regionPicker${className ? ` ${className}` : ""}`}
+      className={`regionPicker${disabled ? " isDisabled" : ""}${className ? ` ${className}` : ""}`}
       open={open}
       onOpenChange={setPickerOpen}
     >
@@ -130,6 +132,7 @@ export function RegionPicker({
         ref={searchRef}
         value={open ? query : selectedOption?.label ?? "World"}
         onFocus={() => {
+          if (disabled) return;
           if (!open) setQuery("");
           setActiveKey(
             selectedOption?.key ?? options[0]?.key ?? null,
@@ -142,11 +145,13 @@ export function RegionPicker({
           setPickerOpen(false);
         }}
         onChange={(event) => {
+          if (disabled) return;
           setQuery(event.target.value);
           setActiveKey(null);
           setPickerOpen(true);
         }}
         onKeyDown={(event) => {
+          if (disabled) return;
           if (event.key === "Escape") {
             event.preventDefault();
             setQuery("");
@@ -190,6 +195,7 @@ export function RegionPicker({
           }
         }}
         role="combobox"
+        disabled={disabled}
         aria-label="Region"
         aria-haspopup="listbox"
         aria-expanded={open}

@@ -67,6 +67,8 @@ https://YOUR_DOMAIN/api/auth/wca/callback
 
 Set `WCA_CLIENT_ID`, `WCA_CLIENT_SECRET`, and `WCA_REDIRECT_URI` in the deployment `.env` file. The app requests only the `public` scope, persists the verified WCA identity in `app_users`, and stores a hashed, revocable session in `auth_sessions`. It does not persist the WCA access token.
 
+For localhost development, the app defaults to WCA staging with `example-application-id` and `example-secret`; no local OAuth values are required. This fallback applies only to `NODE_ENV=development` requests to `localhost`, `127.0.0.1`, or `::1`. Production never uses the example credentials or WCA staging.
+
 Run Flyway before enabling sign-in so the user and session tables exist.
 
 ## Repository layout

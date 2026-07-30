@@ -3,7 +3,6 @@ import test from "node:test";
 import type { AuthUser } from "@/lib/auth";
 import {
   assertCanViewList,
-  ListNotFoundError,
   type ListSummary,
 } from "@/lib/lists";
 
@@ -26,6 +25,7 @@ function list(visibility: "public" | "private"): ListSummary {
     slug: "friends",
     description: null,
     visibility,
+    joinPolicy: "closed",
     memberCount: 0,
     membershipVersion: 1,
     systemDefinitionVersion: null,
@@ -43,10 +43,7 @@ test("public lists are visible without authentication", () => {
   assert.doesNotThrow(() => assertCanViewList(list("public"), null));
 });
 
-test("private lists return not found to anyone except the owner", () => {
-  assert.throws(
-    () => assertCanViewList(list("private"), null),
-    ListNotFoundError,
-  );
+test("private lists are visible through their direct URLs", () => {
+  assert.doesNotThrow(() => assertCanViewList(list("private"), null));
   assert.doesNotThrow(() => assertCanViewList(list("private"), owner));
 });

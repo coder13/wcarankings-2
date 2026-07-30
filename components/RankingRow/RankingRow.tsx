@@ -1,5 +1,6 @@
 import { formatWcaResult, flagEmoji, RECORD_BADGE_LABELS } from "@/lib/wca";
-import { formatRankingNumber, rankingEntryKey, type RankingEntry } from "../RankingsExplorer/types";
+import { useEffect, useRef } from "react";
+import { formatRankingNumber, type RankingEntry } from "../RankingsExplorer/types";
 
 export function RankingRow({
   entry,
@@ -12,6 +13,10 @@ export function RankingRow({
   hideIdentityId = false,
   rowIndex,
   onNavigate,
+  selectionMode = false,
+  selected = false,
+  onToggleSelected,
+  onMemberContextMenu,
 }: {
   entry: RankingEntry;
   eventId: string;
@@ -23,7 +28,23 @@ export function RankingRow({
   hideIdentityId?: boolean;
   rowIndex?: number;
   onNavigate?: (rowIndex: number, direction: -1 | 1) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelected?: (personId: string) => void;
+  onMemberContextMenu?: (entry: RankingEntry, position: { x: number; y: number }) => void;
 }) {
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressHandledRef = useRef(false);
+  const clearLongPress = () => {
+    if (longPressTimerRef.current === null) return;
+    window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  };
+  useEffect(() => () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+    }
+  }, []);
   const style = {
     "--t-animation-delay": `${animationIndex * 10}ms`,
     minHeight: "65.45px",
@@ -41,7 +62,6 @@ export function RankingRow({
     <li
       className="listItem"
       data-person-id={entry.personId}
-      data-entry-key={rankingEntryKey(entry)}
       data-row-index={rowIndex}
       style={style}
       tabIndex={0}
@@ -62,8 +82,35 @@ export function RankingRow({
           searchMatched ? " row--searchResult" : ""
         }${
           highlighted ? " row--searchMatch" : ""
+        }${
+          onMemberContextMenu ? " row--contextMenu" : ""
         }`}
+        onClick={() => {
+          if (longPressHandledRef.current) {
+            longPressHandledRef.current = false;
+            return;
+          }
+          if (selectionMode) onToggleSelected?.(entry.personId);
+        }}
+        onContextMenu={(event) => {
+          if (!onMemberContextMenu) return;
+          event.preventDefault();
+          onMemberContextMenu(entry, { x: event.clientX, y: event.clientY });
+        }}
+        onPointerDown={(event) => {
+          if (!onMemberContextMenu || event.pointerType !== "touch") return;
+          const { left, top, width, height } = event.currentTarget.getBoundingClientRect();
+          longPressHandledRef.current = false;
+          longPressTimerRef.current = window.setTimeout(() => {
+            longPressHandledRef.current = true;
+            onMemberContextMenu(entry, { x: left + width / 2, y: top + height / 2 });
+          }, 500);
+        }}
+        onPointerUp={clearLongPress}
+        onPointerCancel={clearLongPress}
+        onPointerMove={clearLongPress}
       >
+        {selectionMode && <button className="memberSelectionToggle" type="button" aria-label={`Select ${name}`} aria-pressed={selected} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onToggleSelected?.(entry.personId); }}>{selected ? "✓" : ""}</button>}
         <span className={`rank${rankIsDuplicate ? " rank--duplicate" : ""}`}>
           {formatRankingNumber(rank)}
         </span>

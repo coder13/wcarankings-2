@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 type Profile = {
@@ -84,6 +85,7 @@ export function ProfileMenu() {
           <strong>{profile.name}</strong>
           <span>{profile.wcaId}</span>
         </div>
+        <Link role="menuitem" href="/lists/mine">My lists</Link>
         <a role="menuitem" href="/settings">Settings</a>
         <form action="/api/auth/wca/logout" method="post">
           <button role="menuitem" type="submit">Sign out</button>

@@ -14,12 +14,30 @@ type WcaMeResponse = {
   };
 };
 
+const LOCAL_WCA_ORIGIN = "https://staging.worldcubeassociation.org";
+const LOCAL_WCA_CLIENT_ID = "example-application-id";
+const LOCAL_WCA_CLIENT_SECRET = "example-secret";
+const PRODUCTION_WCA_ORIGIN = "https://www.worldcubeassociation.org";
+
+function isLocalDevelopment(request: Request) {
+  const hostname = new URL(request.url).hostname;
+  return process.env.NODE_ENV !== "production" && (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]"
+  );
+}
+
 export function getWcaAuthConfig(request: Request) {
   const runtime = process.env;
-  const clientId = runtime.WCA_CLIENT_ID;
-  const clientSecret = runtime.WCA_CLIENT_SECRET;
+  const localDevelopment = isLocalDevelopment(request);
+  const configuredOrigin = runtime.WCA_ORIGIN?.replace(/\/+$/, "");
+  const clientId = runtime.WCA_CLIENT_ID ?? (localDevelopment ? LOCAL_WCA_CLIENT_ID : undefined);
+  const clientSecret = runtime.WCA_CLIENT_SECRET ?? (localDevelopment ? LOCAL_WCA_CLIENT_SECRET : undefined);
   const redirectUri = runtime.WCA_REDIRECT_URI ?? `${getRequestOrigin(request)}/api/auth/wca/callback`;
-  const wcaOrigin = (runtime.WCA_ORIGIN ?? "https://www.worldcubeassociation.org").replace(/\/+$/, "");
+  const wcaOrigin = configuredOrigin ?? (localDevelopment ? LOCAL_WCA_ORIGIN : PRODUCTION_WCA_ORIGIN);
+  const exampleConfiguration = clientId === LOCAL_WCA_CLIENT_ID || clientSecret === LOCAL_WCA_CLIENT_SECRET || wcaOrigin === LOCAL_WCA_ORIGIN;
+  if (runtime.NODE_ENV === "production" && exampleConfiguration) {
+    return { clientId: undefined, clientSecret: undefined, redirectUri, wcaOrigin: PRODUCTION_WCA_ORIGIN };
+  }
   return { clientId, clientSecret, redirectUri, wcaOrigin };
 }
 
@@ -30,6 +48,17 @@ export function getRequestOrigin(request: Request) {
     return `${forwardedProtocol}://${requestUrl.host}`;
   }
   return requestUrl.origin;
+}
+
+export function getSameOriginDestination(request: Request, candidate: string | null) {
+  const origin = getRequestOrigin(request);
+  if (!candidate) return origin;
+  try {
+    const destination = new URL(candidate);
+    return destination.origin === origin ? destination.toString() : origin;
+  } catch {
+    return origin;
+  }
 }
 
 export function readCookie(request: Request, name: string) {

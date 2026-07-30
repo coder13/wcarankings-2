@@ -86,7 +86,7 @@ function RailSearch({ searchInputRef, findOpen, findQuery, findError, findLoadin
   );
 }
 
-export function RankingsControlsRail<T extends EventPickerOption>({ event, eventOptions, additionalEventOptions, onEventChange, rankingType, onRankingTypeChange, gender, onGenderChange, regions, regionSelection, onRegionChange, onEventPickerTrigger, compactResultType = false, showResultType = true, showEventPicker = true, showRegion = true, showGender = true, showSearch = true, hemisphere, onHemisphereChange, ...searchProps }: {
+export function RankingsControlsRail<T extends EventPickerOption>({ event, eventOptions, additionalEventOptions, onEventChange, rankingType, onRankingTypeChange, gender, onGenderChange, regions, regionSelection, onRegionChange, onEventPickerTrigger, compactResultType = false, showResultType = true, showEventPicker = true, showRegion = true, showGender = true, showSearch = true, hemisphere, onHemisphereChange, listAddAction, regionDisabled = false, ...searchProps }: {
   event: T;
   eventOptions?: readonly T[];
   additionalEventOptions?: readonly T[];
@@ -107,10 +107,12 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
   showSearch?: boolean;
   hemisphere?: "north" | "south";
   onHemisphereChange?: (hemisphere: "north" | "south") => void;
+  listAddAction?: () => void;
+  regionDisabled?: boolean;
 } & Parameters<typeof RailSearch>[0]) {
   const nextType = rankingType === "single" ? "average" : "single";
   return (
-    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}`} direction="up" compactResultType={compactResultType}>
+    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType}>
       <div className="Jump-railSettings">
         {showEventPicker ? (
           <EventPicker event={event} options={eventOptions} additionalOptions={additionalEventOptions} onChange={onEventChange} onTriggerReady={onEventPickerTrigger} />
@@ -121,18 +123,19 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
           </button>
         ) : null}
         {showResultType && <div className="Jump-resultTypeControl">
-          <button className="Jump-resultTypeToggle" type="button" aria-label={`Switch to ${nextType} rankings`} disabled={event.id === "333mbf"} onClick={() => onRankingTypeChange(nextType)}>{rankingType === "single" ? "Single" : "Average"}</button>
+          <button className="Jump-resultTypeToggle" type="button" disabled={event.id === "333mbf"} aria-label={`Switch to ${nextType} rankings`} onClick={() => onRankingTypeChange(nextType)}>{rankingType === "single" ? "Single" : "Average"}</button>
         </div>}
         {showGender && <GenderPicker className="Jump-genderPicker" value={gender} onChange={onGenderChange} />}
-        {showRegion && <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} />}
+        {showRegion && <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} disabled={regionDisabled} />}
+        {listAddAction && <button className="Jump-listAddButton" type="button" onClick={listAddAction}>+ Add</button>}
       </div>
       {showSearch && <RailSearch {...searchProps} />}
     </RankingsRail>
   );
 }
 
-export function RankingsPagerRail({ upArmed, downArmed, currentPosition, total, onJumpUp, onJumpDown, onFocusMe, searchActive, onSearchPrevious, onSearchNext }: {
-  upArmed: boolean; downArmed: boolean; currentPosition: number; total: number; onJumpUp: () => void; onJumpDown: () => void; onFocusMe?: (wcaId: string) => void; searchActive: boolean; onSearchPrevious: () => void; onSearchNext: () => void;
+export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPosition, total, onJumpUp, onJumpDown, onFocusMe, searchActive, onSearchPrevious, onSearchNext }: {
+  upArmed: boolean; downArmed: boolean; busy?: boolean; currentPosition: number; total: number; onJumpUp: () => void; onJumpDown: () => void; onFocusMe?: (wcaId: string) => void; searchActive: boolean; onSearchPrevious: () => void; onSearchNext: () => void;
 }) {
   const [wcaId, setWcaId] = useState<string | null>(null);
 
@@ -156,13 +159,41 @@ export function RankingsPagerRail({ upArmed, downArmed, currentPosition, total, 
   const nearEnd = Number.isFinite(total) && currentPosition >= total - 5000;
   return <RankingsRail className="Jump--pager" direction="down" searchNavigation={searchActive}>
     <div className="Jump-pagerActions" aria-hidden={searchActive}>
-      <button className="Jump-pagerButton" onClick={onJumpUp} type="button" disabled={searchActive}><span>{upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}</span><ArrowUpIcon /></button>
-      {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={searchActive} aria-label="Jump to my ranking"><span>My rank</span></button>}
-      <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={searchActive}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></button>
+      <button className="Jump-pagerButton" onClick={onJumpUp} type="button" disabled={searchActive || busy}><span>{upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}</span><ArrowUpIcon /></button>
+      {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={searchActive || busy} aria-label="Jump to my ranking"><span>My rank</span></button>}
+      <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={searchActive || busy}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></button>
     </div>
     <div className="Jump-searchNavigation" aria-hidden={!searchActive}><div className="Jump-searchNavigationContent">
       <button className="Jump-searchNavigationButton" onClick={onSearchPrevious} type="button" disabled={!searchActive}><ArrowUpIcon /><span>Previous person</span></button>
       <button className="Jump-searchNavigationButton" onClick={onSearchNext} type="button" disabled={!searchActive}><span>Next person</span><ArrowDownIcon /></button>
     </div></div>
   </RankingsRail>;
+}
+
+export function ListBrowseControlsRail({ query, onQueryChange }: {
+  query: string;
+  onQueryChange: (query: string) => void;
+}) {
+  return (
+    <RankingsRail className="Jump--listBrowse" direction="up">
+      <div className="findBar findBar--rail" data-open="true" role="search">
+        <span className="listBrowseSearchIcon" aria-hidden="true"><SearchIcon /></span>
+        <input className="findInput" value={query} onChange={(event) => onQueryChange(event.target.value)} aria-label="Filter public lists" placeholder="Search public lists" autoFocus />
+      </div>
+    </RankingsRail>
+  );
+}
+
+export function ListBrowsePagerRail({ onJumpUp, onJumpDown }: {
+  onJumpUp: () => void;
+  onJumpDown: () => void;
+}) {
+  return (
+    <RankingsRail className="Jump--pager" direction="down">
+      <div className="Jump-pagerActions">
+        <button className="Jump-pagerButton" onClick={onJumpUp} type="button"><span>Jump to top</span><ArrowUpIcon /></button>
+        <button className="Jump-pagerButton" onClick={onJumpDown} type="button"><ArrowDownIcon /><span>Jump to end</span></button>
+      </div>
+    </RankingsRail>
+  );
 }

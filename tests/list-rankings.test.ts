@@ -16,9 +16,10 @@ test("normalizes list ranking query parameters", () => {
     eventId: "444",
     type: "average",
     start: 25,
-    limit: 100,
+    limit: 50,
     search: "Max",
     locate: "",
+    region: { scope: "world", regionId: "" },
     gender: [],
   });
 });
@@ -31,5 +32,4 @@ test("forces Multi-Blind to single rankings", () => {
     }),
   );
   assert.equal(input.type, "single");
-  assert.deepEqual(input.gender, []);
 });

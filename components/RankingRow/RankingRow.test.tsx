@@ -57,6 +57,37 @@ test("can hide an identity ID for competition ranking rows", () => {
   assert.doesNotMatch(markup, /class="wcaId"/);
 });
 
+test("makes the full row a member selection target", () => {
+  const markup = renderToStaticMarkup(
+    <RankingRow
+      entry={entry}
+      eventId="333"
+      rankingType="single"
+      animationIndex={0}
+      selectionMode
+      selected
+      onToggleSelected={() => undefined}
+    />,
+  );
+
+  assert.match(markup, /aria-pressed="true"/);
+  assert.match(markup, /class="memberSelectionToggle"/);
+});
+
+test("enables the member context menu on a ranking row", () => {
+  const markup = renderToStaticMarkup(
+    <RankingRow
+      entry={entry}
+      eventId="333"
+      rankingType="single"
+      animationIndex={0}
+      onMemberContextMenu={() => undefined}
+    />,
+  );
+
+  assert.match(markup, /row--contextMenu/);
+});
+
 test("can show a venue beneath the row identity", () => {
   const markup = renderToStaticMarkup(
     <RankingRow

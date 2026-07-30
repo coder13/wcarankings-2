@@ -8,10 +8,61 @@
 @import "../components/JumpControlsVisibility/JumpControlsVisibility.css";
 @import "../components/PwaUpdatePrompt/PwaUpdatePrompt.css";
 @import "../components/PlaceholderPage/PlaceholderPage.css";
+@import "../components/ListBrowse/ListBrowse.css";
+@import "../components/ListMine/ListMine.css";
+@import "../components/ListOwnerControls/ListOwnerControls.css";
 @import "./styles/search.css";
 @import "./styles/controls.css";
 @import "./styles/rankings.css";
 @import "./styles/vim.css";
+
+:root,:root[data-theme="light"],:root[data-theme="dark"],:root:not([data-theme]){--surface-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--search-match-hover:var(--search-match)}
+:root[data-theme="dark"]{--surface-hover:color-mix(in srgb,var(--text-strong) 8%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 8%,transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme]){--surface-hover:color-mix(in srgb,var(--text-strong) 8%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 8%,transparent)}}
+.listPersonAvatar{font-size:.875rem}
+.listSettingsMenu{min-width:10.5rem}
+.listSettingsMenu>button{min-height:40px;padding:.4rem .55rem;border:0;border-radius:.4rem;background:transparent;color:var(--text-strong);cursor:pointer;font:inherit;text-align:left;white-space:nowrap}
+.listSettingsMenu>button:hover,.listSettingsMenu>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 6%,transparent);outline:2px solid var(--focus-ring);outline-offset:-2px}
+.row:has(.memberSelectionToggle){cursor:pointer;user-select:none}
+.row--contextMenu{user-select:none;-webkit-user-select:none}
+.memberSelectionToggle{width:36px;height:36px;font-size:1.125rem;line-height:1}
+.listMemberContextMenu{position:fixed;z-index:40;min-width:11rem;padding:.3rem;border:1px solid var(--border-subtle);border-radius:.6rem;background:var(--surface);box-shadow:0 8px 24px var(--shadow)}
+.listMemberContextMenu button{display:block;width:100%;min-height:40px;padding:.45rem .65rem;border:0;border-radius:.35rem;background:transparent;color:var(--text-strong);font:inherit;text-align:left;cursor:pointer}
+.listMemberContextMenu button:hover,.listMemberContextMenu button:focus-visible{background:var(--surface-hover)}
+.listMemberContextMenuBackdrop{display:none}
+.listMemberSelectionRail{bottom:calc(1rem + 3.5rem)}
+.listRemovalDialog{max-width:28rem}
+.listRemovalDialog h2{margin:0;font-size:1.2rem}
+.listRemovalDialog p{margin:.8rem 0 0}
+.listRemovalActions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.25rem}
+.listRemovalActions button{min-height:40px;padding:0 .9rem;border:1px solid var(--border-subtle);border-radius:.5rem;background:var(--surface);color:var(--text-strong);cursor:pointer;font:inherit;font-weight:600}
+.listRemovalActions button:last-child{border-color:var(--record-world);background:var(--record-world);color:#fff}
+.listRemovalActions button:disabled{cursor:wait;opacity:.6}
+.Jump--listAdd{--rail-control-height:52px}
+.Jump--listAdd .listAddComposer{height:var(--rail-control-height)}
+.Jump--listAdd .listAddComposer>.listAddSubmit{position:absolute;z-index:3;right:.5rem;width:auto;min-width:var(--rail-control-height);height:max(40px,calc(var(--rail-control-height) - .5rem));margin:.25rem 0;padding-inline:.7rem;border:0;border-radius:16px;background:transparent;color:var(--focus);font-size:.875rem;font-weight:600}
+.Jump--listAdd .listAddTokens{padding-right:calc(var(--rail-control-height) + 1rem)}
+.Jump--listAdd .listAddError{display:none}
+.Jump--listAdd .listAddCancel{width:40px;height:40px;min-height:40px;margin:6px 0 6px 6px;padding:0;border-radius:16px}
+.Jump--listAdd .listAddCancel:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent)}
+.Jump--listAdd .listAddComposer>.listAddSubmit:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:0}
+.Jump--listAdd .listAddComposer>.listAddSubmit:focus-visible{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
+.Jump--listAdd .listAddComposer>.listAddSubmit:disabled{cursor:wait;opacity:.65}
+.listMemberSelectionRail button:first-child{order:3;background:transparent;color:var(--text-strong)}
+.listMemberSelectionRail span{order:2}
+.listMemberSelectionRail button:nth-of-type(2){order:1;background:var(--record-world);color:#fff}
+@media (hover:hover){:where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(.97);outline:0}}
+@media (hover:hover){:root[data-theme="dark"] :where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(1.08)}}
+@media (prefers-color-scheme:dark){@media (hover:hover){:root:not([data-theme]) :where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(1.08)}}}
+.stickyRankingsRail{--list-owner-control-height:calc(52px - (12px * var(--rail-scroll-progress, 0)))}
+.stickyRankingsRail>.listOwnerControls{top:0}
+.stickyRankingsRail>.listOwnerControls>button{display:grid;width:var(--list-owner-control-height);height:var(--list-owner-control-height);min-height:var(--list-owner-control-height);padding:0;place-items:center;border-radius:50%;background:transparent;box-shadow:none}
+.stickyRankingsRail>.listOwnerControls>button:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:0}
+.stickyRankingsRail>.listOwnerControls>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
+.TextDropdown-trigger:hover:not(:focus-visible){background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong)}
+.listSettingsMenu label{min-height:40px}
+
+@media (max-width:600px){.stickyRankingsRail{--list-owner-control-height:44px}.stickyRankingsRail>.listOwnerControls{right:.35rem}.Jump--listAdd{--rail-control-height:44px}.Jump--rankings.Jump--withListAdd{--result-type-width:5.25rem;--rail-select-width:min(8.5em,max(40px,calc(100vw - 1rem - 44px - 5.25rem - 4.75rem - 44px)));--rail-settings-width:calc(44px + var(--result-type-width) + var(--rail-select-width) + 4.75rem);min-width:calc(var(--rail-settings-width) + var(--rail-control-height))}.listMemberContextMenuBackdrop{position:fixed;z-index:39;inset:0;display:block;background:color-mix(in srgb,#000 42%,transparent);animation:listMemberContextBackdropIn 160ms ease-out}.listMemberContextMenu{z-index:40;right:0;bottom:0;left:0;min-width:0;padding:.75rem 1rem calc(.75rem + env(safe-area-inset-bottom));border:0;border-radius:1.2rem 1.2rem 0 0;box-shadow:0 -8px 24px var(--shadow);animation:listMemberContextSheetIn 220ms var(--cubic-enter, ease-out)}.listMemberContextMenu::before{display:block;width:2.5rem;height:.25rem;margin:0 auto .65rem;border-radius:999px;background:var(--border-strong);content:""}.listMemberContextMenu button{min-height:48px;padding:.65rem .75rem;font-size:1rem;font-weight:600}.listMemberContextMenu button:hover,.listMemberContextMenu button:focus-visible{background:var(--surface-hover)}@keyframes listMemberContextBackdropIn{from{opacity:0}to{opacity:1}}@keyframes listMemberContextSheetIn{from{transform:translateY(100%)}to{transform:translateY(0)}}}
 
 ::-webkit-scrollbar {
   display: none;
@@ -19,8 +70,16 @@
 
 body {
   margin: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   color: var(--text);
   background: var(--page);
+}
+
+@supports (overflow: clip) {
+  body {
+    overflow-x: clip;
+  }
 }
 
 @view-transition {
@@ -70,6 +129,8 @@ ul {
   --page-gutter: 1rem;
 
   padding: 1em var(--page-gutter) 3.5em;
+  max-width: 100%;
+  overflow-x: clip;
   background-color: var(--page);
   --font-family: "Fira Sans", Arial, sans-serif;
 }
@@ -176,6 +237,14 @@ select {
   color: inherit;
   text-decoration: none;
 }
+
+.listRankingName {
+  color: var(--text-subtle);
+  font-size: 1rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
 
 .stickyRankingsRail {
   view-transition-name: rankings-controls;
@@ -518,6 +587,21 @@ main {
     padding: 0.75em;
     padding-right: 44px;
     font-size: 16px;
+  }
+
+  .Jump-regionPicker .regionPickerMenu {
+    right: auto;
+    left: 50%;
+    width: min(20rem, calc(100vw - 2rem));
+    min-width: min(15em, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
+    translate: -50% 0;
+    transform-origin: top center;
+  }
+
+  .regionOptions {
+    max-height: min(30em, calc(100dvh - 7rem));
+    -webkit-overflow-scrolling: touch;
   }
 
   .selectInput select,

@@ -9,6 +9,7 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
   const [component, layout, rankingsRoute, wca, schema] = await Promise.all([
     Promise.all([
       "../components/RankingsExplorer/RankingsExplorer.tsx",
+      "../components/AppHeader/AppHeader.tsx",
       "../components/RankingsExplorer/scrollEngine.ts",
       "../components/RankingsExplorer/types.ts",
       "../components/RankingControls/RankingControls.tsx",

@@ -14,6 +14,11 @@ test("renders paired pager actions with useful labels", () => {
   assert.match(markup, /data-direction="down"/);
 });
 
+test("disables pager actions while a jump is settling", () => {
+  const markup = renderToStaticMarkup(<RankingsPagerRail upArmed={false} downArmed={false} busy currentPosition={5_001} total={10_000} onJumpUp={() => undefined} onJumpDown={() => undefined} searchActive={false} onSearchPrevious={() => undefined} onSearchNext={() => undefined} />);
+  assert.match(markup, /disabled=""/);
+});
+
 test("renders the ranking settings and search in one rail", () => {
   const markup = renderToStaticMarkup(<RankingsControlsRail event={WCA_EVENTS[0]} onEventChange={() => undefined} rankingType="single" onRankingTypeChange={() => undefined} gender={[]} onGenderChange={() => undefined} regions={regions} regionSelection={{ scope: "world", regionId: "" }} onRegionChange={() => undefined} compactResultType={false} findOpen={false} findQuery="" findError="" findLoading={false} findPending={false} findMatches={[]} findIndex={0} onSearchOpen={() => undefined} onSearchClose={() => undefined} onSearchQueryChange={() => undefined} onSearchCycle={() => undefined} />);
   assert.match(markup, /class="Jump RankingsRail Jump--rankings"/);

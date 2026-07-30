@@ -36,18 +36,20 @@ export async function POST(request: Request) {
     assertSameOrigin(request);
     const user = await requireAuthUser(request);
     const body = await readJsonObject(request);
-    const list = await createList(user, {
+    const created = await createList(user, {
       name: body.name,
       description: body.description,
       visibility: body.visibility,
+      joinPolicy: body.joinPolicy,
+      personIds: body.personIds,
     });
     return Response.json(
-      { list },
+      created,
       {
         status: 201,
         headers: {
           "Cache-Control": "private, no-store",
-          Location: `/lists/${list.publicId}/${list.slug}`,
+          Location: `/lists/${created.list.publicId}--${created.list.slug}`,
         },
       },
     );

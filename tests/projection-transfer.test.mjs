@@ -47,5 +47,5 @@ test("packages the export-date normalizer with the publisher", () => {
 
 test("publishes result facts with the core runtime transfer", () => {
   assert.match(schema, /name: "result-facts"[\s\S]*enabledByDefault: true/);
-  assert.match(schema, /tables: PUBLISHED_PROJECTION_TABLES\.filter\(\(table\) => !table\.startsWith\("person_year_"\)\)/);
+  assert.match(schema, /tables: PUBLISHED_PROJECTION_TABLES\.filter\(\(table\) => table !== "person_sum_of_ranks_scores" && !table\.startsWith\("person_year_"\)\)/);
 });
