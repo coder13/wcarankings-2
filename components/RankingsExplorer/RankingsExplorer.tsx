@@ -522,7 +522,7 @@ function searchRankings(
   if (regexSearch) params.set("mode", "vim");
   const year = activeYear();
   if (resource === "people" && year) params.set("year", year);
-  if (resource === "people" && gender) params.set("gender", gender);
+  if (resource === "people" && gender.length) params.set("gender", gender.join(","));
   if (selection.scope !== "world") params.set("region", selection.regionId);
 
   const endpoint = resource === "results"
@@ -551,7 +551,7 @@ function locateRanking(
   });
   const year = activeYear();
   if (year) params.set("year", year);
-  if (gender) params.set("gender", gender);
+  if (gender.length) params.set("gender", gender.join(","));
   if (selection.scope !== "world") params.set("region", selection.regionId);
   return fetch(`/api/rankings?${params}`).then(async (response) => {
     if (!response.ok) {
@@ -3001,7 +3001,7 @@ export function RankingsExplorer({
           onRegionChange={changeRegion}
           onEventPickerTrigger={(trigger) => { railEventPickerTriggerRef.current = trigger; }}
           compactResultType={topRailProgress >= 1}
-          showResultType={!(eventId === "SOR" || eventId === "sor-kinch" || (subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count")))}
+          showResultType={!(eventId === "sor-kinch" || (subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count")))}
           showEventPicker={!(subject === "competitions" && (competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
           showRegion
           showGender={subject === "people" || subject === "results"}

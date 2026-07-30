@@ -27,6 +27,41 @@ const rankingEntry = {
   recordBadges: ["NR"] as const,
 };
 
+function renderExplorerMarkup(
+  props: Partial<Parameters<typeof RankingsExplorer>[0]> = {},
+) {
+  return renderToStaticMarkup(
+    <AppRouterContext.Provider value={{
+      back() {},
+      forward() {},
+      refresh() {},
+      hmrRefresh() {},
+      push() {},
+      replace() {},
+      prefetch() {},
+    }}>
+      <RankingsExplorer
+        initialData={{
+          entries: [
+            rankingEntry,
+          ],
+          hasMore: false,
+          nextPageStart: null,
+          previousPageStart: null,
+          startRank: 1,
+          startPosition: 0,
+          lastRank: 1,
+          total: 1,
+          searchMatches: [],
+          initialMatchPersonId: "",
+        }}
+        initialRegions={{ continents: [], countries: [] }}
+        {...props}
+      />
+    </AppRouterContext.Provider>,
+  );
+}
+
 test("ignores empty search-result slots", () => {
   const matches = new Array<typeof rankingEntry | undefined>(1);
   matches.push(rankingEntry);
@@ -81,36 +116,30 @@ test("exposes active person, result, and competition ranking subjects", () => {
 });
 
 test("renders the rankings shell with extracted components", () => {
-  const markup = renderToStaticMarkup(
-    <AppRouterContext.Provider value={{
-      back() {},
-      forward() {},
-      refresh() {},
-      hmrRefresh() {},
-      push() {},
-      replace() {},
-      prefetch() {},
-    }}>
-      <RankingsExplorer
-        initialData={{
-          entries: [
-            rankingEntry,
-          ],
-          hasMore: false,
-          nextPageStart: null,
-          previousPageStart: null,
-          startRank: 1,
-          startPosition: 0,
-          lastRank: 1,
-          total: 1,
-          searchMatches: [],
-          initialMatchPersonId: "",
-        }}
-        initialRegions={{ continents: [], countries: [] }}
-      />
-    </AppRouterContext.Provider>,
-  );
+  const markup = renderExplorerMarkup();
   assert.match(markup, /WCA Rankings/);
   assert.match(markup, /Avery Chen/);
   assert.doesNotMatch(markup, /sub-rank/);
+});
+
+test("keeps gender filters available for sum of ranks", () => {
+  const markup = renderExplorerMarkup({
+    initialEventId: "SOR",
+    showAllEventRankingOptions: true,
+  });
+  assert.match(markup, /aria-label="Gender"/);
+  assert.match(markup, />Men</);
+  assert.match(markup, />Women</);
+  assert.match(markup, /Switch to average rankings/);
+});
+
+test("keeps gender filters available for Kinch", () => {
+  const markup = renderExplorerMarkup({
+    initialEventId: "sor-kinch",
+    showAllEventRankingOptions: true,
+  });
+  assert.match(markup, /aria-label="Gender"/);
+  assert.match(markup, />Men</);
+  assert.match(markup, />Women</);
+  assert.doesNotMatch(markup, /Switch to average rankings/);
 });
