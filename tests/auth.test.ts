@@ -26,6 +26,68 @@ test("uses the configured WCA OAuth origin", () => {
   }
 });
 
+test("uses the WCA staging example application only for local development", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousClientId = process.env.WCA_CLIENT_ID;
+  const previousClientSecret = process.env.WCA_CLIENT_SECRET;
+  const previousOrigin = process.env.WCA_ORIGIN;
+  delete process.env.WCA_CLIENT_ID;
+  delete process.env.WCA_CLIENT_SECRET;
+  delete process.env.WCA_ORIGIN;
+  process.env.NODE_ENV = "development";
+  try {
+    const config = getWcaAuthConfig(new Request("http://localhost:3000/api/auth/wca"));
+    assert.deepEqual(config, {
+      clientId: "example-application-id",
+      clientSecret: "example-secret",
+      redirectUri: "http://localhost:3000/api/auth/wca/callback",
+      wcaOrigin: "https://staging.worldcubeassociation.org",
+    });
+    assert.deepEqual(
+      getWcaAuthConfig(new Request("http://[::1]:3000/api/auth/wca")),
+      {
+        ...config,
+        redirectUri: "http://[::1]:3000/api/auth/wca/callback",
+      },
+    );
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+    if (previousClientId === undefined) delete process.env.WCA_CLIENT_ID;
+    else process.env.WCA_CLIENT_ID = previousClientId;
+    if (previousClientSecret === undefined) delete process.env.WCA_CLIENT_SECRET;
+    else process.env.WCA_CLIENT_SECRET = previousClientSecret;
+    if (previousOrigin === undefined) delete process.env.WCA_ORIGIN;
+    else process.env.WCA_ORIGIN = previousOrigin;
+  }
+});
+
+test("does not allow the WCA staging example configuration in production", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousClientId = process.env.WCA_CLIENT_ID;
+  const previousClientSecret = process.env.WCA_CLIENT_SECRET;
+  const previousOrigin = process.env.WCA_ORIGIN;
+  process.env.NODE_ENV = "production";
+  process.env.WCA_CLIENT_ID = "example-application-id";
+  process.env.WCA_CLIENT_SECRET = "example-secret";
+  process.env.WCA_ORIGIN = "https://staging.worldcubeassociation.org";
+  try {
+    const config = getWcaAuthConfig(new Request("https://rankings.example.com/api/auth/wca"));
+    assert.equal(config.clientId, undefined);
+    assert.equal(config.clientSecret, undefined);
+    assert.equal(config.wcaOrigin, "https://www.worldcubeassociation.org");
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+    if (previousClientId === undefined) delete process.env.WCA_CLIENT_ID;
+    else process.env.WCA_CLIENT_ID = previousClientId;
+    if (previousClientSecret === undefined) delete process.env.WCA_CLIENT_SECRET;
+    else process.env.WCA_CLIENT_SECRET = previousClientSecret;
+    if (previousOrigin === undefined) delete process.env.WCA_ORIGIN;
+    else process.env.WCA_ORIGIN = previousOrigin;
+  }
+});
+
 test("uses the forwarded HTTPS protocol for callback URLs and cookies", () => {
   const request = new Request("http://wcarankings.com/api/auth/wca", {
     headers: { "x-forwarded-proto": "https" },

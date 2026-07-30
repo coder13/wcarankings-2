@@ -288,13 +288,14 @@ export async function createList(
   input: {
     name: unknown;
     description?: unknown;
-    visibility: unknown;
+    visibility?: unknown;
     joinPolicy?: unknown;
   },
 ) {
   const name = validateName(input.name);
   const description = validateDescription(input.description);
-  const visibility = validateVisibility(input.visibility);
+  const visibility =
+    input.visibility === undefined ? "private" : validateVisibility(input.visibility);
   const joinPolicy =
     input.joinPolicy === undefined ? "closed" : validateJoinPolicy(input.joinPolicy);
   const slug = slugifyListName(name);
@@ -774,8 +775,8 @@ export async function listMembershipRequests(user: AuthUser, lookup: string) {
      FROM list_membership_requests AS request
      JOIN app_users AS requester ON requester.id = request.requester_user_id
      WHERE request.list_id = ?
+       AND request.status = 'pending'
      ORDER BY
-      request.status = 'pending' DESC,
       request.created_at`,
     [list.id],
   );

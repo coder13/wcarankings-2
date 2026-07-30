@@ -8,5 +8,7 @@ test("renders the list creation and owner actions", () => {
   assert.match(markup, /Create a list/);
   assert.match(markup, /List settings/);
   assert.match(markup, /Membership requests/);
-  assert.match(markup, /Accept all/);
+  assert.match(markup, /Select Ethan Davis/);
+  assert.match(markup, /listMembershipRequestBulkActions" aria-hidden="true"/);
+  assert.match(markup, /Accept selected/);
 });

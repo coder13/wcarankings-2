@@ -6,7 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
+    "dev": "NODE_ENV=development vinext dev",
     "build": "vinext build",
     "storybook": "STORYBOOK=true storybook dev -p 6006",
     "build-storybook": "STORYBOOK=true storybook build",
@@ -28,7 +28,7 @@
     "@tanstack/react-virtual": "^3.14.5",
     "lru-cache": "^11.5.2",
     "mysql2": "^3.23.2",
-    "next": "16.2.6",
+    "next": "^16.2.11",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "react-ga4": "^3.0.1",
