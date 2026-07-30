@@ -311,14 +311,14 @@ jobs:
           groups_csv=$(IFS=,; echo "${groups[*]}")
           for group in "${groups[@]}"; do scp -q -o BatchMode=yes "/tmp/${group}-projection-transfer.sql.gz" "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-${group}-projection-transfer.sql.gz"; done
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "CORE_PROJECTION_FINGERPRINT='$CORE_PROJECTION_FINGERPRINT' YEARLY_PROJECTION_FINGERPRINT='$YEARLY_PROJECTION_FINGERPRINT' GROUPS='$groups_csv' sh -s" <<'REMOTE'
+            "CORE_PROJECTION_FINGERPRINT='$CORE_PROJECTION_FINGERPRINT' YEARLY_PROJECTION_FINGERPRINT='$YEARLY_PROJECTION_FINGERPRINT' PROJECTION_GROUPS='$groups_csv' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
             (while sleep 30; do echo "Projection transfer import is still running…"; done) &
             heartbeat_pid=$!
             trap 'kill "$heartbeat_pid" 2>/dev/null || true; rm -f /tmp/wcarankings-core-projection-transfer.sql.gz /tmp/wcarankings-yearly-projection-transfer.sql.gz' EXIT
-            for group in $(printf '%s' "$GROUPS" | tr ',' ' '); do gzip -dc "/tmp/wcarankings-${group}-projection-transfer.sql.gz" | docker compose exec -T db sh -c 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE"'; done
-            publish_groups=$(printf '%s' "$GROUPS" | sed 's/yearly/yearly-person-rankings/g')
+            for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do gzip -dc "/tmp/wcarankings-${group}-projection-transfer.sql.gz" | docker compose exec -T db sh -c 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE"'; done
+            publish_groups=$(printf '%s' "$PROJECTION_GROUPS" | sed 's/yearly/yearly-person-rankings/g')
             docker compose run --rm app node /app/scripts/publish-projection-transfer.mjs --groups="$publish_groups"
             docker compose run --rm app node /app/scripts/check-ranking-projections.mjs
             jq -n --arg core "$CORE_PROJECTION_FINGERPRINT" --arg yearly "$YEARLY_PROJECTION_FINGERPRINT" '{core: $core, yearly: $yearly}' > /srv/wcarankings/projection-transfer-state.json.tmp
