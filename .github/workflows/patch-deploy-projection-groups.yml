@@ -1,0 +1,34 @@
+name: Patch deploy projection groups
+
+on:
+  push:
+    branches:
+      - fix/deploy-projection-groups
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/deploy-projection-groups
+      - name: Patch reserved Bash variable
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/deploy.yml')
+          text = workflow.read_text()
+          if text.count('GROUPS') != 3:
+              raise SystemExit(f'Expected exactly 3 GROUPS references, found {text.count("GROUPS")}')
+          workflow.write_text(text.replace('GROUPS', 'PROJECTION_GROUPS'))
+          Path('.github/workflows/patch-deploy-projection-groups.yml').unlink()
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/deploy.yml .github/workflows/patch-deploy-projection-groups.yml
+          git commit -m "Fix deployment projection group variable"
+          git push origin HEAD:fix/deploy-projection-groups
