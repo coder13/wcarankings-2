@@ -123,20 +123,10 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
           </button>
         ) : null}
         {showResultType && <div className="Jump-resultTypeControl">
-          <fieldset className="rankingTypeToggle Jump-resultTypeOptions" data-ranking-type={rankingType} aria-label="Ranking type" aria-hidden={compactResultType}>
-            <legend className="visuallyHidden">Ranking type</legend>
-            {(["single", "average"] as const).map((option) => {
-              const disabled = option === "average" && event.id === "333mbf";
-              return <label className={`rankingTypeOption${rankingType === option ? " isSelected" : ""}${disabled ? " isDisabled" : ""}`} data-result-type={option} key={option}>
-                <input type="radio" name="rail-ranking-type" value={option} checked={rankingType === option} disabled={disabled} tabIndex={compactResultType ? -1 : 0} onChange={() => onRankingTypeChange(option)} />
-                <span>{option === "single" ? "Single" : "Average"}</span>
-              </label>;
-            })}
-          </fieldset>
-          <button className="Jump-resultTypeToggle" type="button" tabIndex={compactResultType ? 0 : -1} aria-hidden={!compactResultType} disabled={event.id === "333mbf"} aria-label={`Switch to ${nextType} rankings`} onClick={() => onRankingTypeChange(nextType)}>{rankingType === "single" ? "Single" : "Average"}</button>
+          <button className="Jump-resultTypeToggle" type="button" disabled={event.id === "333mbf"} aria-label={`Switch to ${nextType} rankings`} onClick={() => onRankingTypeChange(nextType)}>{rankingType === "single" ? "Single" : "Average"}</button>
         </div>}
-        {showRegion && <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} disabled={regionDisabled} />}
         {showGender && <GenderPicker className="Jump-genderPicker" value={gender} onChange={onGenderChange} />}
+        {showRegion && <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} disabled={regionDisabled} />}
         {listAddAction && <button className="Jump-listAddButton" type="button" onClick={listAddAction}>+ Add</button>}
       </div>
       {showSearch && <RailSearch {...searchProps} />}
