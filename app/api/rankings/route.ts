@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const listId = searchParams.get("list")?.trim();
   const hasDynamicList = searchParams.has("wca_ids");
   const eventId = isRankingEventId(rawEventId) ? rawEventId : "333";
-  const type = eventId === "333mbf" ? "single" : isRankingType(rawType) ? rawType : "single";
+  const type = eventId === "333mbf" || eventId === "sor-kinch" ? "single" : isRankingType(rawType) ? rawType : "single";
   const { scope } = parseRegionQuery(searchParams.get("region"));
 
   try {

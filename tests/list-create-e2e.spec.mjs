@@ -26,6 +26,7 @@ test("creates a list with its initial members", async ({ page }) => {
     name: "Pacific Northwest cubers",
     visibility: "private",
     joinPolicy: "closed",
+    personIds: [],
   });
   await expect(page).toHaveURL(/\/lists\/7K3M9Q2D--pacific-northwest-cubers$/);
 });

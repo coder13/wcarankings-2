@@ -149,7 +149,7 @@ jobs:
       - name: Verify production image contents
         run: |
           docker run --rm --entrypoint sh "wcarankings-app:${GITHUB_SHA}" -c \
-            'test -f /app/scripts/backfill-result-entries.mjs && test -f /app/scripts/backfill-result-rankings.mjs && test -f /app/scripts/backfill-person-year-rankings.mjs && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs && test -f /app/scripts/publish-projection-transfer.mjs && test -f /app/scripts/projection-transfer-date.mjs && css=$(find /app/dist/standalone/dist/client -name "*.css" -type f -print -quit) && test -n "$css" && test -s "$css"'
+            'test -f /app/scripts/backfill-result-entries.mjs && test -f /app/scripts/backfill-result-rankings.mjs && test -f /app/scripts/backfill-person-year-rankings.mjs && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs && test -f /app/scripts/refresh-system-lists.mjs && test -f /app/scripts/system-list-definitions.mjs && test -f /app/scripts/publish-projection-transfer.mjs && test -f /app/scripts/projection-transfer-date.mjs && css=$(find /app/dist/standalone/dist/client -name "*.css" -type f -print -quit) && test -n "$css" && test -s "$css"'
 
       - name: Verify Flyway image contents
         run: |

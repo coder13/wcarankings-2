@@ -103,7 +103,10 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(sumScores, /MIN\(result_value\)/);
   assert.match(sumScores, /kinch_score/);
   assert.match(sumScores, /kinch_position/);
+  assert.match(sumScores, /kinch_continent_score/);
+  assert.match(sumScores, /kinch_continent_position/);
   assert.match(sumScores, /idx_person_kinch_page/);
+  assert.match(sumScores, /idx_person_kinch_continent_page/);
   assert.doesNotMatch(sumScores, /kinch_coverage = 16/);
   assert.match(sumScores, /fallback_score AS SIGNED\)[\s\S]*person\.score_adjustment AS score/);
   assert.match(sumScores, /ENGINE = MEMORY/);
@@ -189,7 +192,10 @@ test("exposes bounded resource APIs without projection name scans", async () => 
   assert.match(rankings, /input\.eventId === "SOR"/);
   assert.match(rankings, /input\.eventId === "sor-kinch"/);
   assert.match(rankings, /score\.\$\{positionColumn\} AS sub_rank/);
-  assert.match(rankings, /score\.kinch_score \/ 16\.0/);
+  assert.match(rankings, /\/ 17\.0/);
+  assert.match(rankings, /kinch_continent_score/);
+  assert.match(rankings, /kinchScoreColumn/);
+  assert.doesNotMatch(rankings, /kinch_score \/ 16\.0/);
   assert.match(rankings, /queryFilteredPersonMetric/);
   assert.match(rankings, /DENSE_RANK\(\) OVER/);
   assert.match(entities, /FROM competition_event_stats stats/);

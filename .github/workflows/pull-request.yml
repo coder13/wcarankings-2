@@ -93,7 +93,7 @@ jobs:
       - name: Verify production image contents
         run: |
           docker run --rm --entrypoint sh wcarankings-app:pull-request -c \
-            'test -f /app/docker-entrypoint.sh && test -f /app/scripts/backfill-result-entries.mjs && test -f /app/scripts/backfill-result-rankings.mjs && test -f /app/scripts/backfill-person-year-rankings.mjs && test -f /app/scripts/backfill-sum-of-ranks.mjs && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs'
+            'test -f /app/docker-entrypoint.sh && test -f /app/scripts/backfill-result-entries.mjs && test -f /app/scripts/backfill-result-rankings.mjs && test -f /app/scripts/backfill-person-year-rankings.mjs && test -f /app/scripts/backfill-sum-of-ranks.mjs && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs && test -f /app/scripts/refresh-system-lists.mjs && test -f /app/scripts/system-list-definitions.mjs'
 
       - name: Seed visual smoke-test database
         run: |

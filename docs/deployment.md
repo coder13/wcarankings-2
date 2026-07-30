@@ -63,8 +63,24 @@ To build or replace only Sum of Ranks against the current imported export, run
 add `--force` to replace an existing Sum of Ranks generation. This targeted
 operation does not import or replace raw WCA tables.
 
-To keep the self-hosted database current, install the included systemd timer and
-failure alert as root after copying the repository to the deployment directory:
+To keep the self-hosted database current, use the `Refresh Ranking Data` GitHub
+Actions workflow. It runs daily at 05:17 UTC and can also be started manually
+from the Actions tab. The manual run has two controls:
+
+- `force=true` re-imports the current WCA export and rebuilds projections even
+  when production already has that export date.
+- `dry_run=true` downloads or verifies the latest export archive in production's
+  persistent cache without importing or rebuilding projections.
+
+The workflow runs Flyway, executes `sync-wca-export.mjs`, validates the published
+ranking projections, and uses `/tmp/wcarankings-sync.lock` on the production host
+so two refreshes do not run at the same time.
+
+The included systemd timer is an optional server-local fallback. Do not enable it
+alongside the scheduled GitHub workflow unless both paths use the same lock and
+the additional redundant daily run is intentional. To install the fallback timer
+and failure alert as root after copying the repository to the deployment
+directory:
 
 ```bash
 install -m 0644 ops/wcarankings-sync.service /etc/systemd/system/

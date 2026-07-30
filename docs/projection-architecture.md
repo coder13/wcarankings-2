@@ -331,21 +331,25 @@ country changes from corrupting regional totals; see issue #50.
 `person_sum_of_ranks_scores` has one row per metric version, event-set version,
 result type, scope, region, and person. It stores the Sum of Ranks total,
 coverage, required coverage, public competition `rank`, and deterministic
-internal `position`, plus nullable Kinch score/rank/position columns. Missing
-events contribute a fallback rank equal to the number of ranked competitors
-for that event and region plus one. A person enters the
+internal `position`, plus Kinch score/rank/position columns. Country-scope rows
+also store the person's continent Kinch score with country-cohort rank and
+position, so a national list can be ordered by either NR Kinch or each person's
+CR Kinch. Missing events contribute a fallback rank equal to the number of
+ranked competitors for that event and region plus one. A person enters the
 World cohort after recording a result in any included event, and enters a
 regional cohort after representing that historical region in any included
 event. Equal totals use competition ranking (`1, 1, 3`), while positions break
 ties by WCA ID for stable positional paging.
 
-Kinch excludes Multi-Blind and uses the 16 remaining events. Each completed
-event contributes `100 × scope reference result ÷ personal result`; a missing
-event contributes zero. The user-facing overall score divides that sum by all
-16 events and therefore ranges from 0 to 100, with higher scores ranking first.
-This gives Kinch the same person cohort as Sum of Ranks while retaining a fixed,
-comparable denominator. Its separate positional index supports the same bounded
-paging API without duplicating the person-event value grain.
+Kinch combines the current 17-event set into one score. Each normal event uses
+`100 × scope reference result ÷ personal result`, while FMC, 3BLD, 4BLD, and
+5BLD use the better of the Single and Average ratios. Multi-Blind uses the
+special points-and-time formula. A missing event contributes zero. The
+user-facing overall score divides that sum by all 17 events and therefore
+ranges from 0 to 100, with higher scores ranking first. Kinch is exposed as a
+single combined ranking; Sum of Ranks retains separate Single and Average
+rankings. Country Kinch pages default to NR Kinch ordering; `kinch=continent`
+orders the same country cohort by the stored CR Kinch companion values.
 
 The event-value intermediate is dropped after the score build. It is not a
 published schema or readiness dependency because the product currently shows
@@ -548,8 +552,11 @@ The v1 policy is:
 - Sum of Ranks Average includes all 16 current Average events.
 - If an event has 10 ranked competitors, a missing result contributes rank 11.
 - Fallbacks are calculated independently for World, continent, and country.
-- Kinch excludes Multi-Blind, averages across all 16 remaining events for both
-  result types, and assigns zero percent to each missing event.
+- Kinch combines all 17 current events, chooses the better Single/Average ratio
+  for FMC and blindfolded events, uses the special Multi-Blind score, and
+  assigns zero percent to each missing event.
+- Country Kinch rows store both NR Kinch ordering and CR Kinch companion
+  score/rank/position values for country-cohort CR ordering.
 
 Any event-set or missing-event policy change increments `metric_version` or
 `event_set_version`; it does not silently reinterpret stored v1 rows.
