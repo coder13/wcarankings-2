@@ -1,0 +1,37 @@
+name: Verify production year API
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare live rankings by year
+        run: |
+          set -euo pipefail
+          for year in 2024 2026; do
+            url="https://wcarankings.com/api/rankings?eventId=333&result=single&year=${year}&start=0&limit=5&paged=1"
+            echo "=== YEAR ${year} ==="
+            curl --fail --silent --show-error --max-time 30 "$url" -o "/tmp/${year}.json"
+            jq -c '
+              if type == "array" then .[0:5]
+              elif has("rankings") then {total, rankings: .rankings[0:5]}
+              elif has("items") then {total, items: .items[0:5]}
+              elif has("results") then {total, results: .results[0:5]}
+              else .
+              end
+            ' "/tmp/${year}.json"
+          done
+
+          echo "=== IDENTICAL RESPONSES ==="
+          if cmp -s /tmp/2024.json /tmp/2026.json; then
+            echo true
+          else
+            echo false
+          fi
