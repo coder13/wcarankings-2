@@ -58,6 +58,18 @@ SELECT
 FROM sum_of_ranks_historical_results history
 WHERE average_result IS NOT NULL;
 
+-- phase: index historical bests
+ALTER TABLE sum_of_ranks_historical_bests
+  ADD INDEX idx_sor_history_country_rank (
+    result_type, event_id, country_id, result_value, person_id
+  ),
+  ADD INDEX idx_sor_history_continent_rank (
+    result_type, event_id, continent_id, result_value, person_id
+  ),
+  ADD INDEX idx_sor_history_region_lists (
+    continent_id, country_id
+  );
+
 DROP TEMPORARY TABLE sum_of_ranks_historical_results;
 
 DROP TEMPORARY TABLE IF EXISTS sum_of_ranks_cohorts;
@@ -168,6 +180,18 @@ FROM continent_bests value
 INNER JOIN sum_of_ranks_cohorts cohort
   ON cohort.scope = 'continent'
   AND cohort.region_id = value.continent_id;
+
+-- phase: index event values
+ALTER TABLE sum_of_ranks_event_values
+  ADD PRIMARY KEY (
+    result_type, cohort_id, person_id, event_id
+  ),
+  ADD INDEX idx_sor_event_values_event (
+    result_type, cohort_id, event_id, result_value, person_id
+  ),
+  ADD INDEX idx_sor_event_values_person (
+    cohort_id, person_id, event_id
+  );
 
 DROP TEMPORARY TABLE IF EXISTS sum_of_ranks_event_penalties;
 

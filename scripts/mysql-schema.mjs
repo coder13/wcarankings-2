@@ -14,6 +14,9 @@ const INDEXES = [
   ["results", "idx_results_single_best", "(`person_id`, `event_id`, `best`, `id`)", "person_id,event_id,best,id"],
   ["results", "idx_results_single_event_best", "(`event_id`, `best`, `id`)", "event_id,best,id"],
   ["results", "idx_results_average_best", "(`person_id`, `event_id`, `average`, `id`)", "person_id,event_id,average,id"],
+  ["results", "idx_results_average_event_best", "(`event_id`, `average`, `id`)", "event_id,average,id"],
+  ["results", "idx_results_single_country_best", "(`event_id`, `person_country_id`, `best`, `id`)", "event_id,person_country_id,best,id"],
+  ["results", "idx_results_average_country_best", "(`event_id`, `person_country_id`, `average`, `id`)", "event_id,person_country_id,average,id"],
 ];
 
 const projectionDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "sql", "ranking-projections");
@@ -252,6 +255,7 @@ function orderedProjections(selectedNames = DEFAULT_PROJECTION_NAMES) {
 
 export async function buildRegisteredProjections(connection, { projectionSuffix = "", projectionNames: selectedNames } = {}) {
   const timings = [];
+  await ensureIndexes(connection, INDEXES);
   for (const projection of orderedProjections(selectedNames)) {
     const startedAt = performance.now();
     writeBuildLog(`Starting projection ${projection.name}…`);
