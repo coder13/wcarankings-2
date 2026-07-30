@@ -259,6 +259,9 @@ CREATE TABLE person_sum_of_ranks_scores (
   required_coverage TINYINT UNSIGNED NOT NULL,
   kinch_score DECIMAL(12, 5) UNSIGNED NOT NULL,
   kinch_coverage TINYINT UNSIGNED NOT NULL,
+  kinch_continent_score DECIMAL(12, 5) UNSIGNED NOT NULL,
+  kinch_continent_rank INT UNSIGNED NOT NULL,
+  kinch_continent_position INT UNSIGNED NOT NULL,
   rank INT UNSIGNED NOT NULL,
   position INT UNSIGNED NOT NULL,
   kinch_rank INT UNSIGNED NOT NULL,
@@ -293,28 +296,48 @@ WITH baselines AS (
     AND penalty.cohort_id = value.cohort_id
     AND penalty.event_id = value.event_id
   GROUP BY value.result_type, value.cohort_id, value.person_id
+), kinch_totals AS (
+  SELECT cohort_id, person_id, SUM(kinch_value) AS kinch_score, COUNT(*) AS kinch_coverage
+  FROM sum_of_ranks_kinch_values
+  GROUP BY cohort_id, person_id
 ), totals AS (
   SELECT
     person.result_type,
     person.cohort_id,
+    baseline.scope,
+    baseline.region_id,
     person.person_id,
     CAST(baseline.fallback_score AS SIGNED)
       + person.score_adjustment AS score,
     person.coverage,
     baseline.required_coverage,
     kinch.kinch_score,
-    kinch.kinch_coverage
+    kinch.kinch_coverage,
+    CASE
+      WHEN baseline.scope = 'country' THEN COALESCE(continent_kinch.kinch_score, kinch.kinch_score)
+      ELSE kinch.kinch_score
+    END AS kinch_continent_score
   FROM person_adjustments person
-  INNER JOIN baselines baseline
+  INNER JOIN (
+    SELECT baselines.*, cohort.scope, cohort.region_id
+    FROM baselines
+    INNER JOIN sum_of_ranks_cohorts cohort
+      ON cohort.cohort_id = baselines.cohort_id
+  ) baseline
     ON baseline.result_type = person.result_type
     AND baseline.cohort_id = person.cohort_id
-  INNER JOIN (
-    SELECT cohort_id, person_id, SUM(kinch_value) AS kinch_score, COUNT(*) AS kinch_coverage
-    FROM sum_of_ranks_kinch_values
-    GROUP BY cohort_id, person_id
-  ) kinch
+  INNER JOIN kinch_totals kinch
     ON kinch.cohort_id = person.cohort_id
     AND kinch.person_id = person.person_id
+  LEFT JOIN countries country
+    ON country.id = baseline.region_id
+  LEFT JOIN sum_of_ranks_cohorts continent_cohort
+    ON baseline.scope = 'country'
+    AND continent_cohort.scope = 'continent'
+    AND continent_cohort.region_id = country.continent_id
+  LEFT JOIN kinch_totals continent_kinch
+    ON continent_kinch.cohort_id = continent_cohort.cohort_id
+    AND continent_kinch.person_id = person.person_id
 ), ranked AS (
   SELECT
     totals.*,
@@ -333,7 +356,15 @@ WITH baselines AS (
     ROW_NUMBER() OVER (
       PARTITION BY result_type, cohort_id
       ORDER BY kinch_score DESC, person_id
-    ) AS kinch_position
+    ) AS kinch_position,
+    RANK() OVER (
+      PARTITION BY result_type, cohort_id
+      ORDER BY kinch_continent_score DESC
+    ) AS kinch_continent_rank,
+    ROW_NUMBER() OVER (
+      PARTITION BY result_type, cohort_id
+      ORDER BY kinch_continent_score DESC, person_id
+    ) AS kinch_continent_position
   FROM totals
 )
 SELECT
@@ -348,6 +379,9 @@ SELECT
   ranked.required_coverage,
   ranked.kinch_score,
   ranked.kinch_coverage,
+  ranked.kinch_continent_score,
+  ranked.kinch_continent_rank,
+  ranked.kinch_continent_position,
   ranked.rank,
   ranked.position,
   ranked.kinch_rank,
@@ -369,6 +403,10 @@ ALTER TABLE person_sum_of_ranks_scores
   ADD INDEX idx_person_kinch_page (
     metric_version, event_set_version, result_type,
     scope, region_id, kinch_position, person_id
+  ),
+  ADD INDEX idx_person_kinch_continent_page (
+    metric_version, event_set_version, result_type,
+    scope, region_id, kinch_continent_position, person_id
   );
 
 DROP TEMPORARY TABLE sum_of_ranks_event_penalties;

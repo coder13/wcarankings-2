@@ -10,7 +10,8 @@ const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const MAX_SEARCH_RESULTS = 500;
 
 type RankingRow = { rank: number; sub_rank: number; total_count?: number; person_id: string; person_name: string; country_id: string; country_name: string; country_iso2: string; continent_id: string; best: number; competition_id: string; competition_name: string; is_world_record: number; is_continent_record: number; is_country_record: number };
-type QueryInput = { eventId: string; type: RankingType; gender: GenderFilter[]; scope: RegionScope; regionId: string; year: number | null; startRank: number; cursorRank: number | null; cursorId: string; limit: number; locate: string; search: string; regexSearch: boolean; searchLimit: number; paged: boolean };
+type KinchOrder = "regional" | "continent";
+type QueryInput = { eventId: string; type: RankingType; gender: GenderFilter[]; scope: RegionScope; regionId: string; year: number | null; kinchOrder: KinchOrder; startRank: number; cursorRank: number | null; cursorId: string; limit: number; locate: string; search: string; regexSearch: boolean; searchLimit: number; paged: boolean };
 type PersonMetricRow = {
   rank: number;
   sub_rank: number;
@@ -223,9 +224,12 @@ function personMetricEntry(row: PersonMetricRow): RankingEntry {
 
 async function queryPersonMetric(input: QueryInput) {
   const kinch = input.eventId === "sor-kinch";
-  const rankColumn = kinch ? "kinch_rank" : "rank";
-  const positionColumn = kinch ? "kinch_position" : "position";
-  const scoreExpression = kinch ? "score.kinch_score / 17.0" : "score.score";
+  const continentKinch = kinch && input.scope === "country" && input.kinchOrder === "continent";
+  const kinchPrefix = continentKinch ? "kinch_continent" : "kinch";
+  const rankColumn = kinch ? `${kinchPrefix}_rank` : "rank";
+  const positionColumn = kinch ? `${kinchPrefix}_position` : "position";
+  const scoreColumn = continentKinch ? "kinch_continent_score" : "kinch_score";
+  const scoreExpression = kinch ? `score.${scoreColumn} / 17.0` : "score.score";
   const metricResultType = kinch ? "single" : input.type;
   const values: unknown[] = [metricResultType, input.scope, input.regionId];
   const conditions = [
@@ -344,16 +348,20 @@ async function queryPersonMetric(input: QueryInput) {
 }
 
 async function queryFilteredPersonMetric(input: QueryInput, kinch: boolean, gender: ReturnType<typeof genderCondition>) {
-  const scoreOrder = kinch ? "score.kinch_score / 16.0 DESC" : "score.score ASC";
-  const scoreValue = kinch ? "score.kinch_score / 16.0" : "score.score";
-  const values: unknown[] = [input.type, input.scope, input.regionId, ...gender.values];
+  const continentKinch = kinch && input.scope === "country" && input.kinchOrder === "continent";
+  const metricResultType = kinch ? "single" : input.type;
+  const kinchScoreColumn = continentKinch ? "kinch_continent_score" : "kinch_score";
+  const positionColumn = kinch ? `${continentKinch ? "kinch_continent" : "kinch"}_position` : "position";
+  const scoreOrder = kinch ? `score.${kinchScoreColumn} / 17.0 DESC` : "score.score ASC";
+  const scoreValue = kinch ? `score.${kinchScoreColumn} / 17.0` : "score.score";
+  const values: unknown[] = [metricResultType, input.scope, input.regionId, ...gender.values];
   const conditions = [
     "score.metric_version = 1",
     "score.event_set_version = 1",
     "score.result_type = ?",
     "score.scope = ?",
     "score.region_id = ?",
-    `score.${kinch ? "kinch_position" : "position"} IS NOT NULL`,
+    `score.${positionColumn} IS NOT NULL`,
     gender.sql,
   ];
   const pageConditions: string[] = [];
@@ -389,7 +397,7 @@ async function queryFilteredPersonMetric(input: QueryInput, kinch: boolean, gend
   const limit = input.locate ? 1 : search ? input.searchLimit : input.limit + 1;
   const result = await query<FilteredPersonMetricRow>(
     `WITH filtered AS (
-       SELECT score.person_id, score.${kinch ? "kinch_score / 16.0" : "score"} AS best,
+       SELECT score.person_id, ${scoreValue} AS best,
          person.name AS person_name, person.country_id AS current_country_id,
          DENSE_RANK() OVER (ORDER BY ${scoreOrder}) AS filtered_rank,
          ROW_NUMBER() OVER (ORDER BY ${scoreOrder}, score.person_id) AS filtered_position,
@@ -445,8 +453,9 @@ async function queryFilteredPersonMetric(input: QueryInput, kinch: boolean, gend
 function parseInput(searchParams: URLSearchParams): QueryInput {
   const eventId = isRankingEventId(searchParams.get("eventId") ?? searchParams.get("event")) ? searchParams.get("eventId") ?? searchParams.get("event")! : "333";
   const rawType = searchParams.get("result") ?? searchParams.get("type");
-  const type = eventId === "333mbf" ? "single" : isRankingType(rawType) ? rawType : "single";
+  const type = eventId === "333mbf" || eventId === "sor-kinch" ? "single" : isRankingType(rawType) ? rawType : "single";
   const { scope, regionId } = parseRegionQuery(searchParams.get("region"));
+  const kinchOrder = searchParams.get("kinch") === "continent" ? "continent" : "regional";
   if (scope !== "world" && !regionId) throw new Error("Choose a region before loading rankings.");
   const paged = searchParams.get("paged") === "1";
   const rawStart = Number(searchParams.get("start"));
@@ -454,7 +463,7 @@ function parseInput(searchParams: URLSearchParams): QueryInput {
   const search = (searchParams.get("search") ?? "").trim().slice(0, 80);
   const regexSearch = searchParams.get("mode") === "vim";
   if (regexSearch && search && !isValidRegexPattern(search)) throw new Error("Invalid regular expression.");
-  return { eventId, type, gender: parseGender(searchParams), scope, regionId, year: parseYear(searchParams), startRank, cursorRank: Number(searchParams.get("cursorRank")) || null, cursorId: searchParams.get("cursorId") ?? "", limit: paged ? PAGE_SIZE : Math.min(PAGE_SIZE, Math.max(20, Number(searchParams.get("limit")) || 80)), locate: (searchParams.get("locate") ?? "").trim().toUpperCase(), search, regexSearch, searchLimit: Math.min(MAX_SEARCH_RESULTS, Math.max(1, Number(searchParams.get("searchLimit")) || MAX_SEARCH_RESULTS)), paged };
+  return { eventId, type, gender: parseGender(searchParams), scope, regionId, year: parseYear(searchParams), kinchOrder, startRank, cursorRank: Number(searchParams.get("cursorRank")) || null, cursorId: searchParams.get("cursorId") ?? "", limit: paged ? PAGE_SIZE : Math.min(PAGE_SIZE, Math.max(20, Number(searchParams.get("limit")) || 80)), locate: (searchParams.get("locate") ?? "").trim().toUpperCase(), search, regexSearch, searchLimit: Math.min(MAX_SEARCH_RESULTS, Math.max(1, Number(searchParams.get("searchLimit")) || MAX_SEARCH_RESULTS)), paged };
 }
 
 export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams) {
