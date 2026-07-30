@@ -13,7 +13,7 @@ test("creates a list with its initial members", async ({ page }) => {
     await route.fulfill({
       status: 201,
       contentType: "application/json",
-      body: JSON.stringify({ list: { publicId: "7K3M9Q2D" } }),
+      body: JSON.stringify({ list: { publicId: "7K3M9Q2D", slug: "pacific-northwest-cubers" } }),
     });
   });
   await page.goto("/lists");
@@ -24,7 +24,8 @@ test("creates a list with its initial members", async ({ page }) => {
 
   await expect.poll(() => createPayload).toEqual({
     name: "Pacific Northwest cubers",
-    visibility: "public",
+    visibility: "private",
+    joinPolicy: "closed",
   });
-  await expect(page).toHaveURL(/\/lists\/7K3M9Q2D$/);
+  await expect(page).toHaveURL(/\/lists\/7K3M9Q2D--pacific-northwest-cubers$/);
 });
