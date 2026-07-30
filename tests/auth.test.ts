@@ -5,6 +5,7 @@ import {
   generateSessionToken,
 } from "@/lib/auth";
 import { getRequestOrigin, getWcaAuthConfig, makeCookie, toWcaProfile } from "@/lib/wca-auth";
+import { getLogoutDestination } from "@/app/api/auth/wca/logout/route";
 
 test("creates high-entropy opaque session tokens", () => {
   const first = generateSessionToken();
@@ -94,6 +95,20 @@ test("uses the forwarded HTTPS protocol for callback URLs and cookies", () => {
   });
   assert.equal(getRequestOrigin(request), "https://wcarankings.com");
   assert.match(makeCookie("state", "value", request), /; Secure$/);
+});
+
+test("returns to the current same-origin page after sign-out", () => {
+  const request = new Request("https://rankings.example.com/api/auth/wca/logout", {
+    headers: { referer: "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333" },
+  });
+  assert.equal(
+    getLogoutDestination(request),
+    "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333",
+  );
+  const externalReferrer = new Request("https://rankings.example.com/api/auth/wca/logout", {
+    headers: { referer: "https://example.com/not-a-safe-return-url" },
+  });
+  assert.equal(getLogoutDestination(externalReferrer), "https://rankings.example.com");
 });
 
 test("prefers the WCA avatar thumbnail for the profile menu", () => {

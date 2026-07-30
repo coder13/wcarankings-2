@@ -237,10 +237,11 @@ export async function resolveList(lookup: string) {
   return toListSummary(result.rows[0]);
 }
 
-export function assertCanViewList(list: ListSummary, user: AuthUser | null) {
-  if (list.visibility === "public") return;
-  if (user && list.owner?.id === user.id) return;
-  throw new ListNotFoundError();
+export function assertCanViewList(_list: ListSummary, _user: AuthUser | null) {
+  // Visibility only controls whether a user-created list is shown in the
+  // public directory. Every list can be opened through its direct URL.
+  void _list;
+  void _user;
 }
 
 function assertOwner(row: ListRow, user: AuthUser) {
@@ -248,7 +249,6 @@ function assertOwner(row: ListRow, user: AuthUser) {
     throw new ListForbiddenError("System lists are read-only.");
   }
   if (Number(row.owner_user_id) !== user.id) {
-    if (row.visibility === "private") throw new ListNotFoundError();
     throw new ListForbiddenError();
   }
 }
@@ -712,12 +712,6 @@ export async function removeSelfFromList(user: AuthUser, lookup: string) {
       [row.id, user.wcaId],
     );
     if (result.affectedRows === 0) {
-      if (
-        row.visibility === "private" &&
-        Number(row.owner_user_id) !== user.id
-      ) {
-        throw new ListNotFoundError();
-      }
       throw new ListConflictError("You are not currently included in this list.");
     }
     await connection.execute(
@@ -811,7 +805,6 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
 export async function listMembershipRequests(user: AuthUser, lookup: string) {
   const list = await resolveList(lookup);
   if (list.kind !== "user" || list.owner?.id !== user.id) {
-    if (list.visibility === "private") throw new ListNotFoundError();
     throw new ListForbiddenError();
   }
   const result = await query<RequestRow>(
