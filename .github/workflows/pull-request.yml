@@ -128,6 +128,19 @@ jobs:
           docker compose run --rm data-tools /app/scripts/backfill-result-entries.mjs
           docker compose run --rm data-tools /app/scripts/refresh-rankings.mjs
 
+      - name: Exercise candidate-schema activation against disposable MariaDB
+        env:
+          INTEGRATION_ADMIN_DATABASE_URL: mysql://wcarankings:local-development-password@db:3306/mysql
+        run: |
+          docker compose exec -T db mariadb \
+            --user=root \
+            --password="$MYSQL_ROOT_PASSWORD" \
+            --execute="GRANT ALL PRIVILEGES ON *.* TO 'wcarankings'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
+          docker compose run --rm \
+            -e INTEGRATION_ADMIN_DATABASE_URL="$INTEGRATION_ADMIN_DATABASE_URL" \
+            -v "$GITHUB_WORKSPACE:/app/repo:ro" \
+            data-tools /app/repo/tests/ranking-generation-activation.integration.mjs
+
       - name: Start visual smoke-test app
         run: |
           docker compose up -d --no-build app

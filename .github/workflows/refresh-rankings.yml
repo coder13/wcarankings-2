@@ -26,12 +26,12 @@ concurrency:
 
 jobs:
   resolve_approved_data_tools:
-    uses: ./.github/workflows/reusable-resolve-approved-data-tools.yml
+    uses: ./.github/workflows/resolve-approved-data-tools.yml
     secrets: inherit
 
   plan_projections:
     needs: resolve_approved_data_tools
-    uses: ./.github/workflows/reusable-plan-projections.yml
+    uses: ./.github/workflows/plan-projections.yml
     with:
       ref: ${{ needs.resolve_approved_data_tools.outputs.source_sha }}
       force_rebuild: ${{ inputs.force_rebuild == true }}
@@ -41,7 +41,7 @@ jobs:
     needs:
       - resolve_approved_data_tools
       - plan_projections
-    uses: ./.github/workflows/reusable-build-projections.yml
+    uses: ./.github/workflows/build-projections.yml
     with:
       ref: ${{ needs.resolve_approved_data_tools.outputs.source_sha }}
       export_date: ${{ needs.plan_projections.outputs.export_date }}
@@ -61,7 +61,7 @@ jobs:
       - plan_projections
       - build_projections
       - resolve_approved_data_tools
-    uses: ./.github/workflows/reusable-deploy-projections.yml
+    uses: ./.github/workflows/deploy-projections.yml
     with:
       ref: ${{ needs.resolve_approved_data_tools.outputs.source_sha }}
       artifact_name: ${{ needs.build_projections.outputs.artifact_name }}

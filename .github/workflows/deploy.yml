@@ -28,14 +28,14 @@ concurrency:
 
 jobs:
   plan_projections:
-    uses: ./.github/workflows/reusable-plan-projections.yml
+    uses: ./.github/workflows/plan-projections.yml
     with:
       ref: ${{ github.sha }}
       force_rebuild: ${{ inputs.force_rebuild == true }}
     secrets: inherit
 
   build_server:
-    uses: ./.github/workflows/reusable-build-server.yml
+    uses: ./.github/workflows/build-server.yml
     with:
       ref: ${{ github.sha }}
       force_rebuild: false
@@ -44,7 +44,7 @@ jobs:
 
   build_projections:
     needs: plan_projections
-    uses: ./.github/workflows/reusable-build-projections.yml
+    uses: ./.github/workflows/build-projections.yml
     with:
       ref: ${{ github.sha }}
       export_date: ${{ needs.plan_projections.outputs.export_date }}
@@ -64,7 +64,7 @@ jobs:
       - plan_projections
       - build_server
       - build_projections
-    uses: ./.github/workflows/reusable-deploy-server.yml
+    uses: ./.github/workflows/deploy-server.yml
     with:
       ref: ${{ github.sha }}
       source_sha: ${{ needs.build_server.outputs.source_sha }}
@@ -87,7 +87,7 @@ jobs:
       - build_projections
       - build_server
       - deploy_server
-    uses: ./.github/workflows/reusable-deploy-projections.yml
+    uses: ./.github/workflows/deploy-projections.yml
     with:
       ref: ${{ github.sha }}
       artifact_name: ${{ needs.build_projections.outputs.artifact_name }}

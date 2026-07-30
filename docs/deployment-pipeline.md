@@ -1,12 +1,12 @@
 # Deployment pipeline
 
-The production pipeline is composed from five reusable workflows:
+The production pipeline is composed from five workflow blocks:
 
-- `reusable-plan-projections.yml` calculates exact dataset fingerprints.
-- `reusable-build-server.yml` builds or resolves app, Flyway, and data-tools images.
-- `reusable-build-projections.yml` creates checksummed ranking-generation bundles.
-- `reusable-deploy-server.yml` deploys a compatible server release.
-- `reusable-deploy-projections.yml` prepares, activates, verifies, or rolls back a ranking generation.
+- `plan-projections.yml` calculates exact dataset fingerprints.
+- `build-server.yml` builds or resolves app, Flyway, and data-tools images.
+- `build-projections.yml` creates checksummed ranking-generation bundles.
+- `deploy-server.yml` deploys a compatible server release.
+- `deploy-projections.yml` prepares, activates, verifies, or rolls back a ranking generation.
 
 `deploy.yml` composes all five for a main release. `refresh-rankings.yml` resolves the
 data-tools release approved by the last successful server deployment, then composes

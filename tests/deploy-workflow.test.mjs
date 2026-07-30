@@ -23,23 +23,23 @@ const [
 ] = await Promise.all([
   workflow("deploy.yml"),
   workflow("refresh-rankings.yml"),
-  workflow("reusable-plan-projections.yml"),
-  workflow("reusable-build-server.yml"),
-  workflow("reusable-build-projections.yml"),
-  workflow("reusable-deploy-server.yml"),
-  workflow("reusable-deploy-projections.yml"),
-  workflow("reusable-resolve-approved-data-tools.yml"),
+  workflow("plan-projections.yml"),
+  workflow("build-server.yml"),
+  workflow("build-projections.yml"),
+  workflow("deploy-server.yml"),
+  workflow("deploy-projections.yml"),
+  workflow("resolve-approved-data-tools.yml"),
   readFile(new URL("../scripts/activate-ranking-generation.mjs", import.meta.url), "utf8"),
   readFile(new URL("../ops/wcarankings-sync.service", import.meta.url), "utf8"),
 ]);
 
 test("composes the main release from independently callable workflow blocks", () => {
   assert.match(release, /group: production-mutation/);
-  assert.match(release, /uses: \.\/\.github\/workflows\/reusable-plan-projections\.yml/);
-  assert.match(release, /uses: \.\/\.github\/workflows\/reusable-build-server\.yml/);
-  assert.match(release, /uses: \.\/\.github\/workflows\/reusable-build-projections\.yml/);
-  assert.match(release, /uses: \.\/\.github\/workflows\/reusable-deploy-server\.yml/);
-  assert.match(release, /uses: \.\/\.github\/workflows\/reusable-deploy-projections\.yml/);
+  assert.match(release, /uses: \.\/\.github\/workflows\/plan-projections\.yml/);
+  assert.match(release, /uses: \.\/\.github\/workflows\/build-server\.yml/);
+  assert.match(release, /uses: \.\/\.github\/workflows\/build-projections\.yml/);
+  assert.match(release, /uses: \.\/\.github\/workflows\/deploy-server\.yml/);
+  assert.match(release, /uses: \.\/\.github\/workflows\/deploy-projections\.yml/);
   assert.match(
     release,
     /deploy_server:[\s\S]*needs:[\s\S]*- build_projections/,
@@ -58,14 +58,14 @@ test("daily refresh reuses only the projection lego blocks", () => {
   assert.match(refresh, /schedule:/);
   assert.match(refresh, /cron: "17 5 \* \* \*"/);
   assert.match(refresh, /group: production-mutation/);
-  assert.match(refresh, /reusable-plan-projections\.yml/);
-  assert.match(refresh, /reusable-build-projections\.yml/);
-  assert.match(refresh, /reusable-deploy-projections\.yml/);
-  assert.match(refresh, /reusable-resolve-approved-data-tools\.yml/);
+  assert.match(refresh, /plan-projections\.yml/);
+  assert.match(refresh, /build-projections\.yml/);
+  assert.match(refresh, /deploy-projections\.yml/);
+  assert.match(refresh, /resolve-approved-data-tools\.yml/);
   assert.match(refresh, /ref: \$\{\{ needs\.resolve_approved_data_tools\.outputs\.source_sha \}\}/);
   assert.match(approvedDataTools, /server-release-state\.json/);
-  assert.doesNotMatch(refresh, /reusable-build-server\.yml/);
-  assert.doesNotMatch(refresh, /reusable-deploy-server\.yml/);
+  assert.doesNotMatch(refresh, /build-server\.yml/);
+  assert.doesNotMatch(refresh, /deploy-server\.yml/);
 });
 
 test("plans projection changes from one dependency-aware fingerprint implementation", () => {
