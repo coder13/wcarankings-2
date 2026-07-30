@@ -3,6 +3,7 @@ import { getCurrentRankingsMetadata } from "@/lib/rankings-metadata";
 import {
   isEventId,
   isGenderFilter,
+  normalizeGenderFilters,
   isRankingType,
   parseRegionQuery,
   type RankingType,
@@ -53,7 +54,7 @@ export function parseGender(params: URLSearchParams) {
   if (unique.some((value) => !isGenderFilter(value))) {
     throw new ApiInputError("gender must contain only m, f, or o.");
   }
-  return (["m", "f", "o"] as const).filter((value) => unique.includes(value)) as GenderFilter[];
+  return normalizeGenderFilters(unique.filter(isGenderFilter));
 }
 
 export function parseStart(params: URLSearchParams) {

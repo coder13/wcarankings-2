@@ -35,6 +35,7 @@ import {
   isRankingEventId,
   isRankingType,
   isGenderFilter,
+  normalizeGenderFilters,
   type GenderFilter,
   parseRegionQuery,
   WCA_EVENTS,
@@ -977,7 +978,7 @@ export function RankingsExplorer({
       const { scope, regionId } = parseRegionQuery(nextRegion);
       setEventId(resolvedEventId);
       setRankingType(resolvedRankingType);
-      setGender(["m", "f", "o"].filter((value) => nextGenders.includes(value)));
+      setGender(normalizeGenderFilters(nextGenders));
       setRegionSelection({ scope, regionId });
       setLatitudeHemisphere(nextLatitudeHemisphere);
       setFindQuery(search);

@@ -91,17 +91,23 @@ export function isGenderFilter(value: string | null): value is GenderFilter {
   return value === "m" || value === "f" || value === "o";
 }
 
+export function normalizeGenderFilters(values: readonly GenderFilter[]) {
+  const normalized = (["m", "f", "o"] as const).filter((value) => values.includes(value));
+  return normalized.length === 3 ? [] : normalized;
+}
+
 export function genderFiltersLabel(values: GenderFilters) {
-  if (values.length === 0) return genderLabel(null);
-  if (values.length === 1) return genderLabel(values[0]);
-  return `${values.length} genders`;
+  const normalized = normalizeGenderFilters(values);
+  if (normalized.length === 0) return genderLabel(null);
+  if (normalized.length === 1) return genderLabel(normalized[0]);
+  return normalized.map((value) => value.toUpperCase()).join(", ");
 }
 
 export function genderLabel(value: GenderFilter | null) {
   if (value === "m") return "Men";
   if (value === "f") return "Women";
   if (value === "o") return "Other";
-  return "Any";
+  return "All";
 }
 
 export function isRegionScope(value: string | null): value is RegionScope {

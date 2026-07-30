@@ -12,6 +12,7 @@ import {
   parseStart,
   parseYear,
 } from "../lib/projection-api";
+import { genderFiltersLabel, normalizeGenderFilters } from "../lib/wca";
 
 test("parses bounded semantic ranking parameters", () => {
   const params = new URLSearchParams({
@@ -32,6 +33,12 @@ test("parses bounded semantic ranking parameters", () => {
   assert.deepEqual(parseGender(new URLSearchParams({ gender: "m,f" })), ["m", "f"]);
   assert.deepEqual(parseGender(new URLSearchParams({ gender: "o" })), ["o"]);
   assert.deepEqual(parseGender(new URLSearchParams()), []);
+  assert.equal(genderFiltersLabel([]), "All");
+  assert.equal(genderFiltersLabel(["m", "f"]), "M, F");
+  assert.equal(genderFiltersLabel(["f", "o"]), "F, O");
+  assert.equal(genderFiltersLabel(["m", "o"]), "M, O");
+  assert.deepEqual(normalizeGenderFilters(["m", "f", "o"]), []);
+  assert.equal(genderFiltersLabel(["m", "f", "o"]), "All");
 });
 
 test("rejects malformed yearly ranking parameters", () => {

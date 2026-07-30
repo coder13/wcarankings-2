@@ -5,7 +5,7 @@ import type {
   RankingPage,
 } from "@/components/RankingsExplorer/types";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
-import { isEventId, isRankingEventId, isRankingType, isValidRegexPattern, parseRegionQuery, WCA_EVENTS, type GenderFilter } from "@/lib/wca";
+import { isEventId, isRankingEventId, isRankingType, isValidRegexPattern, normalizeGenderFilters, parseRegionQuery, WCA_EVENTS, type GenderFilter } from "@/lib/wca";
 import { getRegions } from "@/lib/regions";
 import { loadRankings } from "@/lib/rankings";
 import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
@@ -39,7 +39,7 @@ function getSearchParamWithLegacyKey(
 function getGenderFilters(searchParams: Record<string, string | string[] | undefined>): GenderFilter[] {
   const raw = searchParams.gender;
   const values = (Array.isArray(raw) ? raw : raw ? [raw] : []).flatMap((value) => value.split(","));
-  return (["m", "f", "o"] as const).filter((value) => values.includes(value));
+  return normalizeGenderFilters(values.filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"));
 }
 
 function getCanonicalSearchParams(

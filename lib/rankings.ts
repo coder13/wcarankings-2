@@ -22,6 +22,7 @@ type PersonMetricRow = {
   continent_id: string;
   best: number;
 };
+type FilteredPersonMetricRow = PersonMetricRow & { total_count?: number };
 
 function toRankingEntry(row: RankingRow): RankingEntry {
   return { rank: Number(row.rank), subRank: Number(row.sub_rank), personId: row.person_id, personName: row.person_name, countryId: row.country_id, countryName: row.country_name, countryIso2: row.country_iso2, continentId: row.continent_id, best: Number(row.best), competitionId: row.competition_id, competitionName: row.competition_name, recordBadges: getRecordBadges({ isWorldRecord: Number(row.is_world_record) === 1, isContinentRecord: Number(row.is_continent_record) === 1, isCountryRecord: Number(row.is_country_record) === 1, continentId: row.continent_id }) };
@@ -235,6 +236,7 @@ async function queryPersonMetric(input: QueryInput) {
     `score.${positionColumn} IS NOT NULL`,
   ];
   const gender = genderCondition("person", input.gender);
+  if (input.gender.length) return queryFilteredPersonMetric(input, kinch, gender);
   if (gender.sql) { conditions.push(gender.sql); values.push(...gender.values); }
   let peopleTimings = { queueMs: 0, statementMs: 0 };
   let peopleReturnedRows = 0;
@@ -337,6 +339,105 @@ async function queryPersonMetric(input: QueryInput) {
     },
     queryCount: 2,
     returnedRows: result.rows.length + end.rows.length,
+  };
+}
+
+async function queryFilteredPersonMetric(input: QueryInput, kinch: boolean, gender: ReturnType<typeof genderCondition>) {
+  const scoreOrder = kinch ? "score.kinch_score / 16.0 DESC" : "score.score ASC";
+  const scoreValue = kinch ? "score.kinch_score / 16.0" : "score.score";
+  const values: unknown[] = [input.type, input.scope, input.regionId, ...gender.values];
+  const conditions = [
+    "score.metric_version = 1",
+    "score.event_set_version = 1",
+    "score.result_type = ?",
+    "score.scope = ?",
+    "score.region_id = ?",
+    `score.${kinch ? "kinch_position" : "position"} IS NOT NULL`,
+    gender.sql,
+  ];
+  const pageConditions: string[] = [];
+  const pageValues: unknown[] = [];
+  let peopleTimings = { queueMs: 0, statementMs: 0 };
+  let peopleReturnedRows = 0;
+  let search = false;
+  if (input.locate) {
+    pageConditions.push("filtered.person_id = ?");
+    pageValues.push(input.locate);
+  } else if (input.search) {
+    search = true;
+    const people = await searchPersonIds(input.search, input.regexSearch, input.searchLimit);
+    peopleTimings = people.timings;
+    peopleReturnedRows = people.returnedRows;
+    if (people.personIds.length === 0) {
+      return {
+        data: { entries: [], hasMore: false, nextPageStart: null, previousPageStart: null, startPosition: 0, lastRank: null, total: 0 },
+        timings: people.timings,
+        queryCount: 1,
+        returnedRows: people.returnedRows,
+      };
+    }
+    pageConditions.push(`filtered.person_id IN (${people.personIds.map(() => "?").join(", ")})`);
+    pageValues.push(...people.personIds);
+  } else if (input.cursorRank) {
+    pageConditions.push("(filtered.filtered_position > ? OR (filtered.filtered_position = ? AND filtered.person_id > ?))");
+    pageValues.push(input.cursorRank, input.cursorRank, input.cursorId);
+  } else {
+    pageConditions.push("filtered.filtered_position >= ?");
+    pageValues.push(input.startRank);
+  }
+  const limit = input.locate ? 1 : search ? input.searchLimit : input.limit + 1;
+  const result = await query<FilteredPersonMetricRow>(
+    `WITH filtered AS (
+       SELECT score.person_id, score.${kinch ? "kinch_score / 16.0" : "score"} AS best,
+         person.name AS person_name, person.country_id AS current_country_id,
+         DENSE_RANK() OVER (ORDER BY ${scoreOrder}) AS filtered_rank,
+         ROW_NUMBER() OVER (ORDER BY ${scoreOrder}, score.person_id) AS filtered_position,
+         COUNT(*) OVER () AS total_count
+       FROM person_sum_of_ranks_scores score
+       LEFT JOIN persons person ON person.wca_id = score.person_id AND person.sub_id = 1
+       WHERE ${conditions.join(" AND ")}
+     )
+     SELECT filtered.filtered_rank AS rank, filtered.filtered_position AS sub_rank, filtered.total_count,
+       filtered.person_id, COALESCE(filtered.person_name, filtered.person_id) AS person_name,
+       COALESCE(display_country.id, '') AS country_id,
+       COALESCE(display_country.name, display_country.id, '') AS country_name,
+       COALESCE(display_country.iso2, '') AS country_iso2,
+       COALESCE(display_country.continent_id, '') AS continent_id,
+       filtered.best
+     FROM filtered
+     LEFT JOIN countries current_country ON current_country.id = filtered.current_country_id
+     LEFT JOIN countries display_country ON display_country.id = CASE
+       WHEN ? = 'country' THEN ?
+       WHEN ? = 'continent' AND current_country.continent_id <> ? THEN NULL
+       ELSE filtered.current_country_id
+     END
+     WHERE ${pageConditions.join(" AND ")}
+     ORDER BY filtered.filtered_position
+     LIMIT ?`,
+    [...values, input.scope, input.regionId, input.scope, input.regionId, ...pageValues, limit],
+  );
+  const timings = {
+    queueMs: peopleTimings.queueMs + result.timings.queueMs,
+    statementMs: peopleTimings.statementMs + result.timings.statementMs,
+  };
+  const rows = result.rows;
+  const entries = rows.slice(0, input.locate ? 1 : search ? rows.length : input.limit).map(personMetricEntry);
+  if (input.locate) return { data: { located: entries[0] ?? null }, timings, queryCount: 1, returnedRows: peopleReturnedRows + rows.length };
+  if (search) return { data: { entries, hasMore: false, nextPageStart: null, previousPageStart: null, total: entries.length }, timings, queryCount: 2, returnedRows: peopleReturnedRows + rows.length };
+  return {
+    data: {
+      entries,
+      hasMore: rows.length > input.limit,
+      nextPageStart: rows.length > input.limit ? input.startRank + PAGE_SIZE : null,
+      previousPageStart: input.startRank > 1 ? Math.max(1, input.startRank - PAGE_SIZE) : null,
+      startPosition: Math.max(0, input.startRank - 1),
+      lastRank: entries.at(-1)?.subRank ?? null,
+      total: Number(rows[0]?.total_count ?? 0),
+      exportDate: null,
+    },
+    timings,
+    queryCount: 1,
+    returnedRows: rows.length,
   };
 }
 

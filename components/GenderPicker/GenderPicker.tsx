@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { Dropdown } from "../Dropdown/Dropdown";
 import SelectChevronIcon from "../Icon/select-chevron.svg?react";
-import { genderFiltersLabel, genderLabel, type GenderFilter } from "@/lib/wca";
+import { genderFiltersLabel, genderLabel, normalizeGenderFilters, type GenderFilter } from "@/lib/wca";
 
 export function GenderPicker({
   value,
@@ -55,7 +55,7 @@ export function GenderPicker({
                 const next = value.includes(option.value)
                   ? value.filter((current) => current !== option.value)
                   : [...value, option.value];
-                onChange(["m", "f", "o"].filter((current) => next.includes(current)));
+                onChange(normalizeGenderFilters(next));
               }}
             >
               {option.label}
