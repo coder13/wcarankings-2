@@ -29,21 +29,6 @@ export function ListCreateTrigger() {
   return <><button className="listActionLink" type="button" onPointerDown={() => setOpen(true)} onClick={() => setOpen(true)}>Create a list</button>{open && <Dialog title="Create a list" onClose={() => setOpen(false)}><form className="listModalForm" onSubmit={submit}><label>Name<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} autoFocus /></label><fieldset><legend>Visibility</legend><label><input type="radio" checked={visibility === "public"} onChange={() => setVisibility("public")} /> Public</label><label><input type="radio" checked={visibility === "private"} onChange={() => setVisibility("private")} /> Private</label></fieldset><fieldset><legend>Joining</legend><label><input type="radio" checked={joinPolicy === "open"} onChange={() => setJoinPolicy("open")} /> Anyone can join</label><label><input type="radio" checked={joinPolicy === "closed"} onChange={() => setJoinPolicy("closed")} /> Requests need approval</label></fieldset>{error && <p className="listModalError" role="alert">{error}</p>}<button type="submit" disabled={busy}>{busy ? "Creating…" : "Create list"}</button></form></Dialog>}</>;
 }
 
-export function ListCloneExportControls({ listId }: { listId: string }) {
-  const [busy, setBusy] = useState(false);
-  const clone = async () => {
-    setBusy(true);
-    const response = await fetch(`/api/lists/${listId}`, { method: "POST" });
-    const body = await response.json() as { list?: { publicId: string; slug: string } };
-    if (response.ok && body.list?.publicId) {
-      window.location.assign(listPath({ publicId: body.list.publicId, systemAlias: null, slug: body.list.slug }));
-      return;
-    }
-    setBusy(false);
-  };
-  return <div className="listCloneExportControls"><a href={`/api/lists/${listId}?format=csv`}>Export CSV</a><button type="button" disabled={busy} onClick={() => void clone()}>{busy ? "Cloning…" : "Clone list"}</button></div>;
-}
-
 export function ListOwnerControls({ listId, initialVisibility, initialJoinPolicy = "closed", onManageMembers }: { listId: string; initialVisibility: "public" | "private"; initialJoinPolicy?: "open" | "closed"; onManageMembers?: () => void }) {
   const [mode, setModeState] = useState<"add" | "settings" | null>(null), [visibility, setVisibility] = useState(initialVisibility), [joinPolicy, setJoinPolicy] = useState(initialJoinPolicy), [query, setQuery] = useState(""), [entries, setEntries] = useState<Person[]>([]), [selected, setSelected] = useState<Person[]>([]), [ids, setIds] = useState(""), [error, setError] = useState(""), [busy, setBusy] = useState(false);
   const setMode = (next: "add" | "settings" | null) => setModeState((current) => next === "settings" && current === "settings" ? null : next);
