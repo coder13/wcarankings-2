@@ -85,12 +85,16 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "tree=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
 
+      - name: Set up pnpm
+        if: inputs.groups != '' || inputs.cache_only
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node.js
         if: inputs.groups != '' || inputs.cache_only
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
       - name: Restore cached core projection
         if: contains(inputs.groups, 'core') && !inputs.cache_only
@@ -156,7 +160,7 @@ jobs:
       - name: Install dependencies and MariaDB client
         if: steps.projection-cache-plan.outputs.groups != '' || inputs.include_raw || inputs.cache_only
         run: |
-          npm ci
+          pnpm install --frozen-lockfile
           sudo apt-get update
           sudo apt-get install -y mariadb-client
 

@@ -35,7 +35,7 @@ const COMPATIBILITY_PROJECTION_FILES = [
 
 const SHARED_PROJECTION_FINGERPRINT_FILES = [
   "release-compatibility.json",
-  "package-lock.json",
+  "pnpm-lock.yaml",
   "docker-compose.yml",
   "Dockerfile.flyway",
   "scripts/mysql-schema.mjs",
