@@ -59,7 +59,7 @@ import {
   type NavigationSubject,
 } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { TextDropdown } from "../Dropdown/TextDropdown";
-import { ListAddPeopleRail, ListMembershipControls, ListOwnerControls } from "../ListOwnerControls/ListOwnerControls";
+import { ListAddPeopleRail, ListMembershipControls, ListMembershipRequestRows, ListOwnerControls } from "../ListOwnerControls/ListOwnerControls";
 import { useRailScrollProgress } from "./useRailScrollProgress";
 import { fetchRankingPage, RankingsPageCache } from "./rankingsPageCache";
 import { useScrollVelocity } from "./useScrollVelocity";
@@ -467,6 +467,7 @@ export function RankingsExplorer({
   rankingSource,
   listOwner,
   listMembership,
+  listMembershipRequests,
   regionSelectionDisabled = false,
   initialRegions = {
     continents: FALLBACK_CONTINENTS,
@@ -495,6 +496,10 @@ export function RankingsExplorer({
     listId: string;
     joinPolicy: "open" | "closed";
     state: "member" | "pending" | "not_member";
+  };
+  listMembershipRequests?: {
+    listId: string;
+    requests: Array<{ id: number; personId: string; name: string }>;
   };
   regionSelectionDisabled?: boolean;
   initialRegions?: {
@@ -2842,6 +2847,7 @@ export function RankingsExplorer({
       <main>
         <div className="outerListWrapper" ref={listRef}>
           <div className="listContainer">
+            {listMembershipRequests && <ListMembershipRequestRows listId={listMembershipRequests.listId} initialRequests={listMembershipRequests.requests} />}
             {loadingPrevious && (
               <div className="listMessage">Loading earlier rankings…</div>
             )}

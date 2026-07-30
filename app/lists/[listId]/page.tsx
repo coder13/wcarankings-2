@@ -10,6 +10,7 @@ import {
 import {
   assertCanViewList,
   getListMembershipState,
+  listMembershipRequests,
   ListNotFoundError,
   resolveList,
 } from "@/lib/lists";
@@ -26,11 +27,13 @@ async function getListPageData(listId: string) {
       getAuthUser(request),
     ]);
     assertCanViewList(list, user);
-    const [regions, membershipState] = await Promise.all([
+    const isOwner = list.kind === "user" && list.owner?.id === user?.id;
+    const [regions, membershipState, membershipRequests] = await Promise.all([
       getListRegions(list),
       getListMembershipState(list, user),
+      isOwner && user ? listMembershipRequests(user, listId) : Promise.resolve([]),
     ]);
-    return { list, regions, user, membershipState };
+    return { list, regions, user, membershipState, membershipRequests };
   } catch (error) {
     if (error instanceof ListNotFoundError) notFound();
     throw error;
@@ -54,7 +57,7 @@ export default async function ListPage({
     : resultValue;
   const regionValue = typeof query.region === "string" ? query.region : null;
   const requestedRegionSelection = parseRegionQuery(regionValue);
-  const { list, regions, user, membershipState } = await getListPageData(listId);
+  const { list, regions, user, membershipState, membershipRequests } = await getListPageData(listId);
   const regionSelection = normalizeListRegionSelection(
     requestedRegionSelection,
     regions,
@@ -91,6 +94,11 @@ export default async function ListPage({
         list.publicId &&
         membershipState
           ? { listId: list.publicId, joinPolicy: list.joinPolicy, state: membershipState }
+          : undefined
+      }
+      listMembershipRequests={
+        list.kind === "user" && list.owner?.id === user?.id && list.publicId
+          ? { listId: list.publicId, requests: membershipRequests }
           : undefined
       }
       initialEventId={eventId}
