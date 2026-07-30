@@ -53,6 +53,9 @@ test("builds projection transfers on Actions before publishing them atomically",
   assert.doesNotMatch(workflow, /worldcubeassociation\.org\/api\/v0\/export\/public/);
   assert.match(workflow, /key: projection-transfer-core-v1-/);
   assert.match(workflow, /key: projection-transfer-yearly-v1-/);
+  assert.match(workflow, /projection-build-plan\.mjs --groups="\$groups_csv"/);
+  assert.match(workflow, /WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts\/sync-wca-export\.mjs --force/);
+  assert.match(workflow, /mapfile -t planned_groups/);
   assert.match(workflow, /publish_groups=.*yearly-person-rankings/);
   assert.match(workflow, /node scripts\/sync-wca-export\.mjs --force/);
   assert.match(workflow, /node scripts\/prepare-projection-transfer\.mjs/);

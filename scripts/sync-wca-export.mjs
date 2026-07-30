@@ -295,6 +295,7 @@ async function refreshRankingsSchema() {
     await refreshMysqlSchema(connection, {
       projectionSuffix: "_staging",
       projectionNames: selectedProjectionNames.length > 0 ? selectedProjectionNames : undefined,
+      createConnection: () => mysql.createConnection(databaseOptions()),
     });
   } finally {
     await connection.end();

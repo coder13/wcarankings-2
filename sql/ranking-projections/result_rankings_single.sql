@@ -1,28 +1,28 @@
 CREATE TABLE result_rankings_single AS
 SELECT
-  result.id AS result_id,
+  result.result_id,
   result.event_id,
   result.person_id,
   result.competition_id,
   result.best AS result_value,
   result.person_country_id AS country_id,
-  COALESCE(country.continent_id, '') AS continent_id,
-  COALESCE(result.regional_single_record, '') AS record_code,
+  result.person_continent_id AS continent_id,
+  result.regional_single_record AS record_code,
   RANK() OVER (
     PARTITION BY result.event_id
     ORDER BY result.best
   ) AS world_rank,
   ROW_NUMBER() OVER (
     PARTITION BY result.event_id
-    ORDER BY result.best, result.id
+    ORDER BY result.best, result.result_id
   ) AS world_position,
   RANK() OVER (
-    PARTITION BY result.event_id, COALESCE(country.continent_id, '')
+    PARTITION BY result.event_id, result.person_continent_id
     ORDER BY result.best
   ) AS continent_rank,
   ROW_NUMBER() OVER (
-    PARTITION BY result.event_id, COALESCE(country.continent_id, '')
-    ORDER BY result.best, result.id
+    PARTITION BY result.event_id, result.person_continent_id
+    ORDER BY result.best, result.result_id
   ) AS continent_position,
   RANK() OVER (
     PARTITION BY result.event_id, result.person_country_id
@@ -30,10 +30,9 @@ SELECT
   ) AS country_rank,
   ROW_NUMBER() OVER (
     PARTITION BY result.event_id, result.person_country_id
-    ORDER BY result.best, result.id
+    ORDER BY result.best, result.result_id
   ) AS country_position
-FROM results result
-LEFT JOIN countries country ON country.id = result.person_country_id
+FROM result_facts result
 WHERE result.best > 0;
 
 ALTER TABLE result_rankings_single

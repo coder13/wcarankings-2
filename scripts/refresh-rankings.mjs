@@ -16,7 +16,9 @@ function databaseOptions(connectionString = process.env.DATABASE_URL) {
 
 const connection = await mysql.createConnection(databaseOptions());
 try {
-  await refreshMysqlSchema(connection);
+  await refreshMysqlSchema(connection, {
+    createConnection: () => mysql.createConnection(databaseOptions()),
+  });
   process.stdout.write("Ranking projections refreshed.\n");
 } finally {
   await connection.end();

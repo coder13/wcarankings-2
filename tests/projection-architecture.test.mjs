@@ -55,6 +55,10 @@ test("keeps future grains registered while activating person metrics and competi
 
   assert.match(schema, /PROJECTION_REGISTRY/);
   assert.match(schema, /dependencies/);
+  assert.match(schema, /projectionBuildPlan/);
+  assert.match(schema, /WCA_PROJECTION_BUILD_CONCURRENCY/);
+  assert.match(schema, /buildRegisteredProjectionsConcurrently/);
+  assert.match(schema, /createConnection/);
   assert.match(schema, /build:/);
   assert.match(schema, /validate:/);
   assert.match(schema, /durationMs/);
@@ -62,7 +66,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /statement\.match\(\/\^\\s\*-- phase:/);
   assert.match(schema, /DEFAULT_PROJECTION_NAMES/);
   assert.match(schema, /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/);
-  assert.match(schema, /name: "sum-of-ranks"/);
+  assert.match(schema, /name: "sum-of-ranks"[\s\S]*dependencies: \[\]/);
   assert.match(schema, /enabledByDefault: true/);
   assert.match(importer, /promoteProjectionTables/);
 
@@ -76,6 +80,8 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(people, /world_position/);
   assert.match(results, /CREATE TABLE result_rankings_single AS/);
   assert.match(results, /CREATE TABLE result_rankings_average AS/);
+  assert.match(results, /FROM result_facts result/);
+  assert.doesNotMatch(results, /LEFT JOIN countries/);
   assert.doesNotMatch(results, /competition_start_date/);
   assert.match(results, /ROW_NUMBER\(\)/);
   assert.match(results, /RANK\(\) OVER/);
