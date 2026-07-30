@@ -19,6 +19,10 @@ const schema = await readFile(
   new URL("../scripts/mysql-schema.mjs", import.meta.url),
   "utf8",
 );
+const syncWcaExport = await readFile(
+  new URL("../scripts/sync-wca-export.mjs", import.meta.url),
+  "utf8",
+);
 
 test("defers secondary projection indexes until after bulk transfer import", () => {
   assert.match(prepare, /SHOW INDEX FROM/);
@@ -45,6 +49,15 @@ test("packages the export-date normalizer with the publisher", () => {
   assert.match(dockerfile, /projection-transfer-date\.mjs/);
   assert.match(dockerfile, /refresh-board-list\.mjs/);
   assert.match(dockerfile, /resolve-wca-export\.mjs/);
+});
+
+test("dry-run WCA export caching does not require a database connection", () => {
+  assert.match(syncWcaExport, /if \(dryRun\) \{[\s\S]*await getCachedExport\(latest\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(syncWcaExport, /if \(!force && await getImportedDate\(\) === String\(latest\.exportDate\)\)/);
+  assert.ok(
+    syncWcaExport.indexOf("if (dryRun) {") < syncWcaExport.indexOf("await getImportedDate()"),
+    "dry-run must return before checking the imported database export date",
+  );
 });
 
 test("publishes result facts with the core runtime transfer", () => {

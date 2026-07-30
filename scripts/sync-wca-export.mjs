@@ -314,14 +314,15 @@ async function main() {
     latest = cachedPath ? await getSuppliedExportMetadata(cachedPath) : await getLatestExport();
   }
   process.stdout.write(`Latest WCA export: ${latest.exportDate} (v${String(latest.version).replace(/^v/i, "")})\n`);
-  if (!force && await getImportedDate() === String(latest.exportDate)) {
-    process.stdout.write("Database is already current. Nothing to do.\n");
-    return;
-  }
 
   if (dryRun) {
     await getCachedExport(latest);
     process.stdout.write("Dry run complete. The cached SQL export is available for import.\n");
+    return;
+  }
+
+  if (!force && await getImportedDate() === String(latest.exportDate)) {
+    process.stdout.write("Database is already current. Nothing to do.\n");
     return;
   }
 
