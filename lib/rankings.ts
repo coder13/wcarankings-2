@@ -225,8 +225,9 @@ async function queryPersonMetric(input: QueryInput) {
   const kinch = input.eventId === "sor-kinch";
   const rankColumn = kinch ? "kinch_rank" : "rank";
   const positionColumn = kinch ? "kinch_position" : "position";
-  const scoreExpression = kinch ? "score.kinch_score / 16.0" : "score.score";
-  const values: unknown[] = [input.type, input.scope, input.regionId];
+  const scoreExpression = kinch ? "score.kinch_score / 17.0" : "score.score";
+  const metricResultType = kinch ? "single" : input.type;
+  const values: unknown[] = [metricResultType, input.scope, input.regionId];
   const conditions = [
     "score.metric_version = 1",
     "score.event_set_version = 1",
@@ -320,7 +321,7 @@ async function queryPersonMetric(input: QueryInput) {
        ${genderCondition("person", input.gender).sql ? `AND ${genderCondition("person", input.gender).sql}` : ""}
      ORDER BY ${positionColumn} DESC
      LIMIT 1`,
-    [input.type, input.scope, input.regionId, ...genderCondition("person", input.gender).values],
+    [metricResultType, input.scope, input.regionId, ...genderCondition("person", input.gender).values],
   );
   return {
     data: {

@@ -62,7 +62,7 @@ function getCanonicalSearchParams(
   if (allEventRankingId) params.set("eventId", allEventRankingId);
   else if (eventId === "333") params.delete("eventId");
   else params.set("eventId", eventId);
-  if (rankingType === "single") params.delete("result");
+  if (eventId === "sor-kinch" || rankingType === "single") params.delete("result");
   else params.set("result", rankingType);
   if (regionId) params.set("region", regionId);
   else params.delete("region");
@@ -104,7 +104,7 @@ async function getInitialRankings(
   const rawEventId = getSearchParamWithLegacyKey(searchParams, "eventId", "event");
   const rawRankingType = getSearchParamWithLegacyKey(searchParams, "result", "type");
   const eventId = isRankingEventId(rawEventId) ? rawEventId : "333";
-  const rankingType = eventId === "333mbf" ? "single" : isRankingType(rawRankingType) ? rawRankingType : "single";
+  const rankingType = eventId === "333mbf" || eventId === "sor-kinch" ? "single" : isRankingType(rawRankingType) ? rawRankingType : "single";
   const { scope, regionId } = parseRegionQuery(getSearchParam(searchParams, "region"));
   const gender = getGenderFilters(searchParams);
   const year = yearOverride === null
@@ -323,7 +323,7 @@ export async function RankingsPage({
     initialSubject === "people" && rawEventId === "SOR" ? rawEventId : null;
   const rankingType = initialSubject === "competitions" && initialCompetitionRanking === "podiums"
     ? ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average"
-    : eventId === "333mbf"
+    : eventId === "333mbf" || eventId === "sor-kinch"
       ? "single"
       : isRankingType(rawRankingType) ? rawRankingType : "single";
   const { scope, regionId } = parseRegionQuery(getSearchParam(resolvedSearchParams, "region"));

@@ -192,6 +192,61 @@ SELECT
 FROM sum_of_ranks_event_values
 GROUP BY result_type, cohort_id, event_id;
 
+DROP TEMPORARY TABLE IF EXISTS sum_of_ranks_kinch_values;
+
+CREATE TEMPORARY TABLE sum_of_ranks_kinch_values (
+  cohort_id SMALLINT UNSIGNED NOT NULL,
+  person_id VARCHAR(10) CHARACTER SET ascii NOT NULL,
+  event_id VARCHAR(6) CHARACTER SET ascii NOT NULL,
+  kinch_value DECIMAL(12, 5) UNSIGNED NOT NULL,
+  PRIMARY KEY (cohort_id, person_id, event_id)
+) ENGINE = InnoDB;
+
+-- phase: combine the traditional Kinch event choices
+INSERT INTO sum_of_ranks_kinch_values
+  (cohort_id, person_id, event_id, kinch_value)
+WITH ratios AS (
+  SELECT
+    value.cohort_id,
+    value.person_id,
+    value.event_id,
+    MAX(CASE WHEN value.result_type = 'single' THEN
+      CASE WHEN value.event_id = '333mbf' THEN
+        100.0 * GREATEST(0, (
+          (99 - FLOOR(value.result_value / 10000000) % 100)
+          + 1
+          - CASE WHEN FLOOR(value.result_value / 100) % 100000 = 99999 THEN 0
+            ELSE (FLOOR(value.result_value / 100) % 100000 * 100.0) / 360000 END
+        )) / NULLIF(GREATEST(0, (
+          (99 - FLOOR(penalty.reference_result / 10000000) % 100)
+          + 1
+          - CASE WHEN FLOOR(penalty.reference_result / 100) % 100000 = 99999 THEN 0
+            ELSE (FLOOR(penalty.reference_result / 100) % 100000 * 100.0) / 360000 END
+        )), 0)
+      ELSE 100.0 * penalty.reference_result / value.result_value END
+    END) AS single_ratio,
+    MAX(CASE WHEN value.result_type = 'average' THEN
+      100.0 * penalty.reference_result / value.result_value
+    END) AS average_ratio
+  FROM sum_of_ranks_event_values value
+  INNER JOIN sum_of_ranks_event_penalties penalty
+    ON penalty.result_type = value.result_type
+    AND penalty.cohort_id = value.cohort_id
+    AND penalty.event_id = value.event_id
+  GROUP BY value.cohort_id, value.person_id, value.event_id
+)
+SELECT
+  cohort_id,
+  person_id,
+  event_id,
+  CASE
+    WHEN event_id = '333mbf' THEN COALESCE(single_ratio, 0)
+    WHEN event_id IN ('333fm', '333bf', '444bf', '555bf')
+      THEN GREATEST(COALESCE(single_ratio, 0), COALESCE(average_ratio, 0))
+    ELSE COALESCE(average_ratio, 0)
+  END
+FROM ratios;
+
 CREATE TABLE person_sum_of_ranks_scores (
   metric_version SMALLINT UNSIGNED NOT NULL,
   event_set_version SMALLINT UNSIGNED NOT NULL,
@@ -231,14 +286,7 @@ WITH baselines AS (
       CAST(value.event_rank AS SIGNED)
         - CAST(penalty.fallback_rank AS SIGNED)
     ) AS score_adjustment,
-    COUNT(*) AS coverage,
-    SUM(
-      CASE
-        WHEN value.event_id = '333mbf' THEN 0
-        ELSE 100.0 * penalty.reference_result / value.result_value
-      END
-    ) AS kinch_score,
-    SUM(value.event_id <> '333mbf') AS kinch_coverage
+    COUNT(*) AS coverage
   FROM sum_of_ranks_event_values value
   INNER JOIN sum_of_ranks_event_penalties penalty
     ON penalty.result_type = value.result_type
@@ -254,12 +302,19 @@ WITH baselines AS (
       + person.score_adjustment AS score,
     person.coverage,
     baseline.required_coverage,
-    person.kinch_score,
-    person.kinch_coverage
+    kinch.kinch_score,
+    kinch.kinch_coverage
   FROM person_adjustments person
   INNER JOIN baselines baseline
     ON baseline.result_type = person.result_type
     AND baseline.cohort_id = person.cohort_id
+  INNER JOIN (
+    SELECT cohort_id, person_id, SUM(kinch_value) AS kinch_score, COUNT(*) AS kinch_coverage
+    FROM sum_of_ranks_kinch_values
+    GROUP BY cohort_id, person_id
+  ) kinch
+    ON kinch.cohort_id = person.cohort_id
+    AND kinch.person_id = person.person_id
 ), ranked AS (
   SELECT
     totals.*,
@@ -317,6 +372,7 @@ ALTER TABLE person_sum_of_ranks_scores
   );
 
 DROP TEMPORARY TABLE sum_of_ranks_event_penalties;
+DROP TEMPORARY TABLE sum_of_ranks_kinch_values;
 DROP TEMPORARY TABLE sum_of_ranks_event_values;
 DROP TEMPORARY TABLE sum_of_ranks_cohorts;
 DROP TEMPORARY TABLE sum_of_ranks_historical_bests;
