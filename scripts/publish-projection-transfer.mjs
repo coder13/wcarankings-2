@@ -99,7 +99,7 @@ try {
     renames.push(`\`${table}_transfer\` TO \`${staging}\``);
   }
   await connection.query(`RENAME TABLE ${renames.join(", ")}`);
-  await promoteProjectionTables(connection);
+  await promoteProjectionTables(connection, { tables: transferTables });
   for (const table of [...indexesTables, ...manifestTables]) await dropManagedObject(connection, table);
   process.stdout.write(`Published transferred projection generation for ${normalizedTransferDate}.\n`);
 } finally {

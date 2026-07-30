@@ -180,8 +180,13 @@ export const PUBLISHED_PROJECTION_TABLES = [
 export const DEPLOYMENT_PROJECTION_GROUPS = [
   {
     name: "core",
-    projectionNames: DEFAULT_PROJECTION_NAMES.filter((name) => name !== "person-year-rankings"),
-    tables: PUBLISHED_PROJECTION_TABLES.filter((table) => !table.startsWith("person_year_")),
+    projectionNames: DEFAULT_PROJECTION_NAMES.filter((name) => name !== "sum-of-ranks" && name !== "person-year-rankings"),
+    tables: PUBLISHED_PROJECTION_TABLES.filter((table) => table !== "person_sum_of_ranks_scores" && !table.startsWith("person_year_")),
+  },
+  {
+    name: "sum-of-ranks",
+    projectionNames: ["sum-of-ranks"],
+    tables: ["person_sum_of_ranks_scores"],
   },
   {
     name: "yearly-person-rankings",
@@ -405,10 +410,10 @@ async function tableExists(connection, name) {
   return rows.length > 0;
 }
 
-export async function promoteProjectionTables(connection, { projectionSuffix = "_staging" } = {}) {
+export async function promoteProjectionTables(connection, { projectionSuffix = "_staging", tables = PUBLISHED_PROJECTION_TABLES } = {}) {
   const renames = [];
   const obsolete = [];
-  for (const published of PUBLISHED_PROJECTION_TABLES) {
+  for (const published of tables) {
     const previous = `${published}_previous`;
     await dropManagedObject(connection, previous);
     if (await tableExists(connection, published)) {

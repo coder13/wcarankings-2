@@ -163,7 +163,16 @@ jobs:
           path: |
             /tmp/core-projection-transfer.sql.gz
             /tmp/core-projection-transfer.json
-          key: projection-transfer-core-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/**', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
+          key: projection-transfer-core-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/wca_best_single.sql', 'sql/ranking-projections/wca_best_average.sql', 'sql/ranking-projections/ranking_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_average_source.sql', 'sql/ranking-projections/result_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_indexes.sql', 'sql/ranking-projections/result_entries_single_indexes.sql', 'sql/ranking-projections/ranking_counts.sql', 'sql/ranking-projections/result_counts.sql', 'sql/ranking-projections/competition_podium_members.sql', 'sql/ranking-projections/competition_event_stats.sql', 'sql/ranking-projections/result_facts.sql', 'sql/ranking-projections/result_rankings_single.sql', 'sql/ranking-projections/result_rankings_average.sql', 'sql/ranking-projections/result_ranking_counts.sql', 'sql/ranking-projections/competition_stats.sql', 'scripts/prepare-projection-transfer.mjs') }}
+
+      - name: Restore Sum of Ranks projection transfer
+        id: sum-of-ranks-projection-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            /tmp/sum-of-ranks-projection-transfer.sql.gz
+            /tmp/sum-of-ranks-projection-transfer.json
+          key: projection-transfer-sum-of-ranks-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_sum_of_ranks_scores.sql', 'scripts/prepare-projection-transfer.mjs') }}
 
       - name: Restore yearly projection transfer
         id: yearly-projection-cache
@@ -172,26 +181,30 @@ jobs:
           path: |
             /tmp/yearly-projection-transfer.sql.gz
             /tmp/yearly-projection-transfer.json
-          key: projection-transfer-yearly-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
+          key: projection-transfer-yearly-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/prepare-projection-transfer.mjs') }}
 
       - name: Determine required projection transfer
         id: projection-transfer
         env:
-          CORE_PROJECTION_FINGERPRINT: projection-transfer-core-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/**', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-          YEARLY_PROJECTION_FINGERPRINT: projection-transfer-yearly-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
+          CORE_PROJECTION_FINGERPRINT: projection-transfer-core-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/wca_best_single.sql', 'sql/ranking-projections/wca_best_average.sql', 'sql/ranking-projections/ranking_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_average_source.sql', 'sql/ranking-projections/result_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_indexes.sql', 'sql/ranking-projections/result_entries_single_indexes.sql', 'sql/ranking-projections/ranking_counts.sql', 'sql/ranking-projections/result_counts.sql', 'sql/ranking-projections/competition_podium_members.sql', 'sql/ranking-projections/competition_event_stats.sql', 'sql/ranking-projections/result_facts.sql', 'sql/ranking-projections/result_rankings_single.sql', 'sql/ranking-projections/result_rankings_average.sql', 'sql/ranking-projections/result_ranking_counts.sql', 'sql/ranking-projections/competition_stats.sql', 'scripts/prepare-projection-transfer.mjs') }}
+          SUM_OF_RANKS_PROJECTION_FINGERPRINT: projection-transfer-sum-of-ranks-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_sum_of_ranks_scores.sql', 'scripts/prepare-projection-transfer.mjs') }}
+          YEARLY_PROJECTION_FINGERPRINT: projection-transfer-yearly-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/prepare-projection-transfer.mjs') }}
         run: |
           remote_state=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" 'cat /srv/wcarankings/projection-transfer-state.json 2>/dev/null || true')
           core_required=true
+          sum_of_ranks_required=true
           yearly_required=true
           if jq -e --arg fingerprint "$CORE_PROJECTION_FINGERPRINT" '.core == $fingerprint' <<<"$remote_state" >/dev/null 2>&1; then core_required=false; fi
+          if jq -e --arg fingerprint "$SUM_OF_RANKS_PROJECTION_FINGERPRINT" '.sumOfRanks == $fingerprint' <<<"$remote_state" >/dev/null 2>&1; then sum_of_ranks_required=false; fi
           if jq -e --arg fingerprint "$YEARLY_PROJECTION_FINGERPRINT" '.yearly == $fingerprint' <<<"$remote_state" >/dev/null 2>&1; then yearly_required=false; fi
-          if [ "$core_required" = false ] && [ "$yearly_required" = false ]; then required=false; else required=true; fi
+          if [ "$core_required" = false ] && [ "$sum_of_ranks_required" = false ] && [ "$yearly_required" = false ]; then required=false; else required=true; fi
           echo "core_required=$core_required" >> "$GITHUB_OUTPUT"
+          echo "sum_of_ranks_required=$sum_of_ranks_required" >> "$GITHUB_OUTPUT"
           echo "yearly_required=$yearly_required" >> "$GITHUB_OUTPUT"
           echo "required=$required" >> "$GITHUB_OUTPUT"
 
       - name: Build and export projection generation
-        if: steps.core-projection-cache.outputs.cache-hit != 'true' || steps.yearly-projection-cache.outputs.cache-hit != 'true'
+        if: steps.core-projection-cache.outputs.cache-hit != 'true' || steps.sum-of-ranks-projection-cache.outputs.cache-hit != 'true' || steps.yearly-projection-cache.outputs.cache-hit != 'true'
         id: projection-build
         run: |
           started_at=$(date +%s)
@@ -200,21 +213,25 @@ jobs:
           docker compose run --rm flyway migrate
           build_groups=()
           if [ '${{ steps.core-projection-cache.outputs.cache-hit }}' != true ]; then build_groups+=(core); fi
+          if [ '${{ steps.sum-of-ranks-projection-cache.outputs.cache-hit }}' != true ]; then build_groups+=(sum-of-ranks); fi
           if [ '${{ steps.yearly-projection-cache.outputs.cache-hit }}' != true ]; then build_groups+=(yearly-person-rankings); fi
           groups_csv=$(IFS=,; echo "${build_groups[*]}")
           node scripts/projection-build-plan.mjs --groups="$groups_csv" > /tmp/projection-build-plan.json
-          WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/sync-wca-export.mjs --force
-          node scripts/check-ranking-projections.mjs
+          projection_names_csv=$(jq -r '.projectionNames | join(",")' /tmp/projection-build-plan.json)
+          WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/sync-wca-export.mjs --force --projection-names="$projection_names_csv"
           mapfile -t planned_groups < <(jq -r '.groups[]' /tmp/projection-build-plan.json)
           for group in "${planned_groups[@]}"; do
-            prefix=${group/yearly-person-rankings/yearly}
+            case "$group" in
+              yearly-person-rankings) prefix=yearly ;;
+              *) prefix=$group ;;
+            esac
             node scripts/prepare-projection-transfer.mjs --group="$group" > "/tmp/${prefix}-projection-transfer.json"
             mapfile -t transfer_tables < <(jq -r '.tables[]' "/tmp/${prefix}-projection-transfer.json")
             MYSQL_PWD="$MYSQL_PASSWORD" mariadb-dump --protocol=TCP --host=127.0.0.1 --port=13307 --user="$MYSQL_USER" --single-transaction --skip-lock-tables "$MYSQL_DATABASE" "${transfer_tables[@]}" | gzip -1 > "/tmp/${prefix}-projection-transfer.sql.gz"
           done
           completed_at=$(date +%s)
           duration=$((completed_at - started_at))
-          bytes=$(du -bc /tmp/core-projection-transfer.sql.gz /tmp/yearly-projection-transfer.sql.gz | tail -1 | cut -f1)
+          bytes=$(du -bc /tmp/core-projection-transfer.sql.gz /tmp/sum-of-ranks-projection-transfer.sql.gz /tmp/yearly-projection-transfer.sql.gz | tail -1 | cut -f1)
           echo "duration_seconds=$duration" >> "$GITHUB_OUTPUT"
           echo "archive_bytes=$bytes" >> "$GITHUB_OUTPUT"
           {
@@ -232,7 +249,16 @@ jobs:
           path: |
             /tmp/core-projection-transfer.sql.gz
             /tmp/core-projection-transfer.json
-          key: projection-transfer-core-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/**', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
+          key: projection-transfer-core-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/wca_best_single.sql', 'sql/ranking-projections/wca_best_average.sql', 'sql/ranking-projections/ranking_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_average_source.sql', 'sql/ranking-projections/result_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_indexes.sql', 'sql/ranking-projections/result_entries_single_indexes.sql', 'sql/ranking-projections/ranking_counts.sql', 'sql/ranking-projections/result_counts.sql', 'sql/ranking-projections/competition_podium_members.sql', 'sql/ranking-projections/competition_event_stats.sql', 'sql/ranking-projections/result_facts.sql', 'sql/ranking-projections/result_rankings_single.sql', 'sql/ranking-projections/result_rankings_average.sql', 'sql/ranking-projections/result_ranking_counts.sql', 'sql/ranking-projections/competition_stats.sql', 'scripts/prepare-projection-transfer.mjs') }}
+
+      - name: Save generated Sum of Ranks projection transfer
+        if: steps.sum-of-ranks-projection-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            /tmp/sum-of-ranks-projection-transfer.sql.gz
+            /tmp/sum-of-ranks-projection-transfer.json
+          key: projection-transfer-sum-of-ranks-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_sum_of_ranks_scores.sql', 'scripts/prepare-projection-transfer.mjs') }}
 
       - name: Save generated yearly projection transfer
         if: steps.yearly-projection-cache.outputs.cache-hit != 'true'
@@ -241,12 +267,12 @@ jobs:
           path: |
             /tmp/yearly-projection-transfer.sql.gz
             /tmp/yearly-projection-transfer.json
-          key: projection-transfer-yearly-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
+          key: projection-transfer-yearly-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/prepare-projection-transfer.mjs') }}
 
       - name: Report cached projection transfer
-        if: steps.core-projection-cache.outputs.cache-hit == 'true' && steps.yearly-projection-cache.outputs.cache-hit == 'true'
+        if: steps.core-projection-cache.outputs.cache-hit == 'true' && steps.sum-of-ranks-projection-cache.outputs.cache-hit == 'true' && steps.yearly-projection-cache.outputs.cache-hit == 'true'
         run: |
-          bytes=$(du -bc /tmp/core-projection-transfer.sql.gz /tmp/yearly-projection-transfer.sql.gz | tail -1 | cut -f1)
+          bytes=$(du -bc /tmp/core-projection-transfer.sql.gz /tmp/sum-of-ranks-projection-transfer.sql.gz /tmp/yearly-projection-transfer.sql.gz | tail -1 | cut -f1)
           {
             echo "### Projection build"
             echo "- WCA export: ${{ steps.wca-export.outputs.date }}"
@@ -262,6 +288,8 @@ jobs:
           path: |
             /tmp/core-projection-transfer.sql.gz
             /tmp/core-projection-transfer.json
+            /tmp/sum-of-ranks-projection-transfer.sql.gz
+            /tmp/sum-of-ranks-projection-transfer.json
             /tmp/yearly-projection-transfer.sql.gz
             /tmp/yearly-projection-transfer.json
           retention-days: 7
@@ -308,27 +336,40 @@ jobs:
         if: steps.projection-transfer.outputs.required == 'true'
         id: projection-import
         env:
-          CORE_PROJECTION_FINGERPRINT: projection-transfer-core-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/**', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-          YEARLY_PROJECTION_FINGERPRINT: projection-transfer-yearly-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
+          CORE_PROJECTION_FINGERPRINT: projection-transfer-core-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/wca_best_single.sql', 'sql/ranking-projections/wca_best_average.sql', 'sql/ranking-projections/ranking_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_average_source.sql', 'sql/ranking-projections/result_entries_single_source.sql', 'sql/ranking-projections/ranking_entries_indexes.sql', 'sql/ranking-projections/result_entries_single_indexes.sql', 'sql/ranking-projections/ranking_counts.sql', 'sql/ranking-projections/result_counts.sql', 'sql/ranking-projections/competition_podium_members.sql', 'sql/ranking-projections/competition_event_stats.sql', 'sql/ranking-projections/result_facts.sql', 'sql/ranking-projections/result_rankings_single.sql', 'sql/ranking-projections/result_rankings_average.sql', 'sql/ranking-projections/result_ranking_counts.sql', 'sql/ranking-projections/competition_stats.sql', 'scripts/prepare-projection-transfer.mjs') }}
+          SUM_OF_RANKS_PROJECTION_FINGERPRINT: projection-transfer-sum-of-ranks-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_sum_of_ranks_scores.sql', 'scripts/prepare-projection-transfer.mjs') }}
+          YEARLY_PROJECTION_FINGERPRINT: projection-transfer-yearly-v2-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/prepare-projection-transfer.mjs') }}
         run: |
           started_at=$(date +%s)
           groups=()
           if [ '${{ steps.projection-transfer.outputs.core_required }}' = true ]; then groups+=(core); fi
+          if [ '${{ steps.projection-transfer.outputs.sum_of_ranks_required }}' = true ]; then groups+=(sum-of-ranks); fi
           if [ '${{ steps.projection-transfer.outputs.yearly_required }}' = true ]; then groups+=(yearly); fi
           groups_csv=$(IFS=,; echo "${groups[*]}")
           for group in "${groups[@]}"; do scp -q -o BatchMode=yes "/tmp/${group}-projection-transfer.sql.gz" "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-${group}-projection-transfer.sql.gz"; done
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "CORE_PROJECTION_FINGERPRINT='$CORE_PROJECTION_FINGERPRINT' YEARLY_PROJECTION_FINGERPRINT='$YEARLY_PROJECTION_FINGERPRINT' PROJECTION_GROUPS='$groups_csv' sh -s" <<'REMOTE'
+            "CORE_PROJECTION_FINGERPRINT='$CORE_PROJECTION_FINGERPRINT' SUM_OF_RANKS_PROJECTION_FINGERPRINT='$SUM_OF_RANKS_PROJECTION_FINGERPRINT' YEARLY_PROJECTION_FINGERPRINT='$YEARLY_PROJECTION_FINGERPRINT' PROJECTION_GROUPS='$groups_csv' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
             (while sleep 30; do echo "Projection transfer import is still running…"; done) &
             heartbeat_pid=$!
-            trap 'kill "$heartbeat_pid" 2>/dev/null || true; rm -f /tmp/wcarankings-core-projection-transfer.sql.gz /tmp/wcarankings-yearly-projection-transfer.sql.gz' EXIT
+            trap 'kill "$heartbeat_pid" 2>/dev/null || true; rm -f /tmp/wcarankings-core-projection-transfer.sql.gz /tmp/wcarankings-sum-of-ranks-projection-transfer.sql.gz /tmp/wcarankings-yearly-projection-transfer.sql.gz' EXIT
             for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do gzip -dc "/tmp/wcarankings-${group}-projection-transfer.sql.gz" | docker compose exec -T db sh -c 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE"'; done
             publish_groups=$(printf '%s' "$PROJECTION_GROUPS" | sed 's/yearly/yearly-person-rankings/g')
             docker compose run --rm app node /app/scripts/publish-projection-transfer.mjs --groups="$publish_groups"
             docker compose run --rm app node /app/scripts/check-ranking-projections.mjs
-            jq -n --arg core "$CORE_PROJECTION_FINGERPRINT" --arg yearly "$YEARLY_PROJECTION_FINGERPRINT" '{core: $core, yearly: $yearly}' > /srv/wcarankings/projection-transfer-state.json.tmp
+            existing_state=$(cat /srv/wcarankings/projection-transfer-state.json 2>/dev/null || echo '{}')
+            jq -n \
+              --argjson existing "$existing_state" \
+              --arg groups "$PROJECTION_GROUPS" \
+              --arg core "$CORE_PROJECTION_FINGERPRINT" \
+              --arg sumOfRanks "$SUM_OF_RANKS_PROJECTION_FINGERPRINT" \
+              --arg yearly "$YEARLY_PROJECTION_FINGERPRINT" '
+                $existing
+                | if (($groups | split(",") | index("core")) != null) then .core = $core else . end
+                | if (($groups | split(",") | index("sum-of-ranks")) != null) then .sumOfRanks = $sumOfRanks else . end
+                | if (($groups | split(",") | index("yearly")) != null) then .yearly = $yearly else . end
+              ' > /srv/wcarankings/projection-transfer-state.json.tmp
             mv /srv/wcarankings/projection-transfer-state.json.tmp /srv/wcarankings/projection-transfer-state.json
           REMOTE
           completed_at=$(date +%s)

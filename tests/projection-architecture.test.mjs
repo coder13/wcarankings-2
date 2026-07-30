@@ -67,6 +67,8 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /DEFAULT_PROJECTION_NAMES/);
   assert.match(schema, /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/);
   assert.match(schema, /name: "sum-of-ranks"[\s\S]*dependencies: \[\]/);
+  assert.match(schema, /name: "core"[\s\S]*name !== "sum-of-ranks"/);
+  assert.match(schema, /name: "sum-of-ranks"[\s\S]*projectionNames: \["sum-of-ranks"\]/);
   assert.match(schema, /enabledByDefault: true/);
   assert.match(importer, /promoteProjectionTables/);
 
@@ -270,13 +272,15 @@ test("person search resolves IDs before querying projections", async () => {
 });
 
 test("builds Sum of Ranks as one published score projection", async () => {
-  const [schema, backfill] = await Promise.all([
+  const [schema, backfill, publisher] = await Promise.all([
     readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
     readFile(new URL("scripts/backfill-sum-of-ranks.mjs", root), "utf8"),
+    readFile(new URL("scripts/publish-projection-transfer.mjs", root), "utf8"),
   ]);
   assert.match(schema, /files: \["person_sum_of_ranks_scores\.sql"\]/);
   assert.match(schema, /tables: \["person_sum_of_ranks_scores"\]/);
   assert.match(schema, /RETIRED_PROJECTION_TABLES/);
   assert.match(schema, /for \(const retired of RETIRED_PROJECTION_TABLES\)/);
   assert.match(backfill, /projectionNames = \["sum-of-ranks"\]/);
+  assert.match(publisher, /promoteProjectionTables\(connection, \{ tables: transferTables \}\)/);
 });
