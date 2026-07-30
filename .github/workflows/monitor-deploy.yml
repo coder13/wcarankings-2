@@ -23,20 +23,22 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
 
-      - name: Inspect production projection import
+      - name: Verify deployed production image and endpoints
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: www
         run: |
+          set -euo pipefail
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" 'set -eu
             cd /srv/wcarankings
-            echo "=== containers ==="
+            latest_image=$(docker image inspect wcarankings-app:latest --format "{{.Id}}")
+            running_image=$(docker inspect wcarankings-app-1 --format "{{.Image}}")
+            test "$latest_image" = "$running_image"
             docker compose ps
-            echo "=== MariaDB process list ==="
-            docker compose exec -T db sh -c '\''mariadb --batch --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="SHOW FULL PROCESSLIST"'\''
-            echo "=== transfer files ==="
-            ls -lh /tmp/wcarankings-*-projection-transfer.sql.gz 2>/dev/null || true
-            echo "=== container resource use ==="
-            docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.BlockIO}}"
-            echo "=== disk ==="
-            df -h /srv/wcarankings'
+            curl --fail --silent --show-error http://127.0.0.1:3000/api/health/ready
+            curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:3000/api/rankings?eventId=333&result=single&year=2024&start=0&limit=1&paged=1" >/dev/null
+            curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:3000/api/rankings/competitions?ranking=competitor-count&start=0&limit=10" >/dev/null
+            echo "RUNNING_IMAGE=$running_image"'
+          curl --fail --silent --show-error --max-time 20 "$SERVER_HOST" >/dev/null
+          echo "PUBLIC_SITE_OK=true"
