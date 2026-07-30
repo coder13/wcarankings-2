@@ -156,7 +156,9 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
   assert.match(component, /const nextStart = pageStartForSubRank\(normalizedRank\) \+ 1/);
   assert.doesNotMatch(component, /header-controls|collapsed-filter-summary|table-quick-jump/);
   assert.doesNotMatch(rankingsRoute, /SELECT (MIN|MAX|COUNT\(\*\))/);
-  assert.doesNotMatch(rankingsRoute, /ROW_NUMBER\(\) OVER/);
+  const normalRankingsRoute = rankingsRoute.split("async function queryGenderPage")[0];
+  assert.doesNotMatch(normalRankingsRoute, /ROW_NUMBER\(\) OVER/);
+  assert.match(rankingsRoute, /async function queryGenderPage/);
   assert.match(rankingsRoute, /searchPersonIds/);
   assert.match(rankingsRoute, /personColumn} IN \(\$\{placeholders\}\)/);
   assert.doesNotMatch(rankingsRoute, /person_name \$\{operator\}/);
