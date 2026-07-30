@@ -33,7 +33,7 @@ async function getListPageData(listId: string) {
       getListMembershipState(list, user),
       isOwner && user ? listMembershipRequests(user, listId) : Promise.resolve([]),
     ]);
-    return { list, regions, user, membershipState, membershipRequests };
+    return { list, regions, user, isOwner, membershipState, membershipRequests };
   } catch (error) {
     if (error instanceof ListNotFoundError) notFound();
     throw error;
@@ -57,7 +57,7 @@ export default async function ListPage({
     : resultValue;
   const regionValue = typeof query.region === "string" ? query.region : null;
   const requestedRegionSelection = parseRegionQuery(regionValue);
-  const { list, regions, user, membershipState, membershipRequests } = await getListPageData(listId);
+  const { list, regions, user, isOwner, membershipState, membershipRequests } = await getListPageData(listId);
   const regionSelection = normalizeListRegionSelection(
     requestedRegionSelection,
     regions,
