@@ -86,7 +86,7 @@ export default async function ListPage({
         searchMatches: [],
         initialMatchPersonId: "",
       }}
-      rankingSource={{ listId: rankingListId, listName: list.name }}
+      rankingSource={{ kind: "saved", listId: rankingListId, listName: list.name }}
       showMyRank={membershipState === "member"}
       listOwner={list.kind === "user" && list.owner?.id === user?.id && list.publicId ? { listId: list.publicId, visibility: list.visibility, joinPolicy: list.joinPolicy } : undefined}
       listMembership={

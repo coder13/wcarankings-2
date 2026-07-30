@@ -61,6 +61,7 @@ import {
 import { TextDropdown } from "../Dropdown/TextDropdown";
 import { ListAddPeopleRail, ListMembershipControls, ListMembershipRequestRows, ListOwnerControls } from "../ListOwnerControls/ListOwnerControls";
 import { ListCloneExportControls } from "../ListOwnerControls/ListCloneExportControls";
+import { DynamicListControls } from "../ListOwnerControls/DynamicListControls";
 import { useRailScrollProgress } from "./useRailScrollProgress";
 import { fetchRankingPage, RankingsPageCache } from "./rankingsPageCache";
 import { useScrollVelocity } from "./useScrollVelocity";
@@ -98,10 +99,20 @@ function getMobileControlsSnapshot() {
 const RAIL_REVEAL_DISTANCE = ROW_HEIGHT * 1.5;
 const TOP_RAIL_TRANSFORM_DISTANCE = ROW_HEIGHT * 2;
 const END_MARKER_PEEK = ROW_HEIGHT + 40;
-type RankingSource = {
-  listId: string;
-  listName: string;
-};
+type RankingSource =
+  | { kind: "saved"; listId: string; listName: string }
+  | { kind: "dynamic"; personIds: string[]; listName: string };
+
+function addRankingSourceParams(params: URLSearchParams, source?: RankingSource) {
+  if (!source) return;
+  if (source.kind === "saved") params.set("list", source.listId);
+  else params.set("wca_ids", source.personIds.join(","));
+}
+
+function rankingSourceCacheKey(source: RankingSource | undefined, resource: RankingResource) {
+  if (!source) return resource;
+  return source.kind === "saved" ? source.listId : `dynamic:${source.personIds.join(",")}`;
+}
 type VinextNavigationWindow = Window & {
   __VINEXT_RSC_PENDING__?: Promise<unknown> | null;
 };
@@ -223,7 +234,7 @@ function getPage(
   });
   const year = activeYear();
   if (resource === "people" && year) params.set("year", year);
-  if (source) params.set("list", source.listId);
+  addRankingSourceParams(params, source);
   if (selection.scope !== "world") params.set("region", selection.regionId);
   if (resource === "podiums") params.set("ranking", "podium");
   if (resource === "competitor-count") params.set("ranking", "competitor-count");
@@ -232,7 +243,7 @@ function getPage(
     params.set("hemisphere", resource.slice("latitude-".length));
   }
   const cacheKey = params.toString();
-  const cachePool = `${source?.listId ?? resource}:${eventId}`;
+  const cachePool = `${rankingSourceCacheKey(source, resource)}:${eventId}`;
   const cached = pageCache.get(cachePool, cacheKey);
   if (cached) return cached;
 
@@ -428,7 +439,7 @@ function searchRankings(
     searchLimit: "500",
   });
   if (regexSearch) params.set("mode", "vim");
-  if (source) params.set("list", source.listId);
+  addRankingSourceParams(params, source);
   const year = activeYear();
   if (resource === "people" && year) params.set("year", year);
   if (selection.scope !== "world") params.set("region", selection.regionId);
@@ -455,7 +466,7 @@ function locateRanking(
     result: rankingType,
     locate: wcaId,
   });
-  if (source) params.set("list", source.listId);
+  addRankingSourceParams(params, source);
   if (selection.scope !== "world") params.set("region", selection.regionId);
   return fetch(`/api/rankings?${params}`).then(async (response) => {
     if (!response.ok) {
@@ -486,6 +497,8 @@ export function RankingsExplorer({
   listMembership,
   listMembershipRequests,
   listActions,
+  dynamicList,
+  listNotice,
   regionSelectionDisabled = false,
   initialRegions = {
     continents: FALLBACK_CONTINENTS,
@@ -522,6 +535,8 @@ export function RankingsExplorer({
     requests: Array<{ id: number; personId: string; name: string }>;
   };
   listActions?: { listId: string; isOwner: boolean };
+  dynamicList?: { personIds: string[] };
+  listNotice?: string;
   regionSelectionDisabled?: boolean;
   initialRegions?: {
     continents: Array<{ id: string; name: string }>;
@@ -2823,6 +2838,7 @@ export function RankingsExplorer({
       >
         {listOwner && <ListOwnerControls listId={listOwner.listId} initialVisibility={listOwner.visibility} initialJoinPolicy={listOwner.joinPolicy} onManageMembers={() => { setMemberSelectionMode(true); setSelectedMemberIds(new Set()); }} />}
         {listActions && !listActions.isOwner && <ListCloneExportControls listId={listActions.listId} />}
+        {dynamicList && <DynamicListControls personIds={dynamicList.personIds} />}
         {listMembership && <ListMembershipControls listId={listMembership.listId} joinPolicy={listMembership.joinPolicy} initialState={listMembership.state} />}
         {listAddOpen && listOwner ? <ListAddPeopleRail listId={listOwner.listId} onCancel={() => setListAddOpen(false)} onAdded={() => { forcePageLoadRef.current = true; setStartRank(1); setStartPosition(0); setPageReloadNonce((nonce) => nonce + 1); }} /> : <RankingsControlsRail
           event={currentEvent}
@@ -2870,6 +2886,7 @@ export function RankingsExplorer({
       <main>
         <div className="outerListWrapper" ref={listRef}>
           <div className="listContainer">
+            {listNotice && <div className="listMessage">{listNotice}</div>}
             {listMembershipRequests && <ListMembershipRequestRows listId={listMembershipRequests.listId} initialRequests={listMembershipRequests.requests} />}
             {loadingPrevious && (
               <div className="listMessage">Loading earlier rankings…</div>

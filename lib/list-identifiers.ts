@@ -5,6 +5,7 @@ export const LIST_PUBLIC_ID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 export const RESERVED_LIST_ALIASES = new Set([
   "api",
+  "dynamic",
   "luke",
   "max",
   "me",

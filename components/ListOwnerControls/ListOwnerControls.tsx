@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/Checkbox";
 import { flagEmoji } from "@/lib/wca";
 import { listPath } from "@/lib/list-path";
 import { parseListMemberIds } from "@/lib/list-member-ids";
+import { ListCreateDialog } from "./ListCreateDialog";
 
 type Person = { personId: string; name: string; avatarUrl: string | null; country?: { iso2: string; name: string }; competitionCount?: number };
 type SearchResponse = { entries: Person[]; page?: { hasMore?: boolean }; total?: number };
@@ -24,9 +25,8 @@ function Dialog({ title, children, onClose }: { title: string; children: ReactNo
 }
 
 export function ListCreateTrigger() {
-  const [open, setOpen] = useState(false), [name, setName] = useState(""), [visibility, setVisibility] = useState<"public" | "private">("private"), [joinPolicy, setJoinPolicy] = useState<"open" | "closed">("closed"), [error, setError] = useState(""), [busy, setBusy] = useState(false);
-  const submit = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(""); const response = await fetch("/api/lists", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, visibility, joinPolicy }) }); const body = await response.json() as { list?: { publicId: string; slug: string }; error?: string }; if (!response.ok || !body.list?.publicId) { setError(body.error ?? "Could not create this list."); setBusy(false); return; } window.location.assign(listPath({ publicId: body.list.publicId, systemAlias: null, slug: body.list.slug })); };
-  return <><button className="listActionLink" type="button" onPointerDown={() => setOpen(true)} onClick={() => setOpen(true)}>Create a list</button>{open && <Dialog title="Create a list" onClose={() => setOpen(false)}><form className="listModalForm" onSubmit={submit}><label>Name<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} autoFocus /></label><fieldset><legend>Visibility</legend><label><input type="radio" checked={visibility === "public"} onChange={() => setVisibility("public")} /> Public</label><label><input type="radio" checked={visibility === "private"} onChange={() => setVisibility("private")} /> Private</label></fieldset><fieldset><legend>Joining</legend><label><input type="radio" checked={joinPolicy === "open"} onChange={() => setJoinPolicy("open")} /> Anyone can join</label><label><input type="radio" checked={joinPolicy === "closed"} onChange={() => setJoinPolicy("closed")} /> Requests need approval</label></fieldset>{error && <p className="listModalError" role="alert">{error}</p>}<button type="submit" disabled={busy}>{busy ? "Creating…" : "Create list"}</button></form></Dialog>}</>;
+  const [open, setOpen] = useState(false);
+  return <><button className="listActionLink" type="button" onPointerDown={() => setOpen(true)} onClick={() => setOpen(true)}>Create a list</button>{open && <ListCreateDialog onClose={() => setOpen(false)} />}</>;
 }
 
 export function ListOwnerControls({ listId, initialVisibility, initialJoinPolicy = "closed", onManageMembers }: { listId: string; initialVisibility: "public" | "private"; initialJoinPolicy?: "open" | "closed"; onManageMembers?: () => void }) {

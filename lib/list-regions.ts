@@ -14,6 +14,22 @@ type ListRegionRow = {
   continent_id: string;
 };
 
+function toListRegions(rows: ListRegionRow[]): ListRegions {
+  const continentIds = new Set<string>();
+  return {
+    continents: rows.flatMap((row) => {
+      if (!row.continent_id || continentIds.has(row.continent_id)) return [];
+      continentIds.add(row.continent_id);
+      return [{ id: row.continent_id, name: row.continent_id }];
+    }),
+    countries: rows.map((row) => ({
+      id: row.country_id,
+      name: row.country_name,
+      iso2: row.country_iso2,
+    })),
+  };
+}
+
 export async function getListRegions(list: ListSummary): Promise<ListRegions> {
   const result = await query<ListRegionRow>(
     `SELECT DISTINCT
@@ -30,19 +46,25 @@ export async function getListRegions(list: ListSummary): Promise<ListRegions> {
      ORDER BY country.name, country.id`,
     [list.id],
   );
-  const continentIds = new Set<string>();
-  return {
-    continents: result.rows.flatMap((row) => {
-      if (!row.continent_id || continentIds.has(row.continent_id)) return [];
-      continentIds.add(row.continent_id);
-      return [{ id: row.continent_id, name: row.continent_id }];
-    }),
-    countries: result.rows.map((row) => ({
-      id: row.country_id,
-      name: row.country_name,
-      iso2: row.country_iso2,
-    })),
-  };
+  return toListRegions(result.rows);
+}
+
+export async function getDynamicListRegions(personIds: string[]): Promise<ListRegions> {
+  if (!personIds.length) return { continents: [], countries: [] };
+  const placeholders = personIds.map(() => "?").join(",");
+  const result = await query<ListRegionRow>(
+    `SELECT DISTINCT
+       country.id AS country_id,
+       country.name AS country_name,
+       country.iso2 AS country_iso2,
+       country.continent_id
+     FROM persons AS person
+     JOIN countries AS country ON country.id = person.country_id
+     WHERE person.sub_id = 1 AND person.wca_id IN (${placeholders})
+     ORDER BY country.name, country.id`,
+    personIds,
+  );
+  return toListRegions(result.rows);
 }
 
 export function normalizeListRegionSelection(

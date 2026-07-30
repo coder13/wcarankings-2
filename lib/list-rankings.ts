@@ -56,14 +56,20 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
   return { eventId, type, start, limit, search, locate, region };
 }
 
-export async function loadListRankings(
-  list: ListSummary,
+type ScopedRankingSource = {
+  from: (rankingTable: string) => string;
+  conditions: string[];
+  values: unknown[];
+};
+
+async function loadScopedRankings(
+  scopedSource: ScopedRankingSource,
   searchParams: URLSearchParams,
 ) {
   const input = parseListRankingInput(searchParams);
   const source = rankingTable(input.type);
-  const scopedConditions = ["member.list_id = ?", "ranking.world_rank > 0"];
-  const scopedValues: unknown[] = [list.id];
+  const scopedConditions = [...scopedSource.conditions, "ranking.world_rank > 0"];
+  const scopedValues = [...scopedSource.values];
   if (input.region.scope === "continent") {
     scopedConditions.push("ranking.continent_id = ?");
     scopedValues.push(input.region.regionId);
@@ -102,10 +108,7 @@ export async function loadListRankings(
          ranking.is_world_record,
          ranking.is_continent_record,
          ranking.is_country_record
-       FROM list_members AS member
-       JOIN ${source} AS ranking
-         ON ranking.person_id = member.person_id
-        AND ranking.event_id = ?
+       FROM ${scopedSource.from(source)}
        WHERE ${scopedConditions.join("\n         AND ")}
      )
      SELECT *
@@ -121,14 +124,6 @@ export async function loadListRankings(
   const total = Number(result.rows[0]?.total ?? 0);
   const metadata = await getCurrentRankingsMetadata();
   return {
-    list: {
-      publicId: list.publicId,
-      systemAlias: list.systemAlias,
-      name: list.name,
-      kind: list.kind,
-      memberCount: list.memberCount,
-      membershipVersion: list.membershipVersion,
-    },
     entries: selectedRows.map((row) => ({
       rank: Number(row.rank),
       subRank: Number(row.sub_rank),
@@ -156,4 +151,45 @@ export async function loadListRankings(
     total,
     exportDate: metadata.exportDate,
   };
+}
+
+export async function loadListRankings(
+  list: ListSummary,
+  searchParams: URLSearchParams,
+) {
+  const rankings = await loadScopedRankings({
+    from: (source) => `list_members AS member
+       JOIN ${source} AS ranking
+         ON ranking.person_id = member.person_id
+        AND ranking.event_id = ?`,
+    conditions: ["member.list_id = ?"],
+    values: [list.id],
+  }, searchParams);
+  return {
+    list: {
+      publicId: list.publicId,
+      systemAlias: list.systemAlias,
+      name: list.name,
+      kind: list.kind,
+      memberCount: list.memberCount,
+      membershipVersion: list.membershipVersion,
+    },
+    ...rankings,
+  };
+}
+
+export async function loadDynamicListRankings(
+  personIds: string[],
+  searchParams: URLSearchParams,
+) {
+  if (!personIds.length) {
+    const metadata = await getCurrentRankingsMetadata();
+    return { entries: [], hasMore: false, nextStart: null, total: 0, exportDate: metadata.exportDate };
+  }
+  const placeholders = personIds.map(() => "?").join(",");
+  return loadScopedRankings({
+    from: (source) => `${source} AS ranking`,
+    conditions: ["ranking.event_id = ?", `ranking.person_id IN (${placeholders})`],
+    values: [...personIds],
+  }, searchParams);
 }

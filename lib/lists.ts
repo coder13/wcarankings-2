@@ -290,6 +290,7 @@ export async function createList(
     description?: unknown;
     visibility?: unknown;
     joinPolicy?: unknown;
+    personIds?: unknown;
   },
 ) {
   const name = validateName(input.name);
@@ -299,25 +300,66 @@ export async function createList(
   const joinPolicy =
     input.joinPolicy === undefined ? "closed" : validateJoinPolicy(input.joinPolicy);
   const slug = slugifyListName(name);
+  const rawPersonIds = Array.isArray(input.personIds) ? input.personIds : [];
+  const normalizedPersonIds = [...new Set(rawPersonIds.map(normalizeWcaId).filter(Boolean))] as string[];
+  const invalid = rawPersonIds
+    .filter((personId) => !normalizeWcaId(personId))
+    .map((personId) => String(personId).slice(0, 40));
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const publicId = generateListPublicId();
     try {
-      await withTransaction(async (connection) => {
+      const membership = await withTransaction(async (connection) => {
         const [result] = await connection.execute<ResultSetHeader>(
           `INSERT INTO lists
             (kind, public_id, owner_user_id, name, slug, description, visibility, join_policy)
            VALUES ('user', ?, ?, ?, ?, ?, ?, ?)`,
           [publicId, user.id, name, slug, description, visibility, joinPolicy],
         );
+        const listId = Number(result.insertId);
+        const valid = new Set<string>();
+        const blocked = new Set<string>();
+        if (normalizedPersonIds.length) {
+          const placeholders = normalizedPersonIds.map(() => "?").join(",");
+          const [people] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
+            `SELECT wca_id FROM persons WHERE sub_id = 1 AND wca_id IN (${placeholders})`,
+            normalizedPersonIds,
+          );
+          people.forEach((person) => valid.add(person.wca_id));
+          const validIds = normalizedPersonIds.filter((personId) => valid.has(personId));
+          if (validIds.length) {
+            const validPlaceholders = validIds.map(() => "?").join(",");
+            const [optedOut] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
+              `SELECT wca_id FROM app_users WHERE allow_list_inclusion = FALSE AND wca_id IN (${validPlaceholders})`,
+              validIds,
+            );
+            optedOut.forEach((person) => blocked.add(person.wca_id));
+            const added = validIds.filter((personId) => !blocked.has(personId));
+            if (added.length) {
+              await connection.execute(
+                `INSERT INTO list_members (list_id, person_id, added_by_user_id, source)
+                 VALUES ${added.map(() => "(?, ?, ?, 'bulk_import')").join(",")}`,
+                added.flatMap((personId) => [listId, personId, user.id]),
+              );
+              await connection.execute(
+                "UPDATE lists SET member_count = ?, membership_version = membership_version + 1 WHERE id = ?",
+                [added.length, listId],
+              );
+            }
+          }
+        }
         await activity(connection, {
-          listId: Number(result.insertId),
+          listId,
           actorUserId: user.id,
           eventType: "list.created",
-          eventData: { visibility, joinPolicy },
+          eventData: { visibility, joinPolicy, memberCount: normalizedPersonIds.length },
         });
+        return {
+          invalid: [...invalid, ...normalizedPersonIds.filter((personId) => !valid.has(personId))],
+          blocked: [...blocked],
+        };
       });
-      return resolveList(publicId);
+      return { list: await resolveList(publicId), ...membership };
     } catch (error) {
       if (!isDuplicateKey(error)) throw error;
     }

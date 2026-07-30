@@ -107,7 +107,7 @@ test("renders the rankings shell with extracted components", () => {
           initialMatchPersonId: "",
         }}
         initialRegions={{ continents: [], countries: [] }}
-        rankingSource={{ listId: "7K3M9Q2D", listName: "Pacific Northwest cubers" }}
+        rankingSource={{ kind: "saved", listId: "7K3M9Q2D", listName: "Pacific Northwest cubers" }}
       />
     </AppRouterContext.Provider>,
   );
