@@ -101,6 +101,7 @@ export default async function ListPage({
           ? { listId: list.publicId, requests: membershipRequests }
           : undefined
       }
+      listActions={list.publicId ? { listId: list.publicId } : undefined}
       initialEventId={eventId}
       initialRankingType={rankingType}
       initialRegionSelection={regionSelection}

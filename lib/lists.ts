@@ -325,6 +325,54 @@ export async function createList(
   throw new Error("Could not allocate a unique list ID.");
 }
 
+export async function cloneList(user: AuthUser, source: ListSummary) {
+  const name = validateName(`${source.name.slice(0, 95)} copy`);
+  const slug = slugifyListName(name);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const publicId = generateListPublicId();
+    try {
+      await withTransaction(async (connection) => {
+        const [created] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO lists
+            (kind, public_id, owner_user_id, name, slug, description, visibility, join_policy)
+           VALUES ('user', ?, ?, ?, ?, ?, 'private', 'closed')`,
+          [publicId, user.id, name, slug, source.description],
+        );
+        const listId = Number(created.insertId);
+        const [members] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO list_members (list_id, person_id, added_by_user_id, source)
+           SELECT ?, person_id, ?, 'bulk_import'
+           FROM list_members
+           WHERE list_id = ?`,
+          [listId, user.id, source.id],
+        );
+        await connection.execute(
+          "UPDATE lists SET member_count = ?, membership_version = membership_version + 1 WHERE id = ?",
+          [members.affectedRows, listId],
+        );
+        await activity(connection, {
+          listId,
+          actorUserId: user.id,
+          eventType: "list.cloned",
+          eventData: { sourceListId: source.publicId ?? source.systemAlias, memberCount: members.affectedRows },
+        });
+      });
+      return resolveList(publicId);
+    } catch (error) {
+      if (!isDuplicateKey(error)) throw error;
+    }
+  }
+  throw new Error("Could not allocate a unique list ID.");
+}
+
+export async function listMemberIds(list: ListSummary) {
+  const result = await query<RowDataPacket & { person_id: string }>(
+    "SELECT person_id FROM list_members WHERE list_id = ? ORDER BY person_id",
+    [list.id],
+  );
+  return result.rows.map((row) => row.person_id);
+}
+
 export async function updateList(
   user: AuthUser,
   lookup: string,

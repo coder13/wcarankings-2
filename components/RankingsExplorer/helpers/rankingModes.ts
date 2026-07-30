@@ -7,4 +7,4 @@ export const COMPETITION_RANKING_OPTIONS = [
 
 export type CompetitionRanking = (typeof COMPETITION_RANKING_OPTIONS)[number]["value"];
 
-export type RankingResource = "people" | "competitions" | "podiums" | "competitor-count" | "latitude-north" | "latitude-south";
+export type RankingResource = "people" | "results" | "competitions" | "podiums" | "competitor-count" | "latitude-north" | "latitude-south";

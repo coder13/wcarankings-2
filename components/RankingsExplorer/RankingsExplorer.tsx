@@ -59,7 +59,7 @@ import {
   type NavigationSubject,
 } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { TextDropdown } from "../Dropdown/TextDropdown";
-import { ListAddPeopleRail, ListMembershipControls, ListMembershipRequestRows, ListOwnerControls } from "../ListOwnerControls/ListOwnerControls";
+import { ListAddPeopleRail, ListCloneExportControls, ListMembershipControls, ListMembershipRequestRows, ListOwnerControls } from "../ListOwnerControls/ListOwnerControls";
 import { useRailScrollProgress } from "./useRailScrollProgress";
 import { fetchRankingPage, RankingsPageCache } from "./rankingsPageCache";
 import { useScrollVelocity } from "./useScrollVelocity";
@@ -115,6 +115,7 @@ function rankingResource(
   competitionRanking: CompetitionRanking,
   latitudeHemisphere: "north" | "south" = "north",
 ): RankingResource {
+  if (subject === "results") return "results";
   if (subject !== "competitions") return "people";
   if (competitionRanking === "latitude") return `latitude-${latitudeHemisphere}`;
   if (competitionRanking === "competitor-count") return "competitor-count";
@@ -172,6 +173,11 @@ export function pageStartForViewportSubRank(subRank: number) {
   return pageStartForSubRank(subRank) + 1;
 }
 
+function activeYear() {
+  return window.location.pathname.match(/^\/persons\/year\/(\d{4})$/)?.[1]
+    ?? new URLSearchParams(window.location.search).get("year");
+}
+
 function getRenderedPersonTop(personId: string) {
   const row = Array.from(
     document.querySelectorAll<HTMLElement>(".listItem[data-person-id]")
@@ -214,6 +220,8 @@ function getPage(
     limit: String(PAGE_SIZE),
     paged: "1",
   });
+  const year = activeYear();
+  if (resource === "people" && year) params.set("year", year);
   if (source) params.set("list", source.listId);
   if (selection.scope !== "world") params.set("region", selection.regionId);
   if (resource === "podiums") params.set("ranking", "podium");
@@ -227,9 +235,11 @@ function getPage(
   const cached = pageCache.get(cachePool, cacheKey);
   if (cached) return cached;
 
-  const endpoint = resource !== "people"
-    ? "/api/rankings/competitions"
-    : "/api/rankings";
+  const endpoint = resource === "results"
+    ? "/api/rankings/results"
+    : resource !== "people"
+      ? "/api/rankings/competitions"
+      : "/api/rankings";
   const request = fetchRankingPage(`${endpoint}?${params}`).then(async (response) => {
     if (!response.ok) {
       const body = (await response.json()) as { error?: string };
@@ -408,6 +418,7 @@ function searchRankings(
   regexSearch: boolean,
   signal: AbortSignal,
   source?: RankingSource,
+  resource: RankingResource = "people",
 ) {
   const params = new URLSearchParams({
     eventId,
@@ -417,9 +428,12 @@ function searchRankings(
   });
   if (regexSearch) params.set("mode", "vim");
   if (source) params.set("list", source.listId);
+  const year = activeYear();
+  if (resource === "people" && year) params.set("year", year);
   if (selection.scope !== "world") params.set("region", selection.regionId);
 
-  return fetch(`/api/rankings?${params}`, { signal }).then(async (response) => {
+  const endpoint = resource === "results" ? "/api/rankings/results" : "/api/rankings";
+  return fetch(`${endpoint}?${params}`, { signal }).then(async (response) => {
     if (!response.ok) {
       const body = (await response.json()) as { error?: string };
       throw new Error(body.error ?? "Search is unavailable.");
@@ -457,6 +471,7 @@ export function RankingsExplorer({
   initialRegexSearch = initialData?.regexSearch ?? false,
   initialEventId = "333",
   initialRankingType = "single",
+  initialYear: _initialYear = null,
   initialRegionSelection = { scope: "world", regionId: "" },
   showAllEventRankingOptions = false,
   showSubjectSwitch = false,
@@ -468,6 +483,7 @@ export function RankingsExplorer({
   listOwner,
   listMembership,
   listMembershipRequests,
+  listActions,
   regionSelectionDisabled = false,
   initialRegions = {
     continents: FALLBACK_CONTINENTS,
@@ -479,6 +495,7 @@ export function RankingsExplorer({
   initialRegexSearch?: boolean;
   initialEventId?: (typeof WCA_EVENTS)[number]["id"] | "SOR" | "sor-kinch";
   initialRankingType?: "single" | "average";
+  initialYear?: number | null;
   initialRegionSelection?: RegionSelection;
   showAllEventRankingOptions?: boolean;
   showSubjectSwitch?: boolean;
@@ -501,6 +518,7 @@ export function RankingsExplorer({
     listId: string;
     requests: Array<{ id: number; personId: string; name: string }>;
   };
+  listActions?: { listId: string };
   regionSelectionDisabled?: boolean;
   initialRegions?: {
     continents: Array<{ id: string; name: string }>;
@@ -1614,6 +1632,7 @@ export function RankingsExplorer({
           regexSearch,
           controller.signal,
           rankingSource,
+          rankingResource(subject, competitionRanking, latitudeHemisphere),
         )
           .then((data) => {
             if (controller.signal.aborted) return;
@@ -2800,6 +2819,7 @@ export function RankingsExplorer({
         style={{ "--rail-scroll-progress": topRailProgress } as CSSProperties}
       >
         {listOwner && <ListOwnerControls listId={listOwner.listId} initialVisibility={listOwner.visibility} initialJoinPolicy={listOwner.joinPolicy} onManageMembers={() => { setMemberSelectionMode(true); setSelectedMemberIds(new Set()); }} />}
+        {listActions && <ListCloneExportControls listId={listActions.listId} />}
         {listMembership && <ListMembershipControls listId={listMembership.listId} joinPolicy={listMembership.joinPolicy} initialState={listMembership.state} />}
         {listAddOpen && listOwner ? <ListAddPeopleRail listId={listOwner.listId} onCancel={() => setListAddOpen(false)} onAdded={() => { forcePageLoadRef.current = true; setStartRank(1); setStartPosition(0); setPageReloadNonce((nonce) => nonce + 1); }} /> : <RankingsControlsRail
           event={currentEvent}
