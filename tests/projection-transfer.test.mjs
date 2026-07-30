@@ -12,7 +12,7 @@ const publish = await readFile(
   "utf8",
 );
 const dockerfile = await readFile(
-  new URL("../Dockerfile", import.meta.url),
+  new URL("../Dockerfile.data-tools", import.meta.url),
   "utf8",
 );
 const schema = await readFile(
@@ -33,6 +33,14 @@ test("defers secondary projection indexes until after bulk transfer import", () 
   assert.match(publish, /promoteProjectionTables/);
 });
 
+test("can preflight transfer rows, dates, and indexes before production cutover", () => {
+  assert.match(publish, /prepareOnly = process\.argv\.includes\("--prepare-only"\)/);
+  assert.match(publish, /expectedExportDate/);
+  assert.match(publish, /DELETE FROM/);
+  assert.match(publish, /publication was not requested/);
+  assert.match(publish, /if \(prepareOnly\)[\s\S]*else \{[\s\S]*promoteProjectionTables/);
+});
+
 test("normalizes equivalent export date representations", () => {
   const expected = "2026-07-29T00:00:23.000Z";
   assert.equal(normalizeExportDate("2026-07-29T00:00:23Z"), expected);
@@ -46,9 +54,8 @@ test("rejects missing and invalid export dates", () => {
 });
 
 test("packages the export-date normalizer with the publisher", () => {
-  assert.match(dockerfile, /projection-transfer-date\.mjs/);
-  assert.match(dockerfile, /refresh-board-list\.mjs/);
-  assert.match(dockerfile, /resolve-wca-export\.mjs/);
+  assert.match(dockerfile, /COPY --chown=data-tools:data-tools scripts \.\/scripts/);
+  assert.match(dockerfile, /ENTRYPOINT \["node"\]/);
 });
 
 test("dry-run WCA export caching does not require a database connection", () => {

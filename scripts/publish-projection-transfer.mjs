@@ -5,11 +5,12 @@ import {
   promoteProjectionTables,
 } from "./mysql-schema.mjs";
 import { normalizeExportDate } from "./projection-transfer-date.mjs";
-import { refreshBoardList, refreshDelegatesList } from "./refresh-board-list.mjs";
-import { refreshSystemLists } from "./refresh-system-lists.mjs";
 
 const selectedNames = (process.argv.find((value) => value.startsWith("--groups="))?.slice("--groups=".length) || "")
   .split(",").filter(Boolean);
+const prepareOnly = process.argv.includes("--prepare-only");
+const expectedExportDate = process.argv.find((value) => value.startsWith("--expected-export-date="))
+  ?.slice("--expected-export-date=".length);
 const groups = selectedNames.length === 0
   ? DEPLOYMENT_PROJECTION_GROUPS
   : DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) => selectedNames.includes(name));
@@ -26,7 +27,8 @@ function databaseOptions(connectionString = process.env.DATABASE_URL) {
     port: Number(url.port || 3306),
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
+    database: process.env.DATABASE_NAME_OVERRIDE
+      || decodeURIComponent(url.pathname.replace(/^\//, "")),
   };
 }
 
@@ -45,21 +47,25 @@ const connection = await mysql.createConnection(databaseOptions());
 try {
   for (const table of manifestTables) if (!await tableExists(connection, table)) throw new Error(`The projection transfer manifest ${table} is missing.`);
 
-  const [publishedResult, ...manifestResults] = await Promise.all([
-    connection.query("SELECT value AS export_date FROM export_metadata WHERE `key` = 'export_date' LIMIT 1"),
-    ...manifestTables.map((table) => connection.query(`SELECT export_date FROM \`${table}\` LIMIT 1`)),
-  ]);
+  const manifestResults = await Promise.all(
+    manifestTables.map((table) => connection.query(`SELECT export_date FROM \`${table}\` LIMIT 1`)),
+  );
   const transferDates = manifestResults.map(([rows]) => rows[0]?.export_date);
   const transferDate = transferDates[0];
-  const publishedDate = publishedResult[0][0]?.export_date;
   const normalizedTransferDate = normalizeExportDate(transferDate);
-  const normalizedPublishedDate = normalizeExportDate(publishedDate);
+  const expectedDate = prepareOnly
+    ? normalizeExportDate(expectedExportDate)
+    : normalizeExportDate((await connection.query(
+      "SELECT value AS export_date FROM export_metadata WHERE `key` = 'export_date' LIMIT 1",
+    ))[0][0]?.export_date);
   if (
     !normalizedTransferDate
-    || normalizedTransferDate !== normalizedPublishedDate || transferDates.some((date) => normalizeExportDate(date) !== normalizedTransferDate)
+    || !expectedDate
+    || normalizedTransferDate !== expectedDate
+    || transferDates.some((date) => normalizeExportDate(date) !== normalizedTransferDate)
   ) {
     throw new Error(
-      `Projection export date ${transferDate || "(missing)"} does not match production raw export date ${publishedDate || "(missing)"}.`,
+      `Projection export date ${transferDate || "(missing)"} does not match ${prepareOnly ? "expected" : "production raw"} export date ${expectedDate || "(missing)"}.`,
     );
   }
 
@@ -93,20 +99,23 @@ try {
       `Built ${indexes.length} indexes on ${table} in ${Math.round(performance.now() - startedAt)}ms (${builtIndexCount}/${deferredIndexes.length}).\n`,
     );
   }
-
-  const renames = [];
-  for (const table of transferTables) {
-    const staging = `${table}_staging`;
-    await dropManagedObject(connection, staging);
-    renames.push(`\`${table}_transfer\` TO \`${staging}\``);
+  if (prepareOnly) {
+    for (const table of indexesTables) await connection.query(`DELETE FROM \`${table}\``);
+    process.stdout.write(
+      `Prepared transferred projection generation for ${normalizedTransferDate}; publication was not requested.\n`,
+    );
+  } else {
+    const renames = [];
+    for (const table of transferTables) {
+      const staging = `${table}_staging`;
+      await dropManagedObject(connection, staging);
+      renames.push(`\`${table}_transfer\` TO \`${staging}\``);
+    }
+    await connection.query(`RENAME TABLE ${renames.join(", ")}`);
+    await promoteProjectionTables(connection, { tables: transferTables });
+    for (const table of [...indexesTables, ...manifestTables]) await dropManagedObject(connection, table);
+    process.stdout.write(`Published transferred projection generation for ${normalizedTransferDate}.\n`);
   }
-  await connection.query(`RENAME TABLE ${renames.join(", ")}`);
-  await promoteProjectionTables(connection, { tables: transferTables });
-  await refreshSystemLists(connection);
-  await refreshBoardList(connection);
-  await refreshDelegatesList(connection);
-  for (const table of [...indexesTables, ...manifestTables]) await dropManagedObject(connection, table);
-  process.stdout.write(`Published transferred projection generation for ${normalizedTransferDate}.\n`);
 } finally {
   await connection.end();
 }

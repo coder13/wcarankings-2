@@ -21,6 +21,33 @@ const INDEXES = [
 
 const projectionDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "sql", "ranking-projections");
 
+const COMPATIBILITY_PROJECTION_FILES = [
+  "wca_best_single.sql",
+  "wca_best_average.sql",
+  "ranking_entries_single_source.sql",
+  "ranking_entries_average_source.sql",
+  "result_entries_single_source.sql",
+  "ranking_entries_indexes.sql",
+  "result_entries_single_indexes.sql",
+  "ranking_counts.sql",
+  "result_counts.sql",
+];
+
+const SHARED_PROJECTION_FINGERPRINT_FILES = [
+  "release-compatibility.json",
+  "package-lock.json",
+  "docker-compose.yml",
+  "Dockerfile.flyway",
+  "scripts/mysql-schema.mjs",
+  "scripts/sync-wca-export.mjs",
+  "scripts/prepare-projection-transfer.mjs",
+  "scripts/publish-projection-transfer.mjs",
+  "scripts/projection-transfer-date.mjs",
+  "scripts/refresh-system-lists.mjs",
+  "scripts/refresh-board-list.mjs",
+  "scripts/system-list-definitions.mjs",
+];
+
 function statements(sql) {
   return sql.split(/;\s*(?:\n|$)/).map((statement) => statement.trim()).filter(Boolean);
 }
@@ -183,16 +210,19 @@ export const PUBLISHED_PROJECTION_TABLES = [
 export const DEPLOYMENT_PROJECTION_GROUPS = [
   {
     name: "core",
+    fingerprintVersion: 3,
     projectionNames: DEFAULT_PROJECTION_NAMES.filter((name) => name !== "sum-of-ranks" && name !== "person-year-rankings"),
     tables: PUBLISHED_PROJECTION_TABLES.filter((table) => table !== "person_sum_of_ranks_scores" && !table.startsWith("person_year_")),
   },
   {
     name: "sum-of-ranks",
+    fingerprintVersion: 2,
     projectionNames: ["sum-of-ranks"],
     tables: ["person_sum_of_ranks_scores"],
   },
   {
     name: "yearly-person-rankings",
+    fingerprintVersion: 3,
     projectionNames: ["person-year-rankings"],
     tables: ["person_year_ranking_cohorts", "person_year_rankings_single", "person_year_rankings_average", "person_year_ranking_counts"],
   },
@@ -237,6 +267,43 @@ export const PROJECTION_REGISTRY = projectionDefinitions.map((definition) => ({
   validate: (connection, suffix) => validateProjection(connection, definition, suffix),
 }));
 
+function projectionDependencyClosure(selectedNames) {
+  const byName = new Map(projectionDefinitions.map((projection) => [projection.name, projection]));
+  const ordered = [];
+  const visiting = new Set();
+  const visited = new Set();
+
+  function visit(name) {
+    if (visited.has(name) || name === "raw-wca") return;
+    if (visiting.has(name)) throw new Error(`Projection dependency cycle at ${name}`);
+    const projection = byName.get(name);
+    if (!projection) throw new Error(`Unknown projection dependency: ${name}`);
+    visiting.add(name);
+    for (const dependency of projection.dependencies) visit(dependency);
+    visiting.delete(name);
+    visited.add(name);
+    ordered.push(projection);
+  }
+
+  for (const name of selectedNames) visit(name);
+  return ordered;
+}
+
+export function deploymentProjectionInputFiles(groupName) {
+  const group = DEPLOYMENT_PROJECTION_GROUPS.find(({ name }) => name === groupName);
+  if (!group) throw new Error(`Unknown deployment projection group: ${groupName}`);
+  const projectionFiles = projectionDependencyClosure(group.projectionNames)
+    .flatMap(({ files }) => files.map((file) => `sql/ranking-projections/${file}`));
+  const compatibilityFiles = group.name === "core"
+    ? COMPATIBILITY_PROJECTION_FILES.map((file) => `sql/ranking-projections/${file}`)
+    : [];
+  return [...new Set([
+    ...SHARED_PROJECTION_FINGERPRINT_FILES,
+    ...compatibilityFiles,
+    ...projectionFiles,
+  ])].sort();
+}
+
 export function projectionBuildPlan(groupNames = DEPLOYMENT_PROJECTION_GROUPS.map(({ name }) => name)) {
   const selected = new Set(groupNames);
   const groups = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) => selected.has(name));
@@ -253,24 +320,8 @@ export function projectionBuildPlan(groupNames = DEPLOYMENT_PROJECTION_GROUPS.ma
 }
 
 function orderedProjections(selectedNames = DEFAULT_PROJECTION_NAMES) {
-  const selected = new Set(selectedNames);
   const byName = new Map(PROJECTION_REGISTRY.map((projection) => [projection.name, projection]));
-  const ordered = [];
-  const visiting = new Set();
-  const visited = new Set();
-  function visit(name) {
-    if (visited.has(name) || name === "raw-wca") return;
-    if (visiting.has(name)) throw new Error(`Projection dependency cycle at ${name}`);
-    const projection = byName.get(name);
-    if (!projection) throw new Error(`Unknown projection dependency: ${name}`);
-    visiting.add(name);
-    for (const dependency of projection.dependencies) visit(dependency);
-    visiting.delete(name);
-    visited.add(name);
-    ordered.push(projection);
-  }
-  for (const name of selected) visit(name);
-  return ordered;
+  return projectionDependencyClosure(selectedNames).map(({ name }) => byName.get(name));
 }
 
 async function buildProjection(connection, projection, projectionSuffix) {

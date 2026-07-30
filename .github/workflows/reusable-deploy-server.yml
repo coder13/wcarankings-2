@@ -1,0 +1,446 @@
+name: Deploy Server Images
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref containing the deployment configuration.
+        required: true
+        type: string
+      source_sha:
+        description: Commit SHA represented by the images.
+        required: true
+        type: string
+      app_image:
+        description: Digest-qualified application image.
+        required: true
+        type: string
+      flyway_image:
+        description: Digest-qualified Flyway image.
+        required: true
+        type: string
+      data_tools_image:
+        description: Digest-qualified approved data-tools image.
+        required: true
+        type: string
+      config_checksum:
+        description: Combined Compose and Caddy checksum.
+        required: true
+        type: string
+      compose_checksum:
+        description: Compose configuration checksum.
+        required: true
+        type: string
+      caddy_checksum:
+        description: Caddy configuration checksum.
+        required: true
+        type: string
+      failure_injection_point:
+        description: Test-only failure boundary.
+        required: false
+        default: ""
+        type: string
+    secrets:
+      SERVER_IP:
+        required: true
+      SERVER_HOST:
+        required: true
+      DEPLOY_SSH_KEY:
+        required: true
+      DEPLOY_KNOWN_HOSTS:
+        required: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SERVER_IP: ${{ secrets.SERVER_IP }}
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: www
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      APP_IMAGE: ${{ inputs.app_image }}
+      FLYWAY_IMAGE: ${{ inputs.flyway_image }}
+      DATA_TOOLS_IMAGE: ${{ inputs.data_tools_image }}
+      CONFIG_CHECKSUM: ${{ inputs.config_checksum }}
+      COMPOSE_CHECKSUM: ${{ inputs.compose_checksum }}
+      CADDY_CHECKSUM: ${{ inputs.caddy_checksum }}
+      FAILURE_INJECTION_POINT: ${{ inputs.failure_injection_point }}
+
+    steps:
+      - name: Check out deployment configuration
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate immutable release inputs
+        run: |
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$APP_IMAGE" =~ ^ghcr\.io/.+@sha256:[0-9a-f]{64}$ ]]
+          [[ "$FLYWAY_IMAGE" =~ ^ghcr\.io/.+@sha256:[0-9a-f]{64}$ ]]
+          [[ "$DATA_TOOLS_IMAGE" =~ ^ghcr\.io/.+@sha256:[0-9a-f]{64}$ ]]
+          [[ "$CONFIG_CHECKSUM" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$COMPOSE_CHECKSUM" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$CADDY_CHECKSUM" =~ ^[0-9a-f]{64}$ ]]
+
+      - name: Configure deployment SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Pull immutable images
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Verify and tag immutable images
+        run: |
+          docker pull "$APP_IMAGE"
+          docker pull "$FLYWAY_IMAGE"
+          docker pull "$DATA_TOOLS_IMAGE"
+          docker tag "$APP_IMAGE" "wcarankings-app:${SOURCE_SHA}"
+          docker tag "$FLYWAY_IMAGE" "wcarankings-flyway:${SOURCE_SHA}"
+          docker tag "$DATA_TOOLS_IMAGE" "wcarankings-data-tools:${SOURCE_SHA}"
+          test "$(docker image inspect "$APP_IMAGE" --format '{{index .RepoDigests 0}}')" = "$APP_IMAGE"
+          test "$(docker image inspect "$FLYWAY_IMAGE" --format '{{index .RepoDigests 0}}')" = "$FLYWAY_IMAGE"
+          test "$(docker image inspect "$DATA_TOOLS_IMAGE" --format '{{index .RepoDigests 0}}')" = "$DATA_TOOLS_IMAGE"
+
+      - name: Check server compatibility with the active dataset
+        run: |
+          docker run --rm --entrypoint cat "$APP_IMAGE" /app/release-compatibility.json \
+            > /tmp/server-release-compatibility.json
+          dataset_schema_version=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'cd /srv/wcarankings && docker compose exec -T db sh -c '"'"'
+              mariadb --batch --skip-column-names \
+                --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" \
+                --execute="SELECT dataset_schema_version FROM ranking_generation_state WHERE id = 1" \
+                2>/dev/null || printf "1\n"
+            '"'"'')
+          node scripts/check-release-compatibility.mjs \
+            --compatibility-file=/tmp/server-release-compatibility.json \
+            --dataset-schema-version="$dataset_schema_version"
+
+      - name: Copy deployment configuration
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'set -eu
+            install -d -m 0755 /srv/wcarankings/ops
+            if [ -f /srv/wcarankings/docker-compose.yml ]; then
+              cp /srv/wcarankings/docker-compose.yml /srv/wcarankings/docker-compose.yml.previous
+            fi
+            if [ -f /srv/wcarankings/ops/Caddyfile ]; then
+              cp /srv/wcarankings/ops/Caddyfile /srv/wcarankings/ops/Caddyfile.previous
+            fi'
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'if [ -f /srv/wcarankings/server-release-state.json ]; then
+              cp /srv/wcarankings/server-release-state.json \
+                /srv/wcarankings/server-release-state.json.previous
+            fi'
+          current_state=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'cat /srv/wcarankings/server-release-state.json 2>/dev/null || printf "{}\n"')
+          current_compose=$(jq -r '.composeChecksum // ""' <<<"$current_state")
+          current_caddy=$(jq -r '.caddyChecksum // ""' <<<"$current_state")
+          if [ "$current_caddy" != "$CADDY_CHECKSUM" ]; then
+            echo "PROXY_CONFIG_CHANGED=true" >> "$GITHUB_ENV"
+          else
+            echo "PROXY_CONFIG_CHANGED=false" >> "$GITHUB_ENV"
+          fi
+          scp -q -o BatchMode=yes docker-compose.yml \
+            "$SERVER_USER@$SERVER_IP:/srv/wcarankings/docker-compose.yml"
+          scp -q -o BatchMode=yes ops/Caddyfile \
+            "$SERVER_USER@$SERVER_IP:/srv/wcarankings/ops/Caddyfile"
+
+      - name: Stage server images and run migrations
+        run: |
+          set -o pipefail
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'set -eu
+            cd /srv/wcarankings
+            exec 9>/srv/wcarankings/production-mutation.lock
+            flock -w 60 9
+            if docker image inspect wcarankings-app:latest >/dev/null 2>&1; then
+              docker tag wcarankings-app:latest wcarankings-app:previous
+            fi
+            protected_images=$( {
+              docker ps -q | xargs -r docker inspect --format "{{.Image}}"
+              docker image inspect wcarankings-app:latest wcarankings-app:previous wcarankings-flyway:latest wcarankings-data-tools:latest --format "{{.Id}}" 2>/dev/null || true
+            } | sort -u )
+            docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | while IFS=" " read -r image_ref image_id; do
+              case "$image_ref" in
+                wcarankings-app:*|wcarankings-flyway:*|wcarankings-data-tools:*) ;;
+                *) continue ;;
+              esac
+              case " $protected_images " in
+                *" $image_id "*) continue ;;
+              esac
+              docker image rm "$image_ref" || true
+            done
+            docker image prune -f'
+          docker save \
+            "wcarankings-app:${SOURCE_SHA}" \
+            "wcarankings-flyway:${SOURCE_SHA}" \
+            "wcarankings-data-tools:${SOURCE_SHA}" \
+            | gzip -1 \
+            | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" 'gzip -d | docker load'
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "set -eu
+            exec 9>/srv/wcarankings/production-mutation.lock
+            flock -w 60 9
+            docker tag 'wcarankings-app:${SOURCE_SHA}' wcarankings-app:latest
+            docker tag 'wcarankings-flyway:${SOURCE_SHA}' wcarankings-flyway:latest
+            docker tag 'wcarankings-data-tools:${SOURCE_SHA}' wcarankings-data-tools:latest
+            cd /srv/wcarankings
+            docker compose run --rm flyway migrate"
+          echo "CANDIDATE_STAGED=true" >> "$GITHUB_ENV"
+
+      - name: Inject failure after migrations
+        if: inputs.failure_injection_point == 'after_migrations_before_server_switch'
+        run: |
+          echo "Injected failure after migrations and before server switch." >&2
+          exit 1
+
+      - name: Switch production server
+        run: |
+          echo "SERVICES_SWITCHED=true" >> "$GITHUB_ENV"
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "set -eu
+            cd /srv/wcarankings
+            exec 9>/srv/wcarankings/production-mutation.lock
+            flock -w 60 9
+            docker compose up -d --no-build --remove-orphans --force-recreate app
+            if [ '$PROXY_CONFIG_CHANGED' = true ] \
+              || ! docker compose ps --status running --services | grep -qx proxy; then
+              docker compose up -d --no-build --remove-orphans --force-recreate proxy
+            fi"
+
+      - name: Inject failure after server switch
+        if: inputs.failure_injection_point == 'after_server_switch_before_public_verification'
+        run: |
+          echo "Injected failure after server switch and before public verification." >&2
+          exit 1
+
+      - name: Verify production server
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' sh -s" <<'REMOTE'
+            set -eu
+            cd /srv/wcarankings
+            exec 9>/srv/wcarankings/production-mutation.lock
+            flock -w 60 9
+
+            retry_endpoint() {
+              endpoint=$1
+              attempts=$2
+              delay=$3
+              label=$4
+              attempt=1
+              while [ "$attempt" -le "$attempts" ]; do
+                response_file=$(mktemp)
+                status=$(curl --silent --show-error --max-time 15 \
+                  --output "$response_file" --write-out "%{http_code}" \
+                  "http://127.0.0.1:3000${endpoint}" || true)
+                if [ "$status" -ge 200 ] 2>/dev/null && [ "$status" -lt 300 ] 2>/dev/null; then
+                  rm -f "$response_file"
+                  echo "$label passed on attempt $attempt."
+                  return 0
+                fi
+                echo "$label failed on attempt $attempt/$attempts with HTTP ${status:-curl-error}." >&2
+                head -c 1000 "$response_file" >&2 || true
+                echo >&2
+                rm -f "$response_file"
+                attempt=$((attempt + 1))
+                sleep "$delay"
+              done
+              return 1
+            }
+
+            docker compose ps
+            retry_endpoint "/api/health/ready" 30 2 "Readiness"
+            retry_endpoint "/api/rankings?eventId=333&result=single&year=2024&start=0&limit=1&paged=1" 10 3 "Year ranking"
+            retry_endpoint "/api/rankings?eventId=SOR&result=single&start=0&limit=10" 10 3 "Sum of ranks"
+            retry_endpoint "/api/rankings?eventId=sor-kinch&result=average&start=0&limit=10" 10 3 "Kinch ranks"
+            retry_endpoint "/api/rankings/competitions?ranking=competitor-count&start=0&limit=10" 10 3 "Competition ranking"
+
+            html=$(curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/)
+            css=$(printf "%s" "$html" | sed -n 's/.*href="\([^"]*\.css\)".*/\1/p' | head -n 1)
+            if [ -z "$css" ]; then
+              echo "SSR response did not include a stylesheet link." >&2
+              exit 1
+            fi
+            curl --fail --silent --show-error --max-time 15 \
+              "http://127.0.0.1:3000$css" >/dev/null
+          REMOTE
+
+          public_host="${SERVER_HOST#https://}"
+          public_host="${public_host#http://}"
+          public_host="${public_host%%/*}"
+          if [[ ! "$public_host" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+            echo "SERVER_HOST must contain a valid hostname." >&2
+            exit 1
+          fi
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "for attempt in \$(seq 1 30); do
+              if curl --fail --silent --show-error --max-time 15 -H 'Host: ${public_host}' http://127.0.0.1/ >/dev/null; then
+                exit 0
+              fi
+              echo 'Public proxy check failed; retrying.' >&2
+              sleep 2
+            done
+            exit 1"
+
+      - name: Capture failed deployment diagnostics
+        if: failure()
+        continue-on-error: true
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'cd /srv/wcarankings && docker compose ps && docker compose logs --tail=200 app proxy flyway'
+
+      - name: Restore tag after a pre-switch failure
+        if: failure() && env.SERVICES_SWITCHED != 'true'
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'if docker image inspect wcarankings-app:previous >/dev/null 2>&1; then
+              docker tag wcarankings-app:previous wcarankings-app:latest
+            fi
+            if [ -f /srv/wcarankings/docker-compose.yml.previous ]; then
+              cp /srv/wcarankings/docker-compose.yml.previous /srv/wcarankings/docker-compose.yml
+            fi
+            if [ -f /srv/wcarankings/ops/Caddyfile.previous ]; then
+              cp /srv/wcarankings/ops/Caddyfile.previous /srv/wcarankings/ops/Caddyfile
+            fi'
+
+      - name: Roll back failed server switch
+        if: failure() && env.SERVICES_SWITCHED == 'true'
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' sh -s" <<'REMOTE'
+            set -eu
+            cd /srv/wcarankings
+            exec 9>/srv/wcarankings/production-mutation.lock
+            flock -w 60 9
+            if ! docker image inspect wcarankings-app:previous >/dev/null 2>&1; then
+              echo "No previous server image is available for rollback." >&2
+              exit 1
+            fi
+            docker tag wcarankings-app:previous wcarankings-app:latest
+            if [ -f docker-compose.yml.previous ]; then
+              cp docker-compose.yml.previous docker-compose.yml
+            fi
+            if [ -f ops/Caddyfile.previous ]; then
+              cp ops/Caddyfile.previous ops/Caddyfile
+            fi
+            if [ -f server-release-state.json.previous ]; then
+              cp server-release-state.json.previous server-release-state.json
+            else
+              rm -f server-release-state.json
+            fi
+            docker compose up -d --no-build --remove-orphans --force-recreate app
+            if [ "$PROXY_CONFIG_CHANGED" = true ]; then
+              docker compose up -d --no-build --remove-orphans --force-recreate proxy
+            fi
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error --max-time 15 \
+                http://127.0.0.1:3000/api/health/ready >/dev/null; then
+                curl --fail --silent --show-error --max-time 15 \
+                  'http://127.0.0.1:3000/api/rankings?eventId=333&result=single&start=0&limit=1' \
+                  >/dev/null
+                echo "Rollback readiness check passed."
+                exit 0
+              fi
+              sleep 2
+            done
+            docker compose logs --tail=200 app proxy
+            echo "Rollback did not become ready." >&2
+            exit 1
+          REMOTE
+          echo "ROLLBACK_COMPLETED=true" >> "$GITHUB_ENV"
+
+      - name: Record approved server release
+        if: success()
+        run: |
+          approved=$(jq -n \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg appImage "$APP_IMAGE" \
+            --arg flywayImage "$FLYWAY_IMAGE" \
+            --arg dataToolsImage "$DATA_TOOLS_IMAGE" \
+            --arg configChecksum "$CONFIG_CHECKSUM" \
+            --arg composeChecksum "$COMPOSE_CHECKSUM" \
+            --arg caddyChecksum "$CADDY_CHECKSUM" \
+            '{
+              version: 1,
+              sourceSha: $sourceSha,
+              appImage: $appImage,
+              flywayImage: $flywayImage,
+              dataToolsImage: $dataToolsImage,
+              configChecksum: $configChecksum,
+              composeChecksum: $composeChecksum,
+              caddyChecksum: $caddyChecksum
+            }')
+          printf '%s\n' "$approved" \
+            | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+                'cat > /srv/wcarankings/server-release-state.json.tmp \
+                  && mv /srv/wcarankings/server-release-state.json.tmp \
+                    /srv/wcarankings/server-release-state.json'
+
+      - name: Roll back a late server release failure
+        if: failure() && env.SERVICES_SWITCHED == 'true' && env.ROLLBACK_COMPLETED != 'true'
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' sh -s" <<'REMOTE'
+            set -eu
+            cd /srv/wcarankings
+            exec 9>/srv/wcarankings/production-mutation.lock
+            flock -w 60 9
+            docker tag wcarankings-app:previous wcarankings-app:latest
+            if [ -f docker-compose.yml.previous ]; then cp docker-compose.yml.previous docker-compose.yml; fi
+            if [ -f ops/Caddyfile.previous ]; then cp ops/Caddyfile.previous ops/Caddyfile; fi
+            if [ -f server-release-state.json.previous ]; then
+              cp server-release-state.json.previous server-release-state.json
+            else
+              rm -f server-release-state.json
+            fi
+            docker compose up -d --no-build --remove-orphans --force-recreate app
+            if [ "$PROXY_CONFIG_CHANGED" = true ]; then
+              docker compose up -d --no-build --remove-orphans --force-recreate proxy
+            fi
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error --max-time 15 \
+                http://127.0.0.1:3000/api/health/ready >/dev/null; then
+                curl --fail --silent --show-error --max-time 15 \
+                  'http://127.0.0.1:3000/api/rankings?eventId=333&result=single&start=0&limit=1' \
+                  >/dev/null
+                exit 0
+              fi
+              sleep 2
+            done
+            exit 1
+          REMOTE
+
+      - name: Summarize server deployment
+        if: success()
+        run: |
+          {
+            echo "### Server deployment"
+            echo "- Commit: $SOURCE_SHA"
+            echo "- App image: $APP_IMAGE"
+            echo "- Flyway image: $FLYWAY_IMAGE"
+            echo "- Data-tools image: $DATA_TOOLS_IMAGE"
+            echo "- Config checksum: $CONFIG_CHECKSUM"
+            echo "- Caddy restarted: $PROXY_CONFIG_CHANGED"
+            echo "- Previous app image retained for the next rollback."
+          } >> "$GITHUB_STEP_SUMMARY"
