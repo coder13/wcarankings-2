@@ -43,7 +43,7 @@
 .Jump--listAdd .listAddComposer>.listAddSubmit{position:absolute;z-index:3;right:.5rem;width:auto;min-width:var(--rail-control-height);height:max(40px,calc(var(--rail-control-height) - .5rem));margin:.25rem 0;padding-inline:.7rem;border:0;border-radius:16px;background:transparent;color:var(--focus);font-size:.875rem;font-weight:600}
 .Jump--listAdd .listAddTokens{padding-right:calc(var(--rail-control-height) + 1rem)}
 .Jump--listAdd .listAddError{display:none}
-.Jump--listAdd .listAddCancel{border-radius:16px}
+.Jump--listAdd .listAddCancel{width:40px;height:40px;min-height:40px;margin:6px 0 6px 6px;padding:0;border-radius:16px}
 .Jump--listAdd .listAddCancel:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent)}
 .Jump--listAdd .listAddComposer>.listAddSubmit:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:0}
 .Jump--listAdd .listAddComposer>.listAddSubmit:focus-visible{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
