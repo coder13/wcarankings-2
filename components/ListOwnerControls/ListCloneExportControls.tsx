@@ -5,6 +5,7 @@ import { listPath } from "@/lib/list-path";
 
 export function ListCloneExportControls({ listId }: { listId: string }) {
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const clone = async () => {
     setBusy(true);
     const response = await fetch(`/api/lists/${listId}`, { method: "POST" });
@@ -18,10 +19,13 @@ export function ListCloneExportControls({ listId }: { listId: string }) {
 
   return (
     <div className="listCloneExportControls">
-      <a href={`/api/lists/${listId}?format=csv`}>Export CSV</a>
-      <button type="button" disabled={busy} onClick={() => void clone()}>
-        {busy ? "Cloning…" : "Clone list"}
-      </button>
+      <button type="button" aria-label="List actions" onClick={() => setOpen((current) => !current)}>⋮</button>
+      {open && <div className="listSettingsMenu" role="menu">
+        <a href={`/api/lists/${listId}?format=csv`}>Export CSV</a>
+        <button type="button" disabled={busy} onClick={() => void clone()}>
+          {busy ? "Cloning…" : "Clone list"}
+        </button>
+      </div>}
     </div>
   );
 }

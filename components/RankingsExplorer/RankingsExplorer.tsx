@@ -519,7 +519,7 @@ export function RankingsExplorer({
     listId: string;
     requests: Array<{ id: number; personId: string; name: string }>;
   };
-  listActions?: { listId: string };
+  listActions?: { listId: string; isOwner: boolean };
   regionSelectionDisabled?: boolean;
   initialRegions?: {
     continents: Array<{ id: string; name: string }>;
@@ -2820,7 +2820,7 @@ export function RankingsExplorer({
         style={{ "--rail-scroll-progress": topRailProgress } as CSSProperties}
       >
         {listOwner && <ListOwnerControls listId={listOwner.listId} initialVisibility={listOwner.visibility} initialJoinPolicy={listOwner.joinPolicy} onManageMembers={() => { setMemberSelectionMode(true); setSelectedMemberIds(new Set()); }} />}
-        {listActions && <ListCloneExportControls listId={listActions.listId} />}
+        {listActions && !listActions.isOwner && <ListCloneExportControls listId={listActions.listId} />}
         {listMembership && <ListMembershipControls listId={listMembership.listId} joinPolicy={listMembership.joinPolicy} initialState={listMembership.state} />}
         {listAddOpen && listOwner ? <ListAddPeopleRail listId={listOwner.listId} onCancel={() => setListAddOpen(false)} onAdded={() => { forcePageLoadRef.current = true; setStartRank(1); setStartPosition(0); setPageReloadNonce((nonce) => nonce + 1); }} /> : <RankingsControlsRail
           event={currentEvent}
