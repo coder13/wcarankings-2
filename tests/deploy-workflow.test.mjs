@@ -28,6 +28,8 @@ test("builds deploy images from main when PR images are unavailable", () => {
   );
   assert.match(workflow, /V3__projection_build_timing\.sql/);
   assert.match(workflow, /V4__result_projection_health\.sql/);
+  assert.match(workflow, /refresh-system-lists\.mjs/);
+  assert.match(workflow, /system-list-definitions\.mjs/);
 });
 
 test("reclaims obsolete deployment images before loading a new release", () => {
