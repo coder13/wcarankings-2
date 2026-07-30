@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth";
 import { loadListRankings } from "@/lib/list-rankings";
 import { assertCanViewList, resolveList } from "@/lib/lists";
 import { loadRankingsWithDiagnostics } from "@/lib/rankings";
+import { ApiInputError } from "@/lib/projection-api";
 import { isRankingEventId, isRankingType, parseRegionQuery } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
@@ -62,11 +63,13 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     if (listId) return apiError(error);
-    console.error(JSON.stringify({ operation: "rankings", eventId, result: type, region: scope, status: 503, timings: { total_ms: performance.now() - startedAt }, query_count: 0, returned_rows: 0, cache: "bypass", data_version: null, error: error instanceof Error ? error.name : "unknown" }));
+    const inputError = error instanceof ApiInputError;
+    const status = inputError ? 400 : 503;
+    console.error(JSON.stringify({ operation: "rankings", eventId, result: type, region: scope, status, timings: { total_ms: performance.now() - startedAt }, query_count: 0, returned_rows: 0, cache: "bypass", data_version: null, error: error instanceof Error ? error.name : "unknown" }));
 
     return Response.json(
-      { error: "Rankings are unavailable." },
-      { status: 503, headers: { "Cache-Control": "no-store", ...(error instanceof DatabaseOverloadedError ? { "Retry-After": "1" } : {}) } },
+      { error: inputError ? error.message : "Rankings are unavailable." },
+      { status, headers: { "Cache-Control": "no-store", ...(error instanceof DatabaseOverloadedError ? { "Retry-After": "1" } : {}) } },
     );
   }
 }
