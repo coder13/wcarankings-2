@@ -481,6 +481,7 @@ export function RankingsExplorer({
   initialLatitudeHemisphere = "north",
   mockSubjectRows = false,
   rankingSource,
+  showMyRank = true,
   listOwner,
   listMembership,
   listMembershipRequests,
@@ -505,6 +506,7 @@ export function RankingsExplorer({
   initialLatitudeHemisphere?: "north" | "south";
   mockSubjectRows?: boolean;
   rankingSource?: RankingSource;
+  showMyRank?: boolean;
   listOwner?: {
     listId: string;
     visibility: "public" | "private";
@@ -2925,7 +2927,7 @@ export function RankingsExplorer({
             total={total}
             onJumpUp={handleJumpUp}
             onJumpDown={handleJumpDown}
-            onFocusMe={subject === "people" ? focusMyRanking : undefined}
+            onFocusMe={subject === "people" && showMyRank ? focusMyRanking : undefined}
             searchActive={findOpen && findMatches.length > 0}
             onSearchPrevious={() => cycleFind(-1)}
             onSearchNext={() => cycleFind(1)}

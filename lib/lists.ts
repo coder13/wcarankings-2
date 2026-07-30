@@ -494,7 +494,7 @@ export async function getListMembershipState(
   list: ListSummary,
   user: AuthUser | null,
 ): Promise<ListMembershipState | null> {
-  if (!user || list.kind !== "user") return null;
+  if (!user) return null;
   const membership = await query<RowDataPacket>(
     `SELECT 1
      FROM list_members
@@ -503,6 +503,10 @@ export async function getListMembershipState(
     [list.id, user.wcaId],
   );
   if (membership.rows.length > 0) return "member";
+
+  // System lists do not accept membership requests, but their membership is
+  // still useful for list-scoped UI such as the "My rank" action.
+  if (list.kind !== "user") return "not_member";
 
   const request = await query<RowDataPacket>(
     `SELECT 1
