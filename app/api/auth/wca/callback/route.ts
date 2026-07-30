@@ -1,5 +1,6 @@
 import {
   getWcaAuthConfig,
+  getSameOriginDestination,
   getRequestOrigin,
   makeCookie,
   readCookie,
@@ -15,6 +16,10 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const state = requestUrl.searchParams.get("state");
   const storedState = readCookie(request, "wca_oauth_state");
+  const returnTo = getSameOriginDestination(
+    request,
+    readCookie(request, "wca_oauth_return_to"),
+  );
   const { clientId, clientSecret, redirectUri, wcaOrigin } = getWcaAuthConfig(request);
 
   if (!code || !state || state !== storedState || !clientId || !clientSecret) {
@@ -57,11 +62,12 @@ export async function GET(request: Request) {
 
     const session = await createAuthSession(profile);
     const headers = new Headers({
-      Location: `${origin}/?auth=success`,
+      Location: returnTo,
       "Cache-Control": "no-store",
     });
     headers.append("Set-Cookie", authSessionCookie(session.token, request));
     headers.append("Set-Cookie", makeCookie("wca_oauth_state", "", request, { maxAge: 0 }));
+    headers.append("Set-Cookie", makeCookie("wca_oauth_return_to", "", request, { maxAge: 0 }));
     return new Response(null, { status: 302, headers });
   } catch (error) {
     console.error("WCA OAuth callback failed", error);

@@ -50,6 +50,17 @@ export function getRequestOrigin(request: Request) {
   return requestUrl.origin;
 }
 
+export function getSameOriginDestination(request: Request, candidate: string | null) {
+  const origin = getRequestOrigin(request);
+  if (!candidate) return origin;
+  try {
+    const destination = new URL(candidate);
+    return destination.origin === origin ? destination.toString() : origin;
+  } catch {
+    return origin;
+  }
+}
+
 export function readCookie(request: Request, name: string) {
   const cookies = request.headers.get("cookie") ?? "";
   for (const cookie of cookies.split(";")) {

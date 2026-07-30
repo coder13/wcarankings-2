@@ -1,4 +1,9 @@
-import { getRequestOrigin, getWcaAuthConfig, makeCookie } from "@/lib/wca-auth";
+import {
+  getRequestOrigin,
+  getSameOriginDestination,
+  getWcaAuthConfig,
+  makeCookie,
+} from "@/lib/wca-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +13,7 @@ export async function GET(request: Request) {
   if (!clientId) return Response.redirect(`${origin}/?auth=not-configured`, 302);
 
   const state = crypto.randomUUID();
+  const returnTo = getSameOriginDestination(request, request.headers.get("referer"));
   const authorizeUrl = new URL("/oauth/authorize", wcaOrigin);
   authorizeUrl.searchParams.set("client_id", clientId);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
@@ -15,12 +21,11 @@ export async function GET(request: Request) {
   authorizeUrl.searchParams.set("scope", "public");
   authorizeUrl.searchParams.set("state", state);
 
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: authorizeUrl.toString(),
-      "Set-Cookie": makeCookie("wca_oauth_state", state, request, { maxAge: 600, sameSite: "Lax" }),
-      "Cache-Control": "no-store",
-    },
+  const headers = new Headers({
+    Location: authorizeUrl.toString(),
+    "Cache-Control": "no-store",
   });
+  headers.append("Set-Cookie", makeCookie("wca_oauth_state", state, request, { maxAge: 600, sameSite: "Lax" }));
+  headers.append("Set-Cookie", makeCookie("wca_oauth_return_to", returnTo, request, { maxAge: 600, sameSite: "Lax" }));
+  return new Response(null, { status: 302, headers });
 }

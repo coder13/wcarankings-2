@@ -4,8 +4,15 @@ import {
   AUTH_SESSION_MAX_AGE_SECONDS,
   generateSessionToken,
 } from "@/lib/auth";
-import { getRequestOrigin, getWcaAuthConfig, makeCookie, toWcaProfile } from "@/lib/wca-auth";
+import {
+  getRequestOrigin,
+  getSameOriginDestination,
+  getWcaAuthConfig,
+  makeCookie,
+  toWcaProfile,
+} from "@/lib/wca-auth";
 import { getLogoutDestination } from "@/app/api/auth/wca/logout/route";
+import { GET as startWcaAuth } from "@/app/api/auth/wca/route";
 
 test("creates high-entropy opaque session tokens", () => {
   const first = generateSessionToken();
@@ -109,6 +116,37 @@ test("returns to the current same-origin page after sign-out", () => {
     headers: { referer: "https://example.com/not-a-safe-return-url" },
   });
   assert.equal(getLogoutDestination(externalReferrer), "https://rankings.example.com");
+});
+
+test("only uses a same-origin OAuth return destination", () => {
+  const request = new Request("https://rankings.example.com/api/auth/wca/callback");
+  assert.equal(
+    getSameOriginDestination(request, "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333"),
+    "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333",
+  );
+  assert.equal(
+    getSameOriginDestination(request, "https://example.com/not-a-safe-return-url"),
+    "https://rankings.example.com",
+  );
+});
+
+test("stores the initiating page for the OAuth callback", async () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "development";
+  try {
+    const response = await startWcaAuth(new Request("http://localhost:3000/api/auth/wca", {
+      headers: { referer: "http://localhost:3000/lists/7K3M9Q2D--friends?eventId=333" },
+    }));
+    assert.equal(response.status, 302);
+    assert.ok(
+      response.headers.getSetCookie().some((cookie) =>
+        cookie.includes("wca_oauth_return_to=http%3A%2F%2Flocalhost%3A3000%2Flists%2F7K3M9Q2D--friends%3FeventId%3D333"),
+      ),
+    );
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+  }
 });
 
 test("prefers the WCA avatar thumbnail for the profile menu", () => {
