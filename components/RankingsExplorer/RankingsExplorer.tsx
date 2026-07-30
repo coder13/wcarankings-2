@@ -2752,7 +2752,8 @@ export function RankingsExplorer({
   const changeRankingType = (nextRankingType: "single" | "average") => {
     if (
       nextRankingType === rankingType ||
-      (eventId === "333mbf" && nextRankingType === "average")
+      eventId === "333mbf" ||
+      eventId === "sor-kinch"
     )
       return;
     const viewportSubRank = getCurrentViewportSubRank(
@@ -2798,7 +2799,7 @@ export function RankingsExplorer({
     const nextRankingType =
       subject === "competitions" && competitionRanking === "podiums"
         ? podiumRankingType(nextEventId)
-        : nextEventId === "333mbf"
+        : nextEventId === "333mbf" || nextEventId === "sor-kinch"
           ? "single"
           : rankingType;
     setRankingType(nextRankingType);
@@ -2807,7 +2808,7 @@ export function RankingsExplorer({
     });
     updateQueryParams({
       eventId: nextEventId === "333" ? null : nextEventId,
-      result: nextRankingType === "single" ? null : nextRankingType,
+      result: nextEventId === "sor-kinch" || nextRankingType === "single" ? null : nextRankingType,
       event: null,
       type: null,
     });
@@ -3000,7 +3001,7 @@ export function RankingsExplorer({
           onRegionChange={changeRegion}
           onEventPickerTrigger={(trigger) => { railEventPickerTriggerRef.current = trigger; }}
           compactResultType={topRailProgress >= 1}
-          showResultType={!(subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
+          showResultType={!(eventId === "SOR" || eventId === "sor-kinch" || (subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count")))}
           showEventPicker={!(subject === "competitions" && (competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
           showRegion
           showGender={subject === "people" || subject === "results"}
