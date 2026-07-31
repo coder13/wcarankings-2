@@ -7,7 +7,7 @@ import {
   type NavigationSubject,
 } from "@/components/ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { ListRow } from "@/components/ListBrowse/ListRow";
-import type { ListSummary, PublicListSummary } from "@/lib/lists";
+import type { ListSummary, PublicListSummary } from "@/services/lists/types";
 import "@/components/ListBrowse/ListBrowse.css";
 
 function changeSubject(value: NavigationSubject) {

@@ -19,20 +19,19 @@ import {
   requestListMembership,
   resolveList,
   updateList,
-} from "@/lib/lists";
-import { loadListRankings } from "@/lib/list-rankings";
+} from "@/services/lists/lists";
+import { loadListRankings } from "@/services/lists/rankings";
+import type {
+  ListMemberRouteContext,
+  ListRouteContext,
+  MembershipDecisionRouteContext,
+} from "@/services/lists/types";
 
-export type ListRouteContext = {
-  params: Promise<{ listId: string }>;
-};
-
-export type ListMemberRouteContext = {
-  params: Promise<{ listId: string; personId: string }>;
-};
-
-export type MembershipDecisionRouteContext = {
-  params: Promise<{ listId: string; requestId: string }>;
-};
+export type {
+  ListMemberRouteContext,
+  ListRouteContext,
+  MembershipDecisionRouteContext,
+} from "@/services/lists/types";
 
 function privateResponse<T>(body: T, status?: number) {
   return buildApiJsonResponse(body, {

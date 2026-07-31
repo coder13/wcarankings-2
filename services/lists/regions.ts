@@ -1,18 +1,5 @@
 import { query } from "@/db";
-import type { ListSummary } from "@/lib/lists";
-import type { RegionScope } from "@/lib/wca";
-
-export type ListRegions = {
-  continents: Array<{ id: string; name: string }>;
-  countries: Array<{ id: string; name: string; iso2: string }>;
-};
-
-type ListRegionRow = {
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  continent_id: string;
-};
+import type { ListRegionRow, ListRegions, ListRegionSelection, ListSummary } from "@/services/lists/types";
 
 function toListRegions(rows: ListRegionRow[]): ListRegions {
   const continentIds = new Set<string>();
@@ -68,7 +55,7 @@ export async function getDynamicListRegions(personIds: string[]): Promise<ListRe
 }
 
 export function normalizeListRegionSelection(
-  selection: { scope: RegionScope; regionId: string },
+  selection: ListRegionSelection,
   regions: ListRegions,
 ) {
   if (!hasMultipleListCountries(regions)) {

@@ -9,25 +9,7 @@ import {
   type GenderFilter,
   type RankingType,
 } from "@/lib/wca";
-import type { ListSummary } from "@/lib/lists";
-
-type ListRankingRow = {
-  rank: number;
-  sub_rank: number;
-  total: number;
-  person_id: string;
-  person_name: string;
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  continent_id: string;
-  best: number;
-  competition_id: string;
-  competition_name: string;
-  is_world_record: number;
-  is_continent_record: number;
-  is_country_record: number;
-};
+import type { ListRankingRow, ListSummary, ScopedRankingSource } from "@/services/lists/types";
 
 function rankingTable(type: RankingType) {
   return type === "average"
@@ -62,12 +44,6 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
   );
   return { eventId, type, start, limit, search, locate, region, gender };
 }
-
-type ScopedRankingSource = {
-  from: (rankingTable: string) => string;
-  conditions: string[];
-  values: unknown[];
-};
 
 async function loadScopedRankings(
   scopedSource: ScopedRankingSource,

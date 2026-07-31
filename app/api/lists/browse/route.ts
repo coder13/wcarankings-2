@@ -1,4 +1,4 @@
-import { getPublicLists, withListErrors } from "@/controllers/list-controller";
+import { getPublicLists, withListErrors } from "@/services/lists/controller";
 
 export const dynamic = "force-dynamic";
 

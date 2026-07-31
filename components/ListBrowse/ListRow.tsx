@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { PublicListSummary } from "@/lib/lists";
+import type { PublicListSummary } from "@/services/lists/types";
 import { listPath } from "@/lib/helpers/lists/list-path";
 import "./ListBrowse.css";
 

@@ -1,6 +1,6 @@
 import { buildApiErrorResponse, buildApiJsonResponse, assertSameOrigin, readJsonObject } from "@/lib/api";
 import { requireAuthUser } from "@/lib/auth";
-import { ListValidationError, setListInclusionPreference } from "@/lib/lists";
+import { ListValidationError, setListInclusionPreference } from "@/services/lists/lists";
 
 function buildPrivatePreferenceResponse(allowListInclusion: boolean) {
   return buildApiJsonResponse(

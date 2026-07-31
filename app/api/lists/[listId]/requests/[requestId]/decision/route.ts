@@ -2,7 +2,7 @@ import {
   decideMembershipRequestForUser,
   type MembershipDecisionRouteContext,
   withListErrors,
-} from "@/controllers/list-controller";
+} from "@/services/lists/controller";
 
 export function POST(request: Request, context: MembershipDecisionRouteContext) {
   return withListErrors(() => decideMembershipRequestForUser(request, context));

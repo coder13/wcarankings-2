@@ -4,9 +4,9 @@ import {
   DynamicListInputError,
   parseDynamicListIds,
   resolveDynamicList,
-} from "@/lib/dynamic-list";
-import { getDynamicListRegions, hasMultipleListCountries, normalizeListRegionSelection } from "@/lib/list-regions";
-import { loadDynamicListRankings } from "@/lib/list-rankings";
+} from "@/services/lists/dynamic-list";
+import { getDynamicListRegions, hasMultipleListCountries, normalizeListRegionSelection } from "@/services/lists/regions";
+import { loadDynamicListRankings } from "@/services/lists/rankings";
 import { getAuthUser } from "@/lib/auth";
 import { isEventId, isRankingType, normalizeGenderFilters, parseRegionQuery, type GenderFilter } from "@/lib/wca";
 

@@ -1,4 +1,4 @@
-import { createUserList, getUserLists, withListErrors } from "@/controllers/list-controller";
+import { createUserList, getUserLists, withListErrors } from "@/services/lists/controller";
 
 export const dynamic = "force-dynamic";
 

@@ -3,7 +3,7 @@ import {
   getListMembers,
   type ListRouteContext,
   withListErrors,
-} from "@/controllers/list-controller";
+} from "@/services/lists/controller";
 
 export const dynamic = "force-dynamic";
 

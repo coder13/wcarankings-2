@@ -6,7 +6,7 @@ import {
   ListForbiddenError,
   ListNotFoundError,
   ListValidationError,
-} from "@/lib/lists";
+} from "@/services/lists/lists";
 
 export function buildApiJsonResponse<T>(body: T, init?: ResponseInit) {
   return Response.json(body, init);

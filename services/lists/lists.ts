@@ -7,71 +7,16 @@ import {
   normalizeListPublicId,
   slugifyListName,
 } from "@/lib/helpers/lists/list-identifiers";
-
-export type ListVisibility = "public" | "private";
-export type ListJoinPolicy = "open" | "closed";
-export type ListKind = "user" | "system";
-
-export type ListSummary = {
-  id: number;
-  publicId: string | null;
-  systemAlias: string | null;
-  kind: ListKind;
-  name: string;
-  slug: string;
-  description: string | null;
-  visibility: ListVisibility;
-  joinPolicy: ListJoinPolicy;
-  memberCount: number;
-  membershipVersion: number;
-  systemDefinitionVersion: number | null;
-  owner: {
-    id: number;
-    name: string;
-    wcaId: string;
-  } | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type ListRow = {
-  id: number;
-  public_id: string | null;
-  system_alias: string | null;
-  kind: ListKind;
-  owner_user_id: number | null;
-  owner_name: string | null;
-  owner_wca_id: string | null;
-  name: string;
-  slug: string;
-  description: string | null;
-  visibility: ListVisibility;
-  join_policy: ListJoinPolicy;
-  member_count: number;
-  membership_version: number;
-  system_definition_version: number | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type MemberRow = {
-  person_id: string;
-  person_name: string | null;
-  country_id: string | null;
-  source: "owner" | "self_request" | "bulk_import" | "system_rule";
-  created_at: string;
-};
-
-type RequestRow = {
-  id: number;
-  list_id: number;
-  requester_user_id: number;
-  person_id: string;
-  requester_name: string;
-  status: "pending" | "accepted" | "rejected" | "cancelled";
-  created_at: string;
-  resolved_at: string | null;
-};
+import type {
+  ListJoinPolicy,
+  ListRow,
+  ListSummary,
+  ListVisibility,
+  MemberRow,
+  PublicListSummary,
+  RequestRow,
+  ListMembershipState,
+} from "@/services/lists/types";
 
 export class ListValidationError extends Error {
   constructor(message: string) {
@@ -486,13 +431,6 @@ export async function listOwnedLists(user: AuthUser) {
   return result.rows.map(toListSummary);
 }
 
-export type PublicListSummary = Pick<
-  ListSummary,
-  "publicId" | "systemAlias" | "slug" | "name" | "memberCount" | "kind"
-> & {
-  createdBy: string | null;
-};
-
 export async function listPublicLists() {
   const result = await query<ListRow>(
     `SELECT ${LIST_COLUMNS}
@@ -529,8 +467,6 @@ export async function listContainingUser(user: AuthUser) {
   );
   return result.rows.map(toListSummary);
 }
-
-export type ListMembershipState = "member" | "pending" | "not_member";
 
 export async function getListMembershipState(
   list: ListSummary,
