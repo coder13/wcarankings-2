@@ -319,6 +319,9 @@ test("binds rail scroll progress directly to Motion scroll state", async () => {
 
   assert.match(component, /useScroll\(\)/);
   assert.match(component, /useTransform\(\s*scrollY,/);
+  assert.match(component, /useMotionValueEvent\(rawTopRailProgress, "change"/);
+  assert.match(component, /railProgressAnimationRef\.current\?\.stop\(\)/);
+  assert.match(component, /type: "tween"/);
   assert.match(component, /"--rail-scroll-progress": topRailProgressValue/);
   assert.match(component, /<motion\.div[\s\S]*?className="stickyRankingsRail"/);
   assert.doesNotMatch(component, /as unknown as CSSProperties/);

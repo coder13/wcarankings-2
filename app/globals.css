@@ -278,9 +278,9 @@ main {
   box-shadow:
     0 calc(1px * (1 - var(--rail-scroll-progress)))
       calc(4px * (1 - var(--rail-scroll-progress))) var(--shadow-soft),
-    0 calc(4px * var(--rail-scroll-progress))
-      calc(16px * var(--rail-scroll-progress)) var(--shadow);
-  transform: translateY(calc(-0.25em * var(--rail-scroll-progress)));
+    0 calc(7px * var(--rail-scroll-progress))
+      calc(24px * var(--rail-scroll-progress)) var(--shadow);
+  transform: translateY(calc(-6px * var(--rail-scroll-progress)));
   transition: none;
 }
 
