@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import {
   ANALYTICS_NAVIGATION_EVENT,
   trackGoogleAnalyticsPageView,
-} from "@/lib/google-analytics";
+} from "@/lib/helpers/analytics/google-analytics";
 
 export function GoogleAnalytics() {
   const pathname = usePathname();

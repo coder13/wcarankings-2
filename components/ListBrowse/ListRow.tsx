@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { PublicListSummary } from "@/lib/lists";
-import { listPath } from "@/lib/list-path";
+import { listPath } from "@/lib/helpers/lists/list-path";
 import "./ListBrowse.css";
 
 export function ListRow({ list, alternate = false, subtitle }: { list: PublicListSummary; alternate?: boolean; subtitle?: string | null }) {

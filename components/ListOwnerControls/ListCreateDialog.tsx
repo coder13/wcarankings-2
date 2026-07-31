@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { listPath } from "@/lib/list-path";
+import { listPath } from "@/lib/helpers/lists/list-path";
 
 type CreatedList = { publicId: string; slug: string };
 

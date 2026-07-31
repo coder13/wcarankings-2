@@ -4,7 +4,7 @@ import {
   createGoogleAnalyticsTracker,
   getSafeAnalyticsPath,
   isGoogleAnalyticsEnabled,
-} from "../lib/google-analytics";
+} from "../lib/helpers/analytics/google-analytics";
 
 function createClient() {
   const calls: Array<{ name: string; value: unknown }> = [];

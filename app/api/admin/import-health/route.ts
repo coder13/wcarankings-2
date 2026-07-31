@@ -1,5 +1,5 @@
 import { query } from "@/db";
-import { getImportHealthStatus } from "@/lib/import-health";
+import { getImportHealthStatus } from "@/lib/helpers/text/import-health";
 
 export const dynamic = "force-dynamic";
 

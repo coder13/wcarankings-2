@@ -6,7 +6,7 @@ import {
   normalizeListLookup,
   normalizeListPublicId,
   slugifyListName,
-} from "@/lib/list-identifiers";
+} from "@/lib/helpers/lists/list-identifiers";
 
 export type ListVisibility = "public" | "private";
 export type ListJoinPolicy = "open" | "closed";

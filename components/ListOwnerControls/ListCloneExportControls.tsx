@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { listPath } from "@/lib/list-path";
+import { listPath } from "@/lib/helpers/lists/list-path";
 
 export function ListCloneExportControls({ listId }: { listId: string }) {
   const [busy, setBusy] = useState(false);

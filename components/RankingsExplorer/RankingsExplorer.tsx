@@ -44,7 +44,7 @@ import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import {
   notifyAnalyticsNavigation,
   trackGoogleAnalyticsEvent,
-} from "@/lib/google-analytics";
+} from "@/lib/helpers/analytics/google-analytics";
 import { RankingsControlsRail, RankingsPagerRail } from "../RankingsRail/RankingsRail";
 import {
   ALL_EVENT_RANKING_OPTIONS,

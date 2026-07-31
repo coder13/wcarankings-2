@@ -6,7 +6,7 @@ import {
   formatDate,
   formatDuration,
   type ImportHealthStatus,
-} from "@/lib/import-health";
+} from "@/lib/helpers/text/import-health";
 import styles from "./ImportHealth.module.css";
 
 type ImportRun = {

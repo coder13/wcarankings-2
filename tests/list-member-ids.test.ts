@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseListMemberIds } from "@/lib/list-member-ids";
+import { parseListMemberIds } from "@/lib/helpers/lists/list-member-ids";
 
 test("parses single-column CSV, TSV, and common WCA ID delimiters", () => {
   assert.deepEqual(

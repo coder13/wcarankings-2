@@ -6,8 +6,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { RankingsRail } from "@/components/RankingsRail/RankingsRail";
 import { Checkbox } from "@/components/Checkbox";
 import { flagEmoji } from "@/lib/wca";
-import { listPath } from "@/lib/list-path";
-import { parseListMemberIds } from "@/lib/list-member-ids";
+import { listPath } from "@/lib/helpers/lists/list-path";
+import { parseListMemberIds } from "@/lib/helpers/lists/list-member-ids";
 import { ListCreateDialog } from "./ListCreateDialog";
 
 type Person = { personId: string; name: string; avatarUrl: string | null; country?: { iso2: string; name: string }; competitionCount?: number };

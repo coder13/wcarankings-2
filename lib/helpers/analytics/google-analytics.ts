@@ -23,6 +23,12 @@ type GoogleAnalyticsClient = {
   event: (name: string, parameters?: AnalyticsEventParameters) => void;
 };
 
+type GoogleAnalyticsTrackerOptions = {
+  client: GoogleAnalyticsClient;
+  enabled: boolean;
+  measurementId: string;
+};
+
 export function isGoogleAnalyticsEnabled(nodeEnvironment: string | undefined) {
   return nodeEnvironment === "production";
 }
@@ -48,11 +54,7 @@ export function createGoogleAnalyticsTracker({
   client,
   enabled,
   measurementId,
-}: {
-  client: GoogleAnalyticsClient;
-  enabled: boolean;
-  measurementId: string;
-}) {
+}: GoogleAnalyticsTrackerOptions) {
   let initialized = false;
   let lastPage = "";
 

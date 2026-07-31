@@ -7,7 +7,7 @@ import {
   normalizeSystemAlias,
   RESERVED_LIST_ALIASES,
   slugifyListName,
-} from "@/lib/list-identifiers";
+} from "@/lib/helpers/lists/list-identifiers";
 
 test("generates readable eight-character public list IDs", () => {
   const ids = new Set(Array.from({ length: 100 }, generateListPublicId));

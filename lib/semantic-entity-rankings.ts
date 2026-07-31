@@ -1,5 +1,5 @@
 import { query } from "@/db";
-import { stripMarkdownLinks } from "@/lib/display-text";
+import { stripMarkdownLinks } from "@/lib/helpers/text/display-text";
 import {
   addTimings,
   ApiInputError,

@@ -1,6 +1,11 @@
 export type ImportHealthStatus = "empty" | "export_available" | "import_running" | "last_import_succeeded" | "last_import_failed";
 
-export function getImportHealthStatus({ latestRun, currentExport }: { latestRun?: { status?: string } | null; currentExport?: unknown }) {
+export type ImportHealthStatusInput = {
+  latestRun?: { status?: string } | null;
+  currentExport?: unknown;
+};
+
+export function getImportHealthStatus({ latestRun, currentExport }: ImportHealthStatusInput) {
   if (latestRun?.status === "running") return "import_running" as const;
   if (latestRun?.status === "failed") return "last_import_failed" as const;
   if (latestRun?.status === "succeeded") return "last_import_succeeded" as const;
