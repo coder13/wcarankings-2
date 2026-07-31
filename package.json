@@ -24,7 +24,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern storybook-static",
     "format:server": "prettier --write app/api controllers db lib services",
     "format:server:check": "prettier --check app/api controllers db lib services",
-    "prepare": "git config core.hooksPath .githooks",
+    "prepare": "husky",
     "sync:wca": "node scripts/sync-wca-export.mjs",
     "sync:wca:local": "docker compose --env-file .env.local run --rm flyway migrate && node --env-file=.env.local scripts/sync-wca-export.mjs",
     "load:rankings": "node scripts/load-rankings.mjs"
@@ -53,6 +53,8 @@
     "@vitejs/plugin-rsc": "0.5.26",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
     "prettier": "^3.9.6",
     "react-server-dom-webpack": "19.2.6",
     "storybook": "^10.5.5",
@@ -63,5 +65,12 @@
     "vite": "8.0.13",
     "vite-plugin-svgr": "^5.2.0"
   },
-  "type": "module"
+  "type": "module",
+  "lint-staged": {
+    "app/api/**/*.{js,jsx,ts,tsx}": "prettier --write",
+    "controllers/**/*.{js,jsx,ts,tsx}": "prettier --write",
+    "db/**/*.{js,jsx,ts,tsx}": "prettier --write",
+    "lib/**/*.{js,jsx,ts,tsx}": "prettier --write",
+    "services/**/*.{js,jsx,ts,tsx}": "prettier --write"
+  }
 }
