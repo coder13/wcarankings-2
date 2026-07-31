@@ -58,11 +58,12 @@ test("builds a result-level compatibility projection without unused secondary in
 });
 
 test("normal rankings retain separate historical country and continent bests", async () => {
-  const [single, average, listRankings, fixture] = await Promise.all([
+  const [single, average, listRankings, fixture, resultAttemptsMigration] = await Promise.all([
     readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/ranking_entries_average_source.sql", root), "utf8"),
     readFile(new URL("lib/list-rankings.ts", root), "utf8"),
     readFile(new URL("tests/fixtures/regional-ranking-history.sql", root), "utf8"),
+    readFile(new URL("migrations/mysql/V8__result_attempts_lookup.sql", root), "utf8"),
   ]);
   const sources = `${single}\n${average}`;
 
@@ -79,4 +80,6 @@ test("normal rankings retain separate historical country and continent bests", a
   assert.match(sources, /regional_record = 'NR'/);
   assert.match(listRankings, /let rankingColumn = "world_rank";[\s\S]*input\.region\.scope === "continent"/);
   assert.match(listRankings, /`ranking\.\$\{rankingColumn\} > 0`/);
+  assert.match(resultAttemptsMigration, /information_schema\.tables/);
+  assert.match(resultAttemptsMigration, /PREPARE result_attempts_index_statement/);
 });
