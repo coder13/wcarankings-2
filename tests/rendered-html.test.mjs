@@ -264,9 +264,11 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(pwaRegistration, /import\.meta\.env\.PROD/);
   assert.match(pwaRegistration, /getRegistrations\(\)/);
   assert.match(pwaRegistration, /registration\.unregister\(\)/);
-  assert.match(serviceWorker, /CACHE_NAME/);
   assert.match(serviceWorker, /cache\.match/);
-  assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
+  assert.match(serviceWorker, /if \(!isRankingPage\(url\)\) return/);
+  assert.doesNotMatch(serviceWorker, /request\.destination === "document"/);
+  assert.doesNotMatch(serviceWorker, /\["script", "style", "image", "font"\]/);
+  assert.doesNotMatch(serviceWorker, /SHELL_CACHE|APP_SHELL/);
   assert.match(serviceWorker, /event\.data\?\.type === "SKIP_WAITING"/);
   assert.doesNotMatch(
     serviceWorker,

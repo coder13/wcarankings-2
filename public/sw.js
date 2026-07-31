@@ -1,9 +1,5 @@
-const SHELL_CACHE = "wca-rankings-shell-v4";
 const RANKINGS_CACHE = "wca-rankings-pages-v3";
-// Kept as a compatibility name for existing service-worker checks and diagnostics.
-const CACHE_NAME = SHELL_CACHE;
 const MAX_AGE_MS = 12 * 60 * 60 * 1000;
-const APP_SHELL = ["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", "/icon-512.png"];
 
 function isRankingPage(url) {
   if (url.pathname !== "/api/rankings" || url.searchParams.get("paged") !== "1") return false;
@@ -62,16 +58,6 @@ async function cachedRankingPage(request) {
   });
 }
 
-async function fetchAndCache(request, cache, cacheKey = request) {
-  const response = await fetch(request);
-  if (response.ok) await cache.put(cacheKey, response.clone());
-  return response;
-}
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
-});
-
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") {
     event.waitUntil(self.skipWaiting());
@@ -81,7 +67,7 @@ self.addEventListener("message", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(caches.keys()
     .then((keys) => Promise.all(keys
-      .filter((key) => key.startsWith("wca-rankings-") && key !== SHELL_CACHE && key !== RANKINGS_CACHE)
+      .filter((key) => key.startsWith("wca-rankings-") && key !== RANKINGS_CACHE)
       .map((key) => caches.delete(key))))
     .then(() => self.clients.claim()));
 });
@@ -91,37 +77,17 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/")) return;
+  if (!isRankingPage(url)) return;
 
-  if (isRankingPage(url)) {
-    const refresh = caches.open(RANKINGS_CACHE).then((cache) => fetch(request).then(async (response) => {
-        if (response.ok) {
-          await cache.put(request, await withCacheMetadata(response.clone()));
-          await enforceRankingLimit(cache, eventIdFor(request));
-        }
-        return response;
-      }));
-    event.waitUntil(refresh.catch(() => undefined));
-    event.respondWith(caches.open(RANKINGS_CACHE).then(async (cache) =>
-      (await cache.match(request)) || refresh.catch(async () => (await cachedRankingPage(request)) || Response.error()),
-    ));
-    return;
-  }
-
-  if (request.destination === "document") {
-    const refresh = caches.open(SHELL_CACHE).then((cache) => fetchAndCache(request, cache, "/"));
-    event.waitUntil(refresh.catch(() => undefined));
-    event.respondWith(caches.open(SHELL_CACHE).then(async (cache) =>
-      (await cache.match("/")) || refresh.catch(() => Response.error()),
-    ));
-    return;
-  }
-
-  if (["script", "style", "image", "font"].includes(request.destination)) {
-    const refresh = caches.open(SHELL_CACHE).then((cache) => fetchAndCache(request, cache));
-    event.waitUntil(refresh.catch(() => undefined));
-    event.respondWith(caches.open(SHELL_CACHE).then(async (cache) =>
-      (await cache.match(request)) || refresh,
-    ));
-  }
+  const refresh = caches.open(RANKINGS_CACHE).then((cache) => fetch(request).then(async (response) => {
+    if (response.ok) {
+      await cache.put(request, await withCacheMetadata(response.clone()));
+      await enforceRankingLimit(cache, eventIdFor(request));
+    }
+    return response;
+  }));
+  event.waitUntil(refresh.catch(() => undefined));
+  event.respondWith(caches.open(RANKINGS_CACHE).then(async (cache) =>
+    (await cache.match(request)) || refresh.catch(async () => (await cachedRankingPage(request)) || Response.error()),
+  ));
 });
