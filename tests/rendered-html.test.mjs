@@ -302,8 +302,8 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(css, /\.siteFooter/);
   assert.match(css, /\.row--searchMatch/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before,\s*\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\) > \.RankingsRailTransition::before\s*\{[\s\S]*width:\s*calc\(100vw - 2em\);/);
-  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before\s*\{[\s\S]*to bottom[\s\S]*box-shadow:\s*0 22px 42px 18px/);
+  assert.doesNotMatch(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before/);
+  assert.match(globalCss, /\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\) > \.RankingsRailTransition::before\s*\{[\s\S]*width:\s*calc\(100vw - 2em\);/);
   assert.match(globalCss, /\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\) > \.RankingsRailTransition::before\s*\{[\s\S]*to top[\s\S]*box-shadow:\s*0 -22px 42px 18px/);
   assert.doesNotMatch(css, /app-header|table-quick-jump|jump-overlay/);
   assert.doesNotMatch(layout, /codex-preview|_sites-preview|Starter Project/);

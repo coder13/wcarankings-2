@@ -314,7 +314,6 @@ main {
   isolation: isolate;
 }
 
-.stickyRankingsRail > .RankingsRailTransition::before,
 .JumpControlsVisibility:has(.Jump[data-direction="down"]) > .RankingsRailTransition::before {
   position: absolute;
   z-index: 0;
@@ -326,16 +325,6 @@ main {
   content: "";
   pointer-events: none;
   transform: translateX(-50%);
-}
-
-.stickyRankingsRail > .RankingsRailTransition::before {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--surface) 94%, transparent),
-    color-mix(in srgb, var(--surface) 76%, transparent) 55%,
-    transparent
-  );
-  box-shadow: 0 22px 42px 18px color-mix(in srgb, var(--surface) 38%, transparent);
 }
 
 .JumpControlsVisibility:has(.Jump[data-direction="down"]) > .RankingsRailTransition::before {
