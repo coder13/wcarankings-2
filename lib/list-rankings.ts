@@ -75,7 +75,10 @@ async function loadScopedRankings(
 ) {
   const input = parseListRankingInput(searchParams);
   const source = rankingTable(input.type);
-  const scopedConditions = [...scopedSource.conditions, "ranking.world_rank > 0"];
+  let rankingColumn = "world_rank";
+  if (input.region.scope === "continent") rankingColumn = "continent_rank";
+  if (input.region.scope === "country") rankingColumn = "country_rank";
+  const scopedConditions = [...scopedSource.conditions, `ranking.${rankingColumn} > 0`];
   const scopedValues = [...scopedSource.values];
   if (input.region.scope === "continent") {
     scopedConditions.push("ranking.continent_id = ?");
