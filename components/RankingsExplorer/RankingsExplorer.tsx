@@ -1,7 +1,7 @@
 "use client";
 
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { animate, AnimatePresence, LayoutGroup, motion, useMotionValue, useMotionValueEvent, useScroll, useTransform } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion, useScroll, useTransform } from "motion/react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -689,23 +689,12 @@ export function RankingsExplorer({
   } | null>(null);
   const { topProgress: topRailProgress, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
   const { scrollY } = useScroll();
-  const rawTopRailProgress = useTransform(
+  const topRailProgressValue = useTransform(
     scrollY,
     [0, TOP_RAIL_TRANSFORM_DISTANCE],
     [0, 1],
     { clamp: true },
   );
-  const topRailProgressValue = useMotionValue(0);
-  const railProgressAnimationRef = useRef<{ stop: () => void } | null>(null);
-  useMotionValueEvent(rawTopRailProgress, "change", (value) => {
-    railProgressAnimationRef.current?.stop();
-    railProgressAnimationRef.current = animate(topRailProgressValue, value, {
-      type: "tween",
-      duration: 0.18,
-      ease: "easeOut",
-    });
-  });
-  useEffect(() => () => railProgressAnimationRef.current?.stop(), []);
   const activeListKey = [
     subject,
     competitionRanking,
