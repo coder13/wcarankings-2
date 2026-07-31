@@ -139,7 +139,9 @@ test("builds labeled PR projections and deploys the exact merged artifact", () =
   assert.match(prProjectionRelease, /format\('pr-projection-noop-\{0\}', github\.run_id\)/);
   assert.match(prProjectionRelease, /cancel-in-progress: false/);
   assert.doesNotMatch(prProjectionRelease, /queue: max/);
-  assert.match(projectionDeploy, /if \[ "\$WCA_EXPORT_VALUE" != "\$PRODUCTION_WCA_EXPORT_VALUE" \]; then/);
+  assert.match(projectionDeploy, /normalizeExportDate\(process\.env\.WCA_EXPORT_VALUE\)/);
+  assert.match(projectionDeploy, /Projection export identity: build=/);
+  assert.match(projectionDeploy, /if \[ "\$normalized_wca_export" != "\$normalized_production_export" \]; then/);
   assert.doesNotMatch(
     projectionDeploy,
     /\.raw == null/,
