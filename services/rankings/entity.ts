@@ -13,9 +13,9 @@ import {
 
 import type { CityRow, CompetitionRow, LatitudeRow, PodiumRow } from "@/services/rankings/types";
 import {
-  competitionEntityCountQuery,
+  cityEntityRowsQuery, competitionEntityCountQuery, competitionEntityRowsQuery,
   competitorCountRowsQuery, competitorCountTotalQuery, entityCountQuery,
-  latitudeCountQuery, latitudeRowsQuery, podiumEntityCountQuery,
+  latitudeCountQuery, latitudeRowsQuery, podiumEntityCountQuery, podiumEntityRowsQuery,
 } from "@/services/rankings/queries";
 
 async function entityCount(kind: string, eventId = "", resultType = "") {
@@ -156,30 +156,7 @@ async function loadFastestCompetitions(params: URLSearchParams, limit: number) {
   const resultIdColumn = `${valueColumn}_result_id`;
   const rankColumn = `${valueColumn}_rank`;
   const positionColumn = `${valueColumn}_position`;
-  const rows = await query<CompetitionRow>(`
-    WITH page AS (
-      SELECT stats.competition_id, stats.start_date,
-        stats.${valueColumn} AS result_value,
-        stats.${resultIdColumn} AS result_id,
-        stats.${rankColumn} AS rank,
-        stats.${positionColumn} AS position
-      FROM competition_event_stats stats
-      WHERE stats.event_id = ? AND stats.${positionColumn} > ?
-      ORDER BY stats.${positionColumn}
-      LIMIT ?
-    )
-    SELECT page.*,
-      COALESCE(competition.name, page.competition_id) AS competition_name,
-      COALESCE(country.name, competition.country_id, '') AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2,
-      result.person_id, COALESCE(person.name, result.person_id) AS person_name
-    FROM page
-    INNER JOIN results result ON result.id = page.result_id
-    LEFT JOIN persons person ON person.wca_id = result.person_id AND person.sub_id = 1
-    LEFT JOIN competitions competition ON competition.id = page.competition_id
-    LEFT JOIN countries country ON country.id = competition.country_id
-    ORDER BY page.position
-  `, [eventId, start, limit + 1]);
+  const rows = await query<CompetitionRow>(competitionEntityRowsQuery({ valueColumn, resultIdColumn, rankColumn, positionColumn }), [eventId, start, limit + 1]);
   const counts = await query<{ count: number }>(
     competitionEntityCountQuery({ valueColumn, resultIdColumn, rankColumn, positionColumn }),
     [eventId],
@@ -233,33 +210,7 @@ export async function loadPodiumRankings(params: URLSearchParams, limit = parseL
   if (!Number.isInteger(start) || start < 0) {
     throw new ApiInputError("start must be a non-negative integer.");
   }
-  const rows = await query<PodiumRow>(`
-    WITH page AS (
-      SELECT stats.competition_id, stats.start_date,
-        stats.${scoreColumn} AS score, stats.${rankColumn} AS rank,
-        stats.${positionColumn} AS position
-      FROM competition_event_stats stats
-      WHERE stats.event_id = ? AND stats.${positionColumn} > ?
-      ORDER BY stats.${positionColumn}
-      LIMIT ?
-    )
-    SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name,
-      COALESCE(competition.country_id, '') AS country_id,
-      COALESCE(country.name, competition.country_id, '') AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2,
-      member.podium_position, member.person_id AS member_person_id,
-      COALESCE(person.name, member.person_id) AS member_person_name,
-      member.result_id AS member_result_id, member.result_value AS member_result_value
-    FROM page
-    INNER JOIN competition_podium_members member
-      ON member.competition_id = page.competition_id
-      AND member.event_id = ?
-      AND member.result_type = ?
-    LEFT JOIN persons person ON person.wca_id = member.person_id AND person.sub_id = 1
-    LEFT JOIN competitions competition ON competition.id = page.competition_id
-    LEFT JOIN countries country ON country.id = competition.country_id
-    ORDER BY page.position, member.podium_position, member.result_id
-  `, [eventId, start, limit + 1, eventId, resultType]);
+  const rows = await query<PodiumRow>(podiumEntityRowsQuery({ positionColumn }), [eventId, start, limit + 1, eventId, resultType]);
   const counts = await query<{ count: number }>(
     podiumEntityCountQuery({ positionColumn }),
     [eventId],
@@ -359,29 +310,7 @@ export async function loadCityRankings(params: URLSearchParams) {
     )`;
     values.push(afterValue, afterValue, afterCountryId, afterValue, afterCountryId, afterCity);
   }
-  const rows = await query<CityRow>(`
-    WITH page AS (
-      SELECT stats.city_name, stats.country_id,
-        stats.${valueColumn} AS result_value,
-        stats.${resultIdColumn} AS result_id,
-        stats.${rankColumn} AS rank
-      FROM city_event_stats stats
-      WHERE stats.event_id = ? AND stats.${valueColumn} IS NOT NULL${cursor}
-      ORDER BY stats.${valueColumn}, stats.country_id, stats.city_name
-      LIMIT ?
-    )
-    SELECT page.*, COALESCE(country.name, page.country_id) AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2,
-      facts.person_id, COALESCE(person.name, facts.person_id) AS person_name,
-      facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name,
-      facts.competition_start_date, facts.round_type_id
-    FROM page
-    INNER JOIN result_facts facts ON facts.result_id = page.result_id
-    LEFT JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1
-    LEFT JOIN competitions competition ON competition.id = facts.competition_id
-    LEFT JOIN countries country ON country.id = page.country_id
-    ORDER BY page.result_value, page.country_id, page.city_name
-  `, [...values, limit + 1]);
+  const rows = await query<CityRow>(cityEntityRowsQuery({ valueColumn, resultIdColumn, rankColumn, cursor }), [...values, limit + 1]);
   const counts = await entityCount("city", eventId, resultType);
   const pageRows = rows.rows.slice(0, limit);
   const last = pageRows.at(-1);

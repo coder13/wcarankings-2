@@ -1,18 +1,19 @@
 import type { CityEntityQueryInput, CompetitionEntityQueryInput, FilteredPersonMetricQueryInput, GenderRankingQueryInput, LatitudeQueryInput, PersonMetricQueryInput, PersonRankingsQueryInput, PodiumEntityQueryInput, RankingCursorQueryInput, RankingPageQueryInput, RankingSearchQueryInput, ResultRankingsQueryInput } from "@/services/rankings/types";
+import { sql } from "@/lib/helpers/database/sql";
 
 export function entityCountQuery() { return "SELECT count FROM entity_ranking_counts WHERE ranking_kind = ? AND event_id = ? AND result_type = ?"; }
-export function competitorCountRowsQuery() { return `WITH page AS (SELECT stats.competition_id, stats.competitor_count, stats.competitor_count_rank AS rank, stats.competitor_count_position AS position FROM competition_stats stats WHERE stats.competitor_count_position > ? ORDER BY stats.competitor_count_position LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(competition.venue, '') AS venue, COALESCE(competition.city_name, '') AS city_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2 FROM page LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position`; }
+export function competitorCountRowsQuery() { return sql`WITH page AS (SELECT stats.competition_id, stats.competitor_count, stats.competitor_count_rank AS rank, stats.competitor_count_position AS position FROM competition_stats stats WHERE stats.competitor_count_position > ? ORDER BY stats.competitor_count_position LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(competition.venue, '') AS venue, COALESCE(competition.city_name, '') AS city_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2 FROM page LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position`; }
 export function competitorCountTotalQuery() { return "SELECT COUNT(*) AS count FROM competition_stats WHERE competitor_count_position IS NOT NULL"; }
 export function latitudeRowsQuery(input: LatitudeQueryInput) { return input.scoped ? `WITH scoped AS (SELECT stats.competition_id, stats.start_date, stats.latitude, COALESCE(competition.name, stats.competition_id) AS competition_name, COALESCE(competition.venue, '') AS venue, COALESCE(competition.city_name, '') AS city_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2 FROM competition_stats stats JOIN competitions competition ON competition.id = stats.competition_id JOIN countries country ON country.id = competition.country_id WHERE stats.${input.prefix}_position IS NOT NULL AND ${input.regionColumn} = ?), ranked AS (SELECT scoped.*, DENSE_RANK() OVER (ORDER BY latitude ${input.direction}) AS rank, ROW_NUMBER() OVER (ORDER BY latitude ${input.direction}, start_date, competition_id) AS position FROM scoped) SELECT * FROM ranked WHERE position > ? ORDER BY position LIMIT ?` : `WITH page AS (SELECT stats.competition_id, stats.latitude, stats.${input.prefix}_rank AS rank, stats.${input.prefix}_position AS position FROM competition_stats stats WHERE stats.${input.prefix}_position > ? ORDER BY stats.${input.prefix}_position LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(competition.venue, '') AS venue, COALESCE(competition.city_name, '') AS city_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2 FROM page LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position`; }
 export function latitudeCountQuery(input: LatitudeQueryInput) { return input.scoped ? `SELECT COUNT(*) AS count FROM competition_stats stats JOIN competitions competition ON competition.id = stats.competition_id JOIN countries country ON country.id = competition.country_id WHERE stats.${input.prefix}_position IS NOT NULL AND ${input.regionColumn} = ?` : `SELECT COUNT(*) AS count FROM competition_stats WHERE ${input.prefix}_position IS NOT NULL`; }
-export function competitionEntityRowsQuery(input: CompetitionEntityQueryInput) { return `WITH page AS (SELECT stats.competition_id, stats.start_date, stats.${input.valueColumn} AS result_value, stats.${input.resultIdColumn} AS result_id, stats.${input.rankColumn} AS rank, stats.${input.positionColumn} AS position FROM competition_event_stats stats WHERE stats.event_id = ? AND stats.${input.positionColumn} > ? ORDER BY stats.${input.positionColumn} LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2, result.person_id, COALESCE(person.name, result.person_id) AS person_name FROM page INNER JOIN results result ON result.id = page.result_id LEFT JOIN persons person ON person.wca_id = result.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position`; }
-export function competitionEntityCountQuery(input: CompetitionEntityQueryInput) { return `SELECT COUNT(*) AS count FROM competition_event_stats WHERE event_id = ? AND ${input.positionColumn} IS NOT NULL`; }
-export function podiumEntityRowsQuery(input: PodiumEntityQueryInput) { return `WITH page AS (SELECT stats.competition_id, stats.start_date, stats.podium_score AS score, stats.podium_rank AS rank, stats.${input.positionColumn} AS position FROM competition_event_stats stats WHERE stats.event_id = ? AND stats.${input.positionColumn} > ? ORDER BY stats.${input.positionColumn} LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(competition.country_id, '') AS country_id, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2, member.podium_position, member.person_id AS member_person_id, COALESCE(person.name, member.person_id) AS member_person_name, member.result_id AS member_result_id, member.result_value AS member_result_value FROM page INNER JOIN competition_podium_members member ON member.competition_id = page.competition_id AND member.event_id = ? AND member.result_type = ? LEFT JOIN persons person ON person.wca_id = member.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position, member.podium_position, member.result_id`; }
-export function podiumEntityCountQuery(input: PodiumEntityQueryInput) { return `SELECT COUNT(*) AS count FROM competition_event_stats WHERE event_id = ? AND ${input.positionColumn} IS NOT NULL`; }
-export function cityEntityRowsQuery(input: CityEntityQueryInput) { return `WITH page AS (SELECT stats.city_name, stats.country_id, stats.${input.valueColumn} AS result_value, stats.${input.resultIdColumn} AS result_id, stats.${input.rankColumn} AS rank FROM city_event_stats stats WHERE stats.event_id = ? AND stats.${input.valueColumn} IS NOT NULL${input.cursor} ORDER BY stats.${input.valueColumn}, stats.country_id, stats.city_name LIMIT ?) SELECT page.*, COALESCE(country.name, page.country_id) AS country_name, COALESCE(country.iso2, '') AS country_iso2, facts.person_id, COALESCE(person.name, facts.person_id) AS person_name, facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name, facts.competition_start_date, facts.round_type_id FROM page INNER JOIN result_facts facts ON facts.result_id = page.result_id LEFT JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = facts.competition_id LEFT JOIN countries country ON country.id = page.country_id ORDER BY page.result_value, page.country_id, page.city_name`; }
+export function competitionEntityRowsQuery(input: CompetitionEntityQueryInput) { return sql`WITH page AS (SELECT stats.competition_id, stats.start_date, stats.${input.valueColumn} AS result_value, stats.${input.resultIdColumn} AS result_id, stats.${input.rankColumn} AS rank, stats.${input.positionColumn} AS position FROM competition_event_stats stats WHERE stats.event_id = ? AND stats.${input.positionColumn} > ? ORDER BY stats.${input.positionColumn} LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2, result.person_id, COALESCE(person.name, result.person_id) AS person_name FROM page INNER JOIN results result ON result.id = page.result_id LEFT JOIN persons person ON person.wca_id = result.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position`; }
+export function competitionEntityCountQuery(input: CompetitionEntityQueryInput) { return sql`SELECT COUNT(*) AS count FROM competition_event_stats WHERE event_id = ? AND ${input.positionColumn} IS NOT NULL`; }
+export function podiumEntityRowsQuery(input: PodiumEntityQueryInput) { return sql`WITH page AS (SELECT stats.competition_id, stats.start_date, stats.podium_score AS score, stats.podium_rank AS rank, stats.${input.positionColumn} AS position FROM competition_event_stats stats WHERE stats.event_id = ? AND stats.${input.positionColumn} > ? ORDER BY stats.${input.positionColumn} LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(competition.country_id, '') AS country_id, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2, member.podium_position, member.person_id AS member_person_id, COALESCE(person.name, member.person_id) AS member_person_name, member.result_id AS member_result_id, member.result_value AS member_result_value FROM page INNER JOIN competition_podium_members member ON member.competition_id = page.competition_id AND member.event_id = ? AND member.result_type = ? LEFT JOIN persons person ON person.wca_id = member.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position, member.podium_position, member.result_id`; }
+export function podiumEntityCountQuery(input: PodiumEntityQueryInput) { return sql`SELECT COUNT(*) AS count FROM competition_event_stats WHERE event_id = ? AND ${input.positionColumn} IS NOT NULL`; }
+export function cityEntityRowsQuery(input: CityEntityQueryInput) { return sql`WITH page AS (SELECT stats.city_name, stats.country_id, stats.${input.valueColumn} AS result_value, stats.${input.resultIdColumn} AS result_id, stats.${input.rankColumn} AS rank FROM city_event_stats stats WHERE stats.event_id = ? AND stats.${input.valueColumn} IS NOT NULL${input.cursor} ORDER BY stats.${input.valueColumn}, stats.country_id, stats.city_name LIMIT ?) SELECT page.*, COALESCE(country.name, page.country_id) AS country_name, COALESCE(country.iso2, '') AS country_iso2, facts.person_id, COALESCE(person.name, facts.person_id) AS person_name, facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name, facts.competition_start_date, facts.round_type_id FROM page INNER JOIN result_facts facts ON facts.result_id = page.result_id LEFT JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = facts.competition_id LEFT JOIN countries country ON country.id = page.country_id ORDER BY page.result_value, page.country_id, page.city_name`; }
 
 export function yearCountsQuery() {
-  return `SELECT counts.year, counts.event_id, counts.ranking_type, counts.cohort_id, cohorts.scope, cohorts.region_id, counts.count
+  return sql`SELECT counts.year, counts.event_id, counts.ranking_type, counts.cohort_id, cohorts.scope, cohorts.region_id, counts.count
       FROM person_year_ranking_counts counts
       JOIN person_year_ranking_cohorts cohorts ON cohorts.cohort_id = counts.cohort_id`;
 }
@@ -30,19 +31,19 @@ export function rankingVersionQuery() {
 }
 
 export function requiredRankingTablesQuery(tables: string[]) {
-  return `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")})`;
+  return sql`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")})`;
 }
 
 export function requiredRankingColumnsQuery(tables: string[], columns: string[]) {
-  return `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")}) AND column_name IN (${columns.map(() => "?").join(", ")})`;
+  return sql`SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")}) AND column_name IN (${columns.map(() => "?").join(", ")})`;
 }
 
 export function requiredRankingIndexesQuery(tables: string[], indexes: string[]) {
-  return `SELECT table_name, index_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")}) AND index_name IN (${indexes.map(() => "?").join(", ")})`;
+  return sql`SELECT table_name, index_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")}) AND index_name IN (${indexes.map(() => "?").join(", ")})`;
 }
 
 export function personRankingsQuery(input: PersonRankingsQueryInput) {
-  return `WITH page AS (
+  return sql`WITH page AS (
       SELECT ranking.person_id, ranking.result_id, ranking.result_value,
         ranking.country_id, ranking.continent_id,
         ranking.${input.rankColumn} AS rank, ranking.${input.positionColumn} AS page_position
@@ -66,7 +67,7 @@ export function personRankingsQuery(input: PersonRankingsQueryInput) {
 }
 
 export function personRankingCountsQuery() {
-  return `SELECT count FROM person_ranking_counts
+  return sql`SELECT count FROM person_ranking_counts
      WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?`;
 }
 
@@ -75,7 +76,7 @@ export function resultRankingsQuery(input: ResultRankingsQueryInput) {
   const source = input.gender.length
     ? `(SELECT ranking.*, RANK() OVER (PARTITION BY ranking.event_id${partition} ORDER BY ranking.result_value) AS filtered_rank, ROW_NUMBER() OVER (PARTITION BY ranking.event_id${partition} ORDER BY ranking.result_value, ranking.result_id) AS filtered_position, COUNT(*) OVER (PARTITION BY ranking.event_id${partition}) AS filtered_total FROM ${input.source} ranking WHERE ${input.sourceConditions.join(" AND ")})`
     : input.source;
-  return `WITH page AS (
+  return sql`WITH page AS (
       SELECT
         ranking.result_id,
         ranking.result_value,
@@ -110,7 +111,7 @@ export function resultRankingCountsQuery() {
 }
 
 export function genderRankingPageQuery(input: GenderRankingQueryInput) {
-  return `WITH filtered AS (
+  return sql`WITH filtered AS (
     SELECT ranking.*,
       RANK() OVER (ORDER BY ranking.best) AS filtered_rank,
       ROW_NUMBER() OVER (ORDER BY ranking.best, ranking.person_name, ranking.person_id) AS filtered_position,
@@ -126,7 +127,7 @@ export function genderRankingPageQuery(input: GenderRankingQueryInput) {
 }
 
 export function yearlyRankingPageQuery(table: string, columns: string, conditions: string[]) {
-  return `SELECT ${columns}
+  return sql`SELECT ${columns}
       FROM ${table} ranking
       LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
       LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id
@@ -137,24 +138,24 @@ export function yearlyRankingPageQuery(table: string, columns: string, condition
 }
 
 export function rankingPageQuery(table: string, columns: string, conditions: string[], subRank: string) {
-  return `SELECT ${columns} FROM ${table} WHERE ${conditions.join(" AND ")} AND ${subRank} >= ? AND ${subRank} < ? ORDER BY ${subRank}`;
+  return sql`SELECT ${columns} FROM ${table} WHERE ${conditions.join(" AND ")} AND ${subRank} >= ? AND ${subRank} < ? ORDER BY ${subRank}`;
 }
 
 export function rankingLocateQuery(input: RankingPageQueryInput) {
-  return `SELECT ${input.selectColumns} ${input.from} WHERE ${input.predicate} AND ${input.personColumn} = ? LIMIT 1`;
+  return sql`SELECT ${input.selectColumns} ${input.from} WHERE ${input.predicate} AND ${input.personColumn} = ? LIMIT 1`;
 }
 
 export function rankingSearchQuery(input: RankingSearchQueryInput) {
   const placeholders = input.personIds.map(() => "?").join(", ");
-  return `SELECT ${input.selectColumns} ${input.from} WHERE ${input.predicate} AND ${input.personColumn} IN (${placeholders}) ORDER BY ${input.qualifiedSubRank} LIMIT ?`;
+  return sql`SELECT ${input.selectColumns} ${input.from} WHERE ${input.predicate} AND ${input.personColumn} IN (${placeholders}) ORDER BY ${input.qualifiedSubRank} LIMIT ?`;
 }
 
 export function rankingCursorQuery(input: RankingCursorQueryInput) {
-  return `SELECT ${input.selectColumns} ${input.from} WHERE ${input.predicate}${input.cursor} ORDER BY ${input.qualifiedSubRank} LIMIT ?`;
+  return sql`SELECT ${input.selectColumns} ${input.from} WHERE ${input.predicate}${input.cursor} ORDER BY ${input.qualifiedSubRank} LIMIT ?`;
 }
 
 export function personMetricQuery(input: PersonMetricQueryInput) {
-  return `SELECT score.${input.rankColumn} AS rank, score.${input.positionColumn} AS sub_rank, score.person_id,
+  return sql`SELECT score.${input.rankColumn} AS rank, score.${input.positionColumn} AS sub_rank, score.person_id,
        COALESCE(person.name, score.person_id) AS person_name,
        COALESCE(display_country.id, '') AS country_id,
        COALESCE(display_country.name, display_country.id, '') AS country_name,
@@ -175,7 +176,7 @@ export function personMetricQuery(input: PersonMetricQueryInput) {
 }
 
 export function personMetricEndQuery(positionColumn: string, genderSql: string) {
-  return `SELECT ${positionColumn} AS position
+  return sql`SELECT ${positionColumn} AS position
      FROM person_sum_of_ranks_scores
      LEFT JOIN persons person ON person.wca_id = person_sum_of_ranks_scores.person_id AND person.sub_id = 1
      WHERE metric_version = 1 AND event_set_version = 1
@@ -187,7 +188,7 @@ export function personMetricEndQuery(positionColumn: string, genderSql: string) 
 }
 
 export function filteredPersonMetricQuery(input: FilteredPersonMetricQueryInput) {
-  return `WITH filtered AS (
+  return sql`WITH filtered AS (
        SELECT score.person_id, ${input.scoreValue} AS best,
          person.name AS person_name, person.country_id AS current_country_id,
          DENSE_RANK() OVER (ORDER BY ${input.scoreOrder}) AS filtered_rank,
