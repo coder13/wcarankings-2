@@ -302,7 +302,7 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(css, /\.siteFooter/);
   assert.match(css, /\.row--searchMatch/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before\s*\{[\s\S]*inset:\s*-1\.5rem;[\s\S]*mask-image:\s*radial-gradient\(ellipse 120% 100% at center, #000 72%, transparent 100%\);[\s\S]*backdrop-filter:\s*blur\(24px\);/);
+  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before,\s*\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\) > \.RankingsRailTransition::before\s*\{[\s\S]*inset:\s*-1\.5rem;[\s\S]*mask-image:\s*radial-gradient\(ellipse 120% 100% at center, #000 72%, transparent 100%\);[\s\S]*backdrop-filter:\s*blur\(24px\);/);
   assert.doesNotMatch(css, /app-header|table-quick-jump|jump-overlay/);
   assert.doesNotMatch(layout, /codex-preview|_sites-preview|Starter Project/);
 
@@ -333,6 +333,7 @@ test("hides the site footer after leaving the top of the rankings", async () => 
   assert.match(progressHook, /const nextAtTop = window\.scrollY === 0/);
   assert.match(component, /<footer className="siteFooter" data-at-top=\{footerAtTop\}/);
   assert.match(rankingsCss, /\.siteFooter\[data-at-top="false"\][\s\S]*opacity:\s*0;[\s\S]*translateY/);
+  assert.match(rankingsCss, /@media \(max-width: 600px\)\s*\{\s*\.siteFooter\s*\{[\s\S]*padding-right:\s*max\(1\.5rem, env\(safe-area-inset-right\)\);[\s\S]*padding-left:\s*max\(1\.5rem, env\(safe-area-inset-left\)\);/);
 });
 
 test("production build keeps rankings styles in the root stylesheet", async () => {

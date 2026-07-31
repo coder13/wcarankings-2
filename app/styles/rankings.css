@@ -329,6 +329,13 @@
   text-align: right;
 }
 
+@media (max-width: 600px) {
+  .siteFooter {
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+  }
+}
+
 .rowAccordion {
   display: grid;
   gap: 0.3rem;

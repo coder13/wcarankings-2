@@ -284,12 +284,14 @@ main {
   transition: none;
 }
 
-.stickyRankingsRail > .RankingsRailTransition {
+.stickyRankingsRail > .RankingsRailTransition,
+.JumpControlsVisibility:has(.Jump[data-direction="down"]) > .RankingsRailTransition {
   position: relative;
   isolation: isolate;
 }
 
-.stickyRankingsRail > .RankingsRailTransition::before {
+.stickyRankingsRail > .RankingsRailTransition::before,
+.JumpControlsVisibility:has(.Jump[data-direction="down"]) > .RankingsRailTransition::before {
   position: absolute;
   z-index: 0;
   inset: -1.5rem;
@@ -303,7 +305,8 @@ main {
   backdrop-filter: blur(24px);
 }
 
-.stickyRankingsRail > .RankingsRailTransition > .Jump {
+.stickyRankingsRail > .RankingsRailTransition > .Jump,
+.JumpControlsVisibility:has(.Jump[data-direction="down"]) > .RankingsRailTransition > .Jump {
   z-index: 1;
 }
 
