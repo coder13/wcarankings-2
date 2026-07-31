@@ -346,7 +346,7 @@ export function ResultsTable({
       <ol
         ref={listRef}
         className="list"
-        style={{ height: `renderedListHeightpx` }}
+        style={{ height: `${renderedListHeight}px` }}
       >
       {renderedRowStates.map(({ virtualRow, entry, identity, shouldAnimate }) => {
         let content;
