@@ -30,7 +30,8 @@ WITH ordered AS (
     MIN(CASE WHEN average > 0 THEN average END) AS fastest_average,
     MAX(CASE WHEN average_choice = 1 AND average > 0 THEN result_id END) AS fastest_average_result_id
   FROM ordered
-  GROUP BY city_name, country_id, event_id, gender
+  GROUP BY city_name, country_id, event_id,
+    CASE WHEN gender IN ('m', 'f') THEN gender ELSE 'o' END
 )
 SELECT aggregates.*,
   CASE WHEN fastest_single IS NOT NULL THEN

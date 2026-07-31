@@ -152,7 +152,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(cities, /fastest_average_result_id/);
   assert.match(cities, /fastest_average_rank/);
   assert.match(cities, /CASE[\s\S]*person\.gender IN.*ELSE 'o'/);
-  assert.match(cities, /GROUP BY city_name, country_id, event_id, gender/);
+  assert.match(cities, /GROUP BY city_name, country_id, event_id,[\s\S]*CASE WHEN gender IN/);
   assert.match(cities, /ADD PRIMARY KEY \(city_name, country_id, event_id, gender\)/);
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);
   assert.match(schema, /entity-ranking-counts/);
