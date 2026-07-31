@@ -233,11 +233,11 @@ test("only exposes APIs backed by active projections", async () => {
     "app/api/rankings/route.ts",
     "app/api/rankings/results/route.ts",
     "app/api/rankings/competitions/route.ts",
+    "app/api/rankings/cities/route.ts",
   ];
   const inactiveRoutes = [
     "app/api/rankings/people/route.ts",
     "app/api/rankings/podiums/route.ts",
-    "app/api/rankings/cities/route.ts",
     "app/api/rankings/metrics/route.ts",
   ];
   for (const route of activeRoutes) {
