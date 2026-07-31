@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -eu
+
+staged_server_files=$(mktemp)
+trap 'rm -f "$staged_server_files"' EXIT
+
+git diff --cached --name-only --diff-filter=ACMR -z \
+  | grep -zE '^(app/api|controllers|db|lib|services)/.*\.(js|jsx|ts|tsx|json)$' \
+  > "$staged_server_files" || true
+
+if [ ! -s "$staged_server_files" ]; then
+  exit 0
+fi
+
+xargs -0 npx --no-install prettier --write -- < "$staged_server_files"
+xargs -0 git add -- < "$staged_server_files"
