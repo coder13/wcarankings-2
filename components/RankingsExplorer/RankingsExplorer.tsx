@@ -1,6 +1,7 @@
 "use client";
 
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { AnimatePresence, LayoutGroup, useSpring } from "motion/react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -688,6 +689,11 @@ export function RankingsExplorer({
     y: number;
   } | null>(null);
   const { topProgress: topRailProgress, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
+  const animatedTopRailProgress = useSpring(topRailProgress, {
+    stiffness: 700,
+    damping: 62,
+    mass: 0.22,
+  });
   const activeListKey = [
     subject,
     competitionRanking,
@@ -2994,13 +3000,15 @@ export function RankingsExplorer({
       <div
         ref={stickyRankingsRailRef}
         className="stickyRankingsRail"
-        style={{ "--rail-scroll-progress": topRailProgress } as CSSProperties}
+        style={{ "--rail-scroll-progress": animatedTopRailProgress } as unknown as CSSProperties}
       >
         {listOwner && <ListOwnerControls listId={listOwner.listId} initialVisibility={listOwner.visibility} initialJoinPolicy={listOwner.joinPolicy} onManageMembers={() => { setMemberSelectionMode(true); setSelectedMemberIds(new Set()); }} />}
         {listActions && !listActions.isOwner && <ListCloneExportControls listId={listActions.listId} />}
         {dynamicList && <DynamicListControls personIds={dynamicList.personIds} />}
         {listMembership && <ListMembershipControls listId={listMembership.listId} joinPolicy={listMembership.joinPolicy} initialState={listMembership.state} />}
-        {listAddOpen && listOwner ? <ListAddPeopleRail listId={listOwner.listId} onCancel={() => setListAddOpen(false)} onAdded={() => { forcePageLoadRef.current = true; setStartRank(1); setStartPosition(0); setPageReloadNonce((nonce) => nonce + 1); }} /> : <RankingsControlsRail
+        <LayoutGroup id="rankings-top-rail">
+          <AnimatePresence initial={false} mode="wait">
+            {listAddOpen && listOwner ? <ListAddPeopleRail key="list-add" listId={listOwner.listId} onCancel={() => setListAddOpen(false)} onAdded={() => { forcePageLoadRef.current = true; setStartRank(1); setStartPosition(0); setPageReloadNonce((nonce) => nonce + 1); }} /> : <RankingsControlsRail key="rankings-controls"
           event={currentEvent}
           eventOptions={competitionRanking === "podiums"
             ? WCA_EVENTS.filter((event) => event.id !== "333mbf")
@@ -3044,6 +3052,8 @@ export function RankingsExplorer({
           onSearchQueryChange={changeFindQuery}
           onSearchCycle={cycleFind}
         />}
+          </AnimatePresence>
+        </LayoutGroup>
       </div>
 
       <main>
