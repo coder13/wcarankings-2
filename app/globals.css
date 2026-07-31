@@ -284,6 +284,27 @@ main {
   transition: none;
 }
 
+.stickyRankingsRail > .RankingsRailTransition {
+  position: relative;
+  isolation: isolate;
+}
+
+.stickyRankingsRail > .RankingsRailTransition::before {
+  position: absolute;
+  z-index: 0;
+  inset: -1.5rem;
+  border-radius: 2.5rem;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  content: "";
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
+.stickyRankingsRail > .RankingsRailTransition > .Jump {
+  z-index: 1;
+}
+
 .stickyRankingsRail .findBar--rail {
   background: var(--surface);
 }
