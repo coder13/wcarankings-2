@@ -73,7 +73,7 @@ import { useProjectionFeatureSwitch } from "@/components/ProjectionFeatureSwitch
 import { centeredRowScrollTop, getSearchScrollDirection, subjectPath } from "./helpers/navigation";
 export { centeredRowScrollTop, getSearchScrollDirection, subjectPath } from "./helpers/navigation";
 import {
-  formatRankingsFreshness,
+  formatFooterDate,
   type InitialRankingData,
   type RankingEntry,
   type RankingPage,
@@ -508,6 +508,8 @@ export function RankingsExplorer({
   initialSubject = "people",
   initialCompetitionRanking = "best-result",
   initialLatitudeHemisphere = "north",
+  commitSha = "unknown",
+  lastResultIngestAt,
   mockSubjectRows = false,
   rankingSource,
   showMyRank = true,
@@ -536,6 +538,8 @@ export function RankingsExplorer({
   initialSubject?: ExplorerSubject;
   initialCompetitionRanking?: CompetitionRanking;
   initialLatitudeHemisphere?: "north" | "south";
+  commitSha?: string;
+  lastResultIngestAt?: string | null;
   mockSubjectRows?: boolean;
   rankingSource?: RankingSource;
   showMyRank?: boolean;
@@ -3152,7 +3156,7 @@ export function RankingsExplorer({
         <span>By Adam Walker and Cailyn Sinclair</span>
         {offlineStale && <span role="status">Offline cached rankings may be stale</span>}
         <span>
-          {formatRankingsFreshness(exportDate)}
+          {formatFooterDate(lastResultIngestAt ?? exportDate)}{" • "}{commitSha === "development" || commitSha === "unknown" ? commitSha : commitSha.slice(0, 7)}
         </span>
       </footer>
     </div>

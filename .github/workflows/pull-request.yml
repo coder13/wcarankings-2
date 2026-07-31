@@ -104,6 +104,8 @@ jobs:
           tags: |
             wcarankings-app:pull-request
             ghcr.io/${{ github.repository_owner }}/wcarankings-app:tree-${{ steps.source-tree.outputs.sha }}
+          build-args: |
+            APP_COMMIT_SHA=${{ github.event.pull_request.head.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.event.pull_request.head.sha }}
