@@ -110,7 +110,10 @@ test("builds and verifies digest-addressed server images", () => {
 test("server deployment retries real endpoints and rolls back with diagnostics", () => {
   assert.match(serverDeploy, /@sha256:\[0-9a-f\]\{64\}/);
   assert.match(serverDeploy, /retry_endpoint "\/api\/health\/ready" 30 2/);
-  assert.match(serverDeploy, /retry_endpoint "\/api\/rankings\?/);
+  assert.match(serverDeploy, /retry_endpoint "\/api\/rankings\?eventId=333&result=single&start=0&limit=1" 10 3 "Core ranking"/);
+  assert.doesNotMatch(serverDeploy, /year=2024/);
+  assert.doesNotMatch(serverDeploy, /eventId=SOR/);
+  assert.match(projectionDeploy, /retry_endpoint "\/api\/rankings\?eventId=333&result=single&year=2024/);
   assert.match(serverDeploy, /HTTP \$\{status:-curl-error\}/);
   assert.match(serverDeploy, /docker compose logs --tail=200 app proxy flyway/);
   assert.match(serverDeploy, /docker tag wcarankings-app:previous wcarankings-app:latest/);
