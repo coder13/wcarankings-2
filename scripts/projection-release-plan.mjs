@@ -38,7 +38,7 @@ export async function projectionFingerprints({
 } = {}) {
   const normalizedExportId = normalizeExportDate(exportId);
   if (!normalizedExportId) throw new Error("exportId must be a valid timestamp");
-  const migrations = (await migrationFiles(join(repositoryRoot, "migrations", "mysql")))
+  const resultMigrations = (await migrationFiles(join(repositoryRoot, "migrations", "mysql", "results")))
     .map((path) => relative(repositoryRoot, path))
     .sort();
   const groups = {};
@@ -46,7 +46,7 @@ export async function projectionFingerprints({
   for (const group of DEPLOYMENT_PROJECTION_GROUPS) {
     const inputs = [...new Set([
       ...deploymentProjectionInputFiles(group.name),
-      ...migrations,
+      ...resultMigrations,
     ])].sort();
     const files = [];
     for (const path of inputs) files.push(await fileFingerprint(repositoryRoot, path));

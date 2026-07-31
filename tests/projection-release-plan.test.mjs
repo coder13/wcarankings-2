@@ -25,6 +25,8 @@ test("produces stable deployment fingerprints with transitive dependencies", asy
   assert.ok(first.groups["yearly-person-rankings"].inputs.includes("sql/ranking-projections/result_facts.sql"));
   assert.ok(first.groups["yearly-person-rankings"].inputs.includes("sql/ranking-projections/person_year_rankings_single.sql"));
   assert.ok(!first.groups["sum-of-ranks"].inputs.includes("sql/ranking-projections/result_facts.sql"));
+  assert.ok(first.groups.core.inputs.includes("migrations/mysql/results/V8__result_attempts_lookup.sql"));
+  assert.ok(!first.groups.core.inputs.some((path) => path.startsWith("migrations/mysql/app/")));
 });
 
 test("selects only production groups whose fingerprints differ", async () => {
