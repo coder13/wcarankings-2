@@ -90,10 +90,10 @@ jobs:
           docker compose run --rm \
             -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
             flyway info
-          docker compose run --rm flyway validate -ignoreMigrationPatterns='*:missing,*:ignored'
+          docker compose run --rm flyway -ignoreMigrationPatterns='*:missing,*:ignored' validate
           docker compose run --rm \
             -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
-            flyway validate -ignoreMigrationPatterns='*:missing,*:ignored'
+            flyway -ignoreMigrationPatterns='*:missing,*:ignored' validate
 
       - name: Build production Docker image
         uses: docker/build-push-action@v6
