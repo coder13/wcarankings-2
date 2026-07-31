@@ -69,7 +69,7 @@ import { fetchRankingPage, RankingsPageCache } from "./rankingsPageCache";
 import { useScrollVelocity } from "./useScrollVelocity";
 import { useRankingsExplorerState } from "./useRankingsExplorerState";
 import { COMPETITION_RANKING_OPTIONS, type CompetitionRanking, type RankingResource } from "./helpers/rankingModes";
-import { useProjectionCapabilities } from "@/components/ProjectionCapabilitiesProvider";
+import { useProjectionFeatureSwitch } from "@/components/ProjectionFeatureSwitchProvider";
 import { centeredRowScrollTop, getSearchScrollDirection, subjectPath } from "./helpers/navigation";
 export { centeredRowScrollTop, getSearchScrollDirection, subjectPath } from "./helpers/navigation";
 import {
@@ -562,7 +562,7 @@ export function RankingsExplorer({
     countries: Array<{ id: string; name: string; iso2?: string }>;
   };
 }) {
-  const capabilities = useProjectionCapabilities();
+  const featureSwitch = useProjectionFeatureSwitch();
   const router = useRouter();
   const isMobileControls = useSyncExternalStore(
     subscribeMobileControls,
@@ -3007,7 +3007,7 @@ export function RankingsExplorer({
           eventOptions={competitionRanking === "podiums"
             ? WCA_EVENTS.filter((event) => event.id !== "333mbf")
             : WCA_EVENTS}
-          additionalEventOptions={showAllEventRankingOptions && capabilities.sumOfRanks ? ALL_EVENT_RANKING_OPTIONS : undefined}
+          additionalEventOptions={showAllEventRankingOptions && featureSwitch.sumOfRanks ? ALL_EVENT_RANKING_OPTIONS : undefined}
           onEventChange={changeRailEvent}
           rankingType={rankingType}
           onRankingTypeChange={changeRankingType}

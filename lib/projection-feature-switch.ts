@@ -1,8 +1,8 @@
 import { query } from "@/db";
-import { UNAVAILABLE_PROJECTION_CAPABILITIES, type ProjectionCapabilities } from "@/lib/projection-capabilities-types";
+import { UNAVAILABLE_PROJECTION_FEATURE_SWITCH, type ProjectionFeatureSwitch } from "@/lib/projection-feature-switch-types";
 
-export { DEFAULT_PROJECTION_CAPABILITIES } from "@/lib/projection-capabilities-types";
-export type { ProjectionCapabilities } from "@/lib/projection-capabilities-types";
+export { DEFAULT_PROJECTION_FEATURE_SWITCH } from "@/lib/projection-feature-switch-types";
+export type { ProjectionFeatureSwitch } from "@/lib/projection-feature-switch-types";
 
 const CORE_TABLES = [
   "ranking_entries_single",
@@ -26,18 +26,18 @@ const YEARLY_TABLES = [
   "person_year_ranking_counts",
 ] as const;
 
-let cached: { value: ProjectionCapabilities; expiresAt: number } | null = null;
-let loading: Promise<ProjectionCapabilities> | null = null;
+let cached: { value: ProjectionFeatureSwitch; expiresAt: number } | null = null;
+let loading: Promise<ProjectionFeatureSwitch> | null = null;
 const CACHE_TTL_MS = 5_000;
 
 function allPresent(tables: Set<string>, required: readonly string[]) {
   return required.every((table) => tables.has(table));
 }
 
-export function capabilitiesFromTables(
+export function featureSwitchFromTables(
   tables: Iterable<string>,
-  generation: Pick<ProjectionCapabilities, "generationId" | "exportId"> = { generationId: null, exportId: null },
-): ProjectionCapabilities {
+  generation: Pick<ProjectionFeatureSwitch, "generationId" | "exportId"> = { generationId: null, exportId: null },
+): ProjectionFeatureSwitch {
   const present = new Set(tables);
   return {
     ...generation,
@@ -47,7 +47,7 @@ export function capabilitiesFromTables(
   };
 }
 
-async function loadProjectionCapabilities() {
+async function loadProjectionFeatureSwitch() {
   try {
     const [tables, state] = await Promise.all([
       query<{ table_name: string }>(
@@ -63,22 +63,22 @@ async function loadProjectionCapabilities() {
         throw error;
       }),
     ]);
-    return capabilitiesFromTables(
+    return featureSwitchFromTables(
       tables.rows.map((row) => row.table_name),
       { generationId: state.rows[0]?.generation_id ?? null, exportId: state.rows[0]?.export_id ?? null },
     );
   } catch {
     // Do not advertise projection-backed routes when the capability snapshot
     // cannot be read. Lists and other non-projection pages can still render.
-    return UNAVAILABLE_PROJECTION_CAPABILITIES;
+    return UNAVAILABLE_PROJECTION_FEATURE_SWITCH;
   }
 }
 
-export async function getProjectionCapabilities() {
+export async function getProjectionFeatureSwitch() {
   const now = Date.now();
   if (cached && cached.expiresAt > now) return cached.value;
   if (!loading) {
-    loading = loadProjectionCapabilities().then((value) => {
+    loading = loadProjectionFeatureSwitch().then((value) => {
       cached = { value, expiresAt: Date.now() + CACHE_TTL_MS };
       return value;
     }).finally(() => { loading = null; });
@@ -86,7 +86,7 @@ export async function getProjectionCapabilities() {
   return loading;
 }
 
-export function resetProjectionCapabilitiesForTests() {
+export function resetProjectionFeatureSwitchForTests() {
   cached = null;
   loading = null;
 }

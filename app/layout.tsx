@@ -3,8 +3,8 @@ import { headers } from "next/headers";
 import { AuthSessionRefresh } from "@/components/AuthSessionRefresh";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics/GoogleAnalytics";
 import { PwaRegistration } from "@/components/PwaRegistration/PwaRegistration";
-import { ProjectionCapabilitiesProvider } from "@/components/ProjectionCapabilitiesProvider";
-import { getProjectionCapabilities } from "@/lib/projection-capabilities";
+import { ProjectionFeatureSwitchProvider } from "@/components/ProjectionFeatureSwitchProvider";
+import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 import "./globals.css";
 
 const themeInitScript = `
@@ -58,7 +58,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const capabilities = await getProjectionCapabilities();
+  const featureSwitch = await getProjectionFeatureSwitch();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -70,12 +70,12 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <ProjectionCapabilitiesProvider capabilities={capabilities}>
+        <ProjectionFeatureSwitchProvider featureSwitch={featureSwitch}>
           <AuthSessionRefresh />
           <GoogleAnalytics />
           <PwaRegistration />
           {children}
-        </ProjectionCapabilitiesProvider>
+        </ProjectionFeatureSwitchProvider>
       </body>
     </html>
   );

@@ -12,7 +12,7 @@ import { loadRankings } from "@/lib/rankings";
 import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
 import { loadResultRankings } from "@/lib/semantic-result-rankings";
 import { getAuthUser } from "@/lib/auth";
-import { getProjectionCapabilities } from "@/lib/projection-capabilities";
+import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 
@@ -311,8 +311,8 @@ export async function RankingsPage({
   const { scope, regionId } = parseRegionQuery(getSearchParam(resolvedSearchParams, "region"));
   const gender = (initialSubject === "people" || initialSubject === "results") ? getGenderFilters(resolvedSearchParams) : [];
   const initialYear = initialYearOverride ?? (/^\d{4}$/.test(getSearchParam(resolvedSearchParams, "year")) ? Number(getSearchParam(resolvedSearchParams, "year")) : null);
-  const capabilities = await getProjectionCapabilities();
-  if (!capabilities.core || (initialYear !== null && !capabilities.yearlyPersonRankings) || ((initialAllEventRankingId || eventId === "sor-kinch") && !capabilities.sumOfRanks)) {
+  const featureSwitch = await getProjectionFeatureSwitch();
+  if (!featureSwitch.core || (initialYear !== null && !featureSwitch.yearlyPersonRankings) || ((initialAllEventRankingId || eventId === "sor-kinch") && !featureSwitch.sumOfRanks)) {
     notFound();
   }
   const requestedWcaId = getSearchParam(resolvedSearchParams, "wcaId")

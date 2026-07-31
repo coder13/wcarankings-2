@@ -1,4 +1,4 @@
-export type ProjectionCapabilities = {
+export type ProjectionFeatureSwitch = {
   generationId: string | null;
   exportId: string | null;
   core: boolean;
@@ -6,7 +6,7 @@ export type ProjectionCapabilities = {
   yearlyPersonRankings: boolean;
 };
 
-export const DEFAULT_PROJECTION_CAPABILITIES: ProjectionCapabilities = {
+export const DEFAULT_PROJECTION_FEATURE_SWITCH: ProjectionFeatureSwitch = {
   generationId: null,
   exportId: null,
   core: true,
@@ -14,7 +14,7 @@ export const DEFAULT_PROJECTION_CAPABILITIES: ProjectionCapabilities = {
   yearlyPersonRankings: true,
 };
 
-export const UNAVAILABLE_PROJECTION_CAPABILITIES: ProjectionCapabilities = {
+export const UNAVAILABLE_PROJECTION_FEATURE_SWITCH: ProjectionFeatureSwitch = {
   generationId: null,
   exportId: null,
   core: false,

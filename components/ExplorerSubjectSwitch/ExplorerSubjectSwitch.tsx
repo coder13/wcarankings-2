@@ -1,7 +1,7 @@
 "use client";
 
 import { TextDropdown } from "../Dropdown/TextDropdown";
-import { useProjectionCapabilities } from "@/components/ProjectionCapabilitiesProvider";
+import { useProjectionFeatureSwitch } from "@/components/ProjectionFeatureSwitchProvider";
 
 export const EXPLORER_SUBJECTS = [
   { id: "people", label: "Persons" },
@@ -25,8 +25,8 @@ export function ExplorerSubjectSwitch({
   onChange: (subject: NavigationSubject) => void;
   variant?: "segmented" | "select" | "text";
 }) {
-  const capabilities = useProjectionCapabilities();
-  const subjects = NAVIGATION_SUBJECTS.filter((option) => capabilities.core || option.id === "lists");
+  const featureSwitch = useProjectionFeatureSwitch();
+  const subjects = NAVIGATION_SUBJECTS.filter((option) => featureSwitch.core || option.id === "lists");
   if (variant === "text") {
     return (
       <TextDropdown
