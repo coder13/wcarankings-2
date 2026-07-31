@@ -1,5 +1,5 @@
 export function upsertUserQuery() {
-  return sql`INSERT INTO app_users
+  return sqlFragment`INSERT INTO app_users
         (wca_id, name, country_iso2, avatar_url, last_login_at)
        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(6))
        ON DUPLICATE KEY UPDATE
@@ -11,18 +11,18 @@ export function upsertUserQuery() {
 }
 
 export function insertAuthSessionQuery() {
-  return sql`INSERT INTO auth_sessions (token_hash, user_id, expires_at)
+  return sqlFragment`INSERT INTO auth_sessions (token_hash, user_id, expires_at)
        VALUES (?, ?, ?)`;
 }
 
 export function authUserByIdQuery() {
-  return sql`SELECT id, wca_id, name, country_iso2, avatar_url, allow_list_inclusion
+  return sqlFragment`SELECT id, wca_id, name, country_iso2, avatar_url, allow_list_inclusion
        FROM app_users
        WHERE id = ?`;
 }
 
 export function authUserBySessionQuery() {
-  return sql`SELECT
+  return sqlFragment`SELECT
       u.id,
       u.wca_id,
       u.name,
@@ -39,4 +39,4 @@ export function authUserBySessionQuery() {
 export function deleteAuthSessionQuery() {
   return "DELETE FROM auth_sessions WHERE token_hash = ?";
 }
-import { sql } from "@/lib/helpers/database/sql";
+import { sqlFragment } from "@/lib/helpers/database/sql";

@@ -1,10 +1,11 @@
 import type { PersonIdSearchInput, PersonSearchDatabaseInput } from "@/services/people/types";
+import { sqlFragment } from "@/lib/helpers/database/sql";
 
 export function personSearchRowsQuery(input: PersonSearchDatabaseInput) {
   const nameCondition = input.regexSearch
     ? "person.name REGEXP ?"
     : "person.name LIKE ? ESCAPE '\\\\'";
-  return sql`SELECT person.wca_id, person.name, person.country_id, user.avatar_url,
+  return sqlFragment`SELECT person.wca_id, person.name, person.country_id, user.avatar_url,
        COUNT(*) OVER() AS total_count,
        COALESCE(competition_counts.competition_count, 0) AS competition_count,
        COALESCE(country.name, person.country_id) AS country_name,
@@ -21,10 +22,9 @@ export function personSearchRowsQuery(input: PersonSearchDatabaseInput) {
 
 export function personIdsQuery(input: PersonIdSearchInput) {
   const nameCondition = input.regexSearch ? "name REGEXP ?" : "name LIKE ? ESCAPE '\\\\'";
-  return sql`SELECT wca_id FROM persons
+  return sqlFragment`SELECT wca_id FROM persons
      WHERE sub_id = 1
        AND (wca_id = ? OR ${nameCondition})
      ORDER BY (wca_id = ?) DESC, name, wca_id
      LIMIT ?`;
 }
-import { sql } from "@/lib/helpers/database/sql";
