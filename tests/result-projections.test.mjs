@@ -64,7 +64,7 @@ test("normal rankings retain separate historical country and continent bests", a
     readFile(new URL("sql/ranking-projections/ranking_entries_average_source.sql", root), "utf8"),
     readFile(new URL("lib/list-rankings.ts", root), "utf8"),
     readFile(new URL("tests/fixtures/regional-ranking-history.sql", root), "utf8"),
-    readFile(new URL("migrations/mysql/V8__result_attempts_lookup.sql", root), "utf8"),
+    readFile(new URL("migrations/mysql/results/V8__result_attempts_lookup.sql", root), "utf8"),
   ]);
   const sources = `${single}\n${average}`;
 

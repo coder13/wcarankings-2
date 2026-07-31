@@ -301,6 +301,10 @@ jobs:
               docker compose run --rm \
                 -e FLYWAY_URL="jdbc:mariadb://db:3306/${candidate}" \
                 flyway migrate
+              docker compose run --rm \
+                -e FLYWAY_URL="jdbc:mariadb://db:3306/${candidate}" \
+                -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+                flyway migrate
               printf "initialized\n" > "$phase_file"
               phase=initialized
             }

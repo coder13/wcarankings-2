@@ -179,6 +179,21 @@ test("server deployment retries real endpoints and rolls back with diagnostics",
   assert.match(serverDeploy, /after_server_switch_before_public_verification/);
 });
 
+test("runs app and result migrations in separate deployment lanes", async () => {
+  const [dockerfile, compose] = await Promise.all([
+    readFile(new URL("../Dockerfile.flyway", import.meta.url), "utf8"),
+    readFile(new URL("../docker-compose.yml", import.meta.url), "utf8"),
+  ]);
+  assert.match(dockerfile, /COPY migrations\/mysql\/app \/flyway\/migrations\/app/);
+  assert.match(dockerfile, /COPY migrations\/mysql\/results \/flyway\/migrations\/results/);
+  assert.match(compose, /FLYWAY_LOCATIONS: filesystem:\/flyway\/migrations\/app/);
+  assert.match(compose, /FLYWAY_IGNORE_MIGRATION_PATTERNS: "\*:missing"/);
+  assert.match(serverDeploy, /docker compose run --rm flyway migrate/);
+  assert.match(projectionBuild, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
+  assert.match(projectionDeploy, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
+  assert.match(pullRequest, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
+});
+
 test("projection deployment uses exact artifacts and atomically activates a coherent generation", () => {
   assert.match(projectionDeploy, /projection-release-artifact\.mjs verify/);
   assert.match(projectionDeploy, /actions\/artifacts\/\$\{ARTIFACT_ID\}/);
