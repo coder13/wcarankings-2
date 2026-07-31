@@ -3,10 +3,12 @@ import type { CSSProperties, ReactElement } from "react";
 export function JumpControlsVisibility({
   visible,
   progress,
+  bottomOffset = 0,
   children,
 }: {
   visible?: boolean;
   progress?: number;
+  bottomOffset?: number;
   children: ReactElement;
 }) {
   const resolvedProgress = Math.max(
@@ -24,7 +26,10 @@ export function JumpControlsVisibility({
       aria-hidden={!isInteractive}
       inert={!isInteractive}
       style={
-        { "--jump-controls-progress": resolvedProgress } as CSSProperties
+        {
+          "--jump-controls-progress": resolvedProgress,
+          "--jump-controls-bottom-offset": `${bottomOffset}px`,
+        } as CSSProperties
       }
     >
       {children}

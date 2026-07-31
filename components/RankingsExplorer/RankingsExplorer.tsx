@@ -682,6 +682,7 @@ export function RankingsExplorer({
   const [memberRemovalBusy, setMemberRemovalBusy] = useState(false);
   const [memberRemovalError, setMemberRemovalError] = useState("");
   const [memberRemovalPersonIds, setMemberRemovalPersonIds] = useState<string[]>([]);
+  const [footerHeight, setFooterHeight] = useState(0);
   const [memberContextMenu, setMemberContextMenu] = useState<{
     personId: string;
     x: number;
@@ -699,6 +700,7 @@ export function RankingsExplorer({
     regionSelection.regionId,
   ].join(":");
   const listRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
   const stickyRankingsRailRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
   useMotionValueEvent(scrollY, "change", (scrollPosition) => {
@@ -706,6 +708,16 @@ export function RankingsExplorer({
     stickyRankingsRailRef.current?.style.setProperty("--rail-scroll-progress", String(progress));
   });
   const railFindInputRef = useRef<HTMLInputElement>(null);
+
+  useLayoutEffect(() => {
+    const footer = footerRef.current;
+    if (!footer) return;
+    const measureFooter = () => setFooterHeight(footer.getBoundingClientRect().height);
+    measureFooter();
+    const observer = new ResizeObserver(measureFooter);
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, []);
   const setRailFindInputRef = useCallback((input: HTMLInputElement | null) => {
     railFindInputRef.current = input;
   }, []);
@@ -3101,6 +3113,7 @@ export function RankingsExplorer({
 
         {!memberSelectionMode && (!rankingSource || total > PAGE_SIZE) && <JumpControlsVisibility
           progress={pagerNavigationBusy ? 1 : bottomRailProgress}
+          bottomOffset={footerAtTop ? footerHeight : 0}
         >
           <RankingsPagerRail
             upArmed={false}
@@ -3144,7 +3157,7 @@ export function RankingsExplorer({
       {(vimMode || vimSearchActive) && vimHelpOpen && (
         <VimHelp onClose={() => setVimHelpOpen(false)} />
       )}
-      <footer className="siteFooter" data-at-top={footerAtTop} aria-hidden={!footerAtTop}>
+      <footer ref={footerRef} className="siteFooter" data-at-top={footerAtTop} aria-hidden={!footerAtTop}>
         <span>By Adam Walker and Cailyn Sinclair</span>
         {offlineStale && <span role="status">Offline cached rankings may be stale</span>}
         <span>

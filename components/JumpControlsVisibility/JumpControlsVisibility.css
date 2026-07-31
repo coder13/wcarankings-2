@@ -23,7 +23,10 @@
 }
 
 .JumpControlsVisibility:has(.Jump[data-direction="down"]) {
-  bottom: max(1em, env(safe-area-inset-bottom));
+  bottom: max(
+    calc(1em + var(--jump-controls-bottom-offset, 0px)),
+    env(safe-area-inset-bottom)
+  );
   opacity: var(--jump-controls-progress);
   transform: translate3d(
     0,
