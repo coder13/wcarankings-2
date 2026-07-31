@@ -6,6 +6,7 @@ export const EXPLORER_SUBJECTS = [
   { id: "people", label: "Persons" },
   { id: "results", label: "Results" },
   { id: "competitions", label: "Competitions" },
+  { id: "cities", label: "Cities" },
 ] as const;
 export const NAVIGATION_SUBJECTS = [
   ...EXPLORER_SUBJECTS,

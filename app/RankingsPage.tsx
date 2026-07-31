@@ -9,7 +9,7 @@ import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import { isEventId, isRankingEventId, isRankingType, isValidRegexPattern, normalizeGenderFilters, parseRegionQuery, type GenderFilter, WCA_EVENTS } from "@/lib/wca";
 import { getRegions } from "@/lib/regions";
 import { loadRankings } from "@/lib/rankings";
-import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
+import { loadCityRankings, loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
 import { loadResultRankings } from "@/lib/semantic-result-rankings";
 import { getAuthUser } from "@/lib/auth";
 
@@ -269,6 +269,43 @@ async function getInitialResultRankings(
   };
 }
 
+async function getInitialCityRankings(
+  eventId: (typeof WCA_EVENTS)[number]["id"],
+  rankingType: "single" | "average",
+  cityRanking: "competitions" | "competitors" | "solves" | "fastest-single" | "fastest-average",
+  regionId: string,
+  gender: readonly GenderFilter[],
+) {
+  const params = new URLSearchParams({
+    eventId,
+    result: rankingType,
+    start: "0",
+    limit: String(PAGE_SIZE),
+    paged: "1",
+    ...(regionId ? { region: regionId } : {}),
+    ...(gender.length ? { gender: gender.join(",") } : {}),
+    ...(cityRanking === "competitions" || cityRanking === "competitors" || cityRanking === "solves"
+      ? { stat: cityRanking }
+      : {}),
+  });
+  const loaded = await loadCityRankings(params);
+  const data = loaded.data as RankingsResponse;
+  return {
+    entries: data.entries,
+    hasMore: data.hasMore ?? false,
+    nextPageStart: data.nextPageStart ?? null,
+    previousPageStart: data.previousPageStart ?? null,
+    startPosition: data.startPosition ?? 0,
+    lastRank: data.lastRank ?? null,
+    total: data.total ?? 0,
+    exportDate: data.exportDate ?? null,
+    startRank: 1,
+    searchMatches: [],
+    initialMatchPersonId: "",
+    regexSearch: false,
+  };
+}
+
 export type SearchParams = Record<string, string | string[] | undefined>;
 
 export async function RankingsPage({
@@ -277,12 +314,14 @@ export async function RankingsPage({
   initialYearOverride,
   initialSubject = "people",
   initialCompetitionRanking = "best-result",
+  initialCityRanking = "fastest-single",
 }: {
   searchParams: Promise<SearchParams>;
   pathname?: string;
   initialYearOverride?: number | null;
-  initialSubject?: "people" | "results" | "competitions";
+  initialSubject?: "people" | "results" | "competitions" | "cities";
   initialCompetitionRanking?: "best-result" | "podiums" | "competitor-count" | "latitude";
+  initialCityRanking?: "competitions" | "competitors" | "solves" | "fastest-single" | "fastest-average";
 }) {
   const resolvedSearchParams = await searchParams;
   const latitudeHemisphere =
@@ -308,7 +347,7 @@ export async function RankingsPage({
       ? "single"
       : isRankingType(rawRankingType) ? rawRankingType : "single";
   const { scope, regionId } = parseRegionQuery(getSearchParam(resolvedSearchParams, "region"));
-  const gender = (initialSubject === "people" || initialSubject === "results") ? getGenderFilters(resolvedSearchParams) : [];
+  const gender = (initialSubject === "people" || initialSubject === "results" || initialSubject === "cities") ? getGenderFilters(resolvedSearchParams) : [];
   const initialYear = initialYearOverride ?? (/^\d{4}$/.test(getSearchParam(resolvedSearchParams, "year")) ? Number(getSearchParam(resolvedSearchParams, "year")) : null);
   const requestedWcaId = getSearchParam(resolvedSearchParams, "wcaId")
     .trim()
@@ -341,6 +380,9 @@ export async function RankingsPage({
     canonicalParams.delete("eventId");
     canonicalParams.delete("result");
   }
+  if (initialSubject === "cities" && ["competitions", "competitors", "solves"].includes(initialCityRanking)) {
+    canonicalParams.delete("result");
+  }
   const currentParams = new URLSearchParams();
   Object.entries(resolvedSearchParams).forEach(([key, value]) => {
     if (Array.isArray(value)) value.forEach((item) => currentParams.append(key, item));
@@ -368,6 +410,14 @@ export async function RankingsPage({
           latitudeHemisphere,
           regionId,
         )
+      : initialSubject === "cities"
+        ? getInitialCityRankings(
+            eventId as (typeof WCA_EVENTS)[number]["id"],
+            rankingType,
+            initialCityRanking,
+            regionId,
+            gender,
+          )
       : Promise.resolve(undefined);
   const [initialRankings, continents, countries] = await Promise.all([
     initialRankingsRequest,
@@ -378,7 +428,7 @@ export async function RankingsPage({
   const initialRegexSearch = getSearchParam(resolvedSearchParams, "mode") === "vim" && isValidRegexPattern(initialSearch);
   return (
     <RankingsExplorer
-      key={`${initialSubject}:${initialCompetitionRanking}:${initialYear ?? "all"}`}
+      key={`${initialSubject}:${initialCompetitionRanking}:${initialCityRanking}:${initialYear ?? "all"}`}
       initialData={initialRankings}
       initialSearch={initialSearch}
       initialRegexSearch={initialRegexSearch}
@@ -390,6 +440,7 @@ export async function RankingsPage({
       initialRegions={{ continents, countries }}
       initialSubject={initialSubject}
       initialCompetitionRanking={initialCompetitionRanking}
+      initialCityRanking={initialCityRanking}
       initialLatitudeHemisphere={latitudeHemisphere}
       showSubjectSwitch
       showAllEventRankingOptions

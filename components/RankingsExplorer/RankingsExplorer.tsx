@@ -68,7 +68,7 @@ import { useRailScrollProgress } from "./useRailScrollProgress";
 import { fetchRankingPage, RankingsPageCache } from "./rankingsPageCache";
 import { useScrollVelocity } from "./useScrollVelocity";
 import { useRankingsExplorerState } from "./useRankingsExplorerState";
-import { COMPETITION_RANKING_OPTIONS, type CompetitionRanking, type RankingResource } from "./helpers/rankingModes";
+import { CITY_RANKING_OPTIONS, COMPETITION_RANKING_OPTIONS, type CityRanking, type CompetitionRanking, type RankingResource } from "./helpers/rankingModes";
 import { centeredRowScrollTop, getSearchScrollDirection, subjectPath } from "./helpers/navigation";
 export { centeredRowScrollTop, getSearchScrollDirection, subjectPath } from "./helpers/navigation";
 import {
@@ -126,12 +126,18 @@ export function competitionRankingPath(ranking: CompetitionRanking) {
   return `/competitions/${ranking}`;
 }
 
+export function cityRankingPath(ranking: CityRanking) {
+  return `/cities/${ranking}`;
+}
+
 function rankingResource(
   subject: ExplorerSubject,
   competitionRanking: CompetitionRanking,
+  cityRanking: CityRanking,
   latitudeHemisphere: "north" | "south" = "north",
 ): RankingResource {
   if (subject === "results") return "results";
+  if (subject === "cities") return `city-${cityRanking}` as RankingResource;
   if (subject !== "competitions") return "people";
   if (competitionRanking === "latitude") return `latitude-${latitudeHemisphere}`;
   if (competitionRanking === "competitor-count") return "competitor-count";
@@ -228,6 +234,7 @@ function getPage(
   resource: RankingResource = "people",
   source?: RankingSource,
   gender: readonly GenderFilter[] = [],
+  cityRanking: CityRanking = "fastest-single",
 ) {
   const pageStart = pageStartForSubRank(start);
   const params = new URLSearchParams({
@@ -240,13 +247,17 @@ function getPage(
   const year = activeYear();
   if (resource === "people" && year) params.set("year", year);
   addRankingSourceParams(params, source);
-  if ((resource === "people" || resource === "results") && gender.length) params.set("gender", gender.join(","));
+  if ((resource === "people" || resource === "results" || resource.startsWith("city-")) && gender.length) params.set("gender", gender.join(","));
   if (selection.scope !== "world") params.set("region", selection.regionId);
   if (resource === "podiums") params.set("ranking", "podium");
   if (resource === "competitor-count") params.set("ranking", "competitor-count");
   if (resource.startsWith("latitude-")) {
     params.set("ranking", "latitude");
     params.set("hemisphere", resource.slice("latitude-".length));
+  }
+  if (resource.startsWith("city-")) {
+    const cityStat = resource.slice("city-".length);
+    if (cityStat === "competitions" || cityStat === "competitors" || cityStat === "solves") params.set("stat", cityStat);
   }
   const cacheKey = params.toString();
   const cachePool = `${rankingSourceCacheKey(source, resource)}:${eventId}`;
@@ -255,6 +266,8 @@ function getPage(
 
   const endpoint = resource === "results"
     ? "/api/rankings/results"
+    : resource.startsWith("city-")
+      ? "/api/rankings/cities"
     : resource !== "people"
       ? "/api/rankings/competitions"
       : "/api/rankings";
@@ -506,6 +519,7 @@ export function RankingsExplorer({
   showSubjectSwitch = false,
   initialSubject = "people",
   initialCompetitionRanking = "best-result",
+  initialCityRanking = "fastest-single",
   initialLatitudeHemisphere = "north",
   mockSubjectRows = false,
   rankingSource,
@@ -534,6 +548,7 @@ export function RankingsExplorer({
   showSubjectSwitch?: boolean;
   initialSubject?: ExplorerSubject;
   initialCompetitionRanking?: CompetitionRanking;
+  initialCityRanking?: CityRanking;
   initialLatitudeHemisphere?: "north" | "south";
   mockSubjectRows?: boolean;
   rankingSource?: RankingSource;
@@ -571,6 +586,7 @@ export function RankingsExplorer({
   const {
     eventId, setEventId, rankingType, setRankingType, regionSelection, setRegionSelection,
     subject, setSubject, competitionRanking, setCompetitionRanking,
+    cityRanking, setCityRanking,
     latitudeHemisphere, setLatitudeHemisphere, listAddOpen, setListAddOpen,
     memberSelectionMode, setMemberSelectionMode, selectedMemberIds, setSelectedMemberIds,
   } = useRankingsExplorerState({
@@ -579,6 +595,7 @@ export function RankingsExplorer({
     regionSelection: initialRegionSelection,
     subject: initialSubject,
     competitionRanking: initialCompetitionRanking,
+    cityRanking: initialCityRanking,
     latitudeHemisphere: initialLatitudeHemisphere,
   });
   const [gender, setGender] = useState<readonly GenderFilter[]>(initialGender);
@@ -1067,7 +1084,7 @@ export function RankingsExplorer({
     const focusMatch = personFocus
       ? { personId: personFocus.personId, subRank: pendingRankRef.current }
       : null;
-    const resource = rankingResource(subject, competitionRanking, latitudeHemisphere);
+    const resource = rankingResource(subject, competitionRanking, cityRanking, latitudeHemisphere);
     const pageRequest = focusLast
       ? getEndWindow(eventId, rankingType, regionSelection, startRank, resource, rankingSource, gender)
       : focusMatch
@@ -1741,7 +1758,7 @@ export function RankingsExplorer({
           regexSearch,
           controller.signal,
           rankingSource,
-          rankingResource(subject, competitionRanking, latitudeHemisphere),
+          rankingResource(subject, competitionRanking, cityRanking, latitudeHemisphere),
           gender,
         )
           .then((data) => {
@@ -1902,7 +1919,7 @@ export function RankingsExplorer({
           rankingType,
           followingPageStart,
           regionSelection,
-          rankingResource(subject, competitionRanking, latitudeHemisphere),
+          rankingResource(subject, competitionRanking, cityRanking, latitudeHemisphere),
           rankingSource,
           gender,
         ).catch(() => undefined);
@@ -1912,7 +1929,7 @@ export function RankingsExplorer({
         rankingType,
         nextPageStart,
         regionSelection,
-        rankingResource(subject, competitionRanking, latitudeHemisphere),
+        rankingResource(subject, competitionRanking, cityRanking, latitudeHemisphere),
         rankingSource,
         gender,
       );
@@ -1967,7 +1984,7 @@ export function RankingsExplorer({
         rankingType,
         previousPageStart,
         regionSelection,
-        rankingResource(subject, competitionRanking, latitudeHemisphere),
+        rankingResource(subject, competitionRanking, cityRanking, latitudeHemisphere),
         rankingSource,
         gender,
       );
@@ -2462,7 +2479,7 @@ export function RankingsExplorer({
       rankingType,
       1,
       regionSelection,
-      rankingResource(subject, competitionRanking, latitudeHemisphere),
+      rankingResource(subject, competitionRanking, cityRanking, latitudeHemisphere),
       rankingSource,
       gender,
     )
@@ -2898,6 +2915,11 @@ export function RankingsExplorer({
     navigateToPage(subjectPath(nextSubject));
   };
 
+  const changeCityRanking = (nextRanking: CityRanking) => {
+    if (nextRanking === cityRanking) return;
+    navigateToPage(cityRankingPath(nextRanking));
+  };
+
   const activateFind = () => {
     if (vimMode || vimSearchActive || regexSearch) resetFind();
     setVimSearchActive(false);
@@ -2987,6 +3009,15 @@ export function RankingsExplorer({
                 className="competitionRankingDropdown"
               />
             )}
+            {subject === "cities" && (
+              <TextDropdown
+                options={CITY_RANKING_OPTIONS}
+                value={cityRanking}
+                onChange={(nextRanking) => changeCityRanking(nextRanking as CityRanking)}
+                ariaLabel="City ranking"
+                className="competitionRankingDropdown"
+              />
+            )}
           </>
         )}
       </AppHeader>
@@ -3016,10 +3047,10 @@ export function RankingsExplorer({
           onRegionChange={changeRegion}
           onEventPickerTrigger={(trigger) => { railEventPickerTriggerRef.current = trigger; }}
           compactResultType={topRailProgress >= 1 || Boolean(rankingSource) && isMobileControls}
-          showResultType={!(eventId === "SOR" || eventId === "sor-kinch" || (subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count")))}
+          showResultType={!(eventId === "SOR" || eventId === "sor-kinch" || (subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count")) || (subject === "cities" && ["competitions", "competitors", "solves"].includes(cityRanking)))}
           showEventPicker={!(subject === "competitions" && (competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
           showRegion
-          showGender={subject === "people" || subject === "results"}
+          showGender={subject === "people" || subject === "results" || subject === "cities"}
           showSearch
           hemisphere={subject === "competitions" && competitionRanking === "latitude" ? latitudeHemisphere : undefined}
           onHemisphereChange={(nextHemisphere) => {
@@ -3072,7 +3103,7 @@ export function RankingsExplorer({
                 listOffset={listOffset}
                 eventId={eventId}
                 rankingType={entriesRankingType}
-                hideIdentityIds={subject === "competitions"}
+                hideIdentityIds={subject === "competitions" || subject === "cities"}
                 loading={loading}
                 showLoading={showLoading}
                 preserveListDuringLoad={preserveListDuringLoad}
