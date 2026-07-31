@@ -305,7 +305,7 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before,[\s\S]*width:\s*100vw;[\s\S]*backdrop-filter:\s*blur\(14px\)/);
   assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before\s*\{[\s\S]*top:\s*-1em;[\s\S]*bottom:\s*-1em;/);
   assert.match(globalCss, /\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\) > \.RankingsRailTransition::before\s*\{[\s\S]*top:\s*-1em;[\s\S]*--jump-controls-bottom-offset/);
-  assert.doesNotMatch(globalCss, /\.RankingsRailTransition::before\s*\{[\s\S]*border-radius/);
+  assert.doesNotMatch(globalCss, /\.RankingsRailTransition::before,[^{]*\{[^}]*border-radius/);
   assert.doesNotMatch(css, /app-header|table-quick-jump|jump-overlay/);
   assert.doesNotMatch(layout, /codex-preview|_sites-preview|Starter Project/);
 
@@ -324,6 +324,17 @@ test("binds rail scroll progress directly to Motion scroll state", async () => {
   assert.match(component, /useScroll\(\)/);
   assert.match(component, /useMotionValueEvent\(scrollY, "change"/);
   assert.match(component, /style\.setProperty\("--rail-scroll-progress", String\(progress\)\)/);
+});
+
+test("uses a symmetric 160ms pager layout transition", async () => {
+  const component = await readFile(
+    new URL("../components/RankingsRail/RankingsRail.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(component, /const pagerLayoutTransition = \{ duration: 0\.16,/);
+  assert.match(component, /layout: pagerLayoutTransition,[\s\S]*opacity: pagerLayoutTransition,[\s\S]*scale: pagerLayoutTransition/);
+  assert.match(component, /transition=\{\{ layout: pagerLayoutTransition \}\}/);
 });
 
 test("hides the site footer after leaving the top of the rankings", async () => {
