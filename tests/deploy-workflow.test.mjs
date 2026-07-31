@@ -15,26 +15,32 @@ const [
   planner,
   serverBuild,
   projectionBuild,
+  pullRequest,
   serverDeploy,
   projectionDeploy,
   approvedDataTools,
   activation,
   syncService,
+  prProjectionRelease,
 ] = await Promise.all([
   workflow("deploy.yml"),
   workflow("refresh-rankings.yml"),
   workflow("plan-projections.yml"),
   workflow("build-server.yml"),
   workflow("build-projections.yml"),
+  workflow("pull-request.yml"),
   workflow("deploy-server.yml"),
   workflow("deploy-projections.yml"),
   workflow("resolve-approved-data-tools.yml"),
   readFile(new URL("../scripts/activate-ranking-generation.mjs", import.meta.url), "utf8"),
   readFile(new URL("../ops/wcarankings-sync.service", import.meta.url), "utf8"),
+  workflow("pr-projection-release.yml"),
 ]);
 
 test("composes the main release from independently callable workflow blocks", () => {
   assert.match(release, /group: production-mutation/);
+  assert.match(release, /group: production-mutation[\s\S]*cancel-in-progress: false/);
+  assert.doesNotMatch(release, /queue: max/);
   assert.match(release, /uses: \.\/\.github\/workflows\/plan-projections\.yml/);
   assert.match(release, /uses: \.\/\.github\/workflows\/build-server\.yml/);
   assert.match(release, /uses: \.\/\.github\/workflows\/build-projections\.yml/);
@@ -58,6 +64,8 @@ test("daily refresh reuses only the projection lego blocks", () => {
   assert.match(refresh, /schedule:/);
   assert.match(refresh, /cron: "17 5 \* \* \*"/);
   assert.match(refresh, /group: production-mutation/);
+  assert.match(refresh, /group: production-mutation[\s\S]*cancel-in-progress: false/);
+  assert.doesNotMatch(refresh, /queue: max/);
   assert.match(refresh, /plan-projections\.yml/);
   assert.match(refresh, /build-projections\.yml/);
   assert.match(refresh, /deploy-projections\.yml/);
@@ -85,11 +93,46 @@ test("builds one checksummed artifact containing only selected groups", () => {
   assert.match(projectionBuild, /projection-release-group-core-/);
   assert.match(projectionBuild, /Determine projection cache misses/);
   assert.match(projectionBuild, /actions\/upload-artifact@v4/);
-  assert.match(projectionBuild, /retention-days: 7/);
+  assert.match(projectionBuild, /artifact_retention_days:/);
+  assert.match(projectionBuild, /retention-days: \$\{\{ inputs\.artifact_retention_days \}\}/);
   assert.match(projectionBuild, /artifact_id:/);
   assert.match(projectionBuild, /artifact_run_id:/);
   assert.match(projectionBuild, /wca-export\.sql\.zip/);
   assert.match(projectionBuild, /docker compose down --volumes --remove-orphans/);
+  assert.match(projectionBuild, /CREATE TABLE IF NOT EXISTS result_attempts/);
+});
+
+test("keeps applied migrations immutable while preparing disposable validation databases", () => {
+  assert.match(pullRequest, /CREATE TABLE IF NOT EXISTS export_metadata/);
+  assert.match(pullRequest, /CREATE TABLE IF NOT EXISTS result_attempts/);
+  assert.match(pullRequest, /docker compose run --rm flyway migrate/);
+});
+
+test("builds labeled PR projections and deploys the exact merged artifact", () => {
+  assert.match(prProjectionRelease, /types:[\s\S]*- labeled[\s\S]*- closed/);
+  assert.match(prProjectionRelease, /github\.event\.label\.name == 'build-projections'/);
+  assert.match(prProjectionRelease, /force_rebuild: true/);
+  assert.match(prProjectionRelease, /include_raw: true/);
+  assert.match(prProjectionRelease, /artifact_retention_days: 90/);
+  assert.match(prProjectionRelease, /actions\/workflows\/pr-projection-release\.yml\/runs/);
+  assert.match(prProjectionRelease, /head_sha == \$sha/);
+  assert.match(prProjectionRelease, /actions\/download-artifact@v4/);
+  assert.match(prProjectionRelease, /artifact_id:/);
+  assert.match(prProjectionRelease, /deploy-projections\.yml/);
+  assert.match(prProjectionRelease, /production-mutation/);
+  assert.match(
+    prProjectionRelease,
+    /github\.event\.action == 'labeled'[\s\S]*github\.event\.label\.name == 'build-projections'[\s\S]*production-mutation/,
+  );
+  assert.match(prProjectionRelease, /format\('pr-projection-noop-\{0\}', github\.run_id\)/);
+  assert.match(prProjectionRelease, /cancel-in-progress: false/);
+  assert.doesNotMatch(prProjectionRelease, /queue: max/);
+  assert.match(projectionDeploy, /if \[ "\$WCA_EXPORT_VALUE" != "\$PRODUCTION_WCA_EXPORT_VALUE" \]; then/);
+  assert.doesNotMatch(
+    projectionDeploy,
+    /\.raw == null/,
+    "same-export releases may still carry a coherent PR raw export",
+  );
 });
 
 test("builds and verifies digest-addressed server images", () => {
@@ -103,7 +146,11 @@ test("builds and verifies digest-addressed server images", () => {
   assert.match(serverBuild, /data_tools_image:/);
   assert.match(serverBuild, /Dockerfile\.data-tools/);
   assert.match(serverBuild, /require_existing/);
-  assert.match(release, /require_existing: true/);
+  assert.match(
+    release,
+    /build_server:[\s\S]*uses: \.\/\.github\/workflows\/build-server\.yml[\s\S]*require_existing: false/,
+    "production releases may build missing verified images for the exact release commit",
+  );
   assert.match(serverBuild, /config_checksum:/);
 });
 
@@ -120,6 +167,11 @@ test("server deployment retries real endpoints and rolls back with diagnostics",
   assert.match(serverDeploy, /Rollback readiness check passed/);
   assert.match(serverDeploy, /Previous app image retained for the next rollback/);
   assert.match(serverDeploy, /check-release-compatibility\.mjs/);
+  assert.match(
+    serverDeploy,
+    /if \[\[ ! "\$dataset_schema_version" =~ \^\[1-9\]\[0-9\]\*\$ \]\]; then[\s\S]*dataset_schema_version=1/,
+    "an empty or invalid pre-cutover state must use the baseline dataset schema",
+  );
   assert.match(serverDeploy, /PROXY_CONFIG_CHANGED/);
   assert.match(serverDeploy, /server-release-state\.json/);
   assert.match(serverDeploy, /production-mutation\.lock/);

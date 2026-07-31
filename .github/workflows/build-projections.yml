@@ -34,6 +34,11 @@ on:
         required: false
         default: false
         type: boolean
+      artifact_retention_days:
+        description: Number of days to retain the immutable projection release artifact.
+        required: false
+        default: 7
+        type: number
     outputs:
       artifact_name:
         value: ${{ jobs.build.outputs.artifact_name }}
@@ -198,6 +203,18 @@ jobs:
           started_at=$(date +%s)
           mkdir -p "$PROJECTION_ARTIFACT_DIR"
           docker compose up -d db
+          until docker compose exec -T db mariadb-admin ping \
+            -h 127.0.0.1 \
+            -u"$MYSQL_USER" \
+            -p"$MYSQL_PASSWORD" \
+            --silent; do
+            sleep 2
+          done
+          docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$MYSQL_DATABASE" \
+            --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL)"
           docker compose run --rm flyway migrate
           node scripts/projection-build-plan.mjs --groups="$SELECTED_GROUPS" > /tmp/projection-build-plan.json
           projection_names_csv=$(jq -r '.projectionNames | join(",")' /tmp/projection-build-plan.json)
@@ -321,7 +338,7 @@ jobs:
           name: ${{ steps.release-artifact.outputs.name }}
           path: /tmp/projection-release
           if-no-files-found: error
-          retention-days: 7
+          retention-days: ${{ inputs.artifact_retention_days }}
 
       - name: Report no projection build
         if: inputs.groups == '' || inputs.cache_only

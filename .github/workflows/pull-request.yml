@@ -70,6 +70,18 @@ jobs:
             'test -f /flyway/migrations/V1__export_metadata.sql && test -f /flyway/migrations/V2__import_health.sql && test -f /flyway/migrations/V3__projection_build_timing.sql && test -f /flyway/migrations/V4__result_projection_health.sql'
           docker tag wcarankings-flyway:pull-request wcarankings-flyway:latest
           docker compose up -d db
+          until docker compose exec -T db mariadb-admin ping \
+            -h 127.0.0.1 \
+            -u"$MYSQL_USER" \
+            -p"$MYSQL_PASSWORD" \
+            --silent; do
+            sleep 2
+          done
+          docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$MYSQL_DATABASE" \
+            --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL)"
           docker compose run --rm flyway migrate
           docker compose run --rm flyway info
           docker compose run --rm flyway validate

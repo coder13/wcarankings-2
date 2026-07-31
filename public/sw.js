@@ -91,6 +91,7 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/")) return;
 
   if (isRankingPage(url)) {
     const refresh = caches.open(RANKINGS_CACHE).then((cache) => fetch(request).then(async (response) => {

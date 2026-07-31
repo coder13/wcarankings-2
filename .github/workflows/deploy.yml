@@ -12,7 +12,7 @@ on:
         default: false
         type: boolean
       force_rebuild:
-        description: Rebuild all projection groups; server images remain fail-closed to PR-verified digests.
+        description: Rebuild all projection groups and refresh server images when the release images are unavailable.
         required: false
         default: false
         type: boolean
@@ -39,7 +39,7 @@ jobs:
     with:
       ref: ${{ github.sha }}
       force_rebuild: false
-      require_existing: true
+      require_existing: false
     secrets: inherit
 
   build_projections:

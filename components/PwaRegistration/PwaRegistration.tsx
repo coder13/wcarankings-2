@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PwaUpdatePrompt } from "../PwaUpdatePrompt/PwaUpdatePrompt";
 
-const SERVICE_WORKER_URL = "/sw.js?v=5";
+const SERVICE_WORKER_URL = "/sw.js?v=6";
 const SKIP_WAITING_MESSAGE = "SKIP_WAITING";
 const DEVELOPMENT_RELOAD_KEY = "wca-rankings-development-sw-reset";
 

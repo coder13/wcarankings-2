@@ -152,8 +152,6 @@ jobs:
             --source-sha="$EXPECTED_SOURCE_SHA"
           if [ "$WCA_EXPORT_VALUE" != "$PRODUCTION_WCA_EXPORT_VALUE" ]; then
             jq -e '.raw != null' "$PROJECTION_ARTIFACT_DIR/projection-release.json" >/dev/null
-          else
-            jq -e '.raw == null' "$PROJECTION_ARTIFACT_DIR/projection-release.json" >/dev/null
           fi
           jq -e \
             --slurpfile compatibility release-compatibility.json \

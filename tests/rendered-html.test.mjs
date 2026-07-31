@@ -266,6 +266,7 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(pwaRegistration, /registration\.unregister\(\)/);
   assert.match(serviceWorker, /CACHE_NAME/);
   assert.match(serviceWorker, /cache\.match/);
+  assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /event\.data\?\.type === "SKIP_WAITING"/);
   assert.doesNotMatch(
     serviceWorker,
