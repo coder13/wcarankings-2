@@ -67,9 +67,6 @@ export type PersonIdRow = {
   wca_id: string;
 };
 
-export type PersonThumbnail = string | null;
-export type PersonThumbnailMap = Map<string, PersonThumbnail>;
-
 export type RegionKind = "continent" | "country";
 
 export type RegionRecord = {

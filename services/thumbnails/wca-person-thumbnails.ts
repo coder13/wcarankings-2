@@ -1,10 +1,6 @@
 import { LRUCache } from "lru-cache";
-import type {
-  PersonThumbnail,
-  PersonThumbnailMap,
-  WcaPersonResponse,
-  WcaPersonSearchResponse,
-} from "@/lib/data/types";
+import type { WcaPersonResponse, WcaPersonSearchResponse } from "@/lib/data/types";
+import type { PersonThumbnail, PersonThumbnailMap } from "@/services/thumbnails/types";
 
 const thumbUrlCache = new LRUCache<string, PersonThumbnail>({
   maxSize: 64 * 1024 * 1024,

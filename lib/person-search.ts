@@ -6,7 +6,7 @@ import {
 import {
   fetchPersonThumbnailsFromWca,
   getCachedPersonThumbnail,
-} from "@/lib/data/wca-person-thumbnails";
+} from "@/services/thumbnails/wca-person-thumbnails";
 import { isValidRegexPattern } from "@/lib/wca";
 
 export async function searchPersonIds(search: string, regexSearch: boolean, limit: number) {
