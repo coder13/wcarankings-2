@@ -350,6 +350,8 @@ test("hides the site footer after leaving the top of the rankings", async () => 
   assert.match(component, /<footer[^>]*className="siteFooter" data-at-top=\{footerAtTop\}/);
   assert.match(rankingsCss, /\.siteFooter\[data-at-top="false"\][\s\S]*opacity:\s*0;[\s\S]*translateY/);
   assert.match(rankingsCss, /@media \(max-width: 600px\)\s*\{\s*\.siteFooter\s*\{[\s\S]*padding-right:\s*max\(1\.5rem, env\(safe-area-inset-right\)\);[\s\S]*padding-left:\s*max\(1\.5rem, env\(safe-area-inset-left\)\);/);
+  const jumpControlsCss = await readFile(new URL("../components/JumpControlsVisibility/JumpControlsVisibility.css", import.meta.url), "utf8");
+  assert.match(jumpControlsCss, /:has\(\.Jump\[data-direction="down"\]\)\s*\{[^}]*transition:\s*bottom 180ms var\(--cubic-exit\);/);
 });
 
 test("production build keeps rankings styles in the root stylesheet", async () => {

@@ -33,7 +33,7 @@
     calc((1 - var(--jump-controls-progress)) * 96px),
     0
   );
-  transition: none;
+  transition: bottom 180ms var(--cubic-exit);
 }
 
 .JumpControlsVisibility[data-interactive="true"]:has(.Jump[data-direction]) {
