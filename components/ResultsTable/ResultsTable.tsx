@@ -30,6 +30,17 @@ export function getRenderedRowIdentity(
   return `placeholder:${index}:${hasMore ? "more" : "end"}`;
 }
 
+function renderedRowKeysEqual(
+  left: ReadonlyMap<number, string>,
+  right: ReadonlyMap<number, string>,
+) {
+  if (left.size !== right.size) return false;
+  for (const [index, key] of right) {
+    if (left.get(index) !== key) return false;
+  }
+  return true;
+}
+
 export function ResultsTable({
   entries,
   listRef,
@@ -106,7 +117,7 @@ export function ResultsTable({
   }, [enablePersonDetails, entries, initialExpandedPersonId]);
   const activeExpandedKey = focusedExpansionKey || expandedKey;
   const previousExpandedKeyRef = useRef(activeExpandedKey);
-  const previousRenderedKeysRef = useRef(new Map<number, string>());
+  const [previousRenderedKeys, setPreviousRenderedKeys] = useState<ReadonlyMap<number, string>>(() => new Map());
   const expandedDetails = activeExpandedKey ? detailsByKey[activeExpandedKey] : null;
   const expandedError = activeExpandedKey ? detailErrorByKey[activeExpandedKey] : "";
 
@@ -313,7 +324,17 @@ export function ResultsTable({
     return () => source.close();
   }, [activeExpandedKey, expandedDetails]);
 
-  const previousRenderedKeys = previousRenderedKeysRef.current;
+  const currentRenderedKeys = useMemo(() => {
+    const nextKeys = new Map<number, string>();
+    for (const virtualRow of renderedRows) {
+      nextKeys.set(
+        virtualRow.index,
+        getRenderedRowIdentity(entries[virtualRow.index] ?? null, virtualRow.index, hasMore),
+      );
+    }
+    return nextKeys;
+  }, [entries, hasMore, renderedRows]);
+
   const renderedRowStates = renderedRows.map((virtualRow) => {
     const entry = entries[virtualRow.index] ?? null;
     const identity = getRenderedRowIdentity(entry, virtualRow.index, hasMore);
@@ -327,15 +348,10 @@ export function ResultsTable({
   });
 
   useEffect(() => {
-    const nextKeys = new Map<number, string>();
-    for (const virtualRow of renderedRows) {
-      nextKeys.set(
-        virtualRow.index,
-        getRenderedRowIdentity(entries[virtualRow.index] ?? null, virtualRow.index, hasMore),
-      );
-    }
-    previousRenderedKeysRef.current = nextKeys;
-  }, [entries, hasMore, renderedRows]);
+    if (renderedRowKeysEqual(previousRenderedKeys, currentRenderedKeys)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPreviousRenderedKeys(currentRenderedKeys);
+  }, [currentRenderedKeys, previousRenderedKeys]);
 
   if (loading && showLoading && !preserveListDuringLoad && entries.length === 0) {
     return <div className="listMessage">Loading rankings…</div>;
