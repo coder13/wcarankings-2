@@ -323,13 +323,29 @@ main {
   left: 50%;
   width: calc(100vw - 2em);
   border-radius: 2rem;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  box-shadow:
-    0 0 18px 12px color-mix(in srgb, var(--surface) 75%, transparent),
-    0 0 48px 28px color-mix(in srgb, var(--surface) 34%, transparent);
   content: "";
   pointer-events: none;
   transform: translateX(-50%);
+}
+
+.stickyRankingsRail > .RankingsRailTransition::before {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--surface) 94%, transparent),
+    color-mix(in srgb, var(--surface) 76%, transparent) 55%,
+    transparent
+  );
+  box-shadow: 0 22px 42px 18px color-mix(in srgb, var(--surface) 38%, transparent);
+}
+
+.JumpControlsVisibility:has(.Jump[data-direction="down"]) > .RankingsRailTransition::before {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--surface) 94%, transparent),
+    color-mix(in srgb, var(--surface) 76%, transparent) 55%,
+    transparent
+  );
+  box-shadow: 0 -22px 42px 18px color-mix(in srgb, var(--surface) 38%, transparent);
 }
 
 .stickyRankingsRail > .RankingsRailTransition > .Jump,
