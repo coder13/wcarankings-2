@@ -4,19 +4,16 @@ import { UNAVAILABLE_PROJECTION_FEATURE_SWITCH, type ProjectionFeatureSwitch } f
 export { DEFAULT_PROJECTION_FEATURE_SWITCH } from "@/lib/projection-feature-switch-types";
 export type { ProjectionFeatureSwitch } from "@/lib/projection-feature-switch-types";
 
+// The all-time rankings surface can continue serving from the compatibility
+// projections while a newer semantic generation is being built. Keep the
+// core switch tied to those stable tables; optional semantic projections have
+// their own availability checks.
 const CORE_TABLES = [
   "ranking_entries_single",
   "ranking_entries_average",
   "ranking_counts",
   "result_entries_single",
   "result_counts",
-  "competition_podium_members",
-  "competition_event_stats",
-  "result_facts",
-  "result_rankings_single",
-  "result_rankings_average",
-  "result_ranking_counts",
-  "competition_stats",
 ] as const;
 const SUM_OF_RANKS_TABLES = ["person_sum_of_ranks_scores"] as const;
 const YEARLY_TABLES = [

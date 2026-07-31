@@ -29,9 +29,14 @@ test("keeps unavailable feature switches hidden when a projection is absent", ()
 
 test("does not mark core available when a core projection table is missing", () => {
   const featureSwitch = featureSwitchFromTables([
-    "ranking_entries_single", "ranking_entries_average", "ranking_counts", "result_entries_single", "result_counts",
-    "competition_podium_members", "competition_event_stats", "result_facts", "result_rankings_single",
-    "result_rankings_average", "result_ranking_counts",
+    "ranking_entries_single", "ranking_entries_average", "ranking_counts", "result_entries_single",
   ]);
   assert.equal(featureSwitch.core, false);
+});
+
+test("keeps core rankings available while newer semantic projections are absent", () => {
+  const featureSwitch = featureSwitchFromTables([
+    "ranking_entries_single", "ranking_entries_average", "ranking_counts", "result_entries_single", "result_counts",
+  ]);
+  assert.equal(featureSwitch.core, true);
 });
