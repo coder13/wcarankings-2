@@ -23,6 +23,7 @@ permissions:
 concurrency:
   group: production-mutation
   cancel-in-progress: false
+  queue: max
 
 jobs:
   resolve_approved_data_tools:
