@@ -109,6 +109,8 @@ test("builds one checksummed artifact containing only selected groups", () => {
   assert.match(projectionBuild, /wca-export\.sql\.zip/);
   assert.match(projectionBuild, /docker compose down --volumes --remove-orphans/);
   assert.match(projectionBuild, /CREATE TABLE IF NOT EXISTS result_attempts/);
+  assert.match(projectionDeploy, /Projection compatibility: artifact format=/);
+  assert.match(projectionDeploy, /Projection artifact compatibility does not match/);
 });
 
 test("keeps applied migrations immutable while preparing disposable validation databases", () => {
