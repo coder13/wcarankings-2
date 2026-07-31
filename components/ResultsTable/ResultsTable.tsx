@@ -13,6 +13,7 @@ const ACCORDION_TRANSITION_SECONDS = 0.2;
 const DETAIL_PREFETCH_DELAY_MS = 120;
 const ROW_HEIGHT = 65.45;
 const EXPANDED_ROW_HEIGHT = 248;
+const ROW_REARRANGE_TRANSITION_MS = 220;
 
 export type RenderedTableRow = {
   index: number;
@@ -349,8 +350,11 @@ export function ResultsTable({
 
   useEffect(() => {
     if (renderedRowKeysEqual(previousRenderedKeys, currentRenderedKeys)) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPreviousRenderedKeys(currentRenderedKeys);
+    const timer = window.setTimeout(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPreviousRenderedKeys(currentRenderedKeys);
+    }, ROW_REARRANGE_TRANSITION_MS);
+    return () => window.clearTimeout(timer);
   }, [currentRenderedKeys, previousRenderedKeys]);
 
   if (loading && showLoading && !preserveListDuringLoad && entries.length === 0) {
