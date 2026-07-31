@@ -23,6 +23,10 @@ const syncWcaExport = await readFile(
   new URL("../scripts/sync-wca-export.mjs", import.meta.url),
   "utf8",
 );
+const canonicalExportMigration = await readFile(
+  new URL("../migrations/mysql/app/V11__canonicalize_export_identity.sql", import.meta.url),
+  "utf8",
+);
 
 test("defers secondary projection indexes until after bulk transfer import", () => {
   assert.match(prepare, /SHOW INDEX FROM/);
@@ -56,6 +60,13 @@ test("rejects missing and invalid export dates", () => {
 test("packages the export-date normalizer with the publisher", () => {
   assert.match(dockerfile, /COPY --chown=data-tools:data-tools scripts \.\/scripts/);
   assert.match(dockerfile, /ENTRYPOINT \["node"\]/);
+});
+
+test("supports a canonical export date when importing a supplied SQL export", () => {
+  assert.match(syncWcaExport, /canonical-export-date/);
+  assert.match(syncWcaExport, /latest = \{ \.\.\.latest, exportDate: canonicalExportDate \}/);
+  assert.match(canonicalExportMigration, /UPDATE export_metadata/);
+  assert.match(canonicalExportMigration, /REGEXP/);
 });
 
 test("dry-run WCA export caching does not require a database connection", () => {

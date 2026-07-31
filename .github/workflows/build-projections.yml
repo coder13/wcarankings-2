@@ -227,6 +227,7 @@ jobs:
           WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/sync-wca-export.mjs \
             --force \
             --sql-path="/tmp/wca-export-cache/wca-export-${{ inputs.export_date }}.sql.zip" \
+            --canonical-export-date="$EXPORT_VALUE" \
             --projection-names="$projection_names_csv"
           mapfile -t planned_groups < <(jq -r '.groups[]' /tmp/projection-build-plan.json)
           for group in "${planned_groups[@]}"; do

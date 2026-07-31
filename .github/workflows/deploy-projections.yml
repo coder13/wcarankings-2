@@ -152,12 +152,8 @@ jobs:
             --groups="$PROJECTION_GROUPS" \
             --export-id="$WCA_EXPORT_VALUE" \
             --source-sha="$EXPECTED_SOURCE_SHA"
-          normalized_wca_export=$(WCA_EXPORT_VALUE="$WCA_EXPORT_VALUE" node --input-type=module -e \
-            'import { normalizeExportDate } from "./scripts/projection-transfer-date.mjs"; console.log(normalizeExportDate(process.env.WCA_EXPORT_VALUE) ?? "invalid")')
-          normalized_production_export=$(WCA_EXPORT_VALUE="$PRODUCTION_WCA_EXPORT_VALUE" node --input-type=module -e \
-            'import { normalizeExportDate } from "./scripts/projection-transfer-date.mjs"; console.log(normalizeExportDate(process.env.WCA_EXPORT_VALUE) ?? "invalid")')
-          echo "Projection export identity: build=$normalized_wca_export; production=$normalized_production_export"
-          if [ "$normalized_wca_export" != "$normalized_production_export" ]; then
+          echo "Projection export identity: build=$WCA_EXPORT_VALUE; production=$PRODUCTION_WCA_EXPORT_VALUE"
+          if [ "$WCA_EXPORT_VALUE" != "$PRODUCTION_WCA_EXPORT_VALUE" ]; then
             echo "Projection artifact must include the raw export because the build and production exports differ." >&2
             jq -e '.raw != null' "$PROJECTION_ARTIFACT_DIR/projection-release.json" >/dev/null
           fi
@@ -341,6 +337,7 @@ jobs:
                   data-tools /app/scripts/sync-wca-export.mjs \
                     --force \
                     --raw-only \
+                    --canonical-export-date="$WCA_EXPORT_VALUE" \
                     --sql-path="/var/cache/wcarankings/wca-export-${ARTIFACT_ID}.sql.zip"
               else
                 docker compose exec -T \

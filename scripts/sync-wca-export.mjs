@@ -22,6 +22,7 @@ const selectedProjectionNames = argumentValue("projection-names")
   .split(",")
   .map((name) => name.trim())
   .filter(Boolean);
+const canonicalExportDate = argumentValue("canonical-export-date") || process.env.CANONICAL_EXPORT_DATE || "";
 
 function databaseOptions(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -312,6 +313,7 @@ async function main() {
     const cachedPath = await getCachedExportForToday();
     latest = cachedPath ? await getSuppliedExportMetadata(cachedPath) : await getLatestExport();
   }
+  if (canonicalExportDate) latest = { ...latest, exportDate: canonicalExportDate };
   process.stdout.write(`Latest WCA export: ${latest.exportDate} (v${String(latest.version).replace(/^v/i, "")})\n`);
 
   if (dryRun) {
