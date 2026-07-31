@@ -105,7 +105,7 @@ test("builds one checksummed artifact containing only selected groups", () => {
 test("keeps applied migrations immutable while preparing disposable validation databases", () => {
   assert.match(pullRequest, /CREATE TABLE IF NOT EXISTS export_metadata/);
   assert.match(pullRequest, /CREATE TABLE IF NOT EXISTS result_attempts/);
-  assert.match(pullRequest, /docker compose run --rm flyway migrate/);
+  assert.match(pullRequest, /docker compose run --rm[\s\S]*flyway migrate/);
 });
 
 test("builds labeled PR projections and deploys the exact merged artifact", () => {
@@ -187,7 +187,6 @@ test("runs app and result migrations in separate deployment lanes", async () => 
   assert.match(dockerfile, /COPY migrations\/mysql\/app \/flyway\/migrations\/app/);
   assert.match(dockerfile, /COPY migrations\/mysql\/results \/flyway\/migrations\/results/);
   assert.match(compose, /FLYWAY_LOCATIONS: filesystem:\/flyway\/migrations\/app/);
-  assert.match(compose, /FLYWAY_IGNORE_MIGRATION_PATTERNS: "versioned:missing,versioned:ignored,versioned:pending"/);
   assert.match(serverDeploy, /docker compose run --rm flyway migrate/);
   assert.match(projectionBuild, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
   assert.match(projectionDeploy, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);

@@ -82,19 +82,27 @@ jobs:
             --password="$MYSQL_PASSWORD" \
             "$MYSQL_DATABASE" \
             --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL)"
-          docker compose run --rm flyway migrate
           docker compose run --rm \
-            -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
-            -e FLYWAY_OUT_OF_ORDER=true \
+            -e FLYWAY_TABLE=flyway_schema_history_app \
             flyway migrate
-          docker compose run --rm flyway info
           docker compose run --rm \
             -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+            -e FLYWAY_TABLE=flyway_schema_history_results \
+            flyway migrate
+          docker compose run --rm \
+            -e FLYWAY_TABLE=flyway_schema_history_app \
             flyway info
-          docker compose run --rm flyway -ignoreMigrationPatterns='versioned:missing,versioned:ignored,versioned:pending' validate
           docker compose run --rm \
             -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
-            flyway -ignoreMigrationPatterns='versioned:missing,versioned:ignored,versioned:pending' validate
+            -e FLYWAY_TABLE=flyway_schema_history_results \
+            flyway info
+          docker compose run --rm \
+            -e FLYWAY_TABLE=flyway_schema_history_app \
+            flyway validate
+          docker compose run --rm \
+            -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+            -e FLYWAY_TABLE=flyway_schema_history_results \
+            flyway validate
 
       - name: Build production Docker image
         uses: docker/build-push-action@v6
