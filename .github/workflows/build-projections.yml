@@ -203,6 +203,13 @@ jobs:
           started_at=$(date +%s)
           mkdir -p "$PROJECTION_ARTIFACT_DIR"
           docker compose up -d db
+          until docker compose exec -T db mariadb-admin ping \
+            -h 127.0.0.1 \
+            -u"$MYSQL_USER" \
+            -p"$MYSQL_PASSWORD" \
+            --silent; do
+            sleep 2
+          done
           docker compose exec -T db mariadb \
             --user="$MYSQL_USER" \
             --password="$MYSQL_PASSWORD" \
