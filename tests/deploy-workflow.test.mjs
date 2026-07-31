@@ -99,6 +99,7 @@ test("builds one checksummed artifact containing only selected groups", () => {
 });
 
 test("keeps applied migrations immutable while preparing disposable validation databases", () => {
+  assert.match(pullRequest, /CREATE TABLE IF NOT EXISTS export_metadata/);
   assert.match(pullRequest, /CREATE TABLE IF NOT EXISTS result_attempts/);
   assert.match(pullRequest, /docker compose run --rm flyway migrate/);
 });
