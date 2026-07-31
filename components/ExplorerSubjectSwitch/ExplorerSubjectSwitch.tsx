@@ -1,6 +1,7 @@
 "use client";
 
 import { TextDropdown } from "../Dropdown/TextDropdown";
+import { useProjectionFeatureSwitch } from "@/components/ProjectionFeatureSwitchProvider";
 
 export const EXPLORER_SUBJECTS = [
   { id: "people", label: "Persons" },
@@ -24,10 +25,12 @@ export function ExplorerSubjectSwitch({
   onChange: (subject: NavigationSubject) => void;
   variant?: "segmented" | "select" | "text";
 }) {
+  const featureSwitch = useProjectionFeatureSwitch();
+  const subjects = NAVIGATION_SUBJECTS.filter((option) => featureSwitch.core || option.id === "lists");
   if (variant === "text") {
     return (
       <TextDropdown
-        options={NAVIGATION_SUBJECTS.map((option) => ({ value: option.id, label: option.label }))}
+        options={subjects.map((option) => ({ value: option.id, label: option.label }))}
         value={subject}
         onChange={(value) => onChange(value as NavigationSubject)}
         ariaLabel="Browse"
@@ -44,7 +47,7 @@ export function ExplorerSubjectSwitch({
           aria-label="Browse"
           onChange={(event) => onChange(event.target.value as NavigationSubject)}
         >
-          {NAVIGATION_SUBJECTS.map((option) => (
+          {subjects.map((option) => (
             <option key={option.id} value={option.id}>{option.label}</option>
           ))}
         </select>
@@ -54,7 +57,7 @@ export function ExplorerSubjectSwitch({
 
   return (
     <div className="ExplorerSubjectSwitch" role="tablist" aria-label="Browse">
-      {NAVIGATION_SUBJECTS.map((option) => (
+      {subjects.map((option) => (
         <button
           key={option.id}
           type="button"

@@ -67,12 +67,42 @@ jobs:
       - name: Validate Flyway image and migrations
         run: |
           docker run --rm --entrypoint sh wcarankings-flyway:pull-request -c \
-            'test -f /flyway/migrations/V1__export_metadata.sql && test -f /flyway/migrations/V2__import_health.sql && test -f /flyway/migrations/V3__projection_build_timing.sql && test -f /flyway/migrations/V4__result_projection_health.sql'
+            'test -f /flyway/migrations/app/V1__export_metadata.sql && test -f /flyway/migrations/app/V2__import_health.sql && test -f /flyway/migrations/app/V3__projection_build_timing.sql && test -f /flyway/migrations/results/V4__result_projection_health.sql && test -f /flyway/migrations/results/V8__result_attempts_lookup.sql'
           docker tag wcarankings-flyway:pull-request wcarankings-flyway:latest
           docker compose up -d db
-          docker compose run --rm flyway migrate
-          docker compose run --rm flyway info
-          docker compose run --rm flyway validate
+          until docker compose exec -T db mariadb-admin ping \
+            -h 127.0.0.1 \
+            -u"$MYSQL_USER" \
+            -p"$MYSQL_PASSWORD" \
+            --silent; do
+            sleep 2
+          done
+          docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$MYSQL_DATABASE" \
+            --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL)"
+          docker compose run --rm \
+            -e FLYWAY_TABLE=flyway_schema_history_app \
+            flyway migrate
+          docker compose run --rm \
+            -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+            -e FLYWAY_TABLE=flyway_schema_history_results \
+            flyway migrate
+          docker compose run --rm \
+            -e FLYWAY_TABLE=flyway_schema_history_app \
+            flyway info
+          docker compose run --rm \
+            -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+            -e FLYWAY_TABLE=flyway_schema_history_results \
+            flyway info
+          docker compose run --rm \
+            -e FLYWAY_TABLE=flyway_schema_history_app \
+            flyway validate
+          docker compose run --rm \
+            -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+            -e FLYWAY_TABLE=flyway_schema_history_results \
+            flyway validate
 
       - name: Build production Docker image
         uses: docker/build-push-action@v6
@@ -83,6 +113,8 @@ jobs:
           tags: |
             wcarankings-app:pull-request
             ghcr.io/${{ github.repository_owner }}/wcarankings-app:tree-${{ steps.source-tree.outputs.sha }}
+          build-args: |
+            APP_COMMIT_SHA=${{ github.event.pull_request.head.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.event.pull_request.head.sha }}

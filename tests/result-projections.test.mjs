@@ -64,7 +64,7 @@ test("normal rankings retain separate historical country and continent bests", a
     readFile(new URL("sql/ranking-projections/ranking_entries_average_source.sql", root), "utf8"),
     readFile(new URL("lib/list-rankings.ts", root), "utf8"),
     readFile(new URL("tests/fixtures/regional-ranking-history.sql", root), "utf8"),
-    readFile(new URL("migrations/mysql/V8__result_attempts_lookup.sql", root), "utf8"),
+    readFile(new URL("migrations/mysql/results/V8__result_attempts_lookup.sql", root), "utf8"),
   ]);
   const sources = `${single}\n${average}`;
 
@@ -81,6 +81,7 @@ test("normal rankings retain separate historical country and continent bests", a
   assert.match(sources, /regional_record = 'NR'/);
   assert.match(listRankings, /let rankingColumn = "world_rank";[\s\S]*input\.region\.scope === "continent"/);
   assert.match(listRankings, /`ranking\.\$\{rankingColumn\} > 0`/);
-  assert.match(resultAttemptsMigration, /information_schema\.tables/);
-  assert.match(resultAttemptsMigration, /PREPARE result_attempts_index_statement/);
+  assert.match(resultAttemptsMigration, /ALTER TABLE result_attempts/);
+  assert.match(resultAttemptsMigration, /ADD INDEX idx_result_attempts_result/);
+  assert.doesNotMatch(resultAttemptsMigration, /information_schema\.tables/);
 });

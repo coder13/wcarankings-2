@@ -86,3 +86,10 @@ export function formatRankingsFreshness(exportDate: string | null) {
   if (exportDate) return `WCA export dated ${formatExportDate(exportDate)}`;
   return "WCA export date unavailable";
 }
+
+export function formatFooterDate(exportDate: string | null) {
+  if (!exportDate) return "date unavailable";
+  const date = new Date(`${exportDate.slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime())) return "date unavailable";
+  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}/${date.getUTCFullYear()}`;
+}

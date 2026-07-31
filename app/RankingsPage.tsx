@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
 import type {
@@ -12,10 +12,14 @@ import { loadRankings } from "@/lib/rankings";
 import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
 import { loadResultRankings } from "@/lib/semantic-result-rankings";
 import { getAuthUser } from "@/lib/auth";
+import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
+import { getCurrentRankingsMetadata } from "@/lib/rankings-metadata";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 
 export const dynamic = "force-dynamic";
+
+const LIVE_COMMIT_SHA = process.env.APP_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "development";
 
 function pageFirstSubRank(subRank: number) {
   return Math.floor((Math.max(1, subRank) - 1) / PAGE_SIZE) * PAGE_SIZE + 1;
@@ -310,6 +314,11 @@ export async function RankingsPage({
   const { scope, regionId } = parseRegionQuery(getSearchParam(resolvedSearchParams, "region"));
   const gender = (initialSubject === "people" || initialSubject === "results") ? getGenderFilters(resolvedSearchParams) : [];
   const initialYear = initialYearOverride ?? (/^\d{4}$/.test(getSearchParam(resolvedSearchParams, "year")) ? Number(getSearchParam(resolvedSearchParams, "year")) : null);
+  const featureSwitch = await getProjectionFeatureSwitch();
+  if (!featureSwitch.core || (initialYear !== null && !featureSwitch.yearlyPersonRankings) || ((initialAllEventRankingId || eventId === "sor-kinch") && !featureSwitch.sumOfRanks)) {
+    notFound();
+  }
+  const rankingsMetadata = await getCurrentRankingsMetadata();
   const requestedWcaId = getSearchParam(resolvedSearchParams, "wcaId")
     .trim()
     .toUpperCase();
@@ -391,6 +400,8 @@ export async function RankingsPage({
       initialSubject={initialSubject}
       initialCompetitionRanking={initialCompetitionRanking}
       initialLatitudeHemisphere={latitudeHemisphere}
+      commitSha={LIVE_COMMIT_SHA}
+      lastResultIngestAt={rankingsMetadata.fetchedAt}
       showSubjectSwitch
       showAllEventRankingOptions
     />

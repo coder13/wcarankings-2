@@ -13,13 +13,27 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: production-mutation
+  group: >-
+    ${{
+      (
+        (github.repository == 'coder13/wcarankings-2'
+          && github.event.action == 'labeled'
+          && github.event.label.name == 'build-projections')
+        || (github.event.action == 'closed'
+          && github.repository == 'coder13/wcarankings-2'
+          && github.event.pull_request.merged == true
+          && contains(github.event.pull_request.labels.*.name, 'build-projections'))
+      )
+      && 'production-mutation'
+      || format('pr-projection-noop-{0}', github.run_id)
+    }}
   cancel-in-progress: false
-  queue: max
 
 jobs:
   plan_pr_projections:
     if: >-
+      github.repository == 'coder13/wcarankings-2'
+      &&
       github.event.action == 'labeled'
       && github.event.label.name == 'build-projections'
       && github.event.pull_request.head.repo.full_name == github.repository
@@ -31,6 +45,8 @@ jobs:
 
   build_pr_projections:
     if: >-
+      github.repository == 'coder13/wcarankings-2'
+      &&
       github.event.action == 'labeled'
       && github.event.label.name == 'build-projections'
       && github.event.pull_request.head.repo.full_name == github.repository
@@ -49,6 +65,7 @@ jobs:
   locate_merged_pr_artifact:
     if: >-
       github.event.action == 'closed'
+      && github.repository == 'coder13/wcarankings-2'
       && github.event.pull_request.merged == true
       && contains(github.event.pull_request.labels.*.name, 'build-projections')
     runs-on: ubuntu-latest
@@ -118,6 +135,7 @@ jobs:
   resolve_approved_data_tools:
     if: >-
       github.event.action == 'closed'
+      && github.repository == 'coder13/wcarankings-2'
       && github.event.pull_request.merged == true
       && contains(github.event.pull_request.labels.*.name, 'build-projections')
     uses: ./.github/workflows/resolve-approved-data-tools.yml
@@ -126,6 +144,7 @@ jobs:
   plan_merged_pr_environment:
     if: >-
       github.event.action == 'closed'
+      && github.repository == 'coder13/wcarankings-2'
       && github.event.pull_request.merged == true
       && contains(github.event.pull_request.labels.*.name, 'build-projections')
     uses: ./.github/workflows/plan-projections.yml
@@ -136,6 +155,7 @@ jobs:
   deploy_merged_pr_projections:
     if: >-
       github.event.action == 'closed'
+      && github.repository == 'coder13/wcarankings-2'
       && github.event.pull_request.merged == true
       && contains(github.event.pull_request.labels.*.name, 'build-projections')
       && needs.locate_merged_pr_artifact.result == 'success'

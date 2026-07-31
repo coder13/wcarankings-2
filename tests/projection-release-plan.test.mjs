@@ -97,6 +97,26 @@ test("a new raw export expands a partial request to every projection group", asy
   ]);
 });
 
+test("equivalent WCA export timestamps do not trigger a new raw export", async () => {
+  const exportId = "2026-07-30T00:00:23Z";
+  const desired = await projectionFingerprints({ exportId, repositoryRoot });
+  const productionState = {
+    fingerprints: Object.fromEntries(
+      Object.entries(desired.groups).map(([group, value]) => [group, value.fingerprint]),
+    ),
+  };
+  const plan = await projectionReleasePlan({
+    exportId,
+    productionExportId: "2026-07-30 00:00:23 UTC",
+    productionState,
+    repositoryRoot,
+  });
+  assert.equal(plan.exportChanged, false);
+  assert.equal(plan.productionExportId, "2026-07-30 00:00:23 UTC");
+  assert.equal(plan.required, false);
+  assert.deepEqual(plan.requiredGroups, []);
+});
+
 test("a UI-only change invalidates no projection group", async () => {
   const desired = await projectionFingerprints({
     exportId: "2026-07-30 00:00:23 UTC",

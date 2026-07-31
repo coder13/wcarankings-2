@@ -1,3 +1,4 @@
 FROM redgate/flyway:11.20.0-alpine
 
-COPY migrations/mysql /flyway/migrations
+COPY migrations/mysql/app /flyway/migrations/app
+COPY migrations/mysql/results /flyway/migrations/results

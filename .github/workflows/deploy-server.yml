@@ -56,6 +56,7 @@ permissions:
 
 jobs:
   deploy:
+    if: github.repository == 'coder13/wcarankings-2'
     runs-on: ubuntu-latest
     env:
       SERVER_IP: ${{ secrets.SERVER_IP }}
@@ -209,6 +210,7 @@ jobs:
             docker tag 'wcarankings-flyway:${SOURCE_SHA}' wcarankings-flyway:latest
             docker tag 'wcarankings-data-tools:${SOURCE_SHA}' wcarankings-data-tools:latest
             cd /srv/wcarankings
+            docker compose run --rm data-tools /app/scripts/prepare-flyway-history.mjs
             docker compose run --rm flyway migrate"
           echo "CANDIDATE_STAGED=true" >> "$GITHUB_ENV"
 

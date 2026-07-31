@@ -65,8 +65,8 @@ if (!applicationUrl && !adminUrl) {
   async function initializeSchema(schema, tables, marker, exportId = oldExportId) {
     const connection = await mysql.createConnection(connectionOptions(adminUrl, schema));
     try {
-      const exportMetadata = await readFile(new URL("../migrations/mysql/V1__export_metadata.sql", import.meta.url), "utf8");
-      const generationState = await readFile(new URL("../migrations/mysql/V9__ranking_generation_state.sql", import.meta.url), "utf8");
+      const exportMetadata = await readFile(new URL("../migrations/mysql/app/V1__export_metadata.sql", import.meta.url), "utf8");
+      const generationState = await readFile(new URL("../migrations/mysql/app/V9__ranking_generation_state.sql", import.meta.url), "utf8");
       await execute(connection, exportMetadata);
       await execute(connection, generationState);
       for (const table of tables.filter((name) => name !== "export_metadata" && name !== "ranking_generation_state")) {

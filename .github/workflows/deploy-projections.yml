@@ -67,7 +67,9 @@ permissions:
 
 jobs:
   deploy:
-    if: inputs.groups != ''
+    if: >-
+      github.repository == 'coder13/wcarankings-2'
+      && inputs.groups != ''
     runs-on: ubuntu-latest
     env:
       SERVER_IP: ${{ secrets.SERVER_IP }}
@@ -153,11 +155,17 @@ jobs:
           if [ "$WCA_EXPORT_VALUE" != "$PRODUCTION_WCA_EXPORT_VALUE" ]; then
             jq -e '.raw != null' "$PROJECTION_ARTIFACT_DIR/projection-release.json" >/dev/null
           fi
-          jq -e \
-            --slurpfile compatibility release-compatibility.json \
-            '.compatibility.artifactFormatVersion == $compatibility[0].artifactFormatVersion
-             and .compatibility.datasetSchemaVersion == $compatibility[0].datasetSchemaVersion' \
-            "$PROJECTION_ARTIFACT_DIR/projection-release.json" >/dev/null
+          artifact_format=$(jq -r '.compatibility.artifactFormatVersion // "missing"' \
+            "$PROJECTION_ARTIFACT_DIR/projection-release.json")
+          artifact_schema=$(jq -r '.compatibility.datasetSchemaVersion // "missing"' \
+            "$PROJECTION_ARTIFACT_DIR/projection-release.json")
+          expected_format=$(jq -r '.artifactFormatVersion // "missing"' release-compatibility.json)
+          expected_schema=$(jq -r '.datasetSchemaVersion // "missing"' release-compatibility.json)
+          echo "Projection compatibility: artifact format=$artifact_format, schema=$artifact_schema; expected format=$expected_format, schema=$expected_schema"
+          if [ "$artifact_format" != "$expected_format" ] || [ "$artifact_schema" != "$expected_schema" ]; then
+            echo "Projection artifact compatibility does not match the deployed server compatibility contract." >&2
+            exit 1
+          fi
 
       - name: Pull approved data-tools image
         uses: docker/login-action@v3
@@ -248,6 +256,7 @@ jobs:
               echo "Another server-side production mutation holds the lock." >&2
               exit 1
             fi
+            docker compose run --rm data-tools /app/scripts/prepare-flyway-history.mjs
 
             candidate="wcarankings_candidate_${ARTIFACT_ID}"
             previous="${candidate}_previous"
@@ -300,6 +309,12 @@ jobs:
                 '
               docker compose run --rm \
                 -e FLYWAY_URL="jdbc:mariadb://db:3306/${candidate}" \
+                -e FLYWAY_TABLE=flyway_schema_history_app \
+                flyway migrate
+              docker compose run --rm \
+                -e FLYWAY_URL="jdbc:mariadb://db:3306/${candidate}" \
+                -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+                -e FLYWAY_TABLE=flyway_schema_history_results \
                 flyway migrate
               printf "initialized\n" > "$phase_file"
               phase=initialized

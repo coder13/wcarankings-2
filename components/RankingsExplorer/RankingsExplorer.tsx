@@ -69,10 +69,11 @@ import { fetchRankingPage, RankingsPageCache } from "./rankingsPageCache";
 import { useScrollVelocity } from "./useScrollVelocity";
 import { useRankingsExplorerState } from "./useRankingsExplorerState";
 import { COMPETITION_RANKING_OPTIONS, type CompetitionRanking, type RankingResource } from "./helpers/rankingModes";
+import { useProjectionFeatureSwitch } from "@/components/ProjectionFeatureSwitchProvider";
 import { centeredRowScrollTop, getSearchScrollDirection, subjectPath } from "./helpers/navigation";
 export { centeredRowScrollTop, getSearchScrollDirection, subjectPath } from "./helpers/navigation";
 import {
-  formatRankingsFreshness,
+  formatFooterDate,
   type InitialRankingData,
   type RankingEntry,
   type RankingPage,
@@ -507,6 +508,8 @@ export function RankingsExplorer({
   initialSubject = "people",
   initialCompetitionRanking = "best-result",
   initialLatitudeHemisphere = "north",
+  commitSha = "unknown",
+  lastResultIngestAt,
   mockSubjectRows = false,
   rankingSource,
   showMyRank = true,
@@ -535,6 +538,8 @@ export function RankingsExplorer({
   initialSubject?: ExplorerSubject;
   initialCompetitionRanking?: CompetitionRanking;
   initialLatitudeHemisphere?: "north" | "south";
+  commitSha?: string;
+  lastResultIngestAt?: string | null;
   mockSubjectRows?: boolean;
   rankingSource?: RankingSource;
   showMyRank?: boolean;
@@ -561,6 +566,7 @@ export function RankingsExplorer({
     countries: Array<{ id: string; name: string; iso2?: string }>;
   };
 }) {
+  const featureSwitch = useProjectionFeatureSwitch();
   const router = useRouter();
   const isMobileControls = useSyncExternalStore(
     subscribeMobileControls,
@@ -3014,7 +3020,7 @@ export function RankingsExplorer({
           eventOptions={competitionRanking === "podiums"
             ? WCA_EVENTS.filter((event) => event.id !== "333mbf")
             : WCA_EVENTS}
-          additionalEventOptions={showAllEventRankingOptions ? ALL_EVENT_RANKING_OPTIONS : undefined}
+          additionalEventOptions={showAllEventRankingOptions && featureSwitch.sumOfRanks ? ALL_EVENT_RANKING_OPTIONS : undefined}
           onEventChange={changeRailEvent}
           rankingType={rankingType}
           onRankingTypeChange={changeRankingType}
@@ -3162,7 +3168,7 @@ export function RankingsExplorer({
         <span>By Adam Walker and Cailyn Sinclair</span>
         {offlineStale && <span role="status">Offline cached rankings may be stale</span>}
         <span>
-          {formatRankingsFreshness(exportDate)}
+          {formatFooterDate(lastResultIngestAt ?? exportDate)}{" • "}{commitSha === "development" || commitSha === "unknown" ? commitSha : commitSha.slice(0, 7)}
         </span>
       </footer>
     </div>

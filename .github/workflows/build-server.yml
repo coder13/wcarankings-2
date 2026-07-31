@@ -146,6 +146,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/wcarankings-app:tree-${{ steps.source.outputs.tree }}
             ghcr.io/${{ github.repository_owner }}/wcarankings-app:sha-${{ steps.source.outputs.sha }}
+          build-args: |
+            APP_COMMIT_SHA=${{ steps.source.outputs.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
@@ -190,7 +192,7 @@ jobs:
           docker run --rm --entrypoint sh "$app" -c \
             'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.mjs && css=$(find /app/dist/standalone/dist/client -name "*.css" -type f -print -quit) && test -n "$css" && test -s "$css"'
           docker run --rm --entrypoint sh "$flyway" -c \
-            'test -f /flyway/migrations/V1__export_metadata.sql && test -f /flyway/migrations/V9__ranking_generation_state.sql'
+            'test -f /flyway/migrations/app/V1__export_metadata.sql && test -f /flyway/migrations/app/V9__ranking_generation_state.sql && test -f /flyway/migrations/results/V8__result_attempts_lookup.sql'
           docker run --rm --entrypoint sh "$data_tools" -c \
             'test -f /app/release-compatibility.json && test -f /app/scripts/activate-ranking-generation.mjs && test -f /app/scripts/publish-projection-transfer.mjs && test -f /app/scripts/sync-wca-export.mjs'
           echo "app=$app" >> "$GITHUB_OUTPUT"

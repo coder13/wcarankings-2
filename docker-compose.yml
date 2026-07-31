@@ -26,7 +26,10 @@ services:
       FLYWAY_URL: jdbc:mariadb://db:3306/${MYSQL_DATABASE:?MYSQL_DATABASE must be set}
       FLYWAY_USER: ${MYSQL_USER:?MYSQL_USER must be set}
       FLYWAY_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set}
-      FLYWAY_LOCATIONS: filesystem:/flyway/migrations
+      # Server deployment runs the app lane. Projection deployment explicitly
+      # selects the result lane after creating its candidate database.
+      FLYWAY_LOCATIONS: filesystem:/flyway/migrations/app
+      FLYWAY_TABLE: flyway_schema_history_app
       # Production predates Flyway; baseline its existing V1 metadata table once.
       FLYWAY_BASELINE_ON_MIGRATE: "true"
       FLYWAY_CONNECT_RETRIES: 60
