@@ -3,7 +3,6 @@
 import { ListCreateTrigger } from "@/components/ListOwnerControls/ListOwnerControls";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
 import {
-  ExplorerSubjectSwitch,
   type NavigationSubject,
 } from "@/components/ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { ListRow } from "@/components/ListBrowse/ListRow";
@@ -37,9 +36,7 @@ function asRow(list: ListSummary): PublicListSummary {
 export function ListMine({ lists }: { lists: ListSummary[] }) {
   return (
     <div className="app">
-      <AppHeader>
-        <ExplorerSubjectSwitch subject="lists" onChange={changeSubject} variant="text" />
-      </AppHeader>
+      <AppHeader subject="lists" onSubjectChange={changeSubject}>{null}</AppHeader>
       <main className="listBrowse">
         <div className="listMineHeading">
           <div>

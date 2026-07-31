@@ -126,7 +126,7 @@
 }
 
 @media only screen and (min-width: 601px) {
-  .Jump-railSettings > .EventPicker-preview { display: flex; gap: calc(0.5em * (1 - var(--rail-scroll-progress, 0))); padding: 0 calc(0.5em * (1 - var(--rail-scroll-progress, 0))); justify-content: center; font-size: 1em; }
+  .Jump-railSettings > .EventPicker-preview { display: flex; gap: calc(0.5em * (1 - var(--rail-scroll-progress, 0))); padding: 0 calc(0.5em * (1 - var(--rail-scroll-progress, 0))); padding-left: calc(4px + (0.5em * (1 - var(--rail-scroll-progress, 0)))); justify-content: center; font-size: 1em; }
   .Jump-railSettings > .EventPicker-preview::before { flex: 0 0 auto; color: var(--text-strong); font-size: 1.25em; opacity: 1; }
   .Jump-railSettings > .EventPicker-preview .EventPicker-name { display: block; width: calc(6em * (1 - var(--rail-scroll-progress, 0))); min-width: 0; overflow: hidden; color: var(--text-muted); font-size: .875em; opacity: calc(1 - var(--rail-scroll-progress, 0)); text-overflow: ellipsis; white-space: nowrap; }
 }
@@ -148,7 +148,7 @@
 .Jump .genderPickerTrigger:focus-visible { background: transparent; box-shadow: inset 0 0 0 2px var(--focus-ring); color: var(--text-muted); outline: none; }
 
 .Jump-regionPicker { width: var(--rail-select-width); min-width: 0; flex: 0 0 var(--rail-select-width); }
-.Jump .Jump-regionPicker .regionPickerTrigger { height: var(--rail-control-height); min-height: var(--rail-control-height); padding: .5em 2.5em .5em .75em; border: 0; border-radius: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .875em; text-align: left; text-overflow: ellipsis; }
+.Jump .Jump-regionPicker .regionPickerTrigger { height: var(--rail-control-height); min-height: var(--rail-control-height); padding: .5em 2.5em .5em .75em; border: 0; border-radius: 0; background: transparent; color: var(--text-muted); cursor: text; font-size: .875em; text-align: left; text-overflow: ellipsis; }
 .Jump-regionPicker > svg { right: .75em; }
 .Jump-regionPicker .regionPickerTrigger[aria-expanded="true"] { background: transparent; border-color: transparent; box-shadow: none; color: var(--text-muted); }
 .Jump-regionPicker .regionPickerTrigger:focus-visible { background: transparent; box-shadow: inset 0 0 0 2px var(--focus-ring); color: var(--text-muted); outline: none; }
@@ -164,17 +164,18 @@
   box-shadow: 0 4px 16px var(--shadow);
 }
 .Jump--rankings:has(.findBar--rail:is([data-has-text="true"], [data-open="true"])) { background: transparent; box-shadow: none; }
-.Jump--rankings:has(.findBar--rail:is([data-has-text="true"], [data-open="true"])) .Jump-railSettings { opacity: 0; pointer-events: none; }
+.Jump--rankings:has(.findBar--rail:is([data-has-text="true"], [data-open="true"])) .Jump-railSettings { pointer-events: none; }
 .Jump .findBar--rail .findIcon, .Jump .findBar--rail .findClose { position: relative; display: grid; width: var(--rail-control-height); height: var(--rail-control-height); min-width: var(--rail-control-height); min-height: var(--rail-control-height); flex: 0 0 var(--rail-control-height); aspect-ratio: 1; padding: 0; place-items: center; border: 0; background: transparent; color: var(--text-strong); cursor: pointer; transition: color 150ms var(--cubic-move); }
+.Jump .findBar--rail .findIcon { padding-right: 4px; }
 .Jump .findBar--rail .findIcon:hover, .Jump .findBar--rail .findClose:hover, .Jump .findBar--rail .findIcon:focus-visible, .Jump .findBar--rail .findClose:focus-visible { color: var(--focus); outline: none; }
 .Jump .findBar--rail .findClose svg { width: 20px; height: 20px; }
 .Jump .findBar--rail .findInput, .Jump .findBar--rail .findStatus { padding-inline: .25em; }
 .Jump .findBar--rail .findStatus { padding-right: 0; }
 
 .Jump--pager { display: grid; overflow: hidden; }
-.Jump-pagerActions, .Jump-searchNavigationContent { display: flex; width: min(26em, calc(100vw - 2em)); min-width: 0; }
+.Jump-pagerActions, .Jump-searchNavigationContent { display: flex; width: min(18em, calc(100vw - 2em)); min-width: 0; }
 .Jump-pagerActions { grid-area: 1 / 1; opacity: 1; transition: opacity 150ms var(--cubic-move); }
-.Jump-pagerButton, .Jump-searchNavigationButton { flex: 1; }
+.Jump-pagerButton, .Jump-searchNavigationButton { flex: 1; padding-block: .35em; padding-inline: .6em; }
 .Jump-pagerButton svg { flex: 0 0 auto; }
 .Jump-pagerButton--me { padding-inline: .375em; text-align: center; }
 .Jump-pagerButton + .Jump-pagerButton, .Jump-searchNavigationButton + .Jump-searchNavigationButton { border-left: 1px solid var(--border-subtle); }

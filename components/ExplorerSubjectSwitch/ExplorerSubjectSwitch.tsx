@@ -4,7 +4,7 @@ import { TextDropdown } from "../Dropdown/TextDropdown";
 import { useProjectionFeatureSwitch } from "@/components/ProjectionFeatureSwitchProvider";
 
 export const EXPLORER_SUBJECTS = [
-  { id: "people", label: "Persons" },
+  { id: "people", label: "Rankings" },
   { id: "results", label: "Results" },
   { id: "competitions", label: "Competitions" },
 ] as const;
@@ -23,10 +23,22 @@ export function ExplorerSubjectSwitch({
 }: {
   subject: NavigationSubject;
   onChange: (subject: NavigationSubject) => void;
-  variant?: "segmented" | "select" | "text";
+  variant?: "segmented" | "select" | "text" | "title";
 }) {
   const featureSwitch = useProjectionFeatureSwitch();
   const subjects = NAVIGATION_SUBJECTS.filter((option) => featureSwitch.core || option.id === "lists");
+  if (variant === "title") {
+    return (
+      <TextDropdown
+        options={subjects.map((option) => ({ value: option.id, label: option.label }))}
+        value={subject}
+        onChange={(value) => onChange(value as NavigationSubject)}
+        ariaLabel="Browse WCA data"
+        className="headerSubjectDropdown"
+        triggerPrefix="WCA "
+      />
+    );
+  }
   if (variant === "text") {
     return (
       <TextDropdown
@@ -40,7 +52,7 @@ export function ExplorerSubjectSwitch({
 
   if (variant === "select") {
     return (
-      <label className={`ExplorerSubjectSelect${variant === "text" ? " ExplorerSubjectSelect--text" : ""}`}>
+      <label className="ExplorerSubjectSelect">
         <span className="visuallyHidden">Browse</span>
         <select
           value={subject}

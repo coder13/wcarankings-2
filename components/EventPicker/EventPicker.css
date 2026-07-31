@@ -15,7 +15,7 @@
 
 .EventPicker-preview {
   width: 44px;
-  padding-left: 4px;
+  padding-left: 8px;
   border-right: 1px solid var(--border-subtle);
   border-radius: 20px 0 0 20px;
   color: var(--text-strong);

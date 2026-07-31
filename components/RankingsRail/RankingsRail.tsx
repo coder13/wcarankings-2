@@ -8,7 +8,7 @@ import ArrowUpIcon from "../Icon/arrow-up.svg?react";
 import CloseIcon from "../Icon/close.svg?react";
 import CompassIcon from "../Icon/compass.svg?react";
 import SearchIcon from "../Icon/search.svg?react";
-import { formatRankingNumber, type RankingEntry, type RegionOption, type RegionSelection } from "../RankingsExplorer/types";
+import { type RankingEntry, type RegionOption, type RegionSelection } from "../RankingsExplorer/types";
 import type { GenderFilter } from "@/lib/wca";
 import { GenderPicker } from "../GenderPicker/GenderPicker";
 
@@ -157,11 +157,22 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
 
   const nearTop = currentPosition <= 5000;
   const nearEnd = Number.isFinite(total) && currentPosition >= total - 5000;
+  const currentLabels = {
+    up: upArmed || nearTop ? "Top" : "-5000",
+    down: downArmed || nearEnd ? "End" : "+5000",
+  };
+  const [wasBusy, setWasBusy] = useState(busy);
+  const [busyLabels, setBusyLabels] = useState(currentLabels);
+  if (busy !== wasBusy) {
+    setWasBusy(busy);
+    if (busy) setBusyLabels(currentLabels);
+  }
+  const labels = busy ? busyLabels : currentLabels;
   return <RankingsRail className="Jump--pager" direction="down" searchNavigation={searchActive}>
     <div className="Jump-pagerActions" aria-hidden={searchActive}>
-      <button className="Jump-pagerButton" onClick={onJumpUp} type="button" disabled={searchActive || busy}><span>{upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}</span><ArrowUpIcon /></button>
+      <button className="Jump-pagerButton" onClick={onJumpUp} type="button" disabled={searchActive || busy}><ArrowUpIcon /><span>{labels.up}</span></button>
       {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={searchActive || busy} aria-label="Jump to my ranking"><span>My rank</span></button>}
-      <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={searchActive || busy}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></button>
+      <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={searchActive || busy}><span>{labels.down}</span><ArrowDownIcon /></button>
     </div>
     <div className="Jump-searchNavigation" aria-hidden={!searchActive}><div className="Jump-searchNavigationContent">
       <button className="Jump-searchNavigationButton" onClick={onSearchPrevious} type="button" disabled={!searchActive}><ArrowUpIcon /><span>Previous person</span></button>

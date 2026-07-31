@@ -13,6 +13,7 @@ export function useRailScrollProgress({
 }) {
   const [topProgress, setTopProgress] = useState(0);
   const [bottomProgress, setBottomProgress] = useState(0);
+  const [hasScrolled, setHasScrolled] = useState(false);
   const topRef = useRef(0);
   const bottomRef = useRef(0);
 
@@ -20,6 +21,7 @@ export function useRailScrollProgress({
     if (!enabled) return;
     const update = () => {
       const raw = Math.max(0, Math.min(1, window.scrollY / transformDistance));
+      setHasScrolled(window.scrollY > 1);
       const nextTop = raw * raw * (3 - 2 * raw);
       if (nextTop !== topRef.current) {
         topRef.current = nextTop;
@@ -37,5 +39,5 @@ export function useRailScrollProgress({
     return () => { window.cancelAnimationFrame(frame); window.removeEventListener("scroll", update); };
   }, [enabled, revealDistance, transformDistance]);
 
-  return { topProgress, bottomProgress };
+  return { topProgress, bottomProgress, hasScrolled };
 }

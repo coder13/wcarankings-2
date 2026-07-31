@@ -3,7 +3,7 @@
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
-import { ExplorerSubjectSwitch, type NavigationSubject } from "@/components/ExplorerSubjectSwitch/ExplorerSubjectSwitch";
+import { type NavigationSubject } from "@/components/ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { ListBrowseControlsRail, ListBrowsePagerRail } from "@/components/RankingsRail/RankingsRail";
 import type { PublicListSummary } from "@/lib/lists";
 import { ListRow } from "./ListRow";
@@ -30,9 +30,7 @@ export function ListBrowse({ lists }: { lists: PublicListSummary[] }) {
   };
   return (
     <div className="app">
-      <AppHeader>
-        <ExplorerSubjectSwitch subject="lists" onChange={changeSubject} variant="text" />
-      </AppHeader>
+      <AppHeader subject="lists" onSubjectChange={changeSubject}>{null}</AppHeader>
       <div className="stickyRankingsRail"><ListBrowseControlsRail query={query} onQueryChange={setQuery} /></div>
       <main className="listBrowse">
         <div className="listBrowseActions">

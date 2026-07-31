@@ -51,7 +51,7 @@ export function RegionPicker({
       ]
     : [];
   const defaultActiveOption =
-    visibleOptions.find((option) => option.key === selectedOption?.key) ??
+    visibleOptions.find((option) => option.scope !== "world") ??
     visibleOptions[0];
   const effectiveActiveKey = visibleOptions.some(
     (option) => option.key === activeKey,
@@ -135,8 +135,14 @@ export function RegionPicker({
           if (disabled) return;
           if (!open) setQuery("");
           setActiveKey(
-            selectedOption?.key ?? options[0]?.key ?? null,
+            options.find((option) => option.scope !== "world")?.key ??
+              options[0]?.key ??
+              null,
           );
+          setPickerOpen(true);
+        }}
+        onClick={() => {
+          if (disabled) return;
           setPickerOpen(true);
         }}
         onBlur={() => {
@@ -172,7 +178,9 @@ export function RegionPicker({
             if (!open) {
               setQuery("");
               setActiveKey(
-                selectedOption?.key ?? options[0]?.key ?? null,
+                options.find((option) => option.scope !== "world")?.key ??
+                  options[0]?.key ??
+                  null,
               );
               setPickerOpen(true);
               return;

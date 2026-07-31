@@ -12,6 +12,7 @@ import {
   useSyncExternalStore,
   type CSSProperties,
 } from "react";
+import { flushSync } from "react-dom";
 import {
   animateScrollTo,
   cancelScrollAnimation,
@@ -56,7 +57,6 @@ import { AppHeader } from "../AppHeader/AppHeader";
 import { VimHelp } from "../VimHelp/VimHelp";
 import { VimSearchInput } from "../VimSearchInput/VimSearchInput";
 import {
-  ExplorerSubjectSwitch,
   type ExplorerSubject,
   type NavigationSubject,
 } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
@@ -501,7 +501,7 @@ export function RankingsExplorer({
   initialEventId = "333",
   initialRankingType = "single",
   initialGender = [],
-  initialYear: _initialYear = null,
+  initialYear = null,
   initialRegionSelection = { scope: "world", regionId: "" },
   showAllEventRankingOptions = false,
   showSubjectSwitch = false,
@@ -588,6 +588,7 @@ export function RankingsExplorer({
     latitudeHemisphere: initialLatitudeHemisphere,
   });
   const [gender, setGender] = useState<readonly GenderFilter[]>(initialGender);
+  const availableYears = initialData?.availableYears ?? [];
   const navigateToPage = useCallback((path: string) => {
     const navigate = () => router.push(path);
     const reduceMotion = window.matchMedia(
@@ -693,7 +694,7 @@ export function RankingsExplorer({
     x: number;
     y: number;
   } | null>(null);
-  const { topProgress: topRailProgress, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
+  const { topProgress: topRailProgress, hasScrolled } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
   const activeListKey = [
     subject,
     competitionRanking,
@@ -726,6 +727,7 @@ export function RankingsExplorer({
   const pendingScrollToTopRef = useRef(false);
   const pendingScrollDirectionRef = useRef<-1 | 1 | null>(null);
   const pendingNavigationAppendRef = useRef(false);
+  const pendingNavigationRebaseRef = useRef<(() => void) | null>(null);
   const navigationTargetRankRef = useRef<number | null>(null);
   const pagerNavigationBusyRef = useRef(false);
   const preserveListDuringLoadRef = useRef(false);
@@ -1187,6 +1189,70 @@ export function RankingsExplorer({
             : pendingDirection === -1
             ? Math.max(0, loadedEntries.length - 1)
             : 0;
+        const rebaseAppendedWindow = appendNavigation
+          ? () => {
+              if (!active) return;
+              const list = listRef.current;
+              const targetEntry = loadedEntries[targetIndex];
+              const rebasedTargetIndex = targetEntry
+                ? data.entries.findIndex(
+                    (entry) =>
+                      rankingEntryKey(entry) === rankingEntryKey(targetEntry)
+                  )
+                : -1;
+              const oldListTop = list
+                ? list.getBoundingClientRect().top + window.scrollY
+                : 0;
+              const oldTargetOffset =
+                rowVirtualizerRef.current.getOffsetForIndex(
+                  targetIndex,
+                  "start"
+                )?.[0] ?? targetIndex * ROW_HEIGHT;
+              const targetViewportTop =
+                oldListTop + oldTargetOffset - window.scrollY;
+
+              scrollAnimationStateRef.current.programmatic = true;
+              entriesRef.current = data.entries;
+              startPositionRef.current = data.startPosition;
+              flushSync(() => {
+                setEntries(data.entries);
+                setStartPosition(data.startPosition);
+                setPreviousPageStart(data.previousPageStart);
+                setNextPageStart(data.nextPageStart);
+              });
+              rowVirtualizerRef.current.measure();
+              window.requestAnimationFrame(() => {
+                const nextListTop = listRef.current
+                  ? listRef.current.getBoundingClientRect().top + window.scrollY
+                  : 0;
+                const nextIndex = Math.max(0, rebasedTargetIndex);
+                const nextTargetOffset =
+                  rowVirtualizerRef.current.getOffsetForIndex(
+                    nextIndex,
+                    "start"
+                  )?.[0] ?? nextIndex * ROW_HEIGHT;
+                window.scrollTo({
+                  top: Math.max(
+                    0,
+                    nextListTop + nextTargetOffset - targetViewportTop
+                  ),
+                  behavior: "auto",
+                });
+                window.requestAnimationFrame(() => {
+                  scrollAnimationStateRef.current.programmatic = false;
+                  navigationTargetRankRef.current = null;
+                  finishPagerNavigation();
+                });
+              });
+            }
+          : null;
+        pendingNavigationRebaseRef.current = rebaseAppendedWindow;
+        const finishNavigation = () => {
+          const rebase = pendingNavigationRebaseRef.current;
+          pendingNavigationRebaseRef.current = null;
+          if (rebase) rebase();
+          else finishPagerNavigation();
+        };
         const shouldScrollToTarget = Boolean(
           scrollToTop ||
             focusLast ||
@@ -1246,9 +1312,10 @@ export function RankingsExplorer({
                       targetIndex,
                       "start"
                     )?.[0],
-              onComplete: pagerNavigationBusyRef.current
-                ? finishPagerNavigation
-                : undefined,
+              onComplete:
+                rebaseAppendedWindow || pagerNavigationBusyRef.current
+                  ? finishNavigation
+                  : undefined,
             });
           });
 
@@ -2107,14 +2174,17 @@ export function RankingsExplorer({
   }, [entries.length, loadMore, virtualRows]);
 
   useEffect(() => {
+    let lastScrollY = window.scrollY;
     const onScroll = () => {
       if (
         !scrollAnimationStateRef.current.programmatic &&
+        window.scrollY < lastScrollY &&
         window.scrollY <= listOffset + ROW_HEIGHT * 14
       ) {
         navigationTargetRankRef.current = null;
         void loadPrevious();
       }
+      lastScrollY = window.scrollY;
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -2161,7 +2231,10 @@ export function RankingsExplorer({
       setLoading(false);
       preserveListDuringLoadRef.current = false;
       setPreserveListDuringLoad(false);
-      finishPagerNavigation();
+      const rebase = pendingNavigationRebaseRef.current;
+      pendingNavigationRebaseRef.current = null;
+      if (rebase) rebase();
+      else finishPagerNavigation();
     };
     window.addEventListener("wheel", cancelOnUserInput, { passive: true });
     window.addEventListener("touchstart", cancelOnUserInput, { passive: true });
@@ -2227,6 +2300,7 @@ export function RankingsExplorer({
         searchTransformOffsetRef.current = 0;
       }
       pendingNavigationAppendRef.current = false;
+      pendingNavigationRebaseRef.current = null;
       setLoading(false);
       const normalizedRank = clampTargetSubRank(rank, total, lastRank);
       const currentRank = getCurrentViewportSubRank(
@@ -2968,19 +3042,38 @@ export function RankingsExplorer({
         findQuery.trim() ? " app--searching" : ""
       }`}
     >
-      <AppHeader>
+      <AppHeader
+        subject={rankingSource ? "lists" : showSubjectSwitch ? subject : undefined}
+        onSubjectChange={rankingSource ? changeListSubject : showSubjectSwitch ? changeSubject : undefined}
+      >
         {rankingSource ? (
-          <>
-            <ExplorerSubjectSwitch subject="lists" onChange={changeListSubject} variant="text" />
-            <span className="listRankingName">{rankingSource.listName}</span>
-          </>
+          <span className="listRankingName">{rankingSource.listName}</span>
         ) : showSubjectSwitch && (
           <>
-            <ExplorerSubjectSwitch
-              subject={subject}
-              onChange={changeSubject}
-              variant="text"
-            />
+            {subject === "people" && availableYears.length > 0 && (
+              <TextDropdown
+                options={[
+                  { value: "", label: "All time" },
+                  ...availableYears.map((year) => ({
+                    value: String(year),
+                    label: String(year),
+                  })),
+                ]}
+                value={initialYear ? String(initialYear) : ""}
+                onChange={(year) => {
+                  const params = new URLSearchParams(window.location.search);
+                  params.delete("year");
+                  params.delete("search");
+                  params.delete("wcaId");
+                  params.delete("focus");
+                  const query = params.toString();
+                  const path = year ? `/persons/year/${year}` : "/";
+                  navigateToPage(`${path}${query ? `?${query}` : ""}`);
+                }}
+                ariaLabel="Person ranking period"
+                className="personYearDropdown"
+              />
+            )}
             {subject === "competitions" && (
               <TextDropdown
                 options={COMPETITION_RANKING_OPTIONS}
@@ -3108,7 +3201,16 @@ export function RankingsExplorer({
         </div>
 
         {!memberSelectionMode && (!rankingSource || total > PAGE_SIZE) && <JumpControlsVisibility
-          progress={pagerNavigationBusy ? 1 : bottomRailProgress}
+          visible={pagerNavigationBusy || hasScrolled}
+          fallback={(
+            <footer className="siteFooter">
+              <span>By Adam Walker and Cailyn Sinclair</span>
+              {offlineStale && <span role="status">Offline cached rankings may be stale</span>}
+              <span>
+                {formatFooterDate(lastResultIngestAt ?? exportDate)}{" • "}{commitSha === "development" || commitSha === "unknown" ? commitSha : commitSha.slice(0, 7)}
+              </span>
+            </footer>
+          )}
         >
           <RankingsPagerRail
             upArmed={false}
@@ -3152,13 +3254,15 @@ export function RankingsExplorer({
       {(vimMode || vimSearchActive) && vimHelpOpen && (
         <VimHelp onClose={() => setVimHelpOpen(false)} />
       )}
-      <footer className="siteFooter">
-        <span>By Adam Walker and Cailyn Sinclair</span>
-        {offlineStale && <span role="status">Offline cached rankings may be stale</span>}
-        <span>
-          {formatFooterDate(lastResultIngestAt ?? exportDate)}{" • "}{commitSha === "development" || commitSha === "unknown" ? commitSha : commitSha.slice(0, 7)}
-        </span>
-      </footer>
+      {memberSelectionMode || rankingSource && total <= PAGE_SIZE ? (
+        <footer className="siteFooter siteFooter--standalone">
+          <span>By Adam Walker and Cailyn Sinclair</span>
+          {offlineStale && <span role="status">Offline cached rankings may be stale</span>}
+          <span>
+            {formatFooterDate(lastResultIngestAt ?? exportDate)}{" • "}{commitSha === "development" || commitSha === "unknown" ? commitSha : commitSha.slice(0, 7)}
+          </span>
+        </footer>
+      ) : null}
     </div>
   );
 }
