@@ -294,14 +294,13 @@ main {
 .JumpControlsVisibility:has(.Jump[data-direction="down"]) > .RankingsRailTransition::before {
   position: absolute;
   z-index: 0;
-  inset: -0.5rem;
+  inset: -6px;
   border-radius: 2rem;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow:
-    0 0 12px 8px color-mix(in srgb, var(--surface) 82%, transparent),
-    0 0 30px 20px color-mix(in srgb, var(--surface) 50%, transparent);
+    0 0 18px 12px color-mix(in srgb, var(--surface) 75%, transparent),
+    0 0 48px 28px color-mix(in srgb, var(--surface) 34%, transparent);
   content: "";
-  filter: blur(3px);
   pointer-events: none;
 }
 
