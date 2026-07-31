@@ -157,6 +157,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);
   assert.match(schema, /entity-ranking-counts/);
   assert.match(schema, /name: "competition-event-stats"[\s\S]*enabledByDefault: true/);
+  assert.match(schema, /name: "city-event-stats"[\s\S]*enabledByDefault: true/);
 });
 
 test("does not introduce entries or sub-rank vocabulary in new schemas", async () => {

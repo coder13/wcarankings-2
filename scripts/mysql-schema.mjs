@@ -186,7 +186,13 @@ const projectionDefinitions = [
     tables: ["competition_stats"],
     enabledByDefault: true,
   },
-  { name: "city-event-stats", dependencies: ["result-facts"], files: ["city_event_stats.sql"], tables: ["city_event_stats"] },
+  {
+    name: "city-event-stats",
+    dependencies: ["result-facts"],
+    files: ["city_event_stats.sql"],
+    tables: ["city_event_stats"],
+    enabledByDefault: true,
+  },
   { name: "entity-ranking-counts", dependencies: ["competition-event-stats", "competition-stats", "city-event-stats"], files: ["entity_ranking_counts.sql"], tables: ["entity_ranking_counts"] },
 ];
 
