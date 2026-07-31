@@ -273,7 +273,7 @@ main {
   }
 }
 
-.stickyRankingsRail > .Jump {
+.stickyRankingsRail > .RankingsRailTransition > .Jump {
   background: var(--surface);
   box-shadow:
     0 calc(1px * (1 - var(--rail-scroll-progress)))
@@ -288,7 +288,7 @@ main {
   background: var(--surface);
 }
 
-.stickyRankingsRail > .Jump--rankings:has(
+.stickyRankingsRail > .RankingsRailTransition > .Jump--rankings:has(
   .findBar--rail:is([data-has-text="true"], [data-open="true"])
 ) {
   background: transparent;

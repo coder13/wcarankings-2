@@ -26,24 +26,27 @@ export const RankingsRail = forwardRef<HTMLDivElement, { children: ReactNode; cl
     return (
       <MotionConfig reducedMotion="user">
         <motion.div
-          ref={ref}
           layout
+          layoutId={`rankings-rail-${direction}`}
           initial={false}
           animate={{
             opacity: isPresent ? 1 : 0,
-            scale: isPresent ? 1 : 0.97,
           }}
           transition={{
             layout: railLayoutTransition,
             opacity: { duration: 0.14, ease: "easeOut" },
-            scale: { duration: 0.14, ease: "easeOut" },
           }}
-          className={`Jump RankingsRail ${className}`}
-          data-direction={direction}
-          data-search-navigation={searchNavigation || undefined}
-          data-compact-result-type={compactResultType || undefined}
+          className="RankingsRailTransition"
         >
-          {children}
+          <div
+            ref={ref}
+            className={`Jump RankingsRail ${className}`}
+            data-direction={direction}
+            data-search-navigation={searchNavigation || undefined}
+            data-compact-result-type={compactResultType || undefined}
+          >
+            {children}
+          </div>
         </motion.div>
       </MotionConfig>
     );
@@ -102,15 +105,13 @@ function RailSearch({ searchInputRef, findOpen, findQuery, findError, findLoadin
     onSearchOpen();
   };
 
-  const isExpanded = findOpen || Boolean(findQuery);
-
   return (
-    <motion.div layout className="findBar findBar--rail" ref={searchBarRef} data-open={findOpen} data-has-text={findQuery.length > 0} role="search" animate={{ scale: isExpanded ? 1 : 0.985 }} transition={{ layout: railLayoutTransition, scale: { duration: 0.16, ease: "easeOut" } }}>
+    <div className="findBar findBar--rail" ref={searchBarRef} data-open={findOpen} data-has-text={findQuery.length > 0} role="search">
       <button className="findIcon" type="button" onMouseDown={(event) => event.preventDefault()} onClick={openSearch} aria-label="Search names or WCA IDs" title="Search names or WCA IDs (Ctrl+F)"><SearchIcon /></button>
       <input ref={inputRef} className="findInput" type="text" tabIndex={findOpen || findQuery ? 0 : -1} value={findQuery} onChange={(event) => onSearchQueryChange(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") { event.preventDefault(); onSearchCycle(event.shiftKey ? -1 : 1); } }} aria-label="Find a name or WCA ID" />
       <span className={`findStatus${findError ? " isError" : ""}`} aria-live="polite">{findLoading || findPending ? <span className="searchSpinner" aria-label="Searching" /> : status}</span>
       <button className="findClose" type="button" tabIndex={findOpen || findQuery ? 0 : -1} onMouseDown={(event) => event.preventDefault()} onClick={() => { inputRef.current?.blur(); onSearchClose(); }} aria-label="Close search"><CloseIcon /></button>
-    </motion.div>
+    </div>
   );
 }
 
@@ -139,15 +140,10 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
   regionDisabled?: boolean;
 } & Parameters<typeof RailSearch>[0]) {
   const nextType = rankingType === "single" ? "average" : "single";
+  const searchExpanded = searchProps.findOpen || Boolean(searchProps.findQuery);
   return (
     <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType}>
-      <motion.div
-        layout
-        className="Jump-railSettings"
-        animate={{ opacity: findOpen || Boolean(findQuery) ? 0 : 1 }}
-        transition={{ layout: railLayoutTransition, opacity: { duration: 0.16, ease: "easeOut" } }}
-        aria-hidden={findOpen || Boolean(findQuery) ? true : undefined}
-      >
+      <div className="Jump-railSettings" aria-hidden={searchExpanded || undefined}>
         {showEventPicker ? (
           <EventPicker event={event} options={eventOptions} additionalOptions={additionalEventOptions} onChange={onEventChange} onTriggerReady={onEventPickerTrigger} />
         ) : hemisphere ? (
@@ -162,7 +158,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
         {showGender && <GenderPicker className="Jump-genderPicker" value={gender} onChange={onGenderChange} />}
         {showRegion && <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} disabled={regionDisabled} />}
         {listAddAction && <button className="Jump-listAddButton" type="button" onClick={listAddAction}>+ Add</button>}
-      </motion.div>
+      </div>
       {showSearch && <RailSearch {...searchProps} />}
     </RankingsRail>
   );

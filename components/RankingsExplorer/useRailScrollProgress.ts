@@ -20,7 +20,7 @@ export function useRailScrollProgress({
     if (!enabled) return;
     const update = () => {
       const raw = Math.max(0, Math.min(1, window.scrollY / transformDistance));
-      const nextTop = raw * raw * (3 - 2 * raw);
+      const nextTop = raw;
       if (nextTop !== topRef.current) {
         topRef.current = nextTop;
         setTopProgress(nextTop);

@@ -10,6 +10,7 @@
 }
 
 .RankingsRail { isolation: isolate; }
+.RankingsRailTransition { display: flex; }
 .Jump svg { width: 22px; height: 22px; }
 
 .Jump--rankings {
@@ -168,6 +169,7 @@
 .Jump .findBar--rail .findIcon, .Jump .findBar--rail .findClose { position: relative; display: grid; width: var(--rail-control-height); height: var(--rail-control-height); min-width: var(--rail-control-height); min-height: var(--rail-control-height); flex: 0 0 var(--rail-control-height); aspect-ratio: 1; padding: 0; place-items: center; border: 0; background: transparent; color: var(--text-strong); cursor: pointer; transition: color 150ms var(--cubic-move); }
 .Jump .findBar--rail .findIcon:hover, .Jump .findBar--rail .findClose:hover, .Jump .findBar--rail .findIcon:focus-visible, .Jump .findBar--rail .findClose:focus-visible { color: var(--focus); outline: none; }
 .Jump .findBar--rail .findClose svg { width: 20px; height: 20px; }
+.Jump .findBar--rail[data-open="false"][data-has-text="false"] .findClose { display: none; }
 .Jump .findBar--rail .findInput, .Jump .findBar--rail .findStatus { padding-inline: .25em; }
 .Jump .findBar--rail .findStatus { padding-right: 0; }
 
