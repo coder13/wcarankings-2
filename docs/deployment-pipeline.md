@@ -22,7 +22,9 @@ coherent dataset if production advances before the merge.
 
 When that labeled pull request is merged, the workflow finds the successful build
 by the PR head SHA, downloads that exact artifact, and sends its immutable
-coordinates through `deploy-projections.yml`. A fork PR is intentionally ignored
+coordinates through `deploy-projections.yml`. The deployer requires the raw
+export when production has advanced, and safely reuses it when production is
+still on the same export. A fork PR is intentionally ignored
 because the build requires the repository's deployment credentials and executes
 database-generation code.
 

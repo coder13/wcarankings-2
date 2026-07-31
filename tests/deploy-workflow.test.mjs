@@ -107,6 +107,12 @@ test("builds labeled PR projections and deploys the exact merged artifact", () =
   assert.match(prProjectionRelease, /artifact_id:/);
   assert.match(prProjectionRelease, /deploy-projections\.yml/);
   assert.match(prProjectionRelease, /production-mutation/);
+  assert.match(projectionDeploy, /if \[ "\$WCA_EXPORT_VALUE" != "\$PRODUCTION_WCA_EXPORT_VALUE" \]; then/);
+  assert.doesNotMatch(
+    projectionDeploy,
+    /\.raw == null/,
+    "same-export releases may still carry a coherent PR raw export",
+  );
 });
 
 test("builds and verifies digest-addressed server images", () => {
