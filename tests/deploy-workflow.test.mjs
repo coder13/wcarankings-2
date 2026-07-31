@@ -120,6 +120,11 @@ test("server deployment retries real endpoints and rolls back with diagnostics",
   assert.match(serverDeploy, /Rollback readiness check passed/);
   assert.match(serverDeploy, /Previous app image retained for the next rollback/);
   assert.match(serverDeploy, /check-release-compatibility\.mjs/);
+  assert.match(
+    serverDeploy,
+    /if \[\[ ! "\$dataset_schema_version" =~ \^\[1-9\]\[0-9\]\*\$ \]\]; then[\s\S]*dataset_schema_version=1/,
+    "an empty or invalid pre-cutover state must use the baseline dataset schema",
+  );
   assert.match(serverDeploy, /PROXY_CONFIG_CHANGED/);
   assert.match(serverDeploy, /server-release-state\.json/);
   assert.match(serverDeploy, /production-mutation\.lock/);
