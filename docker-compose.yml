@@ -46,17 +46,25 @@ services:
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-5}
       DATABASE_QUEUE_LIMIT: ${DATABASE_QUEUE_LIMIT:-20}
       RANKINGS_STATEMENT_TIMEOUT_MS: ${RANKINGS_STATEMENT_TIMEOUT_MS:-2000}
-      WCA_EXPORT_CACHE_DIR: /var/cache/wcarankings
       WCA_CLIENT_ID: ${WCA_CLIENT_ID:-}
       WCA_CLIENT_SECRET: ${WCA_CLIENT_SECRET:-}
       WCA_REDIRECT_URI: ${WCA_REDIRECT_URI:-}
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - wca_export_cache:/var/cache/wcarankings
     ports:
       - "127.0.0.1:3000:3000"
+
+  data-tools:
+    image: wcarankings-data-tools:latest
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      WCA_EXPORT_CACHE_DIR: /var/cache/wcarankings
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - wca_export_cache:/var/cache/wcarankings
 
   proxy:
     image: caddy:2-alpine

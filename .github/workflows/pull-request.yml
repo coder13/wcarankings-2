@@ -90,20 +90,56 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build data-tools Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.data-tools
+          load: true
+          push: false
+          tags: |
+            wcarankings-data-tools:pull-request
+            ghcr.io/${{ github.repository_owner }}/wcarankings-data-tools:tree-${{ steps.source-tree.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha }}
+            org.opencontainers.image.version=tree-${{ steps.source-tree.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify data-tools image
+        run: |
+          docker run --rm --entrypoint sh wcarankings-data-tools:pull-request -c \
+            'test -f /app/release-compatibility.json && test -f /app/scripts/activate-ranking-generation.mjs && test -f /app/scripts/sync-wca-export.mjs'
+
       - name: Verify production image contents
         run: |
           docker run --rm --entrypoint sh wcarankings-app:pull-request -c \
-            'test -f /app/docker-entrypoint.sh && test -f /app/scripts/backfill-result-entries.mjs && test -f /app/scripts/backfill-result-rankings.mjs && test -f /app/scripts/backfill-person-year-rankings.mjs && test -f /app/scripts/backfill-sum-of-ranks.mjs && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs && test -f /app/scripts/refresh-system-lists.mjs && test -f /app/scripts/system-list-definitions.mjs'
+            'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.mjs'
 
       - name: Seed visual smoke-test database
         run: |
           docker tag wcarankings-app:pull-request wcarankings-app:latest
+          docker tag wcarankings-data-tools:pull-request wcarankings-data-tools:latest
           docker compose exec -T db mariadb \
             --user="$MYSQL_USER" \
             --password="$MYSQL_PASSWORD" \
             "$MYSQL_DATABASE" < tests/fixtures/visual-smoke.sql
-          docker compose run --rm app node scripts/backfill-result-entries.mjs
-          docker compose run --rm app node scripts/refresh-rankings.mjs
+          docker compose run --rm data-tools /app/scripts/backfill-result-entries.mjs
+          docker compose run --rm data-tools /app/scripts/refresh-rankings.mjs
+
+      - name: Exercise candidate-schema activation against disposable MariaDB
+        env:
+          INTEGRATION_ADMIN_DATABASE_URL: mysql://wcarankings:local-development-password@db:3306/mysql
+        run: |
+          docker compose exec -T db mariadb \
+            --user=root \
+            --password="$MYSQL_ROOT_PASSWORD" \
+            --execute="GRANT ALL PRIVILEGES ON *.* TO 'wcarankings'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
+          docker compose run --rm \
+            -e INTEGRATION_ADMIN_DATABASE_URL="$INTEGRATION_ADMIN_DATABASE_URL" \
+            -v "$GITHUB_WORKSPACE:/app/repo:ro" \
+            data-tools /app/repo/tests/ranking-generation-activation.integration.mjs
 
       - name: Start visual smoke-test app
         run: |
@@ -153,6 +189,7 @@ jobs:
         run: |
           docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-flyway:tree-${{ steps.source-tree.outputs.sha }}"
           docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-app:tree-${{ steps.source-tree.outputs.sha }}"
+          docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-data-tools:tree-${{ steps.source-tree.outputs.sha }}"
 
       - name: Clean up visual smoke-test containers
         if: always()

@@ -1,0 +1,348 @@
+name: Build Ranking Projection Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref containing projection generation code.
+        required: true
+        type: string
+      export_date:
+        description: YYYY-MM-DD WCA export cache date.
+        required: true
+        type: string
+      export_value:
+        description: Complete WCA export identity.
+        required: true
+        type: string
+      groups:
+        description: Comma-separated projection groups to build.
+        required: false
+        default: ""
+        type: string
+      fingerprints:
+        description: JSON map of canonical projection group fingerprints.
+        required: true
+        type: string
+      cache_only:
+        description: Download/cache the WCA export without generating projections.
+        required: false
+        default: false
+        type: boolean
+      include_raw:
+        description: Bundle the raw WCA SQL export for coherent generation activation.
+        required: false
+        default: false
+        type: boolean
+    outputs:
+      artifact_name:
+        value: ${{ jobs.build.outputs.artifact_name }}
+      manifest_sha256:
+        value: ${{ jobs.build.outputs.manifest_sha256 }}
+      source_sha:
+        value: ${{ jobs.build.outputs.source_sha }}
+      source_tree:
+        value: ${{ jobs.build.outputs.source_tree }}
+      duration_seconds:
+        value: ${{ jobs.build.outputs.duration_seconds }}
+      artifact_id:
+        value: ${{ jobs.build.outputs.artifact_id }}
+      artifact_run_id:
+        value: ${{ jobs.build.outputs.artifact_run_id }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_name: ${{ steps.release-artifact.outputs.name }}
+      manifest_sha256: ${{ steps.release-artifact.outputs.sha256 }}
+      source_sha: ${{ steps.source.outputs.sha }}
+      source_tree: ${{ steps.source.outputs.tree }}
+      duration_seconds: ${{ steps.projection-build.outputs.duration_seconds || '0' }}
+      artifact_id: ${{ steps.upload.outputs['artifact-id'] }}
+      artifact_run_id: ${{ github.run_id }}
+    env:
+      MYSQL_DATABASE: wcarankings
+      MYSQL_USER: wcarankings
+      MYSQL_PASSWORD: projection-build
+      MYSQL_ROOT_PASSWORD: projection-build-root
+      DATABASE_URL: mysql://wcarankings:projection-build@127.0.0.1:13307/wcarankings
+      WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
+      PROJECTION_ARTIFACT_DIR: /tmp/projection-release
+
+    steps:
+      - name: Check out projection source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Resolve source identity
+        id: source
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "tree=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        if: inputs.groups != '' || inputs.cache_only
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Restore cached core projection
+        if: contains(inputs.groups, 'core') && !inputs.cache_only
+        id: core-projection-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            /tmp/projection-release/core-projection-transfer.sql.gz
+            /tmp/projection-release/core-projection-transfer.json
+          key: projection-release-group-core-${{ fromJSON(inputs.fingerprints).core }}
+
+      - name: Restore cached Sum of Ranks projection
+        if: contains(inputs.groups, 'sum-of-ranks') && !inputs.cache_only
+        id: sum-of-ranks-projection-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            /tmp/projection-release/sum-of-ranks-projection-transfer.sql.gz
+            /tmp/projection-release/sum-of-ranks-projection-transfer.json
+          key: projection-release-group-sum-of-ranks-${{ fromJSON(inputs.fingerprints)['sum-of-ranks'] }}
+
+      - name: Restore cached yearly projection
+        if: contains(inputs.groups, 'yearly-person-rankings') && !inputs.cache_only
+        id: yearly-projection-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            /tmp/projection-release/yearly-projection-transfer.sql.gz
+            /tmp/projection-release/yearly-projection-transfer.json
+          key: projection-release-group-yearly-${{ fromJSON(inputs.fingerprints)['yearly-person-rankings'] }}
+
+      - name: Determine projection cache misses
+        id: projection-cache-plan
+        env:
+          SELECTED_GROUPS: ${{ inputs.groups }}
+          CORE_CACHE_HIT: ${{ steps.core-projection-cache.outputs.cache-hit }}
+          SUM_OF_RANKS_CACHE_HIT: ${{ steps.sum-of-ranks-projection-cache.outputs.cache-hit }}
+          YEARLY_CACHE_HIT: ${{ steps.yearly-projection-cache.outputs.cache-hit }}
+        run: |
+          build_groups=()
+          for group in $(printf '%s' "$SELECTED_GROUPS" | tr ',' ' '); do
+            case "$group" in
+              core) cache_hit=$CORE_CACHE_HIT; prefix=core ;;
+              sum-of-ranks) cache_hit=$SUM_OF_RANKS_CACHE_HIT; prefix=sum-of-ranks ;;
+              yearly-person-rankings) cache_hit=$YEARLY_CACHE_HIT; prefix=yearly ;;
+              *) echo "Unknown projection group: $group" >&2; exit 1 ;;
+            esac
+            archive="$PROJECTION_ARTIFACT_DIR/${prefix}-projection-transfer.sql.gz"
+            metadata="$PROJECTION_ARTIFACT_DIR/${prefix}-projection-transfer.json"
+            if [ "$cache_hit" = true ] && {
+              ! gzip -t "$archive" \
+              || ! jq -e --arg group "$group" '.group == $group' "$metadata" >/dev/null;
+            }; then
+              echo "::warning::Cached $group projection failed validation; rebuilding it."
+              rm -f "$archive" "$metadata"
+              cache_hit=false
+            fi
+            if [ "$cache_hit" != true ]; then build_groups+=("$group"); fi
+          done
+          groups_csv=$(IFS=,; echo "${build_groups[*]}")
+          echo "groups=$groups_csv" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies and MariaDB client
+        if: steps.projection-cache-plan.outputs.groups != '' || inputs.include_raw || inputs.cache_only
+        run: |
+          npm ci
+          sudo apt-get update
+          sudo apt-get install -y mariadb-client
+
+      - name: Restore WCA SQL export
+        if: steps.projection-cache-plan.outputs.groups != '' || inputs.cache_only || inputs.include_raw
+        id: wca-export-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/wca-export-cache
+          key: wca-sql-export-${{ inputs.export_date }}
+
+      - name: Populate WCA SQL export cache
+        if: (steps.projection-cache-plan.outputs.groups != '' || inputs.cache_only || inputs.include_raw) && steps.wca-export-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/wca-export-cache
+          WCA_EXPORT_CACHE_DIR=/tmp/wca-export-cache node scripts/sync-wca-export.mjs --dry-run
+          test -s "/tmp/wca-export-cache/wca-export-${{ inputs.export_date }}.sql.zip"
+
+      - name: Save WCA SQL export
+        if: (steps.projection-cache-plan.outputs.groups != '' || inputs.cache_only || inputs.include_raw) && steps.wca-export-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: /tmp/wca-export-cache
+          key: wca-sql-export-${{ inputs.export_date }}
+
+      - name: Build Flyway image for projection database
+        if: steps.projection-cache-plan.outputs.groups != '' && !inputs.cache_only
+        run: docker build -f Dockerfile.flyway -t wcarankings-flyway:latest .
+
+      - name: Build and export requested projection groups
+        if: steps.projection-cache-plan.outputs.groups != '' && !inputs.cache_only
+        id: projection-build
+        env:
+          SELECTED_GROUPS: ${{ steps.projection-cache-plan.outputs.groups }}
+          EXPORT_VALUE: ${{ inputs.export_value }}
+        run: |
+          set -euo pipefail
+          started_at=$(date +%s)
+          mkdir -p "$PROJECTION_ARTIFACT_DIR"
+          docker compose up -d db
+          docker compose run --rm flyway migrate
+          node scripts/projection-build-plan.mjs --groups="$SELECTED_GROUPS" > /tmp/projection-build-plan.json
+          projection_names_csv=$(jq -r '.projectionNames | join(",")' /tmp/projection-build-plan.json)
+          WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/sync-wca-export.mjs \
+            --force \
+            --sql-path="/tmp/wca-export-cache/wca-export-${{ inputs.export_date }}.sql.zip" \
+            --projection-names="$projection_names_csv"
+          mapfile -t planned_groups < <(jq -r '.groups[]' /tmp/projection-build-plan.json)
+          for group in "${planned_groups[@]}"; do
+            case "$group" in
+              yearly-person-rankings) prefix=yearly ;;
+              *) prefix=$group ;;
+            esac
+            node scripts/prepare-projection-transfer.mjs --group="$group" \
+              > "$PROJECTION_ARTIFACT_DIR/${prefix}-projection-transfer.json"
+            mapfile -t transfer_tables < <(
+              jq -r '.tables[]' "$PROJECTION_ARTIFACT_DIR/${prefix}-projection-transfer.json"
+            )
+            MYSQL_PWD="$MYSQL_PASSWORD" mariadb-dump \
+              --protocol=TCP \
+              --host=127.0.0.1 \
+              --port=13307 \
+              --user="$MYSQL_USER" \
+              --single-transaction \
+              --skip-lock-tables \
+              "$MYSQL_DATABASE" \
+              "${transfer_tables[@]}" \
+              | gzip -1 > "$PROJECTION_ARTIFACT_DIR/${prefix}-projection-transfer.sql.gz"
+          done
+          completed_at=$(date +%s)
+          duration=$((completed_at - started_at))
+          bytes=$(du -bc "$PROJECTION_ARTIFACT_DIR"/*.sql.gz | tail -1 | cut -f1)
+          echo "duration_seconds=$duration" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Projection build"
+            echo "- WCA export: $EXPORT_VALUE"
+            echo "- Built groups: $SELECTED_GROUPS"
+            echo "- Build and dump: ${duration}s"
+            echo "- Compressed transfer: ${bytes} bytes"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate release fingerprints
+        if: inputs.groups != '' && !inputs.cache_only
+        env:
+          EXPECTED_FINGERPRINTS: ${{ inputs.fingerprints }}
+          EXPORT_VALUE: ${{ inputs.export_value }}
+        run: |
+          node scripts/projection-release-plan.mjs \
+            --export-id="$EXPORT_VALUE" > /tmp/projection-fingerprints.json
+          actual=$(jq -cS '.groups | with_entries(.value = .value.fingerprint)' \
+            /tmp/projection-fingerprints.json)
+          expected=$(jq -cS . <<<"$EXPECTED_FINGERPRINTS")
+          if [ "$actual" != "$expected" ]; then
+            echo "Projection fingerprints changed between planning and build." >&2
+            exit 1
+          fi
+
+      - name: Save generated core projection
+        if: contains(steps.projection-cache-plan.outputs.groups, 'core') && !inputs.cache_only
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: |
+            /tmp/projection-release/core-projection-transfer.sql.gz
+            /tmp/projection-release/core-projection-transfer.json
+          key: projection-release-group-core-${{ fromJSON(inputs.fingerprints).core }}
+
+      - name: Save generated Sum of Ranks projection
+        if: contains(steps.projection-cache-plan.outputs.groups, 'sum-of-ranks') && !inputs.cache_only
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: |
+            /tmp/projection-release/sum-of-ranks-projection-transfer.sql.gz
+            /tmp/projection-release/sum-of-ranks-projection-transfer.json
+          key: projection-release-group-sum-of-ranks-${{ fromJSON(inputs.fingerprints)['sum-of-ranks'] }}
+
+      - name: Save generated yearly projection
+        if: contains(steps.projection-cache-plan.outputs.groups, 'yearly-person-rankings') && !inputs.cache_only
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: |
+            /tmp/projection-release/yearly-projection-transfer.sql.gz
+            /tmp/projection-release/yearly-projection-transfer.json
+          key: projection-release-group-yearly-${{ fromJSON(inputs.fingerprints)['yearly-person-rankings'] }}
+
+      - name: Create checksummed projection release
+        if: inputs.groups != '' && !inputs.cache_only
+        id: release-artifact
+        env:
+          SELECTED_GROUPS: ${{ inputs.groups }}
+          EXPORT_VALUE: ${{ inputs.export_value }}
+        run: |
+          raw_argument=()
+          if [ '${{ inputs.include_raw }}' = true ]; then
+            install -m 0644 \
+              "/tmp/wca-export-cache/wca-export-${{ inputs.export_date }}.sql.zip" \
+              "$PROJECTION_ARTIFACT_DIR/wca-export.sql.zip"
+            raw_argument+=(--raw-file=wca-export.sql.zip)
+          fi
+          result=$(node scripts/projection-release-artifact.mjs create \
+            --directory="$PROJECTION_ARTIFACT_DIR" \
+            --export-id="$EXPORT_VALUE" \
+            --export-date="${{ inputs.export_date }}" \
+            --groups="$SELECTED_GROUPS" \
+            --fingerprints-file=/tmp/projection-fingerprints.json \
+            --compatibility-file=release-compatibility.json \
+            --source-sha="${{ steps.source.outputs.sha }}" \
+            --source-tree="${{ steps.source.outputs.tree }}" \
+            "${raw_argument[@]}")
+          artifact_name="projection-release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(jq -r '.sha256' <<<"$result")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload projection release artifact
+        if: inputs.groups != '' && !inputs.cache_only
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.release-artifact.outputs.name }}
+          path: /tmp/projection-release
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Report no projection build
+        if: inputs.groups == '' || inputs.cache_only
+        run: |
+          {
+            echo "### Projection build"
+            echo "- WCA export: ${{ inputs.export_value }}"
+            echo "- Cache only: ${{ inputs.cache_only }}"
+            echo "- Required groups: ${{ inputs.groups || 'none' }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report fully cached projection release
+        if: inputs.groups != '' && !inputs.cache_only && steps.projection-cache-plan.outputs.groups == ''
+        run: |
+          {
+            echo "### Projection build"
+            echo "- WCA export: ${{ inputs.export_value }}"
+            echo "- Restored every required group from immutable fingerprint caches."
+            echo "- Built groups: none"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up projection build database
+        if: always() && steps.projection-cache-plan.outputs.groups != '' && !inputs.cache_only
+        run: docker compose down --volumes --remove-orphans

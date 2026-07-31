@@ -1,11 +1,10 @@
 [Unit]
-Description=Sync CubeRanks WCA rankings
-Requires=docker.service
-After=docker.service
-OnFailure=wcarankings-sync-alert.service
+Description=Deprecated CubeRanks server-local WCA ranking sync
+Documentation=https://github.com/coder13/wcarankings-2/actions/workflows/refresh-rankings.yml
+ConditionPathExists=/srv/wcarankings/ENABLE_DEPRECATED_SERVER_REFRESH
 
 [Service]
 Type=oneshot
 User=www
 WorkingDirectory=/srv/wcarankings
-ExecStart=/usr/bin/flock -n /tmp/wcarankings-sync.lock /bin/sh -lc '/usr/bin/docker compose run --rm flyway migrate && /usr/bin/docker compose run --rm app node /app/scripts/sync-wca-export.mjs && /usr/bin/docker compose run --rm app node /app/scripts/check-ranking-projections.mjs'
+ExecStart=/bin/sh -lc 'echo "Deprecated: production WCA data refreshes must be initiated by GitHub Actions only. Use the Refresh Ranking Data workflow." >&2; exit 1'

@@ -5,395 +5,99 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Plan projections and build server images without changing production.
+        required: false
+        default: false
+        type: boolean
+      force_rebuild:
+        description: Rebuild all projection groups; server images remain fail-closed to PR-verified digests.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
+  actions: read
   contents: read
-  packages: read
+  packages: write
 
 concurrency:
-  group: production-deploy
+  group: production-mutation
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    env:
-      SERVER_IP: ${{ secrets.SERVER_IP }}
-      SERVER_HOST: ${{ secrets.SERVER_HOST }}
-      SERVER_USER: www
-      MYSQL_DATABASE: wcarankings
-      MYSQL_USER: wcarankings
-      MYSQL_PASSWORD: projection-build
-      MYSQL_ROOT_PASSWORD: projection-build-root
-      DATABASE_URL: mysql://wcarankings:projection-build@127.0.0.1:13307/wcarankings
-      WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
+  plan_projections:
+    uses: ./.github/workflows/plan-projections.yml
+    with:
+      ref: ${{ github.sha }}
+      force_rebuild: ${{ inputs.force_rebuild == true }}
+    secrets: inherit
 
-    steps:
-      - name: Check out main
-        uses: actions/checkout@v4
+  build_server:
+    uses: ./.github/workflows/build-server.yml
+    with:
+      ref: ${{ github.sha }}
+      force_rebuild: false
+      require_existing: true
+    secrets: inherit
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+  build_projections:
+    needs: plan_projections
+    uses: ./.github/workflows/build-projections.yml
+    with:
+      ref: ${{ github.sha }}
+      export_date: ${{ needs.plan_projections.outputs.export_date }}
+      export_value: ${{ needs.plan_projections.outputs.export_value }}
+      groups: ${{ needs.plan_projections.outputs.groups }}
+      fingerprints: ${{ needs.plan_projections.outputs.fingerprints }}
+      cache_only: ${{ inputs.dry_run == true }}
+      include_raw: ${{ needs.plan_projections.outputs.raw_required == 'true' }}
+    secrets: inherit
 
-      - name: Install dependencies and MariaDB client
-        run: |
-          npm ci
-          sudo apt-get update
-          sudo apt-get install -y mariadb-client
+  deploy_server:
+    if: >-
+      inputs.dry_run != true
+      && needs.build_server.result == 'success'
+      && needs.build_projections.result == 'success'
+    needs:
+      - plan_projections
+      - build_server
+      - build_projections
+    uses: ./.github/workflows/deploy-server.yml
+    with:
+      ref: ${{ github.sha }}
+      source_sha: ${{ needs.build_server.outputs.source_sha }}
+      app_image: ${{ needs.build_server.outputs.app_image }}
+      flyway_image: ${{ needs.build_server.outputs.flyway_image }}
+      data_tools_image: ${{ needs.build_server.outputs.data_tools_image }}
+      config_checksum: ${{ needs.build_server.outputs.config_checksum }}
+      compose_checksum: ${{ needs.build_server.outputs.compose_checksum }}
+      caddy_checksum: ${{ needs.build_server.outputs.caddy_checksum }}
+    secrets: inherit
 
-      - name: Configure deployment SSH
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          install -m 700 -d "$HOME/.ssh"
-          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
-
-      - name: Resolve production WCA export
-        id: wca-export
-        run: |
-          export_value=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'cd /srv/wcarankings && docker compose exec -T db sh -c '"'"'mariadb --batch --skip-column-names --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="SELECT value FROM export_metadata WHERE \`key\` = 0x6578706f72745f64617465 LIMIT 1"'"'"'')
-          export_date=${export_value:0:10}
-          if [ -z "$export_date" ] || [ "$export_date" = "null" ]; then
-            echo "Production did not return a WCA export date." >&2
-            exit 1
-          fi
-          echo "date=$export_date" >> "$GITHUB_OUTPUT"
-          echo "value=$export_value" >> "$GITHUB_OUTPUT"
-
-      - name: Restore current WCA SQL export
-        id: wca-export-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: /tmp/wca-export-cache
-          key: wca-sql-export-${{ steps.wca-export.outputs.date }}
-
-      - name: Populate current WCA SQL export cache
-        if: steps.wca-export-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p /tmp/wca-export-cache
-          destination="/tmp/wca-export-cache/wca-export-${{ steps.wca-export.outputs.date }}.sql.zip"
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "cd /srv/wcarankings && docker compose run --rm -T app sh -c 'cat /var/cache/wcarankings/wca-export-${{ steps.wca-export.outputs.date }}.sql.zip'" \
-            > "${destination}.part"
-          test -s "${destination}.part"
-          mv "${destination}.part" "$destination"
-
-      - name: Save current WCA SQL export
-        if: steps.wca-export-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: /tmp/wca-export-cache
-          key: wca-sql-export-${{ steps.wca-export.outputs.date }}
-
-      - name: Calculate source tree tag
-        id: source-tree
-        run: echo "sha=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull images built by the pull request
-        id: pull-images
-        env:
-          SOURCE_TREE: ${{ steps.source-tree.outputs.sha }}
-        run: |
-          APP_IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-app:tree-${SOURCE_TREE}"
-          FLYWAY_IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-flyway:tree-${SOURCE_TREE}"
-          if docker pull "$APP_IMAGE" && docker pull "$FLYWAY_IMAGE"; then
-            docker tag "$APP_IMAGE" "wcarankings-app:${GITHUB_SHA}"
-            docker tag "$FLYWAY_IMAGE" "wcarankings-flyway:${GITHUB_SHA}"
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Verified PR images are unavailable; building the merged main tree."
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Set up Docker Buildx
-        if: steps.pull-images.outputs.available != 'true'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Flyway image from main
-        if: steps.pull-images.outputs.available != 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.flyway
-          load: true
-          push: false
-          tags: wcarankings-flyway:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build production image from main
-        if: steps.pull-images.outputs.available != 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          load: true
-          push: false
-          tags: wcarankings-app:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Verify production image contents
-        run: |
-          docker run --rm --entrypoint sh "wcarankings-app:${GITHUB_SHA}" -c \
-            'test -f /app/scripts/backfill-result-entries.mjs && test -f /app/scripts/backfill-result-rankings.mjs && test -f /app/scripts/backfill-person-year-rankings.mjs && test -f /app/scripts/check-ranking-projections.mjs && test -f /app/scripts/sync-wca-export.mjs && test -f /app/scripts/refresh-rankings.mjs && test -f /app/scripts/refresh-system-lists.mjs && test -f /app/scripts/system-list-definitions.mjs && test -f /app/scripts/publish-projection-transfer.mjs && test -f /app/scripts/projection-transfer-date.mjs && css=$(find /app/dist/standalone/dist/client -name "*.css" -type f -print -quit) && test -n "$css" && test -s "$css"'
-
-      - name: Verify Flyway image contents
-        run: |
-          docker run --rm --entrypoint sh "wcarankings-flyway:${GITHUB_SHA}" -c \
-            'test -f /flyway/migrations/V1__export_metadata.sql && test -f /flyway/migrations/V2__import_health.sql && test -f /flyway/migrations/V3__projection_build_timing.sql && test -f /flyway/migrations/V4__result_projection_health.sql'
-
-      - name: Restore core projection transfer
-        id: core-projection-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            /tmp/core-projection-transfer.sql.gz
-            /tmp/core-projection-transfer.json
-          key: projection-transfer-core-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/**', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-
-      - name: Restore yearly projection transfer
-        id: yearly-projection-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            /tmp/yearly-projection-transfer.sql.gz
-            /tmp/yearly-projection-transfer.json
-          key: projection-transfer-yearly-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-
-      - name: Determine required projection transfer
-        id: projection-transfer
-        env:
-          CORE_PROJECTION_FINGERPRINT: projection-transfer-core-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/**', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-          YEARLY_PROJECTION_FINGERPRINT: projection-transfer-yearly-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-        run: |
-          remote_state=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" 'cat /srv/wcarankings/projection-transfer-state.json 2>/dev/null || true')
-          core_required=true
-          yearly_required=true
-          if jq -e --arg fingerprint "$CORE_PROJECTION_FINGERPRINT" '.core == $fingerprint' <<<"$remote_state" >/dev/null 2>&1; then core_required=false; fi
-          if jq -e --arg fingerprint "$YEARLY_PROJECTION_FINGERPRINT" '.yearly == $fingerprint' <<<"$remote_state" >/dev/null 2>&1; then yearly_required=false; fi
-          if [ "$core_required" = false ] && [ "$yearly_required" = false ]; then required=false; else required=true; fi
-          echo "core_required=$core_required" >> "$GITHUB_OUTPUT"
-          echo "yearly_required=$yearly_required" >> "$GITHUB_OUTPUT"
-          echo "required=$required" >> "$GITHUB_OUTPUT"
-
-      - name: Build and export projection generation
-        if: steps.core-projection-cache.outputs.cache-hit != 'true' || steps.yearly-projection-cache.outputs.cache-hit != 'true'
-        id: projection-build
-        run: |
-          started_at=$(date +%s)
-          docker tag "wcarankings-flyway:${GITHUB_SHA}" wcarankings-flyway:latest
-          docker compose up -d db
-          docker compose run --rm flyway migrate
-          node scripts/sync-wca-export.mjs --force
-          node scripts/check-ranking-projections.mjs
-          for group in core yearly-person-rankings; do
-            prefix=${group/yearly-person-rankings/yearly}
-            node scripts/prepare-projection-transfer.mjs --group="$group" > "/tmp/${prefix}-projection-transfer.json"
-            mapfile -t transfer_tables < <(jq -r '.tables[]' "/tmp/${prefix}-projection-transfer.json")
-            MYSQL_PWD="$MYSQL_PASSWORD" mariadb-dump --protocol=TCP --host=127.0.0.1 --port=13307 --user="$MYSQL_USER" --single-transaction --skip-lock-tables "$MYSQL_DATABASE" "${transfer_tables[@]}" | gzip -1 > "/tmp/${prefix}-projection-transfer.sql.gz"
-          done
-          completed_at=$(date +%s)
-          duration=$((completed_at - started_at))
-          bytes=$(du -bc /tmp/core-projection-transfer.sql.gz /tmp/yearly-projection-transfer.sql.gz | tail -1 | cut -f1)
-          echo "duration_seconds=$duration" >> "$GITHUB_OUTPUT"
-          echo "archive_bytes=$bytes" >> "$GITHUB_OUTPUT"
-          {
-            echo "### Projection build"
-            echo "- WCA export: ${{ steps.wca-export.outputs.date }}"
-            echo "- Build and dump: ${duration}s"
-            echo "- Compressed transfer: ${bytes} bytes"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Save generated core projection transfer
-        if: steps.core-projection-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            /tmp/core-projection-transfer.sql.gz
-            /tmp/core-projection-transfer.json
-          key: projection-transfer-core-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/**', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-
-      - name: Save generated yearly projection transfer
-        if: steps.yearly-projection-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            /tmp/yearly-projection-transfer.sql.gz
-            /tmp/yearly-projection-transfer.json
-          key: projection-transfer-yearly-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-
-      - name: Report cached projection transfer
-        if: steps.core-projection-cache.outputs.cache-hit == 'true' && steps.yearly-projection-cache.outputs.cache-hit == 'true'
-        run: |
-          bytes=$(du -bc /tmp/core-projection-transfer.sql.gz /tmp/yearly-projection-transfer.sql.gz | tail -1 | cut -f1)
-          {
-            echo "### Projection build"
-            echo "- WCA export: ${{ steps.wca-export.outputs.date }}"
-            echo "- Reused validated projection artifact from Actions cache"
-            echo "- Compressed transfer: ${bytes} bytes"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload projection transfer artifact
-        if: steps.projection-transfer.outputs.required == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: projection-transfer-${{ github.sha }}
-          path: |
-            /tmp/core-projection-transfer.sql.gz
-            /tmp/core-projection-transfer.json
-            /tmp/yearly-projection-transfer.sql.gz
-            /tmp/yearly-projection-transfer.json
-          retention-days: 7
-
-      - name: Copy deployment configuration
-        run: |
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'install -d -m 0755 /srv/wcarankings/ops'
-          scp -q -o BatchMode=yes docker-compose.yml \
-            "$SERVER_USER@$SERVER_IP:/srv/wcarankings/docker-compose.yml"
-          scp -q -o BatchMode=yes ops/Caddyfile \
-            "$SERVER_USER@$SERVER_IP:/srv/wcarankings/ops/Caddyfile"
-
-      - name: Load images and run pending migrations
-        run: |
-          set -o pipefail
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'cd /srv/wcarankings && if docker image inspect wcarankings-app:latest >/dev/null 2>&1; then docker tag wcarankings-app:latest wcarankings-app:previous; fi'
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'set -eu
-            protected_images=$( {
-              docker ps -q | xargs -r docker inspect --format "{{.Image}}"
-              docker image inspect wcarankings-app:latest wcarankings-app:previous wcarankings-flyway:latest --format "{{.Id}}" 2>/dev/null || true
-            } | sort -u )
-            docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | while IFS=" " read -r image_ref image_id; do
-              case "$image_ref" in
-                wcarankings-app:*|wcarankings-flyway:*) ;;
-                *) continue ;;
-              esac
-              case " $protected_images " in
-                *" $image_id "*) continue ;;
-              esac
-              docker image rm "$image_ref" || true
-            done
-            docker image prune -f'
-          docker save "wcarankings-app:${GITHUB_SHA}" "wcarankings-flyway:${GITHUB_SHA}" \
-            | gzip -1 \
-            | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-                'gzip -d | docker load'
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "docker tag wcarankings-app:${GITHUB_SHA} wcarankings-app:latest && docker tag wcarankings-flyway:${GITHUB_SHA} wcarankings-flyway:latest && cd /srv/wcarankings && docker compose run --rm flyway migrate"
-
-      - name: Import and publish candidate ranking projections
-        if: steps.projection-transfer.outputs.required == 'true'
-        id: projection-import
-        env:
-          CORE_PROJECTION_FINGERPRINT: projection-transfer-core-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/**', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-          YEARLY_PROJECTION_FINGERPRINT: projection-transfer-yearly-v1-${{ steps.wca-export.outputs.date }}-${{ hashFiles('sql/ranking-projections/person_year_*', 'scripts/mysql-schema.mjs', 'scripts/prepare-projection-transfer.mjs') }}
-        run: |
-          started_at=$(date +%s)
-          groups=()
-          if [ '${{ steps.projection-transfer.outputs.core_required }}' = true ]; then groups+=(core); fi
-          if [ '${{ steps.projection-transfer.outputs.yearly_required }}' = true ]; then groups+=(yearly); fi
-          groups_csv=$(IFS=,; echo "${groups[*]}")
-          for group in "${groups[@]}"; do scp -q -o BatchMode=yes "/tmp/${group}-projection-transfer.sql.gz" "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-${group}-projection-transfer.sql.gz"; done
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "CORE_PROJECTION_FINGERPRINT='$CORE_PROJECTION_FINGERPRINT' YEARLY_PROJECTION_FINGERPRINT='$YEARLY_PROJECTION_FINGERPRINT' PROJECTION_GROUPS='$groups_csv' sh -s" <<'REMOTE'
-            set -eu
-            cd /srv/wcarankings
-            (while sleep 30; do echo "Projection transfer import is still running…"; done) &
-            heartbeat_pid=$!
-            trap 'kill "$heartbeat_pid" 2>/dev/null || true; rm -f /tmp/wcarankings-core-projection-transfer.sql.gz /tmp/wcarankings-yearly-projection-transfer.sql.gz' EXIT
-            for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do gzip -dc "/tmp/wcarankings-${group}-projection-transfer.sql.gz" | docker compose exec -T db sh -c 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE"'; done
-            publish_groups=$(printf '%s' "$PROJECTION_GROUPS" | sed 's/yearly/yearly-person-rankings/g')
-            docker compose run --rm app node /app/scripts/publish-projection-transfer.mjs --groups="$publish_groups"
-            docker compose run --rm app node /app/scripts/check-ranking-projections.mjs
-            jq -n --arg core "$CORE_PROJECTION_FINGERPRINT" --arg yearly "$YEARLY_PROJECTION_FINGERPRINT" '{core: $core, yearly: $yearly}' > /srv/wcarankings/projection-transfer-state.json.tmp
-            mv /srv/wcarankings/projection-transfer-state.json.tmp /srv/wcarankings/projection-transfer-state.json
-          REMOTE
-          completed_at=$(date +%s)
-          duration=$((completed_at - started_at))
-          echo "duration_seconds=$duration" >> "$GITHUB_OUTPUT"
-          {
-            echo "### Production transfer"
-            echo "- Upload, import, validation, and publish: ${duration}s"
-            echo "- End-to-end projection path: $((${{ steps.projection-build.outputs.duration_seconds || '0' }} + duration))s"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Report unchanged projection transfer
-        if: steps.projection-transfer.outputs.required != 'true'
-        run: |
-          {
-            echo "### Production transfer"
-            echo "- Reused production projections; no ranking artifact was uploaded or imported"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Switch production services
-        run: |
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'cd /srv/wcarankings && docker compose up -d --no-build --remove-orphans --force-recreate app proxy'
-          echo "SERVICES_SWITCHED=true" >> "$GITHUB_ENV"
-
-      - name: Verify deployment
-        run: |
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'cd /srv/wcarankings && docker compose ps && for attempt in $(seq 1 30); do curl --fail --silent http://127.0.0.1:3000/api/health/ready >/dev/null && exit 0; sleep 2; done; docker compose logs --tail=80 app; exit 1'
-
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'set -eu
-            for endpoint in \
-              "/api/rankings?eventId=333&result=single&year=2024&start=0&limit=1&paged=1" \
-              "/api/rankings?eventId=SOR&result=single&start=0&limit=10" \
-              "/api/rankings?eventId=sor-kinch&result=average&start=0&limit=10" \
-              "/api/rankings/competitions?ranking=competitor-count&start=0&limit=10"; do
-              curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:3000${endpoint}" >/dev/null
-            done'
-
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'set -eu; html=$(curl --fail --silent http://127.0.0.1:3000/); css=$(printf "%s" "$html" | sed -n "s/.*href=\"\([^\"]*\.css\)\".*/\1/p" | head -n 1); if [ -z "$css" ]; then echo "SSR response did not include a stylesheet link." >&2; exit 1; fi; echo "SSR stylesheet: $css"; curl --fail --silent --show-error --dump-header - "http://127.0.0.1:3000$css" >/dev/null'
-
-          PUBLIC_HOST="${SERVER_HOST#https://}"
-          PUBLIC_HOST="${PUBLIC_HOST#http://}"
-          PUBLIC_HOST="${PUBLIC_HOST%%/*}"
-          if [ -z "$PUBLIC_HOST" ]; then
-            echo "SERVER_HOST must contain a hostname." >&2
-            exit 1
-          fi
-
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "for attempt in \$(seq 1 30); do curl --fail --silent --show-error --max-time 15 -H 'Host: ${PUBLIC_HOST}' http://127.0.0.1/ >/dev/null && exit 0; sleep 2; done; exit 1"
-
-      - name: Restore image after a pre-switch failure
-        if: failure() && env.SERVICES_SWITCHED != 'true'
-        run: |
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'set -eu; if docker image inspect wcarankings-app:previous >/dev/null 2>&1; then docker tag wcarankings-app:previous wcarankings-app:latest; fi'
-
-      - name: Roll back failed deployment
-        if: failure() && env.SERVICES_SWITCHED == 'true'
-        run: |
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'set -eu; cd /srv/wcarankings; if ! docker image inspect wcarankings-app:previous >/dev/null 2>&1; then echo "No previous image is available for rollback." >&2; exit 1; fi; docker tag wcarankings-app:previous wcarankings-app:latest; docker compose up -d --no-build --remove-orphans app proxy'
-
-      - name: Remove previous image after successful deployment
-        if: success()
-        run: |
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'docker image inspect wcarankings-app:previous >/dev/null 2>&1 && docker image rm wcarankings-app:previous || true'
-
-      - name: Clean up projection build database
-        if: always()
-        run: docker compose down --volumes --remove-orphans
+  deploy_projections:
+    if: >-
+      inputs.dry_run != true
+      && needs.plan_projections.outputs.required == 'true'
+      && needs.deploy_server.result == 'success'
+      && needs.build_projections.result == 'success'
+    needs:
+      - plan_projections
+      - build_projections
+      - build_server
+      - deploy_server
+    uses: ./.github/workflows/deploy-projections.yml
+    with:
+      ref: ${{ github.sha }}
+      artifact_name: ${{ needs.build_projections.outputs.artifact_name }}
+      manifest_sha256: ${{ needs.build_projections.outputs.manifest_sha256 }}
+      groups: ${{ needs.plan_projections.outputs.groups }}
+      export_date: ${{ needs.plan_projections.outputs.export_date }}
+      export_value: ${{ needs.plan_projections.outputs.export_value }}
+      production_export_value: ${{ needs.plan_projections.outputs.production_export_value }}
+      source_sha: ${{ needs.build_server.outputs.source_sha }}
+      artifact_run_id: ${{ needs.build_projections.outputs.artifact_run_id }}
+      artifact_id: ${{ needs.build_projections.outputs.artifact_id }}
+      data_tools_image: ${{ needs.build_server.outputs.data_tools_image }}
+    secrets: inherit

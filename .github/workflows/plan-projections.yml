@@ -1,0 +1,175 @@
+name: Plan Ranking Projection Release
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref whose projection inputs should be fingerprinted.
+        required: true
+        type: string
+      groups:
+        description: Optional comma-separated projection groups to consider.
+        required: false
+        default: ""
+        type: string
+      force_rebuild:
+        description: Ignore active production fingerprints.
+        required: false
+        default: false
+        type: boolean
+    outputs:
+      required:
+        value: ${{ jobs.plan.outputs.required }}
+      groups:
+        value: ${{ jobs.plan.outputs.groups }}
+      fingerprints:
+        value: ${{ jobs.plan.outputs.fingerprints }}
+      export_date:
+        value: ${{ jobs.plan.outputs.export_date }}
+      export_value:
+        value: ${{ jobs.plan.outputs.export_value }}
+      export_version:
+        value: ${{ jobs.plan.outputs.export_version }}
+      production_export_value:
+        value: ${{ jobs.plan.outputs.production_export_value }}
+      raw_required:
+        value: ${{ jobs.plan.outputs.raw_required }}
+    secrets:
+      SERVER_IP:
+        required: true
+      DEPLOY_SSH_KEY:
+        required: true
+      DEPLOY_KNOWN_HOSTS:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      required: ${{ steps.release-plan.outputs.required }}
+      groups: ${{ steps.release-plan.outputs.groups }}
+      fingerprints: ${{ steps.release-plan.outputs.fingerprints }}
+      export_date: ${{ steps.wca-export.outputs.date }}
+      export_value: ${{ steps.wca-export.outputs.value }}
+      export_version: ${{ steps.wca-export.outputs.version }}
+      production_export_value: ${{ steps.production-wca-export.outputs.value }}
+      raw_required: ${{ steps.release-plan.outputs.raw_required }}
+    env:
+      SERVER_IP: ${{ secrets.SERVER_IP }}
+      SERVER_USER: www
+
+    steps:
+      - name: Check out projection source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install production dependencies
+        run: npm ci --omit=dev
+
+      - name: Configure read-only deployment SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Resolve target WCA export
+        id: wca-export
+        run: |
+          node scripts/resolve-wca-export.mjs > /tmp/wca-export.json
+          export_date=$(jq -r '.date' /tmp/wca-export.json)
+          export_value=$(jq -r '.exportDate' /tmp/wca-export.json)
+          export_version=$(jq -r '.version' /tmp/wca-export.json)
+          if [ -z "$export_date" ] || [ "$export_date" = null ] || [ -z "$export_value" ] || [ "$export_value" = null ]; then
+            echo "The WCA export API did not return an export date." >&2
+            exit 1
+          fi
+          [[ "$export_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
+          [[ "$export_value" =~ ^[0-9TZUTC:+.\ -]+$ ]]
+          echo "date=$export_date" >> "$GITHUB_OUTPUT"
+          echo "value=$export_value" >> "$GITHUB_OUTPUT"
+          echo "version=$export_version" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve production projection state
+        id: production-wca-export
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'cd /srv/wcarankings && docker compose exec -T db sh -c '"'"'
+              mariadb --batch --skip-column-names \
+                --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" \
+                2>/dev/null || printf "{}\n"
+            '"'"'' \
+            > /tmp/production-projection-state.json <<'SQL'
+          SELECT JSON_OBJECT(
+            'version', 2,
+            'exportId', export_id,
+            'datasetSchemaVersion', dataset_schema_version,
+            'fingerprints', JSON_EXTRACT(fingerprints_json, '$')
+          )
+          FROM ranking_generation_state
+          WHERE id = 1;
+          SQL
+          if ! jq -e 'type == "object"' /tmp/production-projection-state.json >/dev/null; then
+            echo "::warning::Production projection state is invalid; rebuilding selected groups."
+            printf '{}\n' > /tmp/production-projection-state.json
+          fi
+          export_value=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'cd /srv/wcarankings && docker compose exec -T db sh -c '"'"'mariadb --batch --skip-column-names --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="SELECT value FROM export_metadata WHERE \`key\` = 0x6578706f72745f64617465 LIMIT 1"'"'"'')
+          if [ -z "$export_value" ] || [ "$export_value" = null ]; then
+            echo "Production did not return a WCA export identity." >&2
+            exit 1
+          fi
+          [[ "$export_value" =~ ^[0-9TZUTC:+.\ -]+$ ]]
+          echo "value=$export_value" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate required projection groups
+        id: release-plan
+        env:
+          EXPORT_VALUE: ${{ steps.wca-export.outputs.value }}
+          PRODUCTION_EXPORT_VALUE: ${{ steps.production-wca-export.outputs.value }}
+          SELECTED_GROUPS: ${{ inputs.groups }}
+          FORCE_REBUILD: ${{ inputs.force_rebuild }}
+        run: |
+          state_file=/tmp/production-projection-state.json
+          if [ "$FORCE_REBUILD" = true ]; then
+            printf '{}\n' > /tmp/forced-projection-state.json
+            state_file=/tmp/forced-projection-state.json
+          fi
+          arguments=(
+            "--export-id=$EXPORT_VALUE"
+            "--production-export-id=$PRODUCTION_EXPORT_VALUE"
+            "--state-file=$state_file"
+          )
+          if [ -n "$SELECTED_GROUPS" ]; then
+            arguments+=("--groups=$SELECTED_GROUPS")
+          fi
+          node scripts/projection-release-plan.mjs "${arguments[@]}" > /tmp/projection-release-plan.json
+          groups=$(jq -r '.requiredGroupsCsv' /tmp/projection-release-plan.json)
+          fingerprints=$(jq -c '.groups | with_entries(.value = .value.fingerprint)' /tmp/projection-release-plan.json)
+          required=$(jq -r '.required' /tmp/projection-release-plan.json)
+          expanded=$(jq -r '.expandedToAllGroups' /tmp/projection-release-plan.json)
+          raw_required=$(jq -r '.exportChanged' /tmp/projection-release-plan.json)
+          echo "groups=$groups" >> "$GITHUB_OUTPUT"
+          echo "fingerprints=$fingerprints" >> "$GITHUB_OUTPUT"
+          echo "required=$required" >> "$GITHUB_OUTPUT"
+          echo "raw_required=$raw_required" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Projection release plan"
+            echo "- WCA export: $EXPORT_VALUE"
+            echo "- Required groups: ${groups:-none}"
+            echo "- Forced rebuild: $FORCE_REBUILD"
+            echo "- Expanded partial request for new export: $expanded"
+          } >> "$GITHUB_STEP_SUMMARY"

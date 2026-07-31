@@ -479,6 +479,8 @@ function locateRanking(
     locate: wcaId,
   });
   addRankingSourceParams(params, source);
+  const year = activeYear();
+  if (year) params.set("year", year);
   if (gender.length) params.set("gender", gender.join(","));
   if (selection.scope !== "world") params.set("region", selection.regionId);
   return fetch(`/api/rankings?${params}`).then(async (response) => {

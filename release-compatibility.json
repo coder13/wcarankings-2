@@ -1,0 +1,8 @@
+{
+  "artifactFormatVersion": 2,
+  "datasetSchemaVersion": 1,
+  "server": {
+    "minimumDatasetSchemaVersion": 1,
+    "maximumDatasetSchemaVersion": 1
+  }
+}

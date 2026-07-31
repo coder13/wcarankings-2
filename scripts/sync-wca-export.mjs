@@ -6,12 +6,11 @@ import { pipeline } from "node:stream/promises";
 import mysql from "mysql2/promise";
 import * as unzipper from "unzipper";
 import { dropManagedObject, promoteProjectionTables, refreshMysqlSchema } from "./mysql-schema.mjs";
-import { refreshSystemLists } from "./refresh-system-lists.mjs";
-import { refreshBoardList, refreshDelegatesList } from "./refresh-board-list.mjs";
 
 const EXPORT_API = "https://www.worldcubeassociation.org/api/v0/export/public";
 const force = process.argv.includes("--force");
 const dryRun = process.argv.includes("--dry-run");
+const rawOnly = process.argv.includes("--raw-only");
 
 function argumentValue(name) {
   const prefix = `--${name}=`;
@@ -32,7 +31,8 @@ function databaseOptions(connectionString = process.env.DATABASE_URL) {
     port: Number(url.port || 3306),
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
+    database: process.env.DATABASE_NAME_OVERRIDE
+      || decodeURIComponent(url.pathname.replace(/^\//, "")),
   };
 }
 
@@ -295,6 +295,7 @@ async function refreshRankingsSchema() {
     await refreshMysqlSchema(connection, {
       projectionSuffix: "_staging",
       projectionNames: selectedProjectionNames.length > 0 ? selectedProjectionNames : undefined,
+      createConnection: () => mysql.createConnection(databaseOptions()),
     });
   } finally {
     await connection.end();
@@ -302,6 +303,7 @@ async function refreshRankingsSchema() {
 }
 
 async function main() {
+  if (dryRun && rawOnly) throw new Error("--dry-run and --raw-only cannot be used together.");
   const suppliedPath = argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH;
   let latest;
   if (suppliedPath) {
@@ -311,14 +313,15 @@ async function main() {
     latest = cachedPath ? await getSuppliedExportMetadata(cachedPath) : await getLatestExport();
   }
   process.stdout.write(`Latest WCA export: ${latest.exportDate} (v${String(latest.version).replace(/^v/i, "")})\n`);
-  if (!force && await getImportedDate() === String(latest.exportDate)) {
-    process.stdout.write("Database is already current. Nothing to do.\n");
-    return;
-  }
 
   if (dryRun) {
     await getCachedExport(latest);
     process.stdout.write("Dry run complete. The cached SQL export is available for import.\n");
+    return;
+  }
+
+  if (!force && await getImportedDate() === String(latest.exportDate)) {
+    process.stdout.write("Database is already current. Nothing to do.\n");
     return;
   }
 
@@ -330,6 +333,18 @@ async function main() {
     await dropRankingViews();
     process.stdout.write("Importing WCA SQL tables into MariaDB…\n");
     await importSqlExport(zipPath);
+    if (rawOnly) {
+      const completedAt = now();
+      await writeExportMetadata(latest);
+      await updateImportRun(runId, {
+        status: "succeeded",
+        projection_swap_status: "not_applicable",
+        completed_at: completedAt,
+        duration_ms: elapsedMilliseconds(startedAt, completedAt),
+      });
+      process.stdout.write(`WCA raw tables are current through ${latest.exportDate}; projection publication skipped by --raw-only.\n`);
+      return;
+    }
     const projectionBuildStartedAt = now();
     await updateImportRun(runId, {
       fetched_at: projectionBuildStartedAt,
@@ -347,14 +362,6 @@ async function main() {
       projection_swap_status: "swapping",
     });
     await promoteRankings();
-    const systemListConnection = await mysql.createConnection(databaseOptions());
-    try {
-      await refreshSystemLists(systemListConnection);
-      await refreshBoardList(systemListConnection);
-      await refreshDelegatesList(systemListConnection);
-    } finally {
-      await systemListConnection.end();
-    }
     const completedAt = now();
     await writeExportMetadata(latest);
     await updateImportRun(runId, {

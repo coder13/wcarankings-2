@@ -12,11 +12,15 @@ const publish = await readFile(
   "utf8",
 );
 const dockerfile = await readFile(
-  new URL("../Dockerfile", import.meta.url),
+  new URL("../Dockerfile.data-tools", import.meta.url),
   "utf8",
 );
 const schema = await readFile(
   new URL("../scripts/mysql-schema.mjs", import.meta.url),
+  "utf8",
+);
+const syncWcaExport = await readFile(
+  new URL("../scripts/sync-wca-export.mjs", import.meta.url),
   "utf8",
 );
 
@@ -27,6 +31,14 @@ test("defers secondary projection indexes until after bulk transfer import", () 
   assert.match(publish, /Building \$\{deferredIndexes\.length\} deferred projection indexes/);
   assert.match(publish, /indexes\.map\(\(index\) => index\.index_sql\)\.join/);
   assert.match(publish, /promoteProjectionTables/);
+});
+
+test("can preflight transfer rows, dates, and indexes before production cutover", () => {
+  assert.match(publish, /prepareOnly = process\.argv\.includes\("--prepare-only"\)/);
+  assert.match(publish, /expectedExportDate/);
+  assert.match(publish, /DELETE FROM/);
+  assert.match(publish, /publication was not requested/);
+  assert.match(publish, /if \(prepareOnly\)[\s\S]*else \{[\s\S]*promoteProjectionTables/);
 });
 
 test("normalizes equivalent export date representations", () => {
@@ -42,10 +54,20 @@ test("rejects missing and invalid export dates", () => {
 });
 
 test("packages the export-date normalizer with the publisher", () => {
-  assert.match(dockerfile, /projection-transfer-date\.mjs/);
+  assert.match(dockerfile, /COPY --chown=data-tools:data-tools scripts \.\/scripts/);
+  assert.match(dockerfile, /ENTRYPOINT \["node"\]/);
+});
+
+test("dry-run WCA export caching does not require a database connection", () => {
+  assert.match(syncWcaExport, /if \(dryRun\) \{[\s\S]*await getCachedExport\(latest\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(syncWcaExport, /if \(!force && await getImportedDate\(\) === String\(latest\.exportDate\)\)/);
+  assert.ok(
+    syncWcaExport.indexOf("if (dryRun) {") < syncWcaExport.indexOf("await getImportedDate()"),
+    "dry-run must return before checking the imported database export date",
+  );
 });
 
 test("publishes result facts with the core runtime transfer", () => {
   assert.match(schema, /name: "result-facts"[\s\S]*enabledByDefault: true/);
-  assert.match(schema, /tables: PUBLISHED_PROJECTION_TABLES\.filter\(\(table\) => !table\.startsWith\("person_year_"\)\)/);
+  assert.match(schema, /tables: PUBLISHED_PROJECTION_TABLES\.filter\(\(table\) => table !== "person_sum_of_ranks_scores" && !table\.startsWith\("person_year_"\)\)/);
 });
