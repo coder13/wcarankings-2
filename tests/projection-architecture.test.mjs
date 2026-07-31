@@ -151,7 +151,14 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(competitions, /idx_competition_stats_south/);
   assert.match(cities, /fastest_average_result_id/);
   assert.match(cities, /fastest_average_rank/);
-  assert.match(cities, /CASE[\s\S]*person\.gender IN.*ELSE 'o'/);
+  assert.match(cities, /COUNT\(DISTINCT base\.person_id\) AS competitor_count/);
+  assert.match(cities, /COUNT\(DISTINCT base\.competition_id\) AS competition_count/);
+  assert.match(cities, /COUNT\(CASE WHEN attempts\.value > 0 THEN 1 END\) AS official_solve_count/);
+  assert.match(cities, /result_attempts attempts/);
+  assert.match(cities, /idx_city_event_competitors/);
+  assert.match(cities, /idx_city_event_competitions/);
+  assert.match(cities, /idx_city_event_solves/);
+  assert.match(cities, /CASE[\s\S]*person\.gender IN[\s\S]*ELSE 'o'/);
   assert.match(cities, /GROUP BY city_name, country_id, event_id,[\s\S]*CASE WHEN gender IN/);
   assert.match(cities, /ADD PRIMARY KEY \(city_name, country_id, event_id, gender\)/);
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);

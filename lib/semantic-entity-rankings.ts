@@ -462,6 +462,10 @@ type CityRow = {
 
 export async function loadCityRankings(params: URLSearchParams) {
   const eventId = parseEvent(params)!;
+  const stat = params.get("stat");
+  if (stat === "competitors" || stat === "competitions" || stat === "solves") {
+    return loadCityCountRankings(params, eventId, stat);
+  }
   const resultType = parseResultType(params, eventId);
   const gender = parseGender(params);
   const { scope, regionId } = parseScope(params);
@@ -544,6 +548,105 @@ export async function loadCityRankings(params: URLSearchParams) {
         formattedValue: formatWcaResult(eventId, Number(row.result_value), resultType),
         competitionId: row.competition_id,
         competitionName: `${row.competition_name} · ${row.person_name}`,
+        recordBadges: [],
+      })),
+      hasMore: rows.rows.length > limit,
+      nextPageStart: rows.rows.length > limit && last ? Number(last.position) : null,
+      previousPageStart: start > 0 ? Math.max(0, start - limit) : null,
+      startPosition: Number(pageRows[0]?.position ?? start + 1) - 1,
+      lastRank: pageRows.length ? Number(pageRows.at(-1)?.rank) : null,
+      total: Number(counts.rows[0]?.count ?? 0),
+    },
+    diagnostics: {
+      timings: addTimings(rows.timings, counts.timings),
+      queryCount: 2,
+      returnedRows: rows.rows.length + counts.rows.length,
+    },
+  };
+}
+
+type CityCountStat = "competitors" | "competitions" | "solves";
+
+async function loadCityCountRankings(
+  params: URLSearchParams,
+  eventId: string,
+  stat: CityCountStat,
+) {
+  const { scope, regionId } = parseScope(params);
+  const limit = parseLimit(params);
+  const rawStart = params.get("start") ?? "0";
+  const start = Number(rawStart);
+  if (!Number.isInteger(start) || start < 0) {
+    throw new ApiInputError("start must be a non-negative integer.");
+  }
+  const gender = parseGender(params);
+  const statColumn = {
+    competitors: "competitor_count",
+    competitions: "competition_count",
+    solves: "official_solve_count",
+  }[stat];
+  const statLabel = {
+    competitors: "competitors",
+    competitions: "competitions",
+    solves: "official solves",
+  }[stat];
+  const genderFilter = gender.length
+    ? ` AND stats.gender IN (${gender.map(() => "?").join(", ")})`
+    : "";
+  const regionFilter = scope === "world"
+    ? ""
+    : ` AND country.${scope === "continent" ? "continent_id" : "id"} = ?`;
+  const filterValues: unknown[] = [eventId, ...gender, ...(scope === "world" ? [] : [regionId])];
+  const cityRankingSql = `
+    WITH ranked AS (
+      SELECT stats.city_name, stats.country_id,
+        stats.${statColumn} AS stat_value,
+        DENSE_RANK() OVER (ORDER BY stats.${statColumn} DESC) AS rank,
+        ROW_NUMBER() OVER (
+          ORDER BY stats.${statColumn} DESC, stats.country_id, stats.city_name
+        ) AS position
+      FROM city_event_stats stats
+      LEFT JOIN countries country ON country.id = stats.country_id
+      WHERE stats.event_id = ? AND stats.${statColumn} > 0${genderFilter}${regionFilter}
+    )`;
+  const rows = await query<{
+    rank: number;
+    position: number;
+    city_name: string;
+    country_id: string;
+    country_name: string;
+    country_iso2: string;
+    stat_value: number;
+  }>(`
+    ${cityRankingSql}
+    SELECT ranked.*, COALESCE(country.name, ranked.country_id) AS country_name,
+      COALESCE(country.iso2, '') AS country_iso2
+    FROM ranked
+    LEFT JOIN countries country ON country.id = ranked.country_id
+    WHERE ranked.position > ?
+    ORDER BY ranked.position
+    LIMIT ?
+  `, [...filterValues, start, limit + 1]);
+  const counts = await query<{ count: number }>(`
+    ${cityRankingSql}
+    SELECT COUNT(*) AS count FROM ranked
+  `, filterValues);
+  const pageRows = rows.rows.slice(0, limit);
+  const last = pageRows.at(-1);
+  return {
+    data: {
+      entries: pageRows.map((row) => ({
+        rank: Number(row.rank),
+        subRank: Number(row.position),
+        personId: `city:${row.country_id}:${row.city_name}`,
+        personName: row.city_name,
+        identitySubtitle: statLabel,
+        countryName: row.country_name,
+        countryIso2: row.country_iso2,
+        best: Number(row.stat_value),
+        formattedValue: new Intl.NumberFormat("en-US").format(Number(row.stat_value)),
+        competitionId: "",
+        competitionName: "",
         recordBadges: [],
       })),
       hasMore: rows.rows.length > limit,
