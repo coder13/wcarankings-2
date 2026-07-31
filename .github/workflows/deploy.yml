@@ -59,11 +59,9 @@ jobs:
     if: >-
       inputs.dry_run != true
       && needs.build_server.result == 'success'
-      && needs.build_projections.result == 'success'
     needs:
       - plan_projections
       - build_server
-      - build_projections
     uses: ./.github/workflows/deploy-server.yml
     with:
       ref: ${{ github.sha }}

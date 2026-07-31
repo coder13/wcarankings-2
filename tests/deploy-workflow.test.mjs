@@ -38,6 +38,8 @@ const [
 ]);
 
 test("composes the main release from independently callable workflow blocks", () => {
+  const deployServer = release.match(/deploy_server:[\s\S]*?(?=\n  deploy_projections:)/)?.[0];
+  assert.ok(deployServer, "the main release must define a server deployment job");
   assert.match(release, /group: production-mutation/);
   assert.match(release, /group: production-mutation[\s\S]*cancel-in-progress: false/);
   assert.doesNotMatch(release, /queue: max/);
@@ -47,9 +49,14 @@ test("composes the main release from independently callable workflow blocks", ()
   assert.match(release, /uses: \.\/\.github\/workflows\/deploy-server\.yml/);
   assert.match(release, /uses: \.\/\.github\/workflows\/deploy-projections\.yml/);
   assert.match(
-    release,
-    /deploy_server:[\s\S]*needs:[\s\S]*- build_projections/,
-    "projection artifacts must finish before the first production mutation",
+    deployServer,
+    /needs:[\s\S]*- build_server/,
+    "server deployment must wait for server images",
+  );
+  assert.doesNotMatch(
+    deployServer,
+    /needs\.build_projections\.result|- build_projections/,
+    "server deployment must not wait for projection artifacts",
   );
   assert.match(
     release,
