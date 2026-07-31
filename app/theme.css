@@ -38,8 +38,11 @@
   --focus: var(--primary);
   --focus-ring: var(--primary-ring);
   --record-world: #dc2626;
-  --record-continent: #a16207;
+  --record-continent: #2563eb;
   --record-national: #15803d;
+  --rank-world: #b42318;
+  --rank-continent: #1d4ed8;
+  --rank-national: var(--record-national);
   --shadow: rgb(24 48 61 / 0.18);
   --shadow-soft: rgb(24 48 61 / 0.12);
   --overlay: rgb(255 252 255 / 0.94);
@@ -81,8 +84,11 @@
   --focus: var(--primary);
   --focus-ring: var(--primary-ring);
   --record-world: #f87171;
-  --record-continent: #f0b44b;
+  --record-continent: #2563eb;
   --record-national: #4ade80;
+  --rank-world: #ff8a80;
+  --rank-continent: #93c5fd;
+  --rank-national: var(--record-national);
   --shadow: rgb(0 0 0 / 0.42);
   --shadow-soft: rgb(0 0 0 / 0.3);
   --overlay: rgb(18 20 23 / 0.94);
@@ -124,8 +130,11 @@
     --focus: var(--primary);
     --focus-ring: var(--primary-ring);
     --record-world: #f87171;
-    --record-continent: #f0b44b;
+    --record-continent: #2563eb;
     --record-national: #4ade80;
+    --rank-world: #ff8a80;
+    --rank-continent: #93c5fd;
+    --rank-national: var(--record-national);
     --shadow: rgb(0 0 0 / 0.42);
     --shadow-soft: rgb(0 0 0 / 0.3);
     --overlay: rgb(18 20 23 / 0.94);

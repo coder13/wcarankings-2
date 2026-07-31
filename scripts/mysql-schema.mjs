@@ -14,6 +14,7 @@ const INDEXES = [
   ["results", "idx_results_single_best", "(`person_id`, `event_id`, `best`, `id`)", "person_id,event_id,best,id"],
   ["results", "idx_results_single_event_best", "(`event_id`, `best`, `id`)", "event_id,best,id"],
   ["results", "idx_results_average_best", "(`person_id`, `event_id`, `average`, `id`)", "person_id,event_id,average,id"],
+  ["result_attempts", "idx_result_attempts_result", "(`result_id`, `attempt_number`)", "result_id,attempt_number"],
   ["results", "idx_results_average_event_best", "(`event_id`, `average`, `id`)", "event_id,average,id"],
   ["results", "idx_results_single_country_best", "(`event_id`, `person_country_id`, `best`, `id`)", "event_id,person_country_id,best,id"],
   ["results", "idx_results_average_country_best", "(`event_id`, `person_country_id`, `average`, `id`)", "event_id,person_country_id,average,id"],

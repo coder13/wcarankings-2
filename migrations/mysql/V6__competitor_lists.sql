@@ -125,4 +125,3 @@ ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   description = VALUES(description),
   system_definition_version = VALUES(system_definition_version);
-

@@ -7,6 +7,7 @@ export type RankingEntry = {
   subRank: number;
   personId: string;
   personName: string;
+  profileHref?: string;
   identitySubtitle?: string;
   countryName: string;
   countryIso2: string;

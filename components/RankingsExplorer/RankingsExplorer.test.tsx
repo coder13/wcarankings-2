@@ -133,7 +133,7 @@ test("keeps gender filters available for sum of ranks", () => {
   assert.match(markup, /aria-label="Gender"/);
   assert.match(markup, />Men</);
   assert.match(markup, />Women</);
-  assert.match(markup, /Switch to average rankings/);
+  assert.doesNotMatch(markup, /Switch to average rankings/);
 });
 
 test("keeps gender filters available for Kinch", () => {

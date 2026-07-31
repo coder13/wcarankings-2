@@ -33,6 +33,7 @@
     "@cubing/icons": "^3.0.5",
     "@tanstack/react-virtual": "^3.14.5",
     "lru-cache": "^11.5.2",
+    "motion": "^12.43.0",
     "mysql2": "^3.23.2",
     "next": "^16.2.11",
     "react": "19.2.6",
