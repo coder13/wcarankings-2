@@ -38,6 +38,7 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "react-ga4": "^3.0.1",
+    "sql-template-tag": "^5.2.1",
     "unzipper": "^0.12.5"
   },
   "devDependencies": {
@@ -67,10 +68,25 @@
   },
   "type": "module",
   "lint-staged": {
-    "app/api/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"],
-    "controllers/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"],
-    "db/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"],
-    "lib/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"],
-    "services/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"]
+    "app/api/**/*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "controllers/**/*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "db/**/*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "lib/**/*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "services/**/*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   }
 }
