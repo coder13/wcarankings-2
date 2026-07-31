@@ -275,13 +275,31 @@ main {
 
 .stickyRankingsRail > .RankingsRailTransition > .Jump {
   background: var(--surface);
-  box-shadow:
-    0 calc(1px * (1 - var(--rail-lift-progress)))
-      calc(4px * (1 - var(--rail-lift-progress))) var(--shadow-soft),
-    0 calc(7px * var(--rail-lift-progress))
-      calc(24px * var(--rail-lift-progress)) var(--shadow);
+  box-shadow: none;
   transform: translateY(calc(-6px * var(--rail-lift-progress)));
   transition: none;
+  will-change: transform;
+}
+
+.stickyRankingsRail > .RankingsRailTransition > .Jump::before,
+.stickyRankingsRail > .RankingsRailTransition > .Jump::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.stickyRankingsRail > .RankingsRailTransition > .Jump::before {
+  box-shadow: 0 1px 4px var(--shadow-soft);
+  opacity: calc(1 - var(--rail-lift-progress));
+}
+
+.stickyRankingsRail > .RankingsRailTransition > .Jump::after {
+  box-shadow: 0 7px 24px var(--shadow);
+  opacity: var(--rail-lift-progress);
 }
 
 @media (max-width: 600px) {

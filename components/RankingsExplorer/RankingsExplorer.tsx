@@ -3112,7 +3112,8 @@ export function RankingsExplorer({
         </div>
 
         {!memberSelectionMode && (!rankingSource || total > PAGE_SIZE) && <JumpControlsVisibility
-          progress={pagerNavigationBusy ? 1 : bottomRailProgress}
+          progress={pagerNavigationBusy ? 1 : undefined}
+          progressValue={pagerNavigationBusy ? undefined : bottomRailProgress}
           bottomOffset={footerAtTop ? footerHeight : 0}
         >
           <RankingsPagerRail

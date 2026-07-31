@@ -331,7 +331,7 @@ test("hides the site footer after leaving the top of the rankings", async () => 
   ]);
 
   assert.match(progressHook, /const nextAtTop = window\.scrollY === 0/);
-  assert.match(component, /<footer className="siteFooter" data-at-top=\{footerAtTop\}/);
+  assert.match(component, /<footer[^>]*className="siteFooter" data-at-top=\{footerAtTop\}/);
   assert.match(rankingsCss, /\.siteFooter\[data-at-top="false"\][\s\S]*opacity:\s*0;[\s\S]*translateY/);
   assert.match(rankingsCss, /@media \(max-width: 600px\)\s*\{\s*\.siteFooter\s*\{[\s\S]*padding-right:\s*max\(1\.5rem, env\(safe-area-inset-right\)\);[\s\S]*padding-left:\s*max\(1\.5rem, env\(safe-area-inset-left\)\);/);
 });

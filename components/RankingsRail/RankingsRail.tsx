@@ -20,15 +20,16 @@ type AuthProfileResponse = {
 
 const railLayoutTransition = { type: "spring", stiffness: 520, damping: 42, mass: 0.55 } as const;
 
-export const RankingsRail = forwardRef<HTMLDivElement, { children: ReactNode; className?: string; direction: "up" | "down"; searchNavigation?: boolean; compactResultType?: boolean }>(
-  ({ children, className = "", direction, searchNavigation, compactResultType }, ref) => {
+export const RankingsRail = forwardRef<HTMLDivElement, { children: ReactNode; className?: string; direction: "up" | "down"; searchNavigation?: boolean; compactResultType?: boolean; animateLayout?: boolean }>(
+  ({ children, className = "", direction, searchNavigation, compactResultType, animateLayout = false }, ref) => {
     const isPresent = useIsPresent();
+    const shouldAnimateLayout = animateLayout || className.includes("Jump--listAdd");
 
     return (
       <MotionConfig reducedMotion="user">
         <motion.div
-          layout
-          layoutId={`rankings-rail-${direction}`}
+          layout={shouldAnimateLayout}
+          layoutId={shouldAnimateLayout ? `rankings-rail-${direction}` : undefined}
           initial={false}
           animate={{
             opacity: isPresent ? 1 : 0,
@@ -143,7 +144,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
   const nextType = rankingType === "single" ? "average" : "single";
   const searchExpanded = searchProps.findOpen || Boolean(searchProps.findQuery);
   return (
-    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType}>
+    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType} animateLayout>
       <div className="Jump-railSettings" aria-hidden={searchExpanded || undefined}>
         {showEventPicker ? (
           <EventPicker event={event} options={eventOptions} additionalOptions={additionalEventOptions} onChange={onEventChange} onTriggerReady={onEventPickerTrigger} />
@@ -213,6 +214,7 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
             key="pager-actions"
             className="Jump-pagerActions"
             layout
+            layoutDependency={showJumpUp}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -224,6 +226,7 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
                 <motion.button
                   key="jump-up"
                   layout
+                  layoutDependency={showJumpUp}
                   className="Jump-pagerButton"
                   initial={{ opacity: 0, scaleX: 0.7 }}
                   animate={{ opacity: 1, scaleX: 1 }}
@@ -239,7 +242,7 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
               )}
             </AnimatePresence>
             {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={busy} aria-label="Jump to my ranking"><span>My rank</span></button>}
-            <motion.button layout transition={{ layout: railLayoutTransition }} className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={busy}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></motion.button>
+            <motion.button layout layoutDependency={showJumpUp} transition={{ layout: railLayoutTransition }} className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={busy}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></motion.button>
           </motion.div>
         )}
       </AnimatePresence>

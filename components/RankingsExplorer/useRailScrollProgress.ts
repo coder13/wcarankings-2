@@ -1,5 +1,6 @@
 "use client";
 
+import { useMotionValue } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 export function useRailScrollProgress({
@@ -13,7 +14,7 @@ export function useRailScrollProgress({
 }) {
   const [atTop, setAtTop] = useState(true);
   const [topCompact, setTopCompact] = useState(false);
-  const [bottomProgress, setBottomProgress] = useState(0);
+  const bottomProgress = useMotionValue(0);
   const atTopRef = useRef(true);
   const topCompactRef = useRef(false);
   const bottomRef = useRef(0);
@@ -35,13 +36,13 @@ export function useRailScrollProgress({
       const nextBottom = Math.max(0, Math.min(1, distanceToEnd / revealDistance));
       if (nextBottom !== bottomRef.current) {
         bottomRef.current = nextBottom;
-        setBottomProgress(nextBottom);
+        bottomProgress.set(nextBottom);
       }
     };
     const frame = window.requestAnimationFrame(update);
     window.addEventListener("scroll", update, { passive: true });
     return () => { window.cancelAnimationFrame(frame); window.removeEventListener("scroll", update); };
-  }, [enabled, revealDistance, transformDistance]);
+  }, [bottomProgress, enabled, revealDistance, transformDistance]);
 
   return { atTop, topCompact, bottomProgress };
 }
