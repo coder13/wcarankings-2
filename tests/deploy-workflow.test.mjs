@@ -39,7 +39,8 @@ const [
 
 test("composes the main release from independently callable workflow blocks", () => {
   assert.match(release, /group: production-mutation/);
-  assert.match(release, /group: production-mutation[\s\S]*cancel-in-progress: false[\s\S]*queue: max/);
+  assert.match(release, /group: production-mutation[\s\S]*cancel-in-progress: false/);
+  assert.doesNotMatch(release, /queue: max/);
   assert.match(release, /uses: \.\/\.github\/workflows\/plan-projections\.yml/);
   assert.match(release, /uses: \.\/\.github\/workflows\/build-server\.yml/);
   assert.match(release, /uses: \.\/\.github\/workflows\/build-projections\.yml/);
@@ -63,7 +64,8 @@ test("daily refresh reuses only the projection lego blocks", () => {
   assert.match(refresh, /schedule:/);
   assert.match(refresh, /cron: "17 5 \* \* \*"/);
   assert.match(refresh, /group: production-mutation/);
-  assert.match(refresh, /group: production-mutation[\s\S]*cancel-in-progress: false[\s\S]*queue: max/);
+  assert.match(refresh, /group: production-mutation[\s\S]*cancel-in-progress: false/);
+  assert.doesNotMatch(refresh, /queue: max/);
   assert.match(refresh, /plan-projections\.yml/);
   assert.match(refresh, /build-projections\.yml/);
   assert.match(refresh, /deploy-projections\.yml/);
@@ -118,7 +120,8 @@ test("builds labeled PR projections and deploys the exact merged artifact", () =
   assert.match(prProjectionRelease, /artifact_id:/);
   assert.match(prProjectionRelease, /deploy-projections\.yml/);
   assert.match(prProjectionRelease, /production-mutation/);
-  assert.match(prProjectionRelease, /group: production-mutation[\s\S]*cancel-in-progress: false[\s\S]*queue: max/);
+  assert.match(prProjectionRelease, /group: production-mutation[\s\S]*cancel-in-progress: false/);
+  assert.doesNotMatch(prProjectionRelease, /queue: max/);
   assert.match(projectionDeploy, /if \[ "\$WCA_EXPORT_VALUE" != "\$PRODUCTION_WCA_EXPORT_VALUE" \]; then/);
   assert.doesNotMatch(
     projectionDeploy,

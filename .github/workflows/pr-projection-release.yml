@@ -15,7 +15,6 @@ permissions:
 concurrency:
   group: production-mutation
   cancel-in-progress: false
-  queue: max
 
 jobs:
   plan_pr_projections:
