@@ -31,7 +31,7 @@ services:
       FLYWAY_LOCATIONS: filesystem:/flyway/migrations/app
       # The other lane shares Flyway's existing history table; its applied
       # migrations are expected to be missing from this lane's location.
-      FLYWAY_IGNORE_MIGRATION_PATTERNS: "versioned:missing,versioned:pending"
+      FLYWAY_IGNORE_MIGRATION_PATTERNS: "versioned:missing,versioned:ignored,versioned:pending"
       # Production predates Flyway; baseline its existing V1 metadata table once.
       FLYWAY_BASELINE_ON_MIGRATE: "true"
       FLYWAY_CONNECT_RETRIES: 60
