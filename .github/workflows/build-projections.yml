@@ -34,6 +34,11 @@ on:
         required: false
         default: false
         type: boolean
+      artifact_retention_days:
+        description: Number of days to retain the immutable projection release artifact.
+        required: false
+        default: 7
+        type: number
     outputs:
       artifact_name:
         value: ${{ jobs.build.outputs.artifact_name }}
@@ -321,7 +326,7 @@ jobs:
           name: ${{ steps.release-artifact.outputs.name }}
           path: /tmp/projection-release
           if-no-files-found: error
-          retention-days: 7
+          retention-days: ${{ inputs.artifact_retention_days }}
 
       - name: Report no projection build
         if: inputs.groups == '' || inputs.cache_only
