@@ -859,7 +859,13 @@ export function RankingsExplorer({
   const rowVirtualizer = useWindowVirtualizer({
     count: entries.length + 1,
     estimateSize: estimatedRowHeight,
-    measureElement: (element, entry) => {
+    measureElement: (element, entry, instance) => {
+      const index = Number(element.getAttribute("data-index"));
+      if (element.getAttribute("data-accordion-measure-lock") === "true") {
+        const key = instance.options.getItemKey(index);
+        const cache = (instance as unknown as { itemSizeCache?: Map<unknown, number> }).itemSizeCache;
+        return cache?.get(key) ?? estimatedRowHeight(index);
+      }
       if (entry?.borderBoxSize) {
         const box = entry.borderBoxSize[0];
         if (box) return Math.round(box.blockSize);
@@ -870,6 +876,9 @@ export function RankingsExplorer({
     scrollMargin: listOffset,
   });
   const rowVirtualizerRef = useRef(rowVirtualizer);
+  const resizeVirtualRow = useCallback((index: number, size: number) => {
+    rowVirtualizerRef.current.resizeItem(index, size);
+  }, []);
 
   useEffect(() => {
     activeListKeyRef.current = activeListKey;
@@ -3098,6 +3107,7 @@ export function RankingsExplorer({
                 searchMatchPersonIds={searchMatchPersonIds}
                 highlightedPersonId={highlightedPersonId}
                 measureElement={rowVirtualizer.measureElement}
+                resizeRow={resizeVirtualRow}
                 onRowNavigate={handleRowNavigate}
                 memberSelectionMode={memberSelectionMode}
                 selectedMemberIds={selectedMemberIds}

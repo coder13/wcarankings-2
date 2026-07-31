@@ -339,24 +339,6 @@ test("uses a symmetric 160ms pager layout transition", async () => {
   assert.match(component, /transition=\{\{ layout: pagerLayoutTransition \}\}/);
 });
 
-test("keeps accordion geometry stable during its visual transition", async () => {
-  const [row, table] = await Promise.all([
-    readFile(new URL("../components/RankingRow/RankingRow.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../components/ResultsTable/ResultsTable.tsx", import.meta.url), "utf8"),
-  ]);
-
-  const accordionFrame = row.slice(
-    row.indexOf("function AccordionFrame"),
-    row.indexOf("export function RankingRow"),
-  );
-  assert.match(accordionFrame, /initial=\{initial \|\| closing \? false : \{ opacity: 0, y: -8 \}\}/);
-  assert.doesNotMatch(accordionFrame, /height:\s*(?:0|"auto")/);
-  assert.doesNotMatch(accordionFrame, /marginBottom:/);
-  assert.match(row, /<AnimatePresence initial=\{false\} mode="popLayout">[\s\S]*<AccordionFrame/);
-  assert.match(table, /initialAccordionAnimationPending && focusedExpansionKey === key/);
-  assert.doesNotMatch(table, /Boolean\(initialExpandedPersonId && focusedExpansionKey === key\)/);
-});
-
 test("hides the site footer after leaving the top of the rankings", async () => {
   const [component, progressHook, rankingsCss] = await Promise.all([
     readFile(new URL("../components/RankingsExplorer/RankingsExplorer.tsx", import.meta.url), "utf8"),

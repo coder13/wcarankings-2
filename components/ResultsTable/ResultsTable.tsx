@@ -2,14 +2,16 @@
 
 import { RankingRow } from "../RankingRow/RankingRow";
 import { rankingEntryKey, type RankingEntry } from "../RankingsExplorer/types";
-import { AnimatePresence, motion, MotionConfig } from "motion/react";
+import { animate } from "motion";
 import type { Key, Ref } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PersonEventDetails } from "@/lib/person-event-details";
 import { personDetailsCache } from "./personDetailsCache";
 
+const ACCORDION_TRANSITION_SECONDS = 0.2;
 const DETAIL_PREFETCH_DELAY_MS = 120;
-const ROW_REARRANGE_TRANSITION_MS = 220;
+const ROW_HEIGHT = 65.45;
+const EXPANDED_ROW_HEIGHT = 248;
 
 export type RenderedTableRow = {
   index: number;
@@ -17,26 +19,6 @@ export type RenderedTableRow = {
   start: number;
   size?: number;
 };
-
-export function getRenderedRowIdentity(
-  entry: RankingEntry | null,
-  index: number,
-  hasMore: boolean,
-) {
-  if (entry) return rankingEntryKey(entry);
-  return `placeholder:${index}:${hasMore ? "more" : "end"}`;
-}
-
-function renderedRowKeysEqual(
-  left: ReadonlyMap<number, string>,
-  right: ReadonlyMap<number, string>,
-) {
-  if (left.size !== right.size) return false;
-  for (const [index, key] of right) {
-    if (left.get(index) !== key) return false;
-  }
-  return true;
-}
 
 export function ResultsTable({
   entries,
@@ -55,6 +37,7 @@ export function ResultsTable({
   highlightedPersonId,
   searchMatchPersonIds,
   measureElement,
+  resizeRow,
   onRowNavigate,
   memberSelectionMode,
   selectedMemberIds,
@@ -80,6 +63,7 @@ export function ResultsTable({
   highlightedPersonId: string;
   searchMatchPersonIds?: ReadonlySet<string>;
   measureElement: (element: Element | null) => void;
+  resizeRow?: (index: number, size: number) => void;
   onRowNavigate: (rowIndex: number, direction: -1 | 1) => void;
   memberSelectionMode?: boolean;
   selectedMemberIds?: ReadonlySet<string>;
@@ -93,7 +77,11 @@ export function ResultsTable({
   const [detailsByKey, setDetailsByKey] = useState<Record<string, PersonEventDetails | null>>({});
   const [loadingKey, setLoadingKey] = useState("");
   const [detailErrorByKey, setDetailErrorByKey] = useState<Record<string, string>>({});
-  const [initialAccordionAnimationPending, setInitialAccordionAnimationPending] = useState(Boolean(initialExpandedPersonId));
+  const [closingKeys, setClosingKeys] = useState<ReadonlySet<string>>(new Set());
+  const [animatedKeys, setAnimatedKeys] = useState<ReadonlySet<string>>(new Set());
+  const animationControlsRef = useRef<{ stop: () => void } | null>(null);
+  const rowSizesRef = useRef(new Map<string, number>());
+  const animationKeysRef = useRef<ReadonlySet<string>>(new Set());
   const thumbRequestedKeys = useRef(new Set<string>());
   const detailRequestsRef = useRef(new Map<string, Promise<PersonEventDetails>>());
   const prefetchTimersRef = useRef(new Map<string, number>());
@@ -107,17 +95,9 @@ export function ResultsTable({
     return entry ? rankingEntryKey(entry) : "";
   }, [enablePersonDetails, entries, initialExpandedPersonId]);
   const activeExpandedKey = focusedExpansionKey || expandedKey;
-  const [previousRenderedKeys, setPreviousRenderedKeys] = useState<ReadonlyMap<number, string>>(() => new Map());
+  const previousExpandedKeyRef = useRef(activeExpandedKey);
   const expandedDetails = activeExpandedKey ? detailsByKey[activeExpandedKey] : null;
   const expandedError = activeExpandedKey ? detailErrorByKey[activeExpandedKey] : "";
-
-  useEffect(() => {
-    if (!initialAccordionAnimationPending || !focusedExpansionKey) return;
-    // The first URL-focused row is already expanded when it enters the viewport.
-    // Later URL updates come from interaction and should retain their animation.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setInitialAccordionAnimationPending(false);
-  }, [focusedExpansionKey, initialAccordionAnimationPending]);
 
   const requestDetails = useCallback((entry: RankingEntry, key: string) => {
     const cacheKey = `${entry.personId}:${eventId}`;
@@ -186,6 +166,68 @@ export function ResultsTable({
     setDetailErrorByKey({});
     if (!enablePersonDetails) setExpandedKey("");
   }, [enablePersonDetails, eventId, rankingType]);
+
+  useEffect(() => {
+    if (!enablePersonDetails) return;
+    const previousKey = previousExpandedKeyRef.current;
+    if (previousKey === activeExpandedKey) return;
+    previousExpandedKeyRef.current = activeExpandedKey;
+
+    const keys = new Set(animationKeysRef.current);
+    if (previousKey) keys.add(previousKey);
+    if (activeExpandedKey) keys.add(activeExpandedKey);
+    const animatedKeyList = [...keys];
+    animationKeysRef.current = keys;
+    setAnimatedKeys(keys);
+    setClosingKeys(new Set(animatedKeyList.filter((key) => key !== activeExpandedKey)));
+
+    const indexes = new Map(
+      entries.map((entry, index) => [rankingEntryKey(entry), index]),
+    );
+    const starts = new Map<string, number>();
+    const targets = new Map<string, number>();
+    for (const key of animatedKeyList) {
+      starts.set(
+        key,
+        rowSizesRef.current.get(
+          key,
+        ) ?? (key === previousKey ? EXPANDED_ROW_HEIGHT : ROW_HEIGHT),
+      );
+      targets.set(key, key === activeExpandedKey ? EXPANDED_ROW_HEIGHT : ROW_HEIGHT);
+    }
+
+    animationControlsRef.current?.stop();
+    const controls = animate(0, 1, {
+      duration: ACCORDION_TRANSITION_SECONDS,
+      ease: [0.2, 0.7, 0.2, 1],
+      onUpdate: (progress) => {
+        for (const key of animatedKeyList) {
+          const index = indexes.get(key);
+          if (index === undefined) continue;
+          const size = (starts.get(key) ?? ROW_HEIGHT) +
+            ((targets.get(key) ?? ROW_HEIGHT) - (starts.get(key) ?? ROW_HEIGHT)) * progress;
+          rowSizesRef.current.set(key, size);
+          resizeRow?.(index, size);
+        }
+      },
+      onComplete: () => {
+        for (const key of animatedKeyList) {
+          const index = indexes.get(key);
+          const size = targets.get(key) ?? ROW_HEIGHT;
+          rowSizesRef.current.set(key, size);
+          if (index !== undefined) resizeRow?.(index, size);
+        }
+        animationControlsRef.current = null;
+        animationKeysRef.current = new Set();
+        setAnimatedKeys(new Set());
+        setClosingKeys(new Set());
+      },
+    });
+    animationControlsRef.current = controls;
+    return () => {
+      if (previousKey !== activeExpandedKey) controls.stop();
+    };
+  }, [activeExpandedKey, enablePersonDetails, entries, resizeRow]);
 
   useEffect(() => {
     if (focusedExpansionKey && focusedExpansionKey !== expandedKey) {
@@ -260,50 +302,18 @@ export function ResultsTable({
     return () => source.close();
   }, [activeExpandedKey, expandedDetails]);
 
-  const currentRenderedKeys = useMemo(() => {
-    const nextKeys = new Map<number, string>();
-    for (const virtualRow of renderedRows) {
-      nextKeys.set(
-        virtualRow.index,
-        getRenderedRowIdentity(entries[virtualRow.index] ?? null, virtualRow.index, hasMore),
-      );
-    }
-    return nextKeys;
-  }, [entries, hasMore, renderedRows]);
-
-  const renderedRowStates = renderedRows.map((virtualRow) => {
-    const entry = entries[virtualRow.index] ?? null;
-    const identity = getRenderedRowIdentity(entry, virtualRow.index, hasMore);
-    return {
-      virtualRow,
-      entry,
-      identity,
-      shouldAnimate: previousRenderedKeys.get(virtualRow.index) !== undefined &&
-        previousRenderedKeys.get(virtualRow.index) !== identity,
-    };
-  });
-
-  useEffect(() => {
-    if (renderedRowKeysEqual(previousRenderedKeys, currentRenderedKeys)) return;
-    const timer = window.setTimeout(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPreviousRenderedKeys(currentRenderedKeys);
-    }, ROW_REARRANGE_TRANSITION_MS);
-    return () => window.clearTimeout(timer);
-  }, [currentRenderedKeys, previousRenderedKeys]);
-
   if (loading && showLoading && !preserveListDuringLoad && entries.length === 0) {
     return <div className="listMessage">Loading rankings…</div>;
   }
 
   return (
-    <MotionConfig reducedMotion="user">
-      <ol
-        ref={listRef}
-        className="list"
-        style={{ height: `${renderedListHeight}px` }}
-      >
-      {renderedRowStates.map(({ virtualRow, entry, identity, shouldAnimate }) => {
+    <ol
+      ref={listRef}
+      className="list"
+      style={{ height: `${renderedListHeight}px` }}
+    >
+      {renderedRows.map((virtualRow) => {
+        const entry = entries[virtualRow.index] ?? null;
         let content;
 
         if (entry) {
@@ -329,8 +339,8 @@ export function ResultsTable({
               onToggleSelected={onMemberToggle}
               onMemberContextMenu={onMemberContextMenu}
               expanded={expanded}
-              closing={false}
-              skipAccordionAnimation={initialAccordionAnimationPending && focusedExpansionKey === key}
+              closing={closingKeys.has(key)}
+              skipAccordionAnimation={Boolean(initialExpandedPersonId && focusedExpansionKey === key)}
               eventDetails={detailsByKey[key] ?? null}
               onPrefetchDetails={enablePersonDetails ? prefetchDetails : undefined}
               onCancelPrefetchDetails={enablePersonDetails ? cancelPrefetchDetails : undefined}
@@ -356,30 +366,20 @@ export function ResultsTable({
             className="virtualRow"
             key={virtualRow.key}
             data-index={virtualRow.index}
-            data-expanded={entry ? activeExpandedKey === rankingEntryKey(entry) : false}
+            data-expanded={entry ? activeExpandedKey === rankingEntryKey(entry) || closingKeys.has(rankingEntryKey(entry)) : false}
             data-highlighted={entry ? rankingEntryKey(entry) === highlightedPersonId : false}
             data-alternate={entry ? virtualRow.index % 2 === 1 : false}
+            data-accordion-measure-lock={entry && animatedKeys.has(rankingEntryKey(entry)) ? "true" : undefined}
             data-details-loading={entry ? loadingKey === rankingEntryKey(entry) : false}
             style={{
-              height: entry || virtualRow.size === undefined ? undefined : `${virtualRow.size}px`,
+              height: virtualRow.size === undefined ? undefined : `${virtualRow.size}px`,
               transform: `translateY(${virtualRow.start - listOffset}px)`,
             }}
           >
-            <AnimatePresence initial={false} mode="popLayout">
-              <motion.div
-                key={identity}
-                className="virtualRowContent"
-                initial={shouldAnimate ? { opacity: 0, y: 8 } : false}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-              >
-                {content}
-              </motion.div>
-            </AnimatePresence>
+            {content}
           </div>
         );
       })}
-      </ol>
-    </MotionConfig>
-  );}
+    </ol>
+  );
+}

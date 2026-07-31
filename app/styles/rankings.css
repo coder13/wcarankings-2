@@ -340,14 +340,11 @@
   display: grid;
   gap: 0.3rem;
   width: calc(100% - (2 * var(--page-gutter)));
-  height: 11.08rem;
-  margin-bottom: 0.4rem;
   margin-inline: var(--page-gutter);
   overflow: hidden;
   border-radius: 8px;
   background: transparent;
   box-shadow: none;
-  will-change: transform, opacity;
 }
 
 .rowAccordionInner {
@@ -393,24 +390,17 @@
 }
 
 .rowAccordionSkeletonLine {
-  position: relative;
   overflow: hidden;
-  background: color-mix(in srgb, var(--text-strong) 8%, transparent);
-}
-
-.rowAccordionSkeletonLine::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--text-strong) 10%, transparent),
-    transparent
-  );
-  content: "";
-  transform: translateX(100%);
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--text-strong) 10%, transparent),
+      transparent
+    ),
+    color-mix(in srgb, var(--text-strong) 8%, transparent);
+  background-size: 220% 100%, 100% 100%;
   animation: rowAccordionSkeletonSweep 1200ms ease-in-out infinite;
-  will-change: transform;
 }
 
 .rowAccordionSkeletonLine {
@@ -449,18 +439,17 @@
 
 @keyframes rowAccordionSkeletonSweep {
   from {
-    transform: translateX(100%);
+    background-position: 160% 0, 0 0;
   }
 
   to {
-    transform: translateX(-100%);
+    background-position: -60% 0, 0 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rowAccordionSkeletonLine::after {
+  .rowAccordionSkeletonLine {
     animation: none;
-    content: none;
   }
 }
 
