@@ -27,6 +27,10 @@
   transition: background-color 420ms ease;
 }
 
+.virtualRowContent {
+  width: 100%;
+}
+
 .virtualRow[data-expanded="true"] {
   background-color: var(--surface-hover);
 }

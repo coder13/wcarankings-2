@@ -3,6 +3,7 @@
 import { RankingRow } from "../RankingRow/RankingRow";
 import { rankingEntryKey, type RankingEntry } from "../RankingsExplorer/types";
 import { animate } from "motion";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import type { Key, Ref } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PersonEventDetails } from "@/lib/person-event-details";
@@ -12,6 +13,7 @@ const ACCORDION_TRANSITION_SECONDS = 0.2;
 const DETAIL_PREFETCH_DELAY_MS = 120;
 const ROW_HEIGHT = 65.45;
 const EXPANDED_ROW_HEIGHT = 248;
+const ROW_REARRANGE_TRANSITION_MS = 220;
 
 export type RenderedTableRow = {
   index: number;
@@ -19,6 +21,26 @@ export type RenderedTableRow = {
   start: number;
   size?: number;
 };
+
+export function getRenderedRowIdentity(
+  entry: RankingEntry | null,
+  index: number,
+  hasMore: boolean,
+) {
+  if (entry) return rankingEntryKey(entry);
+  return `placeholder:${index}:${hasMore ? "more" : "end"}`;
+}
+
+function renderedRowKeysEqual(
+  left: ReadonlyMap<number, string>,
+  right: ReadonlyMap<number, string>,
+) {
+  if (left.size !== right.size) return false;
+  for (const [index, key] of right) {
+    if (left.get(index) !== key) return false;
+  }
+  return true;
+}
 
 export function ResultsTable({
   entries,
@@ -96,6 +118,7 @@ export function ResultsTable({
   }, [enablePersonDetails, entries, initialExpandedPersonId]);
   const activeExpandedKey = focusedExpansionKey || expandedKey;
   const previousExpandedKeyRef = useRef(activeExpandedKey);
+  const [previousRenderedKeys, setPreviousRenderedKeys] = useState<ReadonlyMap<number, string>>(() => new Map());
   const expandedDetails = activeExpandedKey ? detailsByKey[activeExpandedKey] : null;
   const expandedError = activeExpandedKey ? detailErrorByKey[activeExpandedKey] : "";
 
@@ -302,18 +325,50 @@ export function ResultsTable({
     return () => source.close();
   }, [activeExpandedKey, expandedDetails]);
 
+  const currentRenderedKeys = useMemo(() => {
+    const nextKeys = new Map<number, string>();
+    for (const virtualRow of renderedRows) {
+      nextKeys.set(
+        virtualRow.index,
+        getRenderedRowIdentity(entries[virtualRow.index] ?? null, virtualRow.index, hasMore),
+      );
+    }
+    return nextKeys;
+  }, [entries, hasMore, renderedRows]);
+
+  const renderedRowStates = renderedRows.map((virtualRow) => {
+    const entry = entries[virtualRow.index] ?? null;
+    const identity = getRenderedRowIdentity(entry, virtualRow.index, hasMore);
+    return {
+      virtualRow,
+      entry,
+      identity,
+      shouldAnimate: previousRenderedKeys.get(virtualRow.index) !== undefined &&
+        previousRenderedKeys.get(virtualRow.index) !== identity,
+    };
+  });
+
+  useEffect(() => {
+    if (renderedRowKeysEqual(previousRenderedKeys, currentRenderedKeys)) return;
+    const timer = window.setTimeout(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPreviousRenderedKeys(currentRenderedKeys);
+    }, ROW_REARRANGE_TRANSITION_MS);
+    return () => window.clearTimeout(timer);
+  }, [currentRenderedKeys, previousRenderedKeys]);
+
   if (loading && showLoading && !preserveListDuringLoad && entries.length === 0) {
     return <div className="listMessage">Loading rankings…</div>;
   }
 
   return (
-    <ol
-      ref={listRef}
-      className="list"
-      style={{ height: `${renderedListHeight}px` }}
-    >
-      {renderedRows.map((virtualRow) => {
-        const entry = entries[virtualRow.index] ?? null;
+    <MotionConfig reducedMotion="user">
+      <ol
+        ref={listRef}
+        className="list"
+        style={{ height: `${renderedListHeight}px` }}
+      >
+      {renderedRowStates.map(({ virtualRow, entry, identity, shouldAnimate }) => {
         let content;
 
         if (entry) {
@@ -376,10 +431,21 @@ export function ResultsTable({
               transform: `translateY(${virtualRow.start - listOffset}px)`,
             }}
           >
-            {content}
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.div
+                key={identity}
+                className="virtualRowContent"
+                initial={shouldAnimate ? { opacity: 0, y: 8 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+              >
+                {content}
+              </motion.div>
+            </AnimatePresence>
           </div>
         );
       })}
-    </ol>
-  );
-}
+      </ol>
+    </MotionConfig>
+  );}
