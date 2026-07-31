@@ -139,6 +139,7 @@ export function dynamicListRegionsQuery(count: number) {
 export function dynamicListPeopleQuery(count: number) {
   return sql`SELECT wca_id FROM persons WHERE sub_id = 1 AND wca_id IN (${placeholders(count)})`;
 }
+
 function placeholders(count: number) {
   return Array.from({ length: count }, () => "?").join(",");
 }

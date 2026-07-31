@@ -22,8 +22,8 @@
     "test": "npm run build && node --test tests/deploy-workflow.test.mjs tests/projection-transfer.test.mjs tests/rendered-html.test.mjs tests/scroll-engine.test.mjs tests/result-projections.test.mjs",
     "test:unit": "node --import ./tests/register-asset-loader.mjs --import tsx --test components/*/*.test.tsx tests/*.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern storybook-static",
-    "format:server": "prettier --write app/api controllers db lib services",
-    "format:server:check": "prettier --check app/api controllers db lib services",
+    "format:server": "prettier --write app/api controllers db lib services && eslint app/api controllers db lib services --fix",
+    "format:server:check": "prettier --check app/api controllers db lib services && eslint app/api controllers db lib services",
     "prepare": "husky",
     "sync:wca": "node scripts/sync-wca-export.mjs",
     "sync:wca:local": "docker compose --env-file .env.local run --rm flyway migrate && node --env-file=.env.local scripts/sync-wca-export.mjs",
@@ -67,10 +67,10 @@
   },
   "type": "module",
   "lint-staged": {
-    "app/api/**/*.{js,jsx,ts,tsx}": "prettier --write",
-    "controllers/**/*.{js,jsx,ts,tsx}": "prettier --write",
-    "db/**/*.{js,jsx,ts,tsx}": "prettier --write",
-    "lib/**/*.{js,jsx,ts,tsx}": "prettier --write",
-    "services/**/*.{js,jsx,ts,tsx}": "prettier --write"
+    "app/api/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"],
+    "controllers/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"],
+    "db/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"],
+    "lib/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"],
+    "services/**/*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"]
   }
 }
