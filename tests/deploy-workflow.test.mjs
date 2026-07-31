@@ -120,7 +120,12 @@ test("builds labeled PR projections and deploys the exact merged artifact", () =
   assert.match(prProjectionRelease, /artifact_id:/);
   assert.match(prProjectionRelease, /deploy-projections\.yml/);
   assert.match(prProjectionRelease, /production-mutation/);
-  assert.match(prProjectionRelease, /group: production-mutation[\s\S]*cancel-in-progress: false/);
+  assert.match(
+    prProjectionRelease,
+    /github\.event\.action == 'labeled'[\s\S]*github\.event\.label\.name == 'build-projections'[\s\S]*production-mutation/,
+  );
+  assert.match(prProjectionRelease, /format\('pr-projection-noop-\{0\}', github\.run_id\)/);
+  assert.match(prProjectionRelease, /cancel-in-progress: false/);
   assert.doesNotMatch(prProjectionRelease, /queue: max/);
   assert.match(projectionDeploy, /if \[ "\$WCA_EXPORT_VALUE" != "\$PRODUCTION_WCA_EXPORT_VALUE" \]; then/);
   assert.doesNotMatch(

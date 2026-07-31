@@ -13,7 +13,17 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: production-mutation
+  group: >-
+    ${{
+      (
+        (github.event.action == 'labeled' && github.event.label.name == 'build-projections')
+        || (github.event.action == 'closed'
+          && github.event.pull_request.merged == true
+          && contains(github.event.pull_request.labels.*.name, 'build-projections'))
+      )
+      && 'production-mutation'
+      || format('pr-projection-noop-{0}', github.run_id)
+    }}
   cancel-in-progress: false
 
 jobs:
