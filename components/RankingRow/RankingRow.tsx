@@ -127,14 +127,13 @@ function AccordionFrame({
   return (
     <motion.div
       className={`rowAccordion${ready ? " rowAccordion--ready" : ""}`}
-      initial={initial ? false : closing ? false : { height: 0, marginBottom: 0, opacity: 0 }}
+      initial={initial || closing ? false : { opacity: 0, y: -8 }}
       animate={closing
-        ? { height: 0, marginBottom: 0, opacity: 0 }
-        : { height: "auto", marginBottom: "0.4rem", opacity: 1 }}
-      exit={{ height: 0, marginBottom: 0, opacity: 0 }}
+        ? { opacity: 0, y: -8 }
+        : { opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
       transition={{
-        height: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
-        marginBottom: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
+        y: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
         opacity: { duration: ACCORDION_TRANSITION_SECONDS * 0.5, ease: "easeOut" },
       }}
     >
@@ -351,7 +350,7 @@ export function RankingRow({
             )}
           </span>
         </div>
-        <AnimatePresence initial={false} mode="sync">
+        <AnimatePresence initial={false} mode="popLayout">
           {accordionVisible && (
             <AccordionFrame
               key={`accordion-${id}`}

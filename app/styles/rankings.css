@@ -340,11 +340,14 @@
   display: grid;
   gap: 0.3rem;
   width: calc(100% - (2 * var(--page-gutter)));
+  height: 11.08rem;
+  margin-bottom: 0.4rem;
   margin-inline: var(--page-gutter);
   overflow: hidden;
   border-radius: 8px;
   background: transparent;
   box-shadow: none;
+  will-change: transform, opacity;
 }
 
 .rowAccordionInner {

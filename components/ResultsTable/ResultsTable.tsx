@@ -93,6 +93,7 @@ export function ResultsTable({
   const [detailsByKey, setDetailsByKey] = useState<Record<string, PersonEventDetails | null>>({});
   const [loadingKey, setLoadingKey] = useState("");
   const [detailErrorByKey, setDetailErrorByKey] = useState<Record<string, string>>({});
+  const [initialAccordionAnimationPending, setInitialAccordionAnimationPending] = useState(Boolean(initialExpandedPersonId));
   const thumbRequestedKeys = useRef(new Set<string>());
   const detailRequestsRef = useRef(new Map<string, Promise<PersonEventDetails>>());
   const prefetchTimersRef = useRef(new Map<string, number>());
@@ -109,6 +110,14 @@ export function ResultsTable({
   const [previousRenderedKeys, setPreviousRenderedKeys] = useState<ReadonlyMap<number, string>>(() => new Map());
   const expandedDetails = activeExpandedKey ? detailsByKey[activeExpandedKey] : null;
   const expandedError = activeExpandedKey ? detailErrorByKey[activeExpandedKey] : "";
+
+  useEffect(() => {
+    if (!initialAccordionAnimationPending || !focusedExpansionKey) return;
+    // The first URL-focused row is already expanded when it enters the viewport.
+    // Later URL updates come from interaction and should retain their animation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setInitialAccordionAnimationPending(false);
+  }, [focusedExpansionKey, initialAccordionAnimationPending]);
 
   const requestDetails = useCallback((entry: RankingEntry, key: string) => {
     const cacheKey = `${entry.personId}:${eventId}`;
@@ -321,7 +330,7 @@ export function ResultsTable({
               onMemberContextMenu={onMemberContextMenu}
               expanded={expanded}
               closing={false}
-              skipAccordionAnimation={Boolean(initialExpandedPersonId && focusedExpansionKey === key)}
+              skipAccordionAnimation={initialAccordionAnimationPending && focusedExpansionKey === key}
               eventDetails={detailsByKey[key] ?? null}
               onPrefetchDetails={enablePersonDetails ? prefetchDetails : undefined}
               onCancelPrefetchDetails={enablePersonDetails ? cancelPrefetchDetails : undefined}
