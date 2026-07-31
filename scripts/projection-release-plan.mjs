@@ -6,6 +6,7 @@ import {
   DEPLOYMENT_PROJECTION_GROUPS,
   deploymentProjectionInputFiles,
 } from "./mysql-schema.mjs";
+import { normalizeExportDate } from "./projection-transfer-date.mjs";
 
 const FINGERPRINT_FORMAT_VERSION = 1;
 const MARIADB_COMPATIBILITY_VERSION = "11.8";
@@ -35,7 +36,8 @@ export async function projectionFingerprints({
   exportId,
   repositoryRoot = root,
 } = {}) {
-  if (!exportId) throw new Error("exportId is required");
+  const normalizedExportId = normalizeExportDate(exportId);
+  if (!normalizedExportId) throw new Error("exportId must be a valid timestamp");
   const migrations = (await migrationFiles(join(repositoryRoot, "migrations", "mysql")))
     .map((path) => relative(repositoryRoot, path))
     .sort();
@@ -52,7 +54,7 @@ export async function projectionFingerprints({
       fingerprintFormatVersion: FINGERPRINT_FORMAT_VERSION,
       group: group.name,
       groupFingerprintVersion: group.fingerprintVersion,
-      exportId: String(exportId),
+      exportId: normalizedExportId,
       mariaDbCompatibilityVersion: MARIADB_COMPATIBILITY_VERSION,
       files,
     };
@@ -66,7 +68,7 @@ export async function projectionFingerprints({
 
   return {
     version: FINGERPRINT_FORMAT_VERSION,
-    exportId: String(exportId),
+    exportId: normalizedExportId,
     mariaDbCompatibilityVersion: MARIADB_COMPATIBILITY_VERSION,
     groups,
   };
@@ -90,6 +92,10 @@ export async function projectionReleasePlan({
   repositoryRoot = root,
 } = {}) {
   const fingerprints = await projectionFingerprints({ exportId, repositoryRoot });
+  const normalizedExportId = normalizeExportDate(exportId);
+  const normalizedProductionExportId = productionExportId
+    ? normalizeExportDate(productionExportId)
+    : null;
   const requested = selectedGroups?.length
     ? new Set(selectedGroups)
     : new Set(DEPLOYMENT_PROJECTION_GROUPS.map(({ name }) => name));
@@ -98,7 +104,10 @@ export async function projectionReleasePlan({
     throw new Error(`Unknown deployment projection group: ${unknown.join(", ")}`);
   }
   const exportChanged = Boolean(
-    productionExportId && String(productionExportId) !== String(exportId),
+    productionExportId
+      && (normalizedExportId === null
+        || normalizedProductionExportId === null
+        || normalizedProductionExportId !== normalizedExportId),
   );
   // Raw WCA tables are shared by every projection group. A new raw export must
   // therefore publish a complete generation even when a caller requested a
