@@ -4,12 +4,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { RankingEntry } from "../RankingsExplorer/types";
 import { getRenderedRowIdentity, ResultsTable } from "./ResultsTable";
 
-test("uses entry identity for row replacement but not for empty virtual slots", () => {
-  assert.equal(getRenderedRowIdentity(entries[0], 0, true), "2024FAST01");
-  assert.equal(getRenderedRowIdentity(null, 3, true), "placeholder:3:more");
-  assert.equal(getRenderedRowIdentity(null, 3, false), "placeholder:3:end");
-});
-
 const entries: RankingEntry[] = [
   {
     rank: 1,
@@ -36,6 +30,12 @@ const entries: RankingEntry[] = [
     recordBadges: [],
   },
 ];
+
+test("uses entry identity for row replacement but not for empty virtual slots", () => {
+  assert.equal(getRenderedRowIdentity(entries[0], 0, true), "2024FAST01");
+  assert.equal(getRenderedRowIdentity(null, 3, true), "placeholder:3:more");
+  assert.equal(getRenderedRowIdentity(null, 3, false), "placeholder:3:end");
+});
 
 test("renders rows and highlights tied results", () => {
   const markup = renderToStaticMarkup(
