@@ -182,16 +182,16 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
 });
 
 test("does not replace SQL failures with synthetic ranking data", async () => {
-  const [page, rankingsService, rankingsRoute, readme] = await Promise.all([
+  const [page, rankingsService, rankingsController, readme] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/rankings.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/rankings/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../controllers/rankings-controller.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);
 
   assert.doesNotMatch(page, /demo-data|makeDemoRankings/);
   assert.doesNotMatch(rankingsService, /demo-data|makeDemoRankings/);
-  assert.match(rankingsRoute, /inputError \? 400 : 503/);
+  assert.match(rankingsController, /inputError \? 400 : 503/);
   assert.doesNotMatch(readme, /preview rows/);
   await assert.rejects(access(new URL("../lib/demo-data.ts", import.meta.url)));
 });

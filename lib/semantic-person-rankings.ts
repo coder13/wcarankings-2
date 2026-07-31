@@ -7,7 +7,7 @@ import {
   parseResultType,
   parseScope,
   parseStart,
-} from "@/lib/projection-api";
+} from "@/lib/api/projection";
 
 type PersonRankingRow = {
   person_id: string;

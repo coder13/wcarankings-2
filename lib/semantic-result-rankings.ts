@@ -7,7 +7,7 @@ import {
   parseResultType,
   parseGender,
   parseScope,
-} from "@/lib/projection-api";
+} from "@/lib/api/projection";
 import { searchPersonIds } from "@/lib/person-search";
 import { getRecordBadges } from "@/lib/wca";
 

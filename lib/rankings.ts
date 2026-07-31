@@ -3,7 +3,7 @@ import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import { getCurrentRankingsMetadata, getRankingCount, getYearRankingCount, type RankingsMetadata } from "@/lib/rankings-metadata";
 import { normalPageKey, rankingsPageCache } from "@/lib/rankings-cache";
 import { searchPersonIds } from "@/lib/person-search";
-import { ApiInputError, parseGender, parseYear } from "@/lib/projection-api";
+import { ApiInputError, parseGender, parseYear } from "@/lib/api/projection";
 import { getRecordBadges, isRankingEventId, isRankingType, isValidRegexPattern, parseRegionQuery, type GenderFilter, type RankingEntry, type RankingType, type RegionScope } from "@/lib/wca";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;

@@ -180,12 +180,12 @@ test("does not introduce entries or sub-rank vocabulary in new schemas", async (
 
 test("exposes bounded resource APIs without projection name scans", async () => {
   const [shared, people, results, rankings, entities, search] = await Promise.all([
-    readFile(new URL("lib/projection-api.ts", root), "utf8"),
+    readFile(new URL("lib/api/projection.ts", root), "utf8"),
     readFile(new URL("lib/semantic-person-rankings.ts", root), "utf8"),
     readFile(new URL("lib/semantic-result-rankings.ts", root), "utf8"),
     readFile(new URL("lib/rankings.ts", root), "utf8"),
     readFile(new URL("lib/semantic-entity-rankings.ts", root), "utf8"),
-    readFile(new URL("lib/person-search.ts", root), "utf8"),
+    readFile(new URL("lib/data/person-search-database.ts", root), "utf8"),
   ]);
 
   assert.match(shared, /MAX_PAGE_SIZE = 100/);

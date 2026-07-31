@@ -1,4 +1,3 @@
-import { DatabaseOverloadedError } from "@/db";
 import { getCurrentRankingsMetadata } from "@/lib/rankings-metadata";
 import {
   isEventId,
@@ -8,7 +7,6 @@ import {
   parseRegionQuery,
   type RankingType,
   type RegionScope,
-  type GenderFilter,
 } from "@/lib/wca";
 
 export const DEFAULT_PAGE_SIZE = 50;
@@ -90,10 +88,7 @@ export function parseResultType(params: URLSearchParams, eventId?: string | null
   return value;
 }
 
-export function parseScope(params: URLSearchParams): {
-  scope: RegionScope;
-  regionId: string;
-} {
+export function parseScope(params: URLSearchParams): { scope: RegionScope; regionId: string } {
   return parseRegionQuery(params.get("region"));
 }
 
@@ -121,10 +116,7 @@ export function optionalText(params: URLSearchParams, name: string, maxLength = 
   return value;
 }
 
-export async function projectionEnvelope<T extends Record<string, unknown>>(
-  data: T,
-  diagnostics: ApiDiagnostics,
-) {
+export async function projectionEnvelope<T extends Record<string, unknown>>(data: T, diagnostics: ApiDiagnostics) {
   const metadata = await getCurrentRankingsMetadata();
   return {
     data,
@@ -132,61 +124,4 @@ export async function projectionEnvelope<T extends Record<string, unknown>>(
     dataVersion: metadata.fetchedAt,
     exportDate: metadata.exportDate,
   };
-}
-
-export async function handleProjectionApi(
-  request: Request,
-  operation: string,
-  load: (params: URLSearchParams) => Promise<{
-    data: Record<string, unknown>;
-    diagnostics: ApiDiagnostics;
-  }>,
-) {
-  const startedAt = performance.now();
-  try {
-    const loaded = await load(new URL(request.url).searchParams);
-    const enveloped = await projectionEnvelope(loaded.data, loaded.diagnostics);
-    const totalMs = performance.now() - startedAt;
-    const { queueMs, statementMs } = loaded.diagnostics.timings;
-    console.info(JSON.stringify({
-      operation,
-      status: 200,
-      timings: { db_queue_ms: queueMs, db_ms: statementMs, total_ms: totalMs },
-      query_count: loaded.diagnostics.queryCount,
-      returned_rows: loaded.diagnostics.returnedRows,
-      data_version: enveloped.dataVersion,
-    }));
-    return Response.json({
-      ...enveloped.data,
-      snapshot: {
-        exportDate: enveloped.exportDate,
-        dataVersion: enveloped.dataVersion,
-      },
-    }, {
-      headers: {
-        "Cache-Control": "public, max-age=60, s-maxage=3600",
-        "Server-Timing": `db-queue;dur=${queueMs.toFixed(1)}, db;dur=${statementMs.toFixed(1)}, total;dur=${totalMs.toFixed(1)}`,
-        "X-Rankings-Data-Version": enveloped.dataVersion,
-      },
-    });
-  } catch (error) {
-    const inputError = error instanceof ApiInputError;
-    const status = inputError ? 400 : 503;
-    console.error(JSON.stringify({
-      operation,
-      status,
-      timings: { total_ms: performance.now() - startedAt },
-      error: error instanceof Error ? error.name : "unknown",
-    }));
-    return Response.json(
-      { error: inputError ? error.message : "Rankings are unavailable." },
-      {
-        status,
-        headers: {
-          "Cache-Control": "no-store",
-          ...(error instanceof DatabaseOverloadedError ? { "Retry-After": "1" } : {}),
-        },
-      },
-    );
-  }
 }

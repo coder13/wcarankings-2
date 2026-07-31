@@ -11,7 +11,7 @@ import {
   parseScope,
   parseStart,
   parseYear,
-} from "../lib/projection-api";
+} from "../lib/api/projection";
 import { genderFiltersLabel, normalizeGenderFilters } from "../lib/wca";
 
 test("parses bounded semantic ranking parameters", () => {

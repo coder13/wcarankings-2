@@ -9,7 +9,7 @@ import {
   parseLimit,
   parseResultType,
   parseScope,
-} from "@/lib/projection-api";
+} from "@/lib/api/projection";
 
 type CompetitionRow = {
   rank: number;
