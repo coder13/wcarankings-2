@@ -33,6 +33,14 @@ test("logs projection build step starts, completions, failures, and elapsed time
   assert.match(output, /\[projection-build\] Failed table broken_staging after \d+ms/);
 });
 
+test("formats table progress against the complete build workload", async () => {
+  const { createTableProgress } = await import(new URL("scripts/mysql-schema.mjs", root));
+  const progress = createTableProgress(17);
+
+  assert.equal(progress.start("first_table"), "[1/17]");
+  assert.equal(progress.start("second_table"), "[2/17]");
+});
+
 test("keeps future grains registered while activating person metrics and competition bests", async () => {
   const [schema, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, cities, counts, importer] =
     await Promise.all([

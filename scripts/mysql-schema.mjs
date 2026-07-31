@@ -65,9 +65,20 @@ function writeBuildLog(message) {
   process.stdout.write(`[projection-build] ${message}\n`);
 }
 
-export async function runTimedBuildStep(label, build) {
+export function createTableProgress(total) {
+  let started = 0;
+  return {
+    start() {
+      started += 1;
+      return `[${started}/${total}]`;
+    },
+  };
+}
+
+export async function runTimedBuildStep(label, build, { tableProgress, tableName } = {}) {
   const startedAt = performance.now();
-  writeBuildLog(`Starting ${label}…`);
+  const progress = tableProgress && tableName ? `${tableProgress.start(tableName)} ` : "";
+  writeBuildLog(`${progress}Starting ${label}…`);
   try {
     const result = await build();
     const durationMs = elapsedMs(startedAt);
@@ -85,7 +96,7 @@ function createdTableName(statement) {
   )?.[1];
 }
 
-async function executeTableStatements(connection, sql, phases = []) {
+async function executeTableStatements(connection, sql, phases = [], { tableProgress } = {}) {
   let activeTable;
   let activeTableStartedAt;
 
@@ -103,7 +114,8 @@ async function executeTableStatements(connection, sql, phases = []) {
         finishActiveTable();
         activeTable = table;
         activeTableStartedAt = performance.now();
-        writeBuildLog(`Starting table ${table}…`);
+        const progress = tableProgress ? `${tableProgress.start(table)} ` : "";
+        writeBuildLog(`${progress}Starting table ${table}…`);
       }
 
       const phase = statement.match(/^\s*-- phase:\s*([^\n]+)/)?.[1]?.trim();
@@ -287,11 +299,11 @@ function projectionNames(sql, suffix) {
     );
 }
 
-async function buildSqlProjection(connection, definition, suffix) {
+async function buildSqlProjection(connection, definition, suffix, tableProgress) {
   const phases = [];
   for (const file of definition.files) {
     const sql = projectionNames(await projectionSql(file), suffix);
-    await executeTableStatements(connection, sql, phases);
+    await executeTableStatements(connection, sql, phases, { tableProgress });
   }
   return phases;
 }
@@ -307,7 +319,7 @@ async function validateProjection(connection, definition, suffix) {
 
 export const PROJECTION_REGISTRY = projectionDefinitions.map((definition) => ({
   ...definition,
-  build: (connection, suffix) => buildSqlProjection(connection, definition, suffix),
+  build: (connection, suffix, tableProgress) => buildSqlProjection(connection, definition, suffix, tableProgress),
   validate: (connection, suffix) => validateProjection(connection, definition, suffix),
 }));
 
@@ -368,12 +380,12 @@ function orderedProjections(selectedNames = DEFAULT_PROJECTION_NAMES) {
   return projectionDependencyClosure(selectedNames).map(({ name }) => byName.get(name));
 }
 
-async function buildProjection(connection, projection, projectionSuffix) {
+async function buildProjection(connection, projection, projectionSuffix, tableProgress) {
   const startedAt = performance.now();
   writeBuildLog(`Starting projection ${projection.name}…`);
   try {
     for (const table of projection.tables) await dropManagedObject(connection, `${table}${projectionSuffix}`);
-    const phases = await projection.build(connection, projectionSuffix);
+    const phases = await projection.build(connection, projectionSuffix, tableProgress);
     const rowCounts = await projection.validate(connection, projectionSuffix);
     const durationMs = elapsedMs(startedAt);
     const timing = { name: projection.name, durationMs, rowCounts, phases };
@@ -390,10 +402,10 @@ export function projectionConcurrency(value) {
   return Number.isFinite(parsed) && parsed > 1 ? Math.floor(parsed) : 1;
 }
 
-async function buildRegisteredProjectionsSerial(connection, projections, projectionSuffix) {
+async function buildRegisteredProjectionsSerial(connection, projections, projectionSuffix, tableProgress) {
   const timings = [];
   for (const projection of projections) {
-    timings.push(await buildProjection(connection, projection, projectionSuffix));
+    timings.push(await buildProjection(connection, projection, projectionSuffix, tableProgress));
   }
   return timings;
 }
@@ -499,12 +511,12 @@ export async function runDependencyAwareTasks(
   return tasks.map(({ name }) => timings.get(name));
 }
 
-async function buildRegisteredProjectionsConcurrently(projections, { projectionSuffix, createConnection, concurrency }) {
+async function buildRegisteredProjectionsConcurrently(projections, { projectionSuffix, createConnection, concurrency, tableProgress }) {
   const tasks = projections.map((projection) => ({
     name: projection.name,
     dependencies: projection.dependencies,
     estimatedDurationMs: projectionDurationEstimate(projection.name),
-    run: async (connection) => buildProjection(connection, projection, projectionSuffix),
+    run: async (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
   }));
   return runDependencyAwareTasks(tasks, { createConnection, concurrency });
 }
@@ -513,7 +525,7 @@ async function buildRegisteredProjectionsConcurrently(projections, { projectionS
  * Keep this helper separate from the scheduler so compatibility SQL remains
  * easy to compare with the historical serial implementation.
  */
-async function buildCompatibilityTable(connection, table, source, indexFile) {
+async function buildCompatibilityTable(connection, table, source, indexFile, tableProgress) {
   await runTimedBuildStep(`table ${table}`, async () => {
     await connection.query(`CREATE TABLE \`${table}\` AS SELECT * FROM \`${source}\``);
     for (const statement of statements(await projectionSql(indexFile))) {
@@ -522,7 +534,7 @@ async function buildCompatibilityTable(connection, table, source, indexFile) {
         `ALTER TABLE \`${table}\``,
       ));
     }
-  });
+  }, { tableProgress, tableName: table });
 }
 
 function compatibilityProjectionTasks({
@@ -532,16 +544,17 @@ function compatibilityProjectionTasks({
   resultEntriesTable,
   resultCountsTable,
   resultEntriesSource,
+  tableProgress,
 }) {
   const runners = {
     "compatibility-ranking-entries-single": (connection) => buildCompatibilityTable(
-      connection, entriesTables.single, entriesSources.single, "ranking_entries_indexes.sql",
+      connection, entriesTables.single, entriesSources.single, "ranking_entries_indexes.sql", tableProgress,
     ),
     "compatibility-ranking-entries-average": (connection) => buildCompatibilityTable(
-      connection, entriesTables.average, entriesSources.average, "ranking_entries_indexes.sql",
+      connection, entriesTables.average, entriesSources.average, "ranking_entries_indexes.sql", tableProgress,
     ),
     "compatibility-result-entries-single": (connection) => buildCompatibilityTable(
-      connection, resultEntriesTable, resultEntriesSource, "result_entries_single_indexes.sql",
+      connection, resultEntriesTable, resultEntriesSource, "result_entries_single_indexes.sql", tableProgress,
     ),
     "compatibility-ranking-counts": async (connection) => executeTableStatements(
       connection,
@@ -549,12 +562,16 @@ function compatibilityProjectionTasks({
         .replaceAll("ranking_entries_single", entriesTables.single)
         .replaceAll("ranking_entries_average", entriesTables.average)
         .replaceAll("ranking_counts", countsTable),
+      [],
+      { tableProgress },
     ),
     "compatibility-result-counts": async (connection) => executeTableStatements(
       connection,
       (await projectionSql("result_counts.sql"))
         .replaceAll("result_entries_single", resultEntriesTable)
         .replaceAll("result_counts", resultCountsTable),
+      [],
+      { tableProgress },
     ),
   };
   return COMPATIBILITY_PROJECTION_TASKS.map((task) => ({
@@ -568,15 +585,20 @@ export async function buildRegisteredProjections(
   { projectionSuffix = "", projectionNames: selectedNames, createConnection, concurrency } = {},
 ) {
   const projections = orderedProjections(selectedNames);
+  const tableProgress = createTableProgress(projections.reduce(
+    (total, projection) => total + projection.tables.length,
+    0,
+  ));
   const maxConcurrency = projectionConcurrency(concurrency);
   if (!createConnection || maxConcurrency === 1 || projections.length <= 1) {
-    return buildRegisteredProjectionsSerial(connection, projections, projectionSuffix);
+    return buildRegisteredProjectionsSerial(connection, projections, projectionSuffix, tableProgress);
   }
   writeBuildLog(`Building registered projections with concurrency ${maxConcurrency}.`);
   return buildRegisteredProjectionsConcurrently(projections, {
     projectionSuffix,
     createConnection,
     concurrency: maxConcurrency,
+    tableProgress,
   });
 }
 
@@ -709,12 +731,16 @@ export async function refreshMysqlSchema(
 
   const maxConcurrency = projectionConcurrency(concurrency);
   const semanticProjections = orderedProjections(selectedNames);
+  const tableProgress = createTableProgress(
+    COMPATIBILITY_PROJECTION_TASKS.length
+      + semanticProjections.reduce((total, projection) => total + projection.tables.length, 0),
+  );
   const semanticTasks = semanticProjections.map((projection) => ({
     name: `projection:${projection.name}`,
     dependencies: projection.dependencies.map((dependency) =>
       dependency === "raw-wca" ? dependency : `projection:${dependency}`),
     estimatedDurationMs: projectionDurationEstimate(projection.name),
-    run: (worker) => buildProjection(worker, projection, projectionSuffix),
+    run: (worker) => buildProjection(worker, projection, projectionSuffix, tableProgress),
   }));
   await runDependencyAwareTasks([
     ...compatibilityProjectionTasks({
@@ -724,6 +750,7 @@ export async function refreshMysqlSchema(
       resultEntriesTable,
       resultCountsTable,
       resultEntriesSource,
+      tableProgress,
     }),
     ...semanticTasks,
   ], {
