@@ -3,7 +3,7 @@ import {
   getSameOriginDestination,
   getWcaAuthConfig,
   makeCookie,
-} from "@/lib/wca-auth";
+} from "@/services/auth/wca";
 
 export const dynamic = "force-dynamic";
 

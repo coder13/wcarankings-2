@@ -11,8 +11,8 @@ test("yearly person rankings retain historical cohorts and deterministic ties", 
     readFile(new URL("sql/ranking-projections/person_year_rankings_average.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/person_year_ranking_counts.sql", root), "utf8"),
     readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
-    readFile(new URL("lib/rankings.ts", root), "utf8"),
-    readFile(new URL("lib/rankings-metadata.ts", root), "utf8"),
+    readFile(new URL("services/rankings/service.ts", root), "utf8"),
+    readFile(new URL("services/rankings/metadata.ts", root), "utf8"),
     readFile(new URL("Dockerfile", root), "utf8"),
   ]);
   assert.match(cohorts, /ROW_NUMBER\(\) OVER/);

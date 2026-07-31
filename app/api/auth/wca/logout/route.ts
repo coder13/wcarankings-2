@@ -1,8 +1,8 @@
 import {
   clearAuthSessionCookie,
   deleteAuthSession,
-} from "@/lib/auth";
-import { getSameOriginDestination } from "@/lib/wca-auth";
+} from "@/services/auth/auth";
+import { getSameOriginDestination } from "@/services/auth/wca";
 
 export function getLogoutDestination(request: Request) {
   return getSameOriginDestination(request, request.headers.get("referer"));

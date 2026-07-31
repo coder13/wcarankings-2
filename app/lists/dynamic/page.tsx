@@ -7,7 +7,7 @@ import {
 } from "@/services/lists/dynamic-list";
 import { getDynamicListRegions, hasMultipleListCountries, normalizeListRegionSelection } from "@/services/lists/regions";
 import { loadDynamicListRankings } from "@/services/lists/rankings";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser } from "@/services/auth/auth";
 import { isEventId, isRankingType, normalizeGenderFilters, parseRegionQuery, type GenderFilter } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";

@@ -1,5 +1,5 @@
 import { buildApiJsonResponse } from "@/lib/api";
-import { loadPersonSearch, loadPersonSearchParts } from "@/lib/person-search";
+import { loadPersonSearch, loadPersonSearchParts } from "@/services/people/service";
 import { handleProjectionRequest } from "@/controllers/projection-controller";
 
 function buildSearchEventStream(parts: Awaited<ReturnType<typeof loadPersonSearchParts>>) {

@@ -11,25 +11,7 @@ import {
   parseScope,
 } from "@/lib/api/projection";
 
-type CompetitionRow = {
-  rank: number;
-  competition_id: string;
-  competition_name: string;
-  start_date: string;
-  city_name: string;
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  latitude: number | null;
-  longitude: number | null;
-  competitor_count: number;
-  result_id: number | null;
-  result_value: number | null;
-  person_id: string | null;
-  person_name: string | null;
-  round_type_id: string | null;
-  position: number;
-};
+import type { CityRow, CompetitionRow, LatitudeRow, PodiumRow } from "@/services/rankings/types";
 
 async function entityCount(kind: string, eventId = "", resultType = "") {
   return query<{ count: number }>(
@@ -115,18 +97,6 @@ async function loadCompetitorCountRankings(params: URLSearchParams, limit: numbe
     },
   };
 }
-
-type LatitudeRow = {
-  rank: number;
-  position: number;
-  competition_id: string;
-  competition_name: string;
-  venue: string;
-  city_name: string;
-  country_name: string;
-  country_iso2: string;
-  latitude: number;
-};
 
 async function loadLatitudeRankings(params: URLSearchParams, limit: number) {
   const hemisphere = params.get("hemisphere") ?? "north";
@@ -322,15 +292,6 @@ async function loadFastestCompetitions(params: URLSearchParams, limit: number) {
   };
 }
 
-type PodiumRow = CompetitionRow & {
-  score: number;
-  podium_position: number;
-  member_person_id: string;
-  member_person_name: string;
-  member_result_id: number;
-  member_result_value: number;
-};
-
 export async function loadPodiumRankings(params: URLSearchParams, limit = parseLimit(params)) {
   const eventId = parseEvent(params)!;
   if (eventId === "333mbf") throw new ApiInputError("Multi-Blind podium rankings are not supported.");
@@ -450,22 +411,6 @@ export async function loadPodiumRankings(params: URLSearchParams, limit = parseL
     },
   };
 }
-
-type CityRow = {
-  rank: number;
-  city_name: string;
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  result_id: number;
-  result_value: number;
-  person_id: string;
-  person_name: string;
-  competition_id: string;
-  competition_name: string;
-  competition_start_date: string;
-  round_type_id: string;
-};
 
 export async function loadCityRankings(params: URLSearchParams) {
   const eventId = parseEvent(params)!;

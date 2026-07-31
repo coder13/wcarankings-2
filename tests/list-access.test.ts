@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AuthUser } from "@/lib/auth";
+import type { AuthUser } from "@/services/auth/types";
 import { assertCanViewList } from "@/services/lists/lists";
 import type { ListSummary } from "@/services/lists/types";
 

@@ -28,7 +28,10 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
       "../lib/rankings-config.ts",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8"))).then((files) => files.join("\n")),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../lib/rankings.ts", import.meta.url), "utf8"),
+    Promise.all([
+      readFile(new URL("../services/rankings/service.ts", import.meta.url), "utf8"),
+      readFile(new URL("../services/rankings/helpers.ts", import.meta.url), "utf8"),
+    ]).then((files) => files.join("\n")),
     readFile(new URL("../lib/wca.ts", import.meta.url), "utf8"),
     Promise.all([
       "../scripts/mysql-schema.mjs",
@@ -184,7 +187,10 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
 test("does not replace SQL failures with synthetic ranking data", async () => {
   const [page, rankingsService, rankingsController, readme] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../lib/rankings.ts", import.meta.url), "utf8"),
+    Promise.all([
+      readFile(new URL("../services/rankings/service.ts", import.meta.url), "utf8"),
+      readFile(new URL("../services/rankings/helpers.ts", import.meta.url), "utf8"),
+    ]).then((files) => files.join("\n")),
     readFile(new URL("../controllers/rankings-controller.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);

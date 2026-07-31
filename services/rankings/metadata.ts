@@ -1,32 +1,14 @@
 import { query } from "@/db";
-import { RANKINGS_CACHE_REFRESH_MS, rankingsPageCache } from "@/lib/rankings-cache";
 import type { RankingType, RegionScope } from "@/lib/wca";
-
-type CountRow = { event_id: string; ranking_type: RankingType; scope: RegionScope; region_id: string; count: number };
-type YearCountRow = { year: number; event_id: string; ranking_type: RankingType; cohort_id: number; scope: RegionScope; region_id: string; count: number };
-type MetadataRow = { key: string; value: string };
-
-export type RankingsMetadata = {
-  fetchedAt: string;
-  exportDate: string | null;
-  counts: Map<string, number>;
-  yearCounts: Map<string, number>;
-  availableYears: number[];
-  yearProjectionAvailable: boolean;
-};
+import { RANKINGS_CACHE_REFRESH_MS, rankingsPageCache } from "@/services/rankings/cache";
+import { countKey, yearCountKey } from "@/services/rankings/helpers";
+import type { CountRow, MetadataRow, RankingsMetadata, YearCountRow } from "@/services/rankings/types";
 
 let snapshot: RankingsMetadata | null = null;
 let loading: Promise<RankingsMetadata> | null = null;
 let refreshing: Promise<RankingsMetadata> | null = null;
 let lastVersionCheck = 0;
 let readiness: Promise<void> | null = null;
-
-function countKey(eventId: string, type: RankingType, scope: RegionScope, regionId: string) {
-  return `${eventId}:${type}:${scope}:${regionId}`;
-}
-function yearCountKey(year: number, eventId: string, type: RankingType, scope: RegionScope, regionId: string) {
-  return `${year}:${countKey(eventId, type, scope, regionId)}`;
-}
 
 async function loadYearCounts() {
   try {

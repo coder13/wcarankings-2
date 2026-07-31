@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ListMine } from "@/components/ListMine/ListMine";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser } from "@/services/auth/auth";
 import { listOwnedLists } from "@/services/lists/lists";
 
 export const dynamic = "force-dynamic";

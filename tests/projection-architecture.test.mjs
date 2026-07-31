@@ -181,11 +181,11 @@ test("does not introduce entries or sub-rank vocabulary in new schemas", async (
 test("exposes bounded resource APIs without projection name scans", async () => {
   const [shared, people, results, rankings, entities, search] = await Promise.all([
     readFile(new URL("lib/api/projection.ts", root), "utf8"),
-    readFile(new URL("lib/semantic-person-rankings.ts", root), "utf8"),
-    readFile(new URL("lib/semantic-result-rankings.ts", root), "utf8"),
-    readFile(new URL("lib/rankings.ts", root), "utf8"),
-    readFile(new URL("lib/semantic-entity-rankings.ts", root), "utf8"),
-    readFile(new URL("lib/data/person-search-database.ts", root), "utf8"),
+    readFile(new URL("services/rankings/person.ts", root), "utf8"),
+    readFile(new URL("services/rankings/result.ts", root), "utf8"),
+    readFile(new URL("services/rankings/service.ts", root), "utf8"),
+    readFile(new URL("services/rankings/entity.ts", root), "utf8"),
+    readFile(new URL("services/people/database.ts", root), "utf8"),
   ]);
 
   assert.match(shared, /MAX_PAGE_SIZE = 100/);
@@ -254,8 +254,8 @@ test("backfills only the active competition-event projection", async () => {
 
 test("person search resolves IDs before querying projections", async () => {
   const [search, rankings, results, compatibilityResults] = await Promise.all([
-    readFile(new URL("lib/person-search.ts", root), "utf8"),
-    readFile(new URL("lib/rankings.ts", root), "utf8"),
+    readFile(new URL("services/people/service.ts", root), "utf8"),
+    readFile(new URL("services/rankings/service.ts", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_rankings_single.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_entries_single_indexes.sql", root), "utf8"),
   ]);

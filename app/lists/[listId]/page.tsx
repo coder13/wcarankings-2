@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser } from "@/services/auth/auth";
 import { loadListRankings } from "@/services/lists/rankings";
 import {
   getListRegions,

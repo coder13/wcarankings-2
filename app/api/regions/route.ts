@@ -1,4 +1,5 @@
-import { getRegions, type RegionKind } from "@/lib/regions";
+import { getRegions } from "@/services/regions/service";
+import type { RegionKind } from "@/services/regions/types";
 
 export const dynamic = "force-dynamic";
 

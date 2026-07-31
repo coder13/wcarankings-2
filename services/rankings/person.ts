@@ -9,21 +9,7 @@ import {
   parseStart,
 } from "@/lib/api/projection";
 
-type PersonRankingRow = {
-  person_id: string;
-  person_name: string;
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  continent_id: string;
-  rank: number;
-  result_id: number;
-  result_value: number;
-  competition_id: string;
-  competition_name: string;
-  competition_start_date: string;
-  round_type_id: string;
-};
+import type { PersonRankingRow } from "@/services/rankings/types";
 
 export async function loadPersonRankings(params: URLSearchParams) {
   const eventId = parseEvent(params)!;

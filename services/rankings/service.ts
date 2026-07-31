@@ -1,52 +1,23 @@
 import { query } from "@/db";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
-import { getCurrentRankingsMetadata, getRankingCount, getYearRankingCount, type RankingsMetadata } from "@/lib/rankings-metadata";
-import { normalPageKey, rankingsPageCache } from "@/lib/rankings-cache";
-import { searchPersonIds } from "@/lib/person-search";
+import { getCurrentRankingsMetadata, getRankingCount, getYearRankingCount } from "@/services/rankings/metadata";
+import { normalPageKey, rankingsPageCache } from "@/services/rankings/cache";
+import { searchPersonIds } from "@/services/people/service";
 import { ApiInputError, parseGender, parseYear } from "@/lib/api/projection";
-import { getRecordBadges, isRankingEventId, isRankingType, isValidRegexPattern, parseRegionQuery, type GenderFilter, type RankingEntry, type RankingType, type RegionScope } from "@/lib/wca";
+import { getRecordBadges, isRankingEventId, isRankingType, isValidRegexPattern, parseRegionQuery, type RankingEntry, type RankingType } from "@/lib/wca";
+import { genderCondition, rankingColumns, rankingShape, rankingTable, yearlyRankingTable } from "@/services/rankings/helpers";
+import type { FilteredPersonMetricRow, PersonMetricRow, QueryInput, RankingRow } from "@/services/rankings/types";
+import type { RankingsMetadata } from "@/services/rankings/types";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const MAX_SEARCH_RESULTS = 500;
-
-type RankingRow = { rank: number; sub_rank: number; total_count?: number; person_id: string; person_name: string; country_id: string; country_name: string; country_iso2: string; continent_id: string; best: number; competition_id: string; competition_name: string; is_world_record: number; is_continent_record: number; is_country_record: number };
-type KinchOrder = "regional" | "continent";
-type QueryInput = { eventId: string; type: RankingType; gender: GenderFilter[]; scope: RegionScope; regionId: string; year: number | null; kinchOrder: KinchOrder; startRank: number; cursorRank: number | null; cursorId: string; limit: number; locate: string; search: string; regexSearch: boolean; searchLimit: number; paged: boolean };
-type PersonMetricRow = {
-  rank: number;
-  sub_rank: number;
-  person_id: string;
-  person_name: string;
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  continent_id: string;
-  best: number;
-};
-type FilteredPersonMetricRow = PersonMetricRow & { total_count?: number };
 
 function toRankingEntry(row: RankingRow): RankingEntry {
   return { rank: Number(row.rank), subRank: Number(row.sub_rank), personId: row.person_id, personName: row.person_name, countryId: row.country_id, countryName: row.country_name, countryIso2: row.country_iso2, continentId: row.continent_id, best: Number(row.best), competitionId: row.competition_id, competitionName: row.competition_name, recordBadges: getRecordBadges({ isWorldRecord: Number(row.is_world_record) === 1, isContinentRecord: Number(row.is_continent_record) === 1, isCountryRecord: Number(row.is_country_record) === 1, continentId: row.continent_id }) };
 }
 
-function shape(scope: RegionScope) {
-  if (scope === "continent") return { rank: "continent_rank", subRank: "continent_sub_rank", region: "continent_id" } as const;
-  if (scope === "country") return { rank: "country_rank", subRank: "country_sub_rank", region: "country_id" } as const;
-  return { rank: "world_rank", subRank: "world_sub_rank", region: null } as const;
-}
-
-function table(type: RankingType) { return type === "average" ? "ranking_entries_average" : "ranking_entries_single"; }
-function yearlyTable(type: RankingType) { return type === "average" ? "person_year_rankings_average" : "person_year_rankings_single"; }
-function columns(rank: string, subRank: string) {
-  return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record`;
-}
-function genderCondition(alias: string, genders: readonly GenderFilter[]) {
-  if (!genders.length) return { sql: "", values: [] as unknown[] };
-  const parts = genders.map((gender) => gender === "o" ? `(${alias}.gender = 'o' OR ${alias}.gender IS NULL)` : `${alias}.gender = ?`);
-  return { sql: `(${parts.join(" OR ")})`, values: genders.filter((gender) => gender !== "o") };
-}
 function filters(input: QueryInput) {
-  const { rank, subRank, region } = shape(input.scope);
+  const { rank, subRank, region } = rankingShape(input.scope);
   const values: unknown[] = [input.eventId];
   const conditions = ["event_id = ?"];
   if (region) { conditions.push(`${region} = ?`); values.push(input.regionId); }
@@ -92,8 +63,8 @@ function yearlyFilters(input: QueryInput) {
 }
 
 async function queryGenderPage(input: QueryInput) {
-  const source = table(input.type);
-  const { region } = shape(input.scope);
+  const source = rankingTable(input.type);
+  const { region } = rankingShape(input.scope);
   const baseConditions = ["ranking.event_id = ?", "ranking.world_rank > 0"];
   const baseValues: unknown[] = [input.eventId];
   if (region) {
@@ -140,7 +111,7 @@ async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata) {
   if (input.year !== null) {
     const { conditions, values } = yearlyFilters(input);
     const result = await query<RankingRow>(`SELECT ${yearlyColumns(input.type)}
-      FROM ${yearlyTable(input.type)} ranking
+      FROM ${yearlyRankingTable(input.type)} ranking
       LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
       LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id
       LEFT JOIN countries country ON country.id = facts.person_country_id
@@ -151,7 +122,7 @@ async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata) {
   }
   const { rank, subRank, conditions, values } = filters(input);
   const pageValues = [...values, input.startRank, input.startRank + PAGE_SIZE];
-  const result = await query<RankingRow>(`SELECT ${columns(rank, subRank)} FROM ${table(input.type)} WHERE ${conditions.join(" AND ")} AND ${subRank} >= ? AND ${subRank} < ? ORDER BY ${subRank}`, pageValues, { rankingStatementTimeout: true });
+  const result = await query<RankingRow>(`SELECT ${rankingColumns(rank, subRank)} FROM ${rankingTable(input.type)} WHERE ${conditions.join(" AND ")} AND ${subRank} >= ? AND ${subRank} < ? ORDER BY ${subRank}`, pageValues, { rankingStatementTimeout: true });
   return { data: normalPageResponse(result.rows, input, metadata), timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
 }
 
@@ -161,8 +132,8 @@ export async function queryMysql(input: QueryInput) {
   if (input.gender.length && input.year === null) return queryGenderPage(input);
   const yearly = input.year !== null;
   const { rank, subRank, conditions, values } = yearly ? { rank: "public_rank", subRank: "position", ...yearlyFilters(input) } : filters(input);
-  const source = yearly ? yearlyTable(input.type) : table(input.type);
-  const selectColumns = yearly ? yearlyColumns(input.type) : columns(rank, subRank);
+  const source = yearly ? yearlyRankingTable(input.type) : rankingTable(input.type);
+  const selectColumns = yearly ? yearlyColumns(input.type) : rankingColumns(rank, subRank);
   const from = yearly
     ? `FROM ${source} ranking LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1 LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id LEFT JOIN countries country ON country.id = facts.person_country_id LEFT JOIN competitions competition ON competition.id = facts.competition_id`
     : input.gender.length

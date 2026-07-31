@@ -1,5 +1,5 @@
 import { buildApiErrorResponse, buildApiJsonResponse, readJsonObject, assertSameOrigin } from "@/lib/api";
-import { getAuthUser, requireAuthUser } from "@/lib/auth";
+import { getAuthUser, requireAuthUser } from "@/services/auth/auth";
 import {
   addListMembers,
   assertCanViewList,

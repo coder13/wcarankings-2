@@ -1,32 +1,16 @@
-import { createHash, randomBytes } from "node:crypto";
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { ResultSetHeader } from "mysql2/promise";
 import { query, withTransaction } from "@/db";
 import {
   makeCookie,
   readCookie,
-  type WcaProfile,
-} from "@/lib/wca-auth";
+} from "@/services/auth/wca";
+import { generateSessionToken, hashSessionToken } from "@/services/auth/helpers";
+import type { AuthUser, AuthUserRow, WcaProfile } from "@/services/auth/types";
+
+export { generateSessionToken } from "@/services/auth/helpers";
 
 export const AUTH_SESSION_COOKIE = "wca_session";
 export const AUTH_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-
-export type AuthUser = {
-  id: number;
-  wcaId: string;
-  name: string;
-  countryIso2: string;
-  avatarUrl: string | null;
-  allowListInclusion: boolean;
-};
-
-type AuthUserRow = RowDataPacket & {
-  id: number;
-  wca_id: string;
-  name: string;
-  country_iso2: string;
-  avatar_url: string | null;
-  allow_list_inclusion: number;
-};
 
 function toAuthUser(row: AuthUserRow): AuthUser {
   return {
@@ -37,14 +21,6 @@ function toAuthUser(row: AuthUserRow): AuthUser {
     avatarUrl: row.avatar_url,
     allowListInclusion: Boolean(row.allow_list_inclusion),
   };
-}
-
-function hashSessionToken(token: string) {
-  return createHash("sha256").update(token).digest();
-}
-
-export function generateSessionToken() {
-  return randomBytes(32).toString("base64url");
 }
 
 export async function createAuthSession(profile: WcaProfile) {

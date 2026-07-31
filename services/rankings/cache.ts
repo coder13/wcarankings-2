@@ -1,34 +1,13 @@
 import { LRUCache } from "lru-cache";
-import { type RankingType, type RegionScope } from "@/lib/wca";
+import { isPermanentPage, rankingPageKey } from "@/services/rankings/helpers";
+import type { CachePool, RankingsPageKey } from "@/services/rankings/types";
 
 export const RANKINGS_CACHE_REFRESH_MS = 60_000;
 export const RANKINGS_CACHE_CAPACITY_333 = 512;
 export const RANKINGS_CACHE_CAPACITY_DEFAULT = 128;
 
-export type RankingsPageKey = {
-  eventId: string;
-  year?: number | null;
-  type: RankingType;
-  scope: RegionScope;
-  regionId: string;
-  startRank: number;
-};
-
-type CachePool<T> = {
-  cache: LRUCache<string, T>;
-  pinnedKeys: Set<string>;
-};
-
-function keyFor({ year, type, scope, regionId, startRank }: RankingsPageKey) {
-  return `${year ?? "all"}:${type}:${scope}:${regionId}:${startRank}`;
-}
-
-function isPermanentPage(key: RankingsPageKey) {
-  return !key.year && key.scope === "world" && key.startRank === 1;
-}
-
 /** Process-local LRU pools. First world pages are pinned so warm navigation stays fast. */
-export class RankingsPageCache<T> {
+export class RankingsPageCache<T extends object> {
   private readonly pools = new Map<string, CachePool<T>>();
   private readonly pending = new Map<string, Promise<T>>();
 
@@ -54,7 +33,7 @@ export class RankingsPageCache<T> {
   }
 
   has(key: RankingsPageKey) {
-    return this.pools.get(key.eventId)?.cache.has(keyFor(key)) ?? false;
+    return this.pools.get(key.eventId)?.cache.has(rankingPageKey(key)) ?? false;
   }
 
   async get(key: RankingsPageKey, load: () => Promise<T>) {
@@ -63,9 +42,9 @@ export class RankingsPageCache<T> {
 
   async getWithStatus(key: RankingsPageKey, load: () => Promise<T>) {
     const normalized = { ...key, startRank: Math.max(1, Math.floor(key.startRank)) };
-    const cacheKey = `${normalized.eventId}:${keyFor(normalized)}`;
+    const cacheKey = `${normalized.eventId}:${rankingPageKey(normalized)}`;
     const pool = this.pool(normalized.eventId);
-    const cached = pool.cache.get(keyFor(normalized));
+    const cached = pool.cache.get(rankingPageKey(normalized));
     if (cached !== undefined) {
       return { value: cached, outcome: "hit" as const };
     }
@@ -86,7 +65,7 @@ export class RankingsPageCache<T> {
 
   private put(key: RankingsPageKey, value: T) {
     const pool = this.pool(key.eventId);
-    const pageKey = keyFor(key);
+    const pageKey = rankingPageKey(key);
     if (isPermanentPage(key)) {
       pool.pinnedKeys.add(pageKey);
     } else {
@@ -98,7 +77,7 @@ export class RankingsPageCache<T> {
   }
 }
 
-export const rankingsPageCache = new RankingsPageCache<unknown>();
+export const rankingsPageCache = new RankingsPageCache<Record<string, unknown>>();
 
 export function normalPageKey(input: RankingsPageKey) {
   return { ...input, startRank: Math.max(1, Math.floor(input.startRank)) };

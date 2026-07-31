@@ -1,23 +1,11 @@
 import type { WcaMeResponse } from "@/lib/data/types";
-
-export type WcaProfile = {
-  wcaId: string;
-  name: string;
-  countryIso2: string;
-  avatarUrl: string | null;
-};
+import { isLocalDevelopment } from "@/services/auth/helpers";
+import type { WcaProfile } from "@/services/auth/types";
 
 const LOCAL_WCA_ORIGIN = "https://staging.worldcubeassociation.org";
 const LOCAL_WCA_CLIENT_ID = "example-application-id";
 const LOCAL_WCA_CLIENT_SECRET = "example-secret";
 const PRODUCTION_WCA_ORIGIN = "https://www.worldcubeassociation.org";
-
-function isLocalDevelopment(request: Request) {
-  const hostname = new URL(request.url).hostname;
-  return process.env.NODE_ENV !== "production" && (
-    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]"
-  );
-}
 
 export function getWcaAuthConfig(request: Request) {
   const runtime = process.env;

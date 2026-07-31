@@ -1,6 +1,6 @@
 import {
   AuthenticationRequiredError,
-} from "@/lib/auth";
+} from "@/services/auth/auth";
 import {
   ListConflictError,
   ListForbiddenError,

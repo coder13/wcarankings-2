@@ -7,11 +7,11 @@ import type {
 } from "@/components/RankingsExplorer/types";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import { isEventId, isRankingEventId, isRankingType, isValidRegexPattern, normalizeGenderFilters, parseRegionQuery, type GenderFilter, WCA_EVENTS } from "@/lib/wca";
-import { getRegions } from "@/lib/regions";
-import { loadRankings } from "@/lib/rankings";
-import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
-import { loadResultRankings } from "@/lib/semantic-result-rankings";
-import { getAuthUser } from "@/lib/auth";
+import { getRegions } from "@/services/regions/service";
+import { loadRankings } from "@/services/rankings/service";
+import { loadCompetitionRankings } from "@/services/rankings/entity";
+import { loadResultRankings } from "@/services/rankings/result";
+import { getAuthUser } from "@/services/auth/auth";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 

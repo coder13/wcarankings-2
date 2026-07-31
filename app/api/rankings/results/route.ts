@@ -1,5 +1,5 @@
 import { handleProjectionRequest } from "@/controllers/projection-controller";
-import { loadResultRankings } from "@/lib/semantic-result-rankings";
+import { loadResultRankings } from "@/services/rankings/result";
 
 export const dynamic = "force-dynamic";
 

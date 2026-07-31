@@ -1,4 +1,4 @@
-import { assertRankingsReady } from "@/lib/rankings-metadata";
+import { assertRankingsReady } from "@/services/rankings/metadata";
 
 export const dynamic = "force-dynamic";
 

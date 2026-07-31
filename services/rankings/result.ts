@@ -8,25 +8,9 @@ import {
   parseGender,
   parseScope,
 } from "@/lib/api/projection";
-import { searchPersonIds } from "@/lib/person-search";
+import { searchPersonIds } from "@/services/people/service";
 import { getRecordBadges } from "@/lib/wca";
-
-type ResultRankingRow = {
-  result_id: number;
-  result_value: number;
-  rank: number;
-  position: number;
-  person_id: string;
-  person_name: string;
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  continent_id: string;
-  competition_id: string;
-  competition_name: string;
-  record_code: string;
-  total_count?: number;
-};
+import type { ResultRankingRow } from "@/services/rankings/types";
 
 function parsePageStart(params: URLSearchParams) {
   const raw = params.get("start") ?? "0";

@@ -4,11 +4,8 @@ import type {
   PersonIdSearchInput,
   PersonSearchDatabaseInput,
   PersonSearchRow,
-} from "@/lib/data/types";
-
-function escapeLikePrefix(value: string) {
-  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
-}
+} from "@/services/people/types";
+import { escapeLikePrefix } from "@/services/people/helpers";
 
 export async function fetchPersonSearchRowsFromDatabase(input: PersonSearchDatabaseInput) {
   const nameCondition = input.regexSearch ? "person.name REGEXP ?" : "person.name LIKE ? ESCAPE '\\\\'";

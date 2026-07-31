@@ -1,4 +1,4 @@
-import { getCurrentRankingsMetadata } from "@/lib/rankings-metadata";
+import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import {
   isEventId,
   isGenderFilter,

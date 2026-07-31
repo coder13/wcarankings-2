@@ -1,5 +1,5 @@
 import { query } from "@/db";
-import { getCurrentRankingsMetadata } from "@/lib/rankings-metadata";
+import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import {
   getRecordBadges,
   isEventId,

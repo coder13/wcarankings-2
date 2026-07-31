@@ -1,10 +1,10 @@
 import { DatabaseOverloadedError } from "@/db";
 import { buildApiErrorResponse, buildApiJsonResponse } from "@/lib/api";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser } from "@/services/auth/auth";
 import { DynamicListInputError, parseDynamicListIds, resolveDynamicList } from "@/services/lists/dynamic-list";
 import { loadDynamicListRankings, loadListRankings } from "@/services/lists/rankings";
 import { assertCanViewList, resolveList } from "@/services/lists/lists";
-import { loadRankingsWithDiagnostics } from "@/lib/rankings";
+import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { ApiInputError } from "@/lib/api/projection";
 import {
   isRankingEventId,

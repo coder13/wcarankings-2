@@ -1,6 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { query, withTransaction } from "@/db";
-import type { AuthUser } from "@/lib/auth";
+import type { AuthUser } from "@/services/auth/types";
 import {
   generateListPublicId,
   normalizeListLookup,

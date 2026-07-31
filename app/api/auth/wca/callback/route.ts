@@ -5,9 +5,9 @@ import {
   makeCookie,
   readCookie,
   toWcaProfile,
-} from "@/lib/wca-auth";
+} from "@/services/auth/wca";
 import type { WcaOAuthTokenResponse } from "@/lib/data/types";
-import { authSessionCookie, createAuthSession } from "@/lib/auth";
+import { authSessionCookie, createAuthSession } from "@/services/auth/auth";
 
 export const dynamic = "force-dynamic";
 
