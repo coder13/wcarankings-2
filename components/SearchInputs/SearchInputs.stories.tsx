@@ -33,7 +33,6 @@ function InteractiveSearchInputs({
       findPending={false}
       findMatches={matches}
       findIndex={0}
-      activeFindMatch={query ? matches[0] : null}
       onOpen={() => setOpen(true)}
       onClose={() => setOpen(false)}
       onQueryChange={setQuery}
@@ -54,7 +53,6 @@ const meta = {
     findPending: false,
     findMatches: matches,
     findIndex: 0,
-    activeFindMatch: matches[0],
     onOpen: () => undefined,
     onClose: () => undefined,
     onQueryChange: () => undefined,

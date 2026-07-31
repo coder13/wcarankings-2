@@ -70,7 +70,10 @@ function RailSearch({ searchInputRef, findOpen, findQuery, findError, findLoadin
     return () => window.cancelAnimationFrame(frame);
   }, [findOpen]);
 
-  const status = findError || (findQuery.trim() ? findMatches.length ? `${findIndex + 1} of ${findMatches.length}` : "No matches" : "");
+  let status = findError;
+  if (!status && findQuery.trim()) {
+    status = findMatches.length ? `${findIndex + 1} of ${findMatches.length}` : "No matches";
+  }
   const openSearch = () => {
     focusAfterOpenRef.current = true;
     onSearchOpen();
@@ -111,17 +114,22 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
   regionDisabled?: boolean;
 } & Parameters<typeof RailSearch>[0]) {
   const nextType = rankingType === "single" ? "average" : "single";
+  let primaryControl: React.ReactNode = null;
+  if (showEventPicker) {
+    primaryControl = <EventPicker event={event} options={eventOptions} additionalOptions={additionalEventOptions} onChange={onEventChange} onTriggerReady={onEventPickerTrigger} />;
+  } else if (hemisphere) {
+    const nextHemisphere = hemisphere === "north" ? "south" : "north";
+    primaryControl = (
+      <button className="Jump-latitudeToggle" type="button" data-hemisphere={hemisphere} aria-label={`Latitude: ${hemisphere} first. Switch to ${nextHemisphere} first`} title={`Latitude: ${hemisphere} first`} onClick={() => onHemisphereChange?.(nextHemisphere)}>
+        <CompassIcon />
+        <span>{hemisphere === "north" ? "North" : "South"}</span>
+      </button>
+    );
+  }
   return (
     <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType}>
       <div className="Jump-railSettings">
-        {showEventPicker ? (
-          <EventPicker event={event} options={eventOptions} additionalOptions={additionalEventOptions} onChange={onEventChange} onTriggerReady={onEventPickerTrigger} />
-        ) : hemisphere ? (
-          <button className="Jump-latitudeToggle" type="button" data-hemisphere={hemisphere} aria-label={`Latitude: ${hemisphere} first. Switch to ${hemisphere === "north" ? "south" : "north"} first`} title={`Latitude: ${hemisphere} first`} onClick={() => onHemisphereChange?.(hemisphere === "north" ? "south" : "north")}>
-            <CompassIcon />
-            <span>{hemisphere === "north" ? "North" : "South"}</span>
-          </button>
-        ) : null}
+        {primaryControl}
         {showResultType && <div className="Jump-resultTypeControl">
           <button className="Jump-resultTypeToggle" type="button" disabled={event.id === "333mbf"} aria-label={`Switch to ${nextType} rankings`} onClick={() => onRankingTypeChange(nextType)}>{rankingType === "single" ? "Single" : "Average"}</button>
         </div>}

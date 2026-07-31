@@ -13,7 +13,6 @@ test("renders the search input and result status", () => {
       findPending={false}
       findMatches={[]}
       findIndex={-1}
-      activeFindMatch={null}
       onOpen={() => undefined}
       onClose={() => undefined}
       onQueryChange={() => undefined}

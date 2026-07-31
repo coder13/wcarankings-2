@@ -39,8 +39,17 @@ function getSearchParamWithLegacyKey(
 
 function getGenderFilters(searchParams: Record<string, string | string[] | undefined>): GenderFilter[] {
   const raw = searchParams.gender;
-  const values = (Array.isArray(raw) ? raw : raw ? [raw] : []).flatMap((value) => value.split(","));
-  return normalizeGenderFilters(values.filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"));
+  let values: string[];
+  if (Array.isArray(raw)) values = raw;
+  else if (raw === undefined) values = [];
+  else values = [raw];
+  const genderValues = values.flatMap((value) => value.split(","));
+  return normalizeGenderFilters(genderValues.filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"));
+}
+
+function normalizedRankingType(eventId: string, rawRankingType: string) {
+  if (eventId === "333mbf" || eventId === "sor-kinch") return "single";
+  return isRankingType(rawRankingType) ? rawRankingType : "single";
 }
 
 function getCanonicalSearchParams(
@@ -108,7 +117,7 @@ async function getInitialRankings(
   const rawEventId = getSearchParamWithLegacyKey(searchParams, "eventId", "event");
   const rawRankingType = getSearchParamWithLegacyKey(searchParams, "result", "type");
   const eventId = isRankingEventId(rawEventId) ? rawEventId : "333";
-  const rankingType = eventId === "333mbf" || eventId === "sor-kinch" ? "single" : isRankingType(rawRankingType) ? rawRankingType : "single";
+  const rankingType = normalizedRankingType(eventId, rawRankingType);
   const { scope, regionId } = parseRegionQuery(getSearchParam(searchParams, "region"));
   const gender = getGenderFilters(searchParams);
   const year = yearOverride === null ? getSearchParam(searchParams, "year") : String(yearOverride);
@@ -200,8 +209,15 @@ async function getInitialCompetitionRankings(
   competitionRanking: "best-result" | "podiums" | "competitor-count" | "latitude",
   latitudeHemisphere: "north" | "south",
   regionId: string,
-  gender: readonly GenderFilter[],
 ) {
+  const rankingParams: Record<string, string> = {};
+  if (competitionRanking === "podiums") rankingParams.ranking = "podium";
+  else if (competitionRanking === "latitude") {
+    rankingParams.ranking = "latitude";
+    rankingParams.hemisphere = latitudeHemisphere;
+  } else if (competitionRanking === "competitor-count") {
+    rankingParams.ranking = "competitor-count";
+  }
   const loaded = await loadCompetitionRankings(new URLSearchParams({
     eventId,
     result: rankingType,
@@ -209,13 +225,7 @@ async function getInitialCompetitionRankings(
     limit: String(PAGE_SIZE),
     paged: "1",
     ...(regionId ? { region: regionId } : {}),
-    ...(competitionRanking === "podiums"
-      ? { ranking: "podium" }
-      : competitionRanking === "latitude"
-        ? { ranking: "latitude", hemisphere: latitudeHemisphere }
-        : competitionRanking === "competitor-count"
-          ? { ranking: "competitor-count" }
-        : {}),
+    ...rankingParams,
   }));
   const data = loaded.data as RankingsResponse;
   return {
@@ -291,9 +301,12 @@ export async function RankingsPage({
       : "north";
   const rawEventId = getSearchParamWithLegacyKey(resolvedSearchParams, "eventId", "event");
   const rawRankingType = getSearchParamWithLegacyKey(resolvedSearchParams, "result", "type");
-  const parsedEventId = initialSubject === "people"
-    ? isRankingEventId(rawEventId) ? rawEventId : "333"
-    : isEventId(rawEventId) ? rawEventId : "333";
+  let parsedEventId: (typeof WCA_EVENTS)[number]["id"] | "SOR" | "sor-kinch" = "333";
+  if (initialSubject === "people") {
+    if (isRankingEventId(rawEventId)) parsedEventId = rawEventId;
+  } else if (isEventId(rawEventId)) {
+    parsedEventId = rawEventId;
+  }
   const eventId =
     initialSubject === "competitions" &&
     initialCompetitionRanking === "podiums" &&
@@ -302,13 +315,16 @@ export async function RankingsPage({
       : parsedEventId;
   const initialAllEventRankingId =
     initialSubject === "people" && rawEventId === "SOR" ? rawEventId : null;
-  const rankingType = initialSubject === "competitions" && initialCompetitionRanking === "podiums"
-    ? ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average"
-    : eventId === "333mbf" || eventId === "sor-kinch"
-      ? "single"
-      : isRankingType(rawRankingType) ? rawRankingType : "single";
+  let rankingType: "single" | "average" = "single";
+  if (initialSubject === "competitions" && initialCompetitionRanking === "podiums") {
+    rankingType = ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average";
+  } else {
+    rankingType = normalizedRankingType(eventId, rawRankingType);
+  }
   const { scope, regionId } = parseRegionQuery(getSearchParam(resolvedSearchParams, "region"));
-  const gender = (initialSubject === "people" || initialSubject === "results") ? getGenderFilters(resolvedSearchParams) : [];
+  const gender = initialSubject === "people" || initialSubject === "results"
+    ? getGenderFilters(resolvedSearchParams)
+    : [];
   const initialYear = initialYearOverride ?? (/^\d{4}$/.test(getSearchParam(resolvedSearchParams, "year")) ? Number(getSearchParam(resolvedSearchParams, "year")) : null);
   const requestedWcaId = getSearchParam(resolvedSearchParams, "wcaId")
     .trim()
@@ -350,25 +366,30 @@ export async function RankingsPage({
     const query = canonicalParams.toString();
     redirect(query ? `${pathname}?${query}` : pathname);
   }
-  const initialRankingsRequest = initialSubject === "people"
-    ? getInitialRankings(
+  let initialRankingsRequest: ReturnType<typeof getInitialRankings> | ReturnType<typeof getInitialResultRankings> | ReturnType<typeof getInitialCompetitionRankings> | Promise<undefined>;
+  if (initialSubject === "people") {
+    initialRankingsRequest = getInitialRankings(
       resolvedSearchParams,
       focusedWcaId,
       initialYear,
-    )
-    : initialSubject === "results"
-      ? getInitialResultRankings(resolvedSearchParams, eventId as (typeof WCA_EVENTS)[number]["id"], rankingType, regionId, gender)
-    : initialSubject === "competitions"
-      ? getInitialCompetitionRankings(
-          eventId as (typeof WCA_EVENTS)[number]["id"],
-          initialCompetitionRanking === "podiums"
-            ? ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average"
-            : rankingType,
-          initialCompetitionRanking,
-          latitudeHemisphere,
-          regionId,
-        )
-      : Promise.resolve(undefined);
+    );
+  } else if (initialSubject === "results") {
+    initialRankingsRequest = getInitialResultRankings(resolvedSearchParams, eventId as (typeof WCA_EVENTS)[number]["id"], rankingType, regionId, gender);
+  } else if (initialSubject === "competitions") {
+    let competitionRankingType = rankingType;
+    if (initialCompetitionRanking === "podiums") {
+      competitionRankingType = ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average";
+    }
+    initialRankingsRequest = getInitialCompetitionRankings(
+      eventId as (typeof WCA_EVENTS)[number]["id"],
+      competitionRankingType,
+      initialCompetitionRanking,
+      latitudeHemisphere,
+      regionId,
+    );
+  } else {
+    initialRankingsRequest = Promise.resolve(undefined);
+  }
   const [initialRankings, continents, countries] = await Promise.all([
     initialRankingsRequest,
     fetchRegions("continent"),

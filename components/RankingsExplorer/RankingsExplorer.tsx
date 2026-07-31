@@ -253,11 +253,9 @@ function getPage(
   const cached = pageCache.get(cachePool, cacheKey);
   if (cached) return cached;
 
-  const endpoint = resource === "results"
-    ? "/api/rankings/results"
-    : resource !== "people"
-      ? "/api/rankings/competitions"
-      : "/api/rankings";
+  let endpoint = "/api/rankings";
+  if (resource === "results") endpoint = "/api/rankings/results";
+  else if (resource !== "people") endpoint = "/api/rankings/competitions";
   const request = fetchRankingPage(`${endpoint}?${params}`).then(async (response) => {
     if (!response.ok) {
       const body = (await response.json()) as { error?: string };
@@ -500,7 +498,6 @@ export function RankingsExplorer({
   initialEventId = "333",
   initialRankingType = "single",
   initialGender = [],
-  initialYear: _initialYear = null,
   initialRegionSelection = { scope: "world", regionId: "" },
   showAllEventRankingOptions = false,
   showSubjectSwitch = false,
@@ -570,7 +567,7 @@ export function RankingsExplorer({
   const normalizedInitialSearch = initialSearch.trim();
   const {
     eventId, setEventId, rankingType, setRankingType, regionSelection, setRegionSelection,
-    subject, setSubject, competitionRanking, setCompetitionRanking,
+    subject, competitionRanking,
     latitudeHemisphere, setLatitudeHemisphere, listAddOpen, setListAddOpen,
     memberSelectionMode, setMemberSelectionMode, selectedMemberIds, setSelectedMemberIds,
   } = useRankingsExplorerState({
@@ -982,14 +979,12 @@ export function RankingsExplorer({
         url.searchParams.get("hemisphere") === "south" ? "south" : "north";
       const search = url.searchParams.get("search") ?? "";
       const resolvedEventId = isRankingEventId(nextEventId) ? nextEventId : "333";
-      const resolvedRankingType = initialSubject === "competitions" &&
-        initialCompetitionRanking === "podiums"
-          ? podiumRankingType(resolvedEventId)
-          : resolvedEventId === "333mbf"
-          ? "single"
-          : isRankingType(nextRankingType)
-          ? nextRankingType
-          : "single";
+      let resolvedRankingType: "single" | "average" = "single";
+      if (initialSubject === "competitions" && initialCompetitionRanking === "podiums") {
+        resolvedRankingType = podiumRankingType(resolvedEventId);
+      } else if (resolvedEventId !== "333mbf" && isRankingType(nextRankingType)) {
+        resolvedRankingType = nextRankingType;
+      }
       const { scope, regionId } = parseRegionQuery(nextRegion);
       setEventId(resolvedEventId);
       setRankingType(resolvedRankingType);
@@ -1001,16 +996,17 @@ export function RankingsExplorer({
       setVimSearchActive(nextRegexSearch);
       setVimSearchQuery(nextRegexSearch ? search : "");
       setFindOpen(Boolean(search.trim() && !nextRegexSearch));
+      let resultParam: string | null = resolvedRankingType;
+      if (
+        (initialSubject === "competitions" && initialCompetitionRanking === "podiums") ||
+        resolvedRankingType === "single"
+      ) {
+        resultParam = null;
+      }
       updateQueryParams({
         eventId:
           resolvedEventId === "333" ? null : resolvedEventId,
-        result:
-          initialSubject === "competitions" &&
-          initialCompetitionRanking === "podiums"
-            ? null
-            : resolvedRankingType === "single"
-              ? null
-              : resolvedRankingType,
+        result: resultParam,
         event: null,
         type: null,
         region: regionId || null,
@@ -1021,7 +1017,7 @@ export function RankingsExplorer({
     syncStateFromUrl();
     window.addEventListener("popstate", syncStateFromUrl);
     return () => window.removeEventListener("popstate", syncStateFromUrl);
-  }, []);
+  }, [initialCompetitionRanking, initialSubject, setEventId, setLatitudeHemisphere, setRankingType, setRegionSelection]);
 
   useEffect(() => {
     const pageKey = [
@@ -1068,11 +1064,12 @@ export function RankingsExplorer({
       ? { personId: personFocus.personId, subRank: pendingRankRef.current }
       : null;
     const resource = rankingResource(subject, competitionRanking, latitudeHemisphere);
-    const pageRequest = focusLast
-      ? getEndWindow(eventId, rankingType, regionSelection, startRank, resource, rankingSource, gender)
-      : focusMatch
-        ? getPersonWindow(eventId, rankingType, regionSelection, focusMatch, rankingSource, gender)
-      : getPage(eventId, rankingType, startRank, regionSelection, resource, rankingSource, gender);
+    let pageRequest = getPage(eventId, rankingType, startRank, regionSelection, resource, rankingSource, gender);
+    if (focusLast) {
+      pageRequest = getEndWindow(eventId, rankingType, regionSelection, startRank, resource, rankingSource, gender);
+    } else if (focusMatch) {
+      pageRequest = getPersonWindow(eventId, rankingType, regionSelection, focusMatch, rankingSource, gender);
+    }
     pageRequest
       .then((data) => {
         if (
@@ -1122,27 +1119,16 @@ export function RankingsExplorer({
         const previousListHeight = appendNavigation && pendingDirection === -1
           ? rowVirtualizerRef.current.getTotalSize()
           : null;
-        const loadedEntries = appendNavigation
-          ? pendingDirection === 1
-            ? [
-                ...previousEntries,
-                ...data.entries.filter(
-                  (entry) =>
-                    !previousEntries.some(
-                      (currentEntry) => currentEntry.personId === entry.personId
-                    )
-                ),
-              ]
-            : [
-                ...data.entries.filter(
-                  (entry) =>
-                    !previousEntries.some(
-                      (currentEntry) => currentEntry.personId === entry.personId
-                    )
-                ),
-                ...previousEntries,
-              ]
-          : data.entries;
+        const newEntries = data.entries.filter(
+          (entry) => !previousEntries.some(
+            (currentEntry) => currentEntry.personId === entry.personId,
+          ),
+        );
+        let loadedEntries = data.entries;
+        if (appendNavigation) {
+          if (pendingDirection === 1) loadedEntries = [...previousEntries, ...newEntries];
+          else loadedEntries = [...newEntries, ...previousEntries];
+        }
         const loadedStartPosition =
           appendNavigation && pendingDirection === -1
             ? data.startPosition
@@ -1168,19 +1154,14 @@ export function RankingsExplorer({
         const focusedTargetIndex = personFocus
           ? loadedEntries.findIndex((entry) => entry.personId === personFocus.personId)
           : -1;
-        const requestedTargetIndex = focusLast
-          ? Math.max(0, loadedEntries.length - 1)
-          : focusedTargetIndex >= 0
-            ? focusedTargetIndex
-            : loadedEntries.findIndex(
-                (entry) => entry.subRank >= rankForStep
-              );
-        const targetIndex =
-          requestedTargetIndex >= 0
-            ? requestedTargetIndex
-            : pendingDirection === -1
-            ? Math.max(0, loadedEntries.length - 1)
-            : 0;
+        let requestedTargetIndex = loadedEntries.findIndex(
+          (entry) => entry.subRank >= rankForStep,
+        );
+        if (focusLast) requestedTargetIndex = Math.max(0, loadedEntries.length - 1);
+        else if (focusedTargetIndex >= 0) requestedTargetIndex = focusedTargetIndex;
+        let targetIndex = 0;
+        if (requestedTargetIndex >= 0) targetIndex = requestedTargetIndex;
+        else if (pendingDirection === -1) targetIndex = Math.max(0, loadedEntries.length - 1);
         const shouldScrollToTarget = Boolean(
           scrollToTop ||
             focusLast ||
@@ -1212,15 +1193,14 @@ export function RankingsExplorer({
             });
           }
           window.requestAnimationFrame(() => {
+            let alignment: "top" | "center" | "bottom" = "top";
+            if (focusLast) alignment = "bottom";
+            else if (focusedTargetIndex >= 0) alignment = "center";
             scrollToEntry({
               state: scrollAnimationStateRef.current,
               list: listRef.current,
               index: targetIndex,
-              alignment: focusLast
-                ? "bottom"
-                : focusedTargetIndex >= 0
-                  ? "center"
-                  : "top",
+              alignment,
               bottomOffset: focusLast ? END_MARKER_PEEK : 0,
               requestedBehavior:
                 focusedTargetIndex >= 0 && !personFocus?.animate
@@ -1619,12 +1599,8 @@ export function RankingsExplorer({
       const currentIndex = findIndexRef.current;
       const currentMatch =
         currentIndex >= 0 ? matches[currentIndex] : null;
-      const nextIndex =
-        currentIndex < 0
-          ? direction > 0
-            ? 0
-            : matches.length - 1
-          : (currentIndex + direction + matches.length) % matches.length;
+      let nextIndex = (currentIndex + direction + matches.length) % matches.length;
+      if (currentIndex < 0) nextIndex = direction > 0 ? 0 : matches.length - 1;
       const nextMatch = matches[nextIndex];
       if (!nextMatch) {
         findIndexRef.current = -1;
@@ -1790,6 +1766,8 @@ export function RankingsExplorer({
     jumpToMatch,
     rankingSource,
     gender,
+    latitudeHemisphere,
+    subject,
   ]);
 
   useEffect(() => {
@@ -1945,7 +1923,7 @@ export function RankingsExplorer({
       moreRequestRef.current = false;
       setLoadingMore(false);
     }
-  }, [competitionRanking, eventId, gender, hasMore, latitudeHemisphere, loading, nextPageStart, rankingSource, rankingType, regionSelection, subject, total]);
+  }, [competitionRanking, eventId, gender, hasMore, latitudeHemisphere, loading, nextPageStart, rankingSource, rankingType, regionSelection, scrollVelocityRef, subject, total]);
 
   const loadPrevious = useCallback(async () => {
     if (
@@ -2095,10 +2073,9 @@ export function RankingsExplorer({
     // Loading the next bucket is the synchronization performed by this effect.
     const prefetchRows = getPrefetchRowCount(scrollVelocityRef.current.downwardPixelsPerMs);
     if (lastVirtualRow && lastVirtualRow.index >= entries.length - prefetchRows) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       void loadMore();
     }
-  }, [entries.length, loadMore, virtualRows]);
+  }, [entries.length, loadMore, scrollVelocityRef, virtualRows]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -2249,14 +2226,12 @@ export function RankingsExplorer({
       }
       pendingScrollToTopRef.current = false;
       pendingFocusLastRef.current = false;
-      pendingScrollDirectionRef.current = animate
-        ?
-        normalizedRank < currentRank
-          ? -1
-          : normalizedRank > currentRank
-          ? 1
-          : null
-        : null;
+      let pendingDirection: -1 | 1 | null = null;
+      if (animate) {
+        if (normalizedRank < currentRank) pendingDirection = -1;
+        else if (normalizedRank > currentRank) pendingDirection = 1;
+      }
+      pendingScrollDirectionRef.current = pendingDirection;
       // Rank values can be missing, so ask the API for the exact target and let
       // its ordered query choose the first real result at or beyond that rank.
       pendingNavigationAppendRef.current = Boolean(
@@ -2285,12 +2260,9 @@ export function RankingsExplorer({
         const requestedTargetIndex = focusedTargetIndex >= 0
           ? focusedTargetIndex
           : entries.findIndex((entry) => entry.subRank >= normalizedRank);
-        const targetIndex =
-          requestedTargetIndex >= 0
-            ? requestedTargetIndex
-            : pendingScrollDirectionRef.current === -1
-            ? 0
-            : Math.max(0, entries.length - 1);
+        let targetIndex = Math.max(0, entries.length - 1);
+        if (requestedTargetIndex >= 0) targetIndex = requestedTargetIndex;
+        else if (pendingScrollDirectionRef.current === -1) targetIndex = 0;
         scrollToEntry({
           state: scrollAnimationStateRef.current,
           list: listRef.current,
@@ -2325,7 +2297,6 @@ export function RankingsExplorer({
       queuePersonFocus,
       resetFind,
       rowVirtualizer,
-      startRank,
       total,
       finishPagerNavigation,
     ]
@@ -2483,8 +2454,10 @@ export function RankingsExplorer({
         pendingRankRef.current = endRank;
         pendingScrollToTopRef.current = false;
         pendingFocusLastRef.current = true;
-        pendingScrollDirectionRef.current =
-          endRank < currentRank ? -1 : endRank > currentRank ? 1 : null;
+        let pendingDirection: -1 | 1 | null = null;
+        if (endRank < currentRank) pendingDirection = -1;
+        else if (endRank > currentRank) pendingDirection = 1;
+        pendingScrollDirectionRef.current = pendingDirection;
         if (nextStart === startRankRef.current && entriesRef.current.length > 0) {
           scrollToEntry({
             state: scrollAnimationStateRef.current,
@@ -2827,12 +2800,12 @@ export function RankingsExplorer({
     );
     setStartRank(1);
     setEventId(nextEventId);
-    const nextRankingType =
-      subject === "competitions" && competitionRanking === "podiums"
-        ? podiumRankingType(nextEventId)
-        : nextEventId === "333mbf" || nextEventId === "sor-kinch"
-          ? "single"
-          : rankingType;
+    let nextRankingType = rankingType;
+    if (subject === "competitions" && competitionRanking === "podiums") {
+      nextRankingType = podiumRankingType(nextEventId);
+    } else if (nextEventId === "333mbf" || nextEventId === "sor-kinch") {
+      nextRankingType = "single";
+    }
     setRankingType(nextRankingType);
     trackGoogleAnalyticsEvent("ranking_event_changed", {
       event_id: nextEventId,
@@ -3055,15 +3028,15 @@ export function RankingsExplorer({
             {loadingPrevious && (
               <div className="listMessage">Loading earlier rankings…</div>
             )}
-            {error ? (
+            {(() => { if (error) return (
               <div className="listMessage">{error}</div>
-            ) : mockSubjectRows ? (
+            ); if (mockSubjectRows) return (
               <SubjectMockRows
                 subject={subject}
                 competitionRanking={competitionRanking}
                 latitudeHemisphere={latitudeHemisphere}
               />
-            ) : (
+            ); return (
               <ResultsTable
                 listRef={rankingListRef}
                 entries={entries}
@@ -3085,7 +3058,7 @@ export function RankingsExplorer({
                 onRowNavigate={handleRowNavigate}
                 memberSelectionMode={memberSelectionMode}
                 selectedMemberIds={selectedMemberIds}
-                onMemberToggle={(personId) => setSelectedMemberIds((current) => { const next = new Set(current); next.has(personId) ? next.delete(personId) : next.add(personId); return next; })}
+                onMemberToggle={(personId) => setSelectedMemberIds((current) => { const next = new Set(current); if (next.has(personId)) next.delete(personId); else next.add(personId); return next; })}
                 onMemberContextMenu={listOwner ? (entry, position) => {
                   setMemberContextMenu({
                     personId: entry.personId,
@@ -3097,7 +3070,7 @@ export function RankingsExplorer({
                 initialExpandedPersonId={subject === "people" ? focusedExpandedPersonId : ""}
                 onFocusedPersonChange={subject === "people" ? updateFocusedPersonParam : undefined}
               />
-            )}
+            ); })()}
           </div>
         </div>
 

@@ -11,15 +11,10 @@ import type { ListSummary, PublicListSummary } from "@/lib/lists";
 import "@/components/ListBrowse/ListBrowse.css";
 
 function changeSubject(value: NavigationSubject) {
-  window.location.assign(
-    value === "lists"
-      ? "/lists"
-      : value === "people"
-        ? "/"
-        : value === "competitions"
-          ? "/competitions/best-result"
-          : "/results",
-  );
+  if (value === "lists") window.location.assign("/lists");
+  else if (value === "people") window.location.assign("/");
+  else if (value === "competitions") window.location.assign("/competitions/best-result");
+  else window.location.assign("/results");
 }
 
 function asRow(list: ListSummary): PublicListSummary {

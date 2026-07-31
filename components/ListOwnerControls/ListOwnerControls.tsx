@@ -2,13 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import NextImage from "next/image";
 import { RankingsRail } from "@/components/RankingsRail/RankingsRail";
 import { Checkbox } from "@/components/Checkbox";
 import { flagEmoji } from "@/lib/wca";
 import { listPath } from "@/lib/list-path";
 import { parseListMemberIds } from "@/lib/list-member-ids";
 import { ListCreateDialog } from "./ListCreateDialog";
+
+// Search avatar hosts are resolved at runtime, so they cannot be safely listed in Next Image remote patterns.
+/* eslint-disable @next/next/no-img-element */
 
 type Person = { personId: string; name: string; avatarUrl: string | null; country?: { iso2: string; name: string }; competitionCount?: number };
 type SearchResponse = { entries: Person[]; page?: { hasMore?: boolean }; total?: number };
@@ -18,6 +21,16 @@ function personInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length < 2) return parts[0]?.slice(0, 2).toUpperCase() ?? "?";
   return `${parts[0][0]}${parts.at(-1)![0]}`.toUpperCase();
+}
+
+function PersonAvatar({ person }: { person: Person }) {
+  return (
+    <span className="listPersonAvatar">
+      {person.avatarUrl ? (
+        <NextImage src={person.avatarUrl} alt="" width={48} height={48} unoptimized referrerPolicy="no-referrer" />
+      ) : personInitials(person.name)}
+    </span>
+  );
 }
 
 function Dialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
@@ -30,17 +43,100 @@ export function ListCreateTrigger() {
 }
 
 export function ListOwnerControls({ listId, initialVisibility, initialJoinPolicy = "closed", onManageMembers }: { listId: string; initialVisibility: "public" | "private"; initialJoinPolicy?: "open" | "closed"; onManageMembers?: () => void }) {
-  const [mode, setModeState] = useState<"add" | "settings" | null>(null), [visibility, setVisibility] = useState(initialVisibility), [joinPolicy, setJoinPolicy] = useState(initialJoinPolicy), [query, setQuery] = useState(""), [entries, setEntries] = useState<Person[]>([]), [selected, setSelected] = useState<Person[]>([]), [ids, setIds] = useState(""), [error, setError] = useState(""), [busy, setBusy] = useState(false);
-  const setMode = (next: "add" | "settings" | null) => setModeState((current) => next === "settings" && current === "settings" ? null : next);
-  useEffect(() => { if (mode !== "add" || query.trim().length < 2) return; const controller = new AbortController(); const timer = window.setTimeout(() => fetch(`/api/people/search?q=${encodeURIComponent(query)}&limit=12`, { signal: controller.signal }).then((response) => response.json()).then((body: SearchResponse) => setEntries(body.entries ?? [])).catch(() => setEntries([])), 180); return () => { window.clearTimeout(timer); controller.abort(); }; }, [mode, query]);
+  const [mode, setModeState] = useState<"add" | "settings" | null>(null);
+  const [visibility, setVisibility] = useState(initialVisibility);
+  const [joinPolicy, setJoinPolicy] = useState(initialJoinPolicy);
+  const [query, setQuery] = useState("");
+  const [entries, setEntries] = useState<Person[]>([]);
+  const [selected, setSelected] = useState<Person[]>([]);
+  const [ids, setIds] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const selectedIds = useMemo(() => selected.map((person) => person.personId), [selected]);
   const settingsRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (mode !== "settings") return; const close = (event: MouseEvent) => { if (!settingsRef.current?.contains(event.target as Node)) setMode(null); }; document.addEventListener("mousedown", close); return () => document.removeEventListener("mousedown", close); }, [mode]);
-  const add = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(""); const personIds = [...new Set([...selectedIds, ...parseListMemberIds(ids)])]; if (!personIds.length) { setError("Search for a person or enter at least one WCA ID."); setBusy(false); return; } const response = await fetch(`/api/lists/${listId}/members`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personIds }) }); const body = await response.json() as { error?: string; invalid?: string[]; blocked?: string[] }; if (!response.ok) { setError(body.error ?? "Could not add people."); setBusy(false); return; } if (body.invalid?.length || body.blocked?.length) { setError("Some IDs could not be added."); setBusy(false); return; } window.location.reload(); };
-  const save = async (change: { visibility?: "public" | "private"; joinPolicy?: "open" | "closed" }) => { setBusy(true); setError(""); const response = await fetch(`/api/lists/${listId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) }); if (!response.ok) { setError("Could not update this list."); setBusy(false); return; } if (change.visibility) setVisibility(change.visibility); if (change.joinPolicy) setJoinPolicy(change.joinPolicy); setBusy(false); setMode(null); window.location.reload(); };
-  const duplicate = async () => { setBusy(true); const response = await fetch(`/api/lists/${listId}`, { method: "POST" }); const body = await response.json() as { list?: { publicId: string; slug: string } }; if (response.ok && body.list?.publicId) { window.location.assign(listPath({ publicId: body.list.publicId, systemAlias: null, slug: body.list.slug })); return; } setBusy(false); };
-  const closeAdd = () => setMode(null);
-  return <div className="listOwnerControls" ref={settingsRef}><button type="button" onClick={() => setMode("settings")} aria-label="List settings">⋮</button>{mode === "add" && <Dialog title="Add people" onClose={closeAdd}><form className="listModalForm" onSubmit={add}><label>Search by name or WCA ID<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Start typing a name" /></label>{query.trim().length >= 2 && entries.length > 0 && <div className="listPersonResults">{entries.map((person) => <button key={person.personId} type="button" onClick={() => { if (!selectedIds.includes(person.personId)) setSelected((current) => [...current, person]); setQuery(""); }}><span className="listPersonAvatar">{person.avatarUrl ? <img src={person.avatarUrl} alt="" decoding="async" referrerPolicy="no-referrer" /> : personInitials(person.name)}</span><span><strong>{person.country?.iso2 ? flagEmoji(person.country.iso2) + " " : ""}{person.name}</strong><small>{person.personId}</small></span>{person.competitionCount !== undefined && <b className="listAddCompetitionCount">{person.competitionCount} competitions</b>}</button>)}</div>}{selected.length > 0 && <div className="listPersonChips">{selected.map((person) => <button key={person.personId} type="button" onClick={() => setSelected((current) => current.filter((item) => item.personId !== person.personId))}>{person.name} · {person.personId} ×</button>)}</div>}<label>Or paste WCA IDs<textarea value={ids} onChange={(event) => setIds(event.target.value)} placeholder="2016PARK01, 2018EXAM02" rows={3} /></label>{error && <p className="listModalError" role="alert">{error}</p>}<button type="submit" disabled={busy}>{busy ? "Adding…" : "Add people"}</button></form></Dialog>}{mode === "settings" && <div className="listSettingsMenu" role="menu"><button type="button" onClick={() => { onManageMembers?.(); setMode(null); }}>Manage members</button><a href={`/api/lists/${listId}?format=csv`}>Export CSV</a><button type="button" disabled={busy} onClick={() => void duplicate()}>{busy ? "Duplicating…" : "Duplicate list"}</button><label><input type="checkbox" checked={visibility === "private"} disabled={busy} onChange={(event) => void save({ visibility: event.target.checked ? "private" : "public" })} /> Private</label><label><input type="checkbox" checked={joinPolicy === "open"} disabled={busy} onChange={(event) => void save({ joinPolicy: event.target.checked ? "open" : "closed" })} /> Open to join</label>{error && <p role="alert">{error}</p>}</div>}</div>;
+  const setMode = (next: "add" | "settings" | null) => setModeState((current) => next === "settings" && current === "settings" ? null : next);
+
+  useEffect(() => {
+    if (mode !== "add" || query.trim().length < 2) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`/api/people/search?q=${encodeURIComponent(query)}&limit=12`, { signal: controller.signal })
+        .then((response) => response.json())
+        .then((body: SearchResponse) => setEntries(body.entries ?? []))
+        .catch(() => setEntries([]));
+    }, 180);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [mode, query]);
+
+  useEffect(() => {
+    if (mode !== "settings") return;
+    const close = (event: MouseEvent) => {
+      if (!settingsRef.current?.contains(event.target as Node)) setMode(null);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [mode]);
+
+  const add = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    const personIds = [...new Set([...selectedIds, ...parseListMemberIds(ids)])];
+    if (!personIds.length) { setError("Search for a person or enter at least one WCA ID."); setBusy(false); return; }
+    const response = await fetch(`/api/lists/${listId}/members`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personIds }) });
+    const body = await response.json() as { error?: string; invalid?: string[]; blocked?: string[] };
+    if (!response.ok) { setError(body.error ?? "Could not add people."); setBusy(false); return; }
+    if (body.invalid?.length || body.blocked?.length) { setError("Some IDs could not be added."); setBusy(false); return; }
+    window.location.reload();
+  };
+  const save = async (change: { visibility?: "public" | "private"; joinPolicy?: "open" | "closed" }) => {
+    setBusy(true); setError("");
+    const response = await fetch(`/api/lists/${listId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) });
+    if (!response.ok) { setError("Could not update this list."); setBusy(false); return; }
+    if (change.visibility) setVisibility(change.visibility);
+    if (change.joinPolicy) setJoinPolicy(change.joinPolicy);
+    setBusy(false); setMode(null); window.location.reload();
+  };
+  const duplicate = async () => {
+    setBusy(true);
+    const response = await fetch(`/api/lists/${listId}`, { method: "POST" });
+    const body = await response.json() as { list?: { publicId: string; slug: string } };
+    if (response.ok && body.list?.publicId) {
+      window.location.assign(listPath({ publicId: body.list.publicId, systemAlias: null, slug: body.list.slug }));
+      return;
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="listOwnerControls" ref={settingsRef}>
+      <button type="button" onClick={() => setMode("settings")} aria-label="List settings">⋮</button>
+      {mode === "add" && <Dialog title="Add people" onClose={() => setMode(null)}>
+        <form className="listModalForm" onSubmit={add}>
+          <label>Search by name or WCA ID<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Start typing a name" /></label>
+          {query.trim().length >= 2 && entries.length > 0 && <div className="listPersonResults">
+            {entries.map((person) => <button key={person.personId} type="button" onClick={() => { if (!selectedIds.includes(person.personId)) setSelected((current) => [...current, person]); setQuery(""); }}>
+              <PersonAvatar person={person} />
+              <span><strong>{person.country?.iso2 ? flagEmoji(person.country.iso2) + " " : ""}{person.name}</strong><small>{person.personId}</small></span>
+              {person.competitionCount !== undefined && <b className="listAddCompetitionCount">{person.competitionCount} competitions</b>}
+            </button>)}
+          </div>}
+          {selected.length > 0 && <div className="listPersonChips">{selected.map((person) => <button key={person.personId} type="button" onClick={() => setSelected((current) => current.filter((item) => item.personId !== person.personId))}>{person.name} · {person.personId} ×</button>)}</div>}
+          <label>Or paste WCA IDs<textarea value={ids} onChange={(event) => setIds(event.target.value)} placeholder="2016PARK01, 2018EXAM02" rows={3} /></label>
+          {error && <p className="listModalError" role="alert">{error}</p>}
+          <button type="submit" disabled={busy}>{busy ? "Adding…" : "Add people"}</button>
+        </form>
+      </Dialog>}
+      {mode === "settings" && <div className="listSettingsMenu" role="menu">
+        <button type="button" onClick={() => { onManageMembers?.(); setMode(null); }}>Manage members</button>
+        <a href={`/api/lists/${listId}?format=csv`}>Export CSV</a>
+        <button type="button" disabled={busy} onClick={() => void duplicate()}>{busy ? "Duplicating…" : "Duplicate list"}</button>
+        <label><input type="checkbox" checked={visibility === "private"} disabled={busy} onChange={(event) => void save({ visibility: event.target.checked ? "private" : "public" })} /> Private</label>
+        <label><input type="checkbox" checked={joinPolicy === "open"} disabled={busy} onChange={(event) => void save({ joinPolicy: event.target.checked ? "open" : "closed" })} /> Open to join</label>
+        {error && <p role="alert">{error}</p>}
+      </div>}
+    </div>
+  );
 }
 
 export function ListMembershipControls({ listId, joinPolicy, initialState }: { listId: string; joinPolicy: "open" | "closed"; initialState: "member" | "pending" | "not_member" }) {
@@ -65,7 +161,17 @@ export function ListMembershipControls({ listId, joinPolicy, initialState }: { l
     setBusy(false);
     window.location.reload();
   };
-  return <div className="listMembershipControls">{state === "member" ? <button type="button" onClick={() => setConfirmingRemoval(true)}>Remove myself</button> : state === "pending" ? <button type="button" disabled>Request pending</button> : <button type="button" disabled={busy} onClick={() => void action()}>{busy ? "Joining…" : joinPolicy === "open" ? "Join list" : "Request to join"}</button>}{confirmingRemoval && <Dialog title="Remove yourself" onClose={() => !busy && setConfirmingRemoval(false)}><div className="listModalForm"><p>Remove yourself from this list?</p><div className="listRemovalActions"><button type="button" disabled={busy} onClick={() => setConfirmingRemoval(false)}>Cancel</button><button type="button" disabled={busy} onClick={() => void remove()}>{busy ? "Removing…" : "Remove myself"}</button></div></div></Dialog>}</div>;
+  let membershipAction: ReactNode;
+  if (state === "member") {
+    membershipAction = <button type="button" onClick={() => setConfirmingRemoval(true)}>Remove myself</button>;
+  } else if (state === "pending") {
+    membershipAction = <button type="button" disabled>Request pending</button>;
+  } else {
+    let label = busy ? "Joining…" : "Request to join";
+    if (!busy && joinPolicy === "open") label = "Join list";
+    membershipAction = <button type="button" disabled={busy} onClick={() => void action()}>{label}</button>;
+  }
+  return <div className="listMembershipControls">{membershipAction}{confirmingRemoval && <Dialog title="Remove yourself" onClose={() => !busy && setConfirmingRemoval(false)}><div className="listModalForm"><p>Remove yourself from this list?</p><div className="listRemovalActions"><button type="button" disabled={busy} onClick={() => setConfirmingRemoval(false)}>Cancel</button><button type="button" disabled={busy} onClick={() => void remove()}>{busy ? "Removing…" : "Remove myself"}</button></div></div></Dialog>}</div>;
 }
 
 export function ListMembershipRequestRows({ listId, initialRequests }: { listId: string; initialRequests: Array<Pick<MembershipRequest, "id" | "personId" | "name">> }) {
@@ -106,16 +212,54 @@ export function ListMembershipRequestRows({ listId, initialRequests }: { listId:
 }
 
 export function ListAddPeopleRail({ listId, onCancel, onAdded }: { listId: string; onCancel: () => void; onAdded?: () => void }) {
-  const [value, setValue] = useState(""), [entries, setEntries] = useState<Person[]>([]), [active, setActive] = useState(0), [offset, setOffset] = useState(0), [hasMore, setHasMore] = useState(false), [totalResults, setTotalResults] = useState(0), [scrollTop, setScrollTop] = useState(0), [loadingMore, setLoadingMore] = useState(false), [searchOpen, setSearchOpen] = useState(false), [selected, setSelected] = useState<Person[]>([]), [error, setError] = useState(""), [busy, setBusy] = useState(false);
+  const [value, setValue] = useState(""), [entries, setEntries] = useState<Person[]>([]), [active, setActive] = useState(0), [offset, setOffset] = useState(0), [hasMore, setHasMore] = useState(false), [totalResults, setTotalResults] = useState(0), [scrollTop, setScrollTop] = useState(0), [loadingMore, setLoadingMore] = useState(false), [searchOpenState, setSearchOpen] = useState(false), [selected, setSelected] = useState<Person[]>([]), [error, setError] = useState(""), [busy, setBusy] = useState(false);
   const router = useRouter();
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
   const pageSize = 25;
-  const virtualizer = useVirtualizer({ count: entries.length, getScrollElement: () => suggestionsRef.current, estimateSize: () => 48, overscan: 5 });
+  const trimmedValue = value.trim();
+  const looksLikeWcaId = /^\d/.test(trimmedValue);
+  const readyWcaId = /^\d{4}[A-Za-z]{2}/.test(trimmedValue);
+  const searchReady = trimmedValue.length >= 2 && !/[,\n]/.test(value) && (!looksLikeWcaId || readyWcaId);
+  const searchOpen = searchOpenState && searchReady;
+  const virtualItems = useMemo(() => {
+    const firstIndex = Math.max(0, Math.floor(scrollTop / 48) - 5);
+    const lastIndex = Math.min(entries.length, firstIndex + 20);
+    return entries.slice(firstIndex, lastIndex).map((_, index) => {
+      const itemIndex = firstIndex + index;
+      return { index: itemIndex, key: itemIndex, start: itemIndex * 48 };
+    });
+  }, [entries, scrollTop]);
+  const virtualizer = {
+    getTotalSize: () => entries.length * 48,
+    getVirtualItems: () => virtualItems,
+  };
   useEffect(() => { const dismiss = (event: MouseEvent) => { if (!composerRef.current?.contains(event.target as Node)) setSearchOpen(false); }; document.addEventListener("mousedown", dismiss); return () => document.removeEventListener("mousedown", dismiss); }, []);
   useEffect(() => { if (error) console.error("Could not add list members:", error); }, [error]);
   const moveActive = (next: number) => { const bounded = Math.max(0, Math.min(next, entries.length - 1)); setActive(bounded); const container = suggestionsRef.current; if (!container) return; const rowHeight = 48; const rowTop = bounded * rowHeight; const rowBottom = rowTop + rowHeight; if (rowTop < container.scrollTop) container.scrollTo({ top: rowTop, behavior: "smooth" }); else if (rowBottom > container.scrollTop + container.clientHeight) container.scrollTo({ top: rowBottom - container.clientHeight, behavior: "smooth" }); };
-  useEffect(() => { const trimmed = value.trim(); const looksLikeWcaId = /^\d/.test(trimmed); const readyWcaId = /^\d{4}[A-Za-z]{2}/.test(trimmed); if (trimmed.length < 2 || /[,\n]/.test(value) || (looksLikeWcaId && !readyWcaId)) { setEntries([]); return; } suggestionsRef.current?.scrollTo({ top: 0 }); setOffset(0); const source = new EventSource(`/api/people/search?q=${encodeURIComponent(value)}&limit=25&offset=0`); source.addEventListener("results", (event) => { const body = JSON.parse((event as MessageEvent).data) as { data?: SearchResponse }; setEntries(body.data?.entries ?? []); setTotalResults(body.data?.total ?? 0); setScrollTop(0); setSearchOpen(true); setHasMore(Boolean(body.data?.page?.hasMore)); setActive(0); }); source.addEventListener("thumbs", (event) => { const thumbs = JSON.parse((event as MessageEvent).data) as Record<string, string | null>; Object.values(thumbs).forEach((thumb) => { if (thumb) { const image = new Image(); image.src = thumb; } }); setEntries((current) => current.map((person) => ({ ...person, avatarUrl: thumbs[person.personId] ?? person.avatarUrl }))); source.close(); }); source.onerror = () => { source.close(); }; return () => source.close(); }, [value]);
+  useEffect(() => {
+    if (!searchReady) return;
+    suggestionsRef.current?.scrollTo({ top: 0 });
+    const source = new EventSource(`/api/people/search?q=${encodeURIComponent(value)}&limit=25&offset=0`);
+    source.addEventListener("results", (event) => {
+      const body = JSON.parse((event as MessageEvent).data) as { data?: SearchResponse };
+      setEntries(body.data?.entries ?? []);
+      setTotalResults(body.data?.total ?? 0);
+      setScrollTop(0);
+      setOffset(0);
+      setSearchOpen(true);
+      setHasMore(Boolean(body.data?.page?.hasMore));
+      setActive(0);
+    });
+    source.addEventListener("thumbs", (event) => {
+      const thumbs = JSON.parse((event as MessageEvent).data) as Record<string, string | null>;
+      Object.values(thumbs).forEach((thumb) => { if (thumb) { const image = new Image(); image.src = thumb; } });
+      setEntries((current) => current.map((person) => ({ ...person, avatarUrl: thumbs[person.personId] ?? person.avatarUrl })));
+      source.close();
+    });
+    source.onerror = () => { source.close(); };
+    return () => source.close();
+  }, [searchReady, value]);
   const loadMore = () => { if (!hasMore || loadingMore || value.trim().length < 2 || entries.length < offset + pageSize) return; const nextOffset = offset + pageSize; setLoadingMore(true); const source = new EventSource(`/api/people/search?q=${encodeURIComponent(value)}&limit=25&offset=${nextOffset}`); source.addEventListener("results", (event) => { const body = JSON.parse((event as MessageEvent).data) as { data?: SearchResponse }; setEntries((current) => [...current, ...(body.data?.entries ?? [])]); setHasMore(Boolean(body.data?.page?.hasMore)); setOffset(nextOffset); }); source.addEventListener("thumbs", (event) => { const thumbs = JSON.parse((event as MessageEvent).data) as Record<string, string | null>; Object.values(thumbs).forEach((thumb) => { if (thumb) { const image = new Image(); image.src = thumb; } }); setEntries((current) => current.map((person) => ({ ...person, avatarUrl: thumbs[person.personId] ?? person.avatarUrl }))); setLoadingMore(false); source.close(); }); source.onerror = () => { setLoadingMore(false); source.close(); }; };
   const visibleResultCount = 10;
   const showScrollbar = entries.length > visibleResultCount;

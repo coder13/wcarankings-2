@@ -127,7 +127,7 @@ function AccordionFrame({
   return (
     <motion.div
       className={`rowAccordion${ready ? " rowAccordion--ready" : ""}`}
-      initial={initial ? false : closing ? false : { height: 0, marginBottom: 0, opacity: 0 }}
+      initial={initial || closing ? false : { height: 0, marginBottom: 0, opacity: 0 }}
       animate={closing
         ? { height: 0, marginBottom: 0, opacity: 0 }
         : { height: "auto", marginBottom: "0.4rem", opacity: 1 }}
@@ -248,7 +248,6 @@ export function RankingRow({
       style={style}
       tabIndex={0}
       aria-label={`Rank ${formatRankingNumber(rank)}: ${name}, ${formattedResult}`}
-      aria-expanded={onToggle ? expanded : undefined}
       onKeyDown={(keyboardEvent) => {
         if (keyboardEvent.altKey || keyboardEvent.ctrlKey || keyboardEvent.metaKey)
           return;

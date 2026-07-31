@@ -262,7 +262,8 @@ export function ResultsTable({
       })
       .then(() => {
         setDetailErrorByKey((current) => {
-          const { [key]: _removed, ...next } = current;
+          const next = { ...current };
+          delete next[key];
           return next;
         });
       })

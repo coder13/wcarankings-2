@@ -56,6 +56,9 @@ function makeMockRankings(): RankingEntry[] {
       const hasMockTie = index > 0 && index % 17 === 0;
       const best = hasMockTie ? previousEntry.best : entry.best;
       const rank = previousBest === best ? previousRank : index + 1;
+      let recordBadges: RecordBadgeCode[] = [];
+      if (index === 0) recordBadges = ["WR", "NR"];
+      else if (index % 31 === 0) recordBadges = ["NR"];
       previousBest = best;
       previousRank = rank;
 
@@ -67,7 +70,7 @@ function makeMockRankings(): RankingEntry[] {
         competitionId: `storybook-${index % 7}`,
         countryName: ["United States", "Canada", "Japan", "Germany"][index % 4],
         countryIso2: ["US", "CA", "JP", "DE"][index % 4],
-        recordBadges: (index === 0 ? ["WR", "NR"] : index % 31 === 0 ? ["NR"] : []) as RecordBadgeCode[],
+        recordBadges,
       };
     });
 }

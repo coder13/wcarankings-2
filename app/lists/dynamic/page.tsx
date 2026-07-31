@@ -13,10 +13,15 @@ import { isEventId, isRankingType, normalizeGenderFilters, parseRegionQuery, typ
 export const dynamic = "force-dynamic";
 
 function messageFor(invalidIds: string[], unknownIds: string[]) {
-  const parts = [
-    invalidIds.length ? `${invalidIds.length} invalid WCA ${invalidIds.length === 1 ? "ID was" : "IDs were"} ignored` : "",
-    unknownIds.length ? `${unknownIds.length} unknown WCA ${unknownIds.length === 1 ? "ID was" : "IDs were"} ignored` : "",
-  ].filter(Boolean);
+  const parts: string[] = [];
+  if (invalidIds.length) {
+    const label = invalidIds.length === 1 ? "ID was" : "IDs were";
+    parts.push(`${invalidIds.length} invalid WCA ${label} ignored`);
+  }
+  if (unknownIds.length) {
+    const label = unknownIds.length === 1 ? "ID was" : "IDs were";
+    parts.push(`${unknownIds.length} unknown WCA ${label} ignored`);
+  }
   return parts.length ? `${parts.join("; ")}.` : "";
 }
 
@@ -27,11 +32,16 @@ export default async function DynamicListPage({ searchParams }: {
   const eventValue = typeof query.eventId === "string" ? query.eventId : "333";
   const eventId = isEventId(eventValue) ? eventValue : "333";
   const resultValue = typeof query.result === "string" ? query.result : "single";
-  const rankingType = eventId === "333mbf" || !isRankingType(resultValue) ? "single" : resultValue;
+  const rankingType = eventId !== "333mbf" && isRankingType(resultValue)
+    ? resultValue
+    : "single";
   const requestedRegion = parseRegionQuery(typeof query.region === "string" ? query.region : null);
+  let genderValues: string[];
+  if (Array.isArray(query.gender)) genderValues = query.gender;
+  else if (query.gender === undefined) genderValues = [];
+  else genderValues = [query.gender];
   const gender = normalizeGenderFilters(
-    (Array.isArray(query.gender) ? query.gender : query.gender ? [query.gender] : [])
-      .flatMap((value) => value.split(","))
+    genderValues.flatMap((value) => value.split(","))
       .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
   );
   let personIds: string[] = [];

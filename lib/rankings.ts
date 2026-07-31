@@ -129,7 +129,10 @@ async function queryGenderPage(input: QueryInput) {
     // Fetch one extra row so the caller can determine whether another page exists.
     values.push(input.startRank, input.startRank + input.limit + 1);
   }
-  const result = await query<RankingRow>(`${cte} SELECT ${columns} FROM filtered ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""} ORDER BY filtered_position LIMIT ?`, [...values, input.locate ? 1 : input.search ? input.searchLimit : input.limit + 1]);
+  let resultLimit = input.limit + 1;
+  if (input.locate) resultLimit = 1;
+  else if (input.search) resultLimit = input.searchLimit;
+  const result = await query<RankingRow>(`${cte} SELECT ${columns} FROM filtered ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""} ORDER BY filtered_position LIMIT ?`, [...values, resultLimit]);
   const entries = result.rows.slice(0, input.locate ? 1 : input.limit).map(toRankingEntry);
   if (input.locate) return { data: { located: entries[0] ?? null }, timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
   const total = Number(result.rows[0]?.total_count ?? 0);
@@ -163,11 +166,12 @@ export async function queryMysql(input: QueryInput) {
   const { rank, subRank, conditions, values } = yearly ? { rank: "public_rank", subRank: "position", ...yearlyFilters(input) } : filters(input);
   const source = yearly ? yearlyTable(input.type) : table(input.type);
   const selectColumns = yearly ? yearlyColumns(input.type) : columns(rank, subRank);
-  const from = yearly
-    ? `FROM ${source} ranking LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1 LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id LEFT JOIN countries country ON country.id = facts.person_country_id LEFT JOIN competitions competition ON competition.id = facts.competition_id`
-    : input.gender.length
-      ? `FROM ${source} ranking JOIN persons gender_person ON gender_person.wca_id = ranking.person_id AND gender_person.sub_id = 1`
-      : `FROM ${source} ranking`;
+  let from = `FROM ${source} ranking`;
+  if (yearly) {
+    from = `FROM ${source} ranking LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1 LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id LEFT JOIN countries country ON country.id = facts.person_country_id LEFT JOIN competitions competition ON competition.id = facts.competition_id`;
+  } else if (input.gender.length) {
+    from = `FROM ${source} ranking JOIN persons gender_person ON gender_person.wca_id = ranking.person_id AND gender_person.sub_id = 1`;
+  }
   const predicate = yearly ? conditions.join(" AND ") : conditions.join(" AND ");
   const qualifiedSubRank = yearly ? `ranking.${subRank}` : subRank;
   const personColumn = yearly ? "ranking.person_id" : "ranking.person_id";
@@ -271,7 +275,9 @@ async function queryPersonMetric(input: QueryInput) {
     values.push(input.startRank);
   }
 
-  const limit = input.locate ? 1 : input.search ? input.searchLimit : input.limit + 1;
+  let limit = input.limit + 1;
+  if (input.locate) limit = 1;
+  else if (input.search) limit = input.searchLimit;
   const result = await query<PersonMetricRow>(
     `SELECT score.${rankColumn} AS rank, score.${positionColumn} AS sub_rank, score.person_id,
        COALESCE(person.name, score.person_id) AS person_name,
@@ -394,7 +400,9 @@ async function queryFilteredPersonMetric(input: QueryInput, kinch: boolean, gend
     pageConditions.push("filtered.filtered_position >= ?");
     pageValues.push(input.startRank);
   }
-  const limit = input.locate ? 1 : search ? input.searchLimit : input.limit + 1;
+  let limit = input.limit + 1;
+  if (input.locate) limit = 1;
+  else if (search) limit = input.searchLimit;
   const result = await query<FilteredPersonMetricRow>(
     `WITH filtered AS (
        SELECT score.person_id, ${scoreValue} AS best,
@@ -430,7 +438,10 @@ async function queryFilteredPersonMetric(input: QueryInput, kinch: boolean, gend
     statementMs: peopleTimings.statementMs + result.timings.statementMs,
   };
   const rows = result.rows;
-  const entries = rows.slice(0, input.locate ? 1 : search ? rows.length : input.limit).map(personMetricEntry);
+  let entryLimit = input.limit;
+  if (input.locate) entryLimit = 1;
+  else if (search) entryLimit = rows.length;
+  const entries = rows.slice(0, entryLimit).map(personMetricEntry);
   if (input.locate) return { data: { located: entries[0] ?? null }, timings, queryCount: 1, returnedRows: peopleReturnedRows + rows.length };
   if (search) return { data: { entries, hasMore: false, nextPageStart: null, previousPageStart: null, total: entries.length }, timings, queryCount: 2, returnedRows: peopleReturnedRows + rows.length };
   return {
@@ -453,7 +464,10 @@ async function queryFilteredPersonMetric(input: QueryInput, kinch: boolean, gend
 function parseInput(searchParams: URLSearchParams): QueryInput {
   const eventId = isRankingEventId(searchParams.get("eventId") ?? searchParams.get("event")) ? searchParams.get("eventId") ?? searchParams.get("event")! : "333";
   const rawType = searchParams.get("result") ?? searchParams.get("type");
-  const type = eventId === "333mbf" || eventId === "sor-kinch" ? "single" : isRankingType(rawType) ? rawType : "single";
+  let type: "single" | "average" = "single";
+  if (eventId !== "333mbf" && eventId !== "sor-kinch" && isRankingType(rawType)) {
+    type = rawType;
+  }
   const { scope, regionId } = parseRegionQuery(searchParams.get("region"));
   const kinchOrder = searchParams.get("kinch") === "continent" ? "continent" : "regional";
   if (scope !== "world" && !regionId) throw new Error("Choose a region before loading rankings.");

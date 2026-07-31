@@ -4,7 +4,6 @@ import { useEffect, useRef, type KeyboardEvent, type Ref } from "react";
 import CloseIcon from "../Icon/close.svg?react";
 import SearchIcon from "../Icon/search.svg?react";
 import {
-  formatRankingNumber,
   type RankingEntry,
 } from "../RankingsExplorer/types";
 
@@ -18,7 +17,6 @@ export function SearchInputs({
   findPending,
   findMatches,
   findIndex,
-  activeFindMatch,
   onOpen,
   onClose,
   onQueryChange,
@@ -33,7 +31,6 @@ export function SearchInputs({
   findPending: boolean;
   findMatches: RankingEntry[];
   findIndex: number;
-  activeFindMatch: RankingEntry | null;
   onOpen: () => void;
   onClose: () => void;
   onQueryChange: (value: string) => void;

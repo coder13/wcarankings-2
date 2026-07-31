@@ -24,9 +24,9 @@ export function ListBrowse({ lists }: { lists: PublicListSummary[] }) {
   const virtualRows = virtualizer.getVirtualItems();
   const changeSubject = (value: NavigationSubject) => {
     if (value === "lists") return;
-    window.location.assign(
-      value === "people" ? "/" : value === "competitions" ? "/competitions/best-result" : "/results",
-    );
+    if (value === "people") window.location.assign("/");
+    else if (value === "competitions") window.location.assign("/competitions/best-result");
+    else window.location.assign("/results");
   };
   return (
     <div className="app">
