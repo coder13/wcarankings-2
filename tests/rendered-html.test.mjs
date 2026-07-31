@@ -318,10 +318,8 @@ test("binds rail scroll progress directly to Motion scroll state", async () => {
   );
 
   assert.match(component, /useScroll\(\)/);
-  assert.match(component, /useTransform\(\s*scrollY,/);
-  assert.match(component, /"--rail-scroll-progress": topRailProgressValue/);
-  assert.match(component, /<motion\.div[\s\S]*?className="stickyRankingsRail"/);
-  assert.doesNotMatch(component, /as unknown as CSSProperties/);
+  assert.match(component, /useMotionValueEvent\(scrollY, "change"/);
+  assert.match(component, /style\.setProperty\("--rail-scroll-progress", String\(progress\)\)/);
 });
 
 test("production build keeps rankings styles in the root stylesheet", async () => {

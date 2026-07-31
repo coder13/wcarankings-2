@@ -11,19 +11,18 @@ export function useRailScrollProgress({
   revealDistance: number;
   transformDistance: number;
 }) {
-  const [topProgress, setTopProgress] = useState(0);
+  const [topCompact, setTopCompact] = useState(false);
   const [bottomProgress, setBottomProgress] = useState(0);
-  const topRef = useRef(0);
+  const topCompactRef = useRef(false);
   const bottomRef = useRef(0);
 
   useEffect(() => {
     if (!enabled) return;
     const update = () => {
-      const raw = Math.max(0, Math.min(1, window.scrollY / transformDistance));
-      const nextTop = raw;
-      if (nextTop !== topRef.current) {
-        topRef.current = nextTop;
-        setTopProgress(nextTop);
+      const nextTopCompact = window.scrollY >= transformDistance;
+      if (nextTopCompact !== topCompactRef.current) {
+        topCompactRef.current = nextTopCompact;
+        setTopCompact(nextTopCompact);
       }
       const distanceToEnd = Math.max(0, document.documentElement.scrollHeight - (window.scrollY + window.innerHeight));
       const nextBottom = Math.max(0, Math.min(1, distanceToEnd / revealDistance));
@@ -37,5 +36,5 @@ export function useRailScrollProgress({
     return () => { window.cancelAnimationFrame(frame); window.removeEventListener("scroll", update); };
   }, [enabled, revealDistance, transformDistance]);
 
-  return { topProgress, bottomProgress };
+  return { topCompact, bottomProgress };
 }

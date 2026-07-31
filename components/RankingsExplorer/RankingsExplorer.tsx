@@ -1,7 +1,7 @@
 "use client";
 
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { AnimatePresence, LayoutGroup, motion, useScroll, useTransform } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion, useMotionValueEvent, useScroll } from "motion/react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -687,14 +687,7 @@ export function RankingsExplorer({
     x: number;
     y: number;
   } | null>(null);
-  const { topProgress: topRailProgress, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
-  const { scrollY } = useScroll();
-  const topRailProgressValue = useTransform(
-    scrollY,
-    [0, TOP_RAIL_TRANSFORM_DISTANCE],
-    [0, 1],
-    { clamp: true },
-  );
+  const { topCompact: topRailCompact, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
   const activeListKey = [
     subject,
     competitionRanking,
@@ -707,6 +700,11 @@ export function RankingsExplorer({
   ].join(":");
   const listRef = useRef<HTMLDivElement>(null);
   const stickyRankingsRailRef = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, "change", (scrollPosition) => {
+    const progress = Math.max(0, Math.min(1, scrollPosition / TOP_RAIL_TRANSFORM_DISTANCE));
+    stickyRankingsRailRef.current?.style.setProperty("--rail-scroll-progress", String(progress));
+  });
   const railFindInputRef = useRef<HTMLInputElement>(null);
   const setRailFindInputRef = useCallback((input: HTMLInputElement | null) => {
     railFindInputRef.current = input;
@@ -2998,10 +2996,9 @@ export function RankingsExplorer({
         )}
       </AppHeader>
 
-      <motion.div
+      <div
         ref={stickyRankingsRailRef}
         className="stickyRankingsRail"
-        style={{ "--rail-scroll-progress": topRailProgressValue }}
       >
         {listOwner && <ListOwnerControls listId={listOwner.listId} initialVisibility={listOwner.visibility} initialJoinPolicy={listOwner.joinPolicy} onManageMembers={() => { setMemberSelectionMode(true); setSelectedMemberIds(new Set()); }} />}
         {listActions && !listActions.isOwner && <ListCloneExportControls listId={listActions.listId} />}
@@ -3024,7 +3021,7 @@ export function RankingsExplorer({
           regionSelection={regionSelection}
           onRegionChange={changeRegion}
           onEventPickerTrigger={(trigger) => { railEventPickerTriggerRef.current = trigger; }}
-          compactResultType={topRailProgress >= 1 || Boolean(rankingSource) && isMobileControls}
+          compactResultType={topRailCompact || Boolean(rankingSource) && isMobileControls}
           showResultType={!(eventId === "SOR" || eventId === "sor-kinch" || (subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count")))}
           showEventPicker={!(subject === "competitions" && (competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
           showRegion
@@ -3055,7 +3052,7 @@ export function RankingsExplorer({
         />}
           </AnimatePresence>
         </LayoutGroup>
-      </motion.div>
+      </div>
 
       <main>
         <div className="outerListWrapper" ref={listRef}>

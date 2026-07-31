@@ -15,13 +15,14 @@
 
 .Jump--rankings {
   --rail-control-height: calc(52px - (12px * var(--rail-scroll-progress, 0)));
+  --rail-icon-slot-width: 44px;
   --rail-event-width: calc(44px + ((9em - 44px) * (1 - var(--rail-scroll-progress, 0))));
   --rail-select-width: calc(9.25em - (1.5em * var(--rail-scroll-progress, 0)));
   --rail-gender-width: 5.5em;
   --result-type-width: 5.5em;
   --rail-settings-width: calc(var(--rail-event-width) + var(--result-type-width) + var(--rail-gender-width) + var(--rail-select-width));
   min-height: var(--rail-control-height);
-  min-width: calc(var(--rail-settings-width) + var(--rail-control-height));
+  min-width: calc(var(--rail-settings-width) + var(--rail-icon-slot-width));
   border-radius: calc(var(--rail-control-height) / 2);
   font-size: calc(1rem + (0.125rem * (1 - var(--rail-scroll-progress, 0))));
   overflow: visible;
@@ -37,6 +38,7 @@
 
 .Jump--listBrowse {
   --rail-control-height: 52px;
+  --rail-icon-slot-width: var(--rail-control-height);
   min-width: min(34rem, calc(100vw - 2rem));
   border-radius: calc(var(--rail-control-height) / 2);
 }
@@ -127,9 +129,9 @@
 }
 
 @media only screen and (min-width: 601px) {
-  .Jump-railSettings > .EventPicker-preview { display: flex; gap: calc(0.5em * (1 - var(--rail-scroll-progress, 0))); padding: 0 calc(0.5em * (1 - var(--rail-scroll-progress, 0))); justify-content: center; font-size: 1em; }
-  .Jump-railSettings > .EventPicker-preview::before { flex: 0 0 auto; color: var(--text-strong); font-size: 1.25em; opacity: 1; }
-  .Jump-railSettings > .EventPicker-preview .EventPicker-name { display: block; width: calc(6em * (1 - var(--rail-scroll-progress, 0))); min-width: 0; overflow: hidden; color: var(--text-muted); font-size: .875em; opacity: calc(1 - var(--rail-scroll-progress, 0)); text-overflow: ellipsis; white-space: nowrap; }
+  .Jump-railSettings > .EventPicker-preview { position: relative; display: block; padding: 0; font-size: 1em; }
+  .Jump-railSettings > .EventPicker-preview::before, .Jump-railSettings > .EventPicker-preview .EventPicker-symbol { position: absolute; top: 50%; left: 0; width: var(--rail-icon-slot-width); color: var(--text-strong); font-size: 1.25em; line-height: 1; opacity: 1; text-align: center; transform: translateY(-50%); }
+  .Jump-railSettings > .EventPicker-preview .EventPicker-name { position: absolute; top: 50%; right: 0; left: var(--rail-icon-slot-width); display: block; min-width: 0; overflow: hidden; color: var(--text-muted); font-size: .875em; opacity: calc(1 - var(--rail-scroll-progress, 0)); text-align: left; text-overflow: ellipsis; white-space: nowrap; transform: translateY(-50%); }
 }
 
 .Jump-resultTypeControl { position: relative; width: var(--result-type-width); min-width: 0; height: var(--rail-control-height); flex: 0 0 var(--result-type-width); }
@@ -157,7 +159,7 @@
 .Jump-listAddButton { min-width: 40px; min-height: 40px; padding: .5em .75em; border: 0; border-left: 1px solid var(--border-subtle); background: transparent; color: var(--focus); cursor: pointer; font: inherit; white-space: nowrap; }
 .Jump-listAddButton:hover, .Jump-listAddButton:focus-visible { background: var(--surface-hover); color: var(--text-strong); outline: none; }
 
-.Jump .findBar--rail { position: absolute; z-index: 5; top: 0; right: 0; width: var(--rail-control-height); height: var(--rail-control-height); flex: 0 0 var(--rail-control-height); overflow: hidden; padding: 0; border: 0; border-left: 1px solid var(--border-subtle); border-radius: 0 20px 20px 0; background: var(--rail-surface); box-shadow: none; transition: width 250ms var(--cubic-move), border-radius 250ms var(--cubic-move), color 150ms var(--cubic-move); }
+.Jump .findBar--rail { position: absolute; z-index: 5; top: 0; right: 0; width: var(--rail-icon-slot-width); height: var(--rail-control-height); flex: 0 0 var(--rail-icon-slot-width); overflow: hidden; padding: 0; border: 0; border-left: 1px solid var(--border-subtle); border-radius: 0 calc(var(--rail-control-height) / 2) calc(var(--rail-control-height) / 2) 0; background: var(--rail-surface); box-shadow: none; transition: width 250ms var(--cubic-move), border-radius 250ms var(--cubic-move), color 150ms var(--cubic-move); }
 .Jump .findBar--rail[data-has-text="true"], .Jump .findBar--rail[data-open="true"] {
   width: 100%;
   border-radius: calc(var(--rail-control-height) / 2);
@@ -166,7 +168,7 @@
 }
 .Jump--rankings:has(.findBar--rail:is([data-has-text="true"], [data-open="true"])) { background: transparent; box-shadow: none; }
 .Jump--rankings:has(.findBar--rail:is([data-has-text="true"], [data-open="true"])) .Jump-railSettings { opacity: 0; pointer-events: none; }
-.Jump .findBar--rail .findIcon, .Jump .findBar--rail .findClose { position: relative; display: grid; width: var(--rail-control-height); height: var(--rail-control-height); min-width: var(--rail-control-height); min-height: var(--rail-control-height); flex: 0 0 var(--rail-control-height); aspect-ratio: 1; padding: 0; place-items: center; border: 0; background: transparent; color: var(--text-strong); cursor: pointer; transition: color 150ms var(--cubic-move); }
+.Jump .findBar--rail .findIcon, .Jump .findBar--rail .findClose { position: relative; display: grid; width: var(--rail-icon-slot-width); height: var(--rail-control-height); min-width: var(--rail-icon-slot-width); min-height: var(--rail-control-height); flex: 0 0 var(--rail-icon-slot-width); padding: 0; place-items: center; border: 0; background: transparent; color: var(--text-strong); cursor: pointer; transition: color 150ms var(--cubic-move); }
 .Jump .findBar--rail .findIcon:hover, .Jump .findBar--rail .findClose:hover, .Jump .findBar--rail .findIcon:focus-visible, .Jump .findBar--rail .findClose:focus-visible { color: var(--focus); outline: none; }
 .Jump .findBar--rail .findClose svg { width: 20px; height: 20px; }
 .Jump .findBar--rail[data-open="false"][data-has-text="false"] .findClose { display: none; }
