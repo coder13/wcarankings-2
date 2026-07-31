@@ -126,7 +126,11 @@ test("builds and verifies digest-addressed server images", () => {
   assert.match(serverBuild, /data_tools_image:/);
   assert.match(serverBuild, /Dockerfile\.data-tools/);
   assert.match(serverBuild, /require_existing/);
-  assert.match(release, /require_existing: true/);
+  assert.match(
+    release,
+    /build_server:[\s\S]*uses: \.\/\.github\/workflows\/build-server\.yml[\s\S]*require_existing: false/,
+    "production releases may build missing verified images for the exact release commit",
+  );
   assert.match(serverBuild, /config_checksum:/);
 });
 
