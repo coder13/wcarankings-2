@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
 import type {
   RankingEntry,

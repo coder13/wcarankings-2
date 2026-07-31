@@ -1,0 +1,4 @@
+interface:
+  display_name: "Animation Best Practices"
+  short_description: "Build smooth, interruptible UI animations"
+  default_prompt: "Use $animation-best-practices to design or debug a smooth UI animation."

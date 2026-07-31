@@ -121,6 +121,8 @@ export async function loadResultRankings(params: URLSearchParams) {
   const source = gender.length
     ? `(SELECT ranking.*, RANK() OVER (PARTITION BY ranking.event_id${scope === "world" ? "" : `, ranking.${scope}_id`} ORDER BY ranking.result_value) AS filtered_rank, ROW_NUMBER() OVER (PARTITION BY ranking.event_id${scope === "world" ? "" : `, ranking.${scope}_id`} ORDER BY ranking.result_value, ranking.result_id) AS filtered_position, COUNT(*) OVER (PARTITION BY ranking.event_id${scope === "world" ? "" : `, ranking.${scope}_id`}) AS filtered_total FROM ${table} ranking WHERE ${sourceConditions.join(" AND ")})`
     : table;
+  const pageWhere = gender.length ? pageConditions : [...conditions, ...pageConditions];
+  const pageValuesForQuery = gender.length ? [...sourceValues, ...pageValues] : [...values, ...pageValues];
   const rows = await query<ResultRankingRow>(`
     WITH page AS (
       SELECT
@@ -135,7 +137,7 @@ export async function loadResultRankings(params: URLSearchParams) {
         ranking.competition_id,
         ranking.record_code
       FROM ${source} ranking
-      WHERE ${(gender.length ? pageConditions : conditions).join(" AND ")}
+      WHERE ${pageWhere.join(" AND ")}
       ORDER BY ranking.${positionColumn}
       LIMIT ?
     )
@@ -150,7 +152,7 @@ export async function loadResultRankings(params: URLSearchParams) {
     LEFT JOIN countries country ON country.id = page.country_id
     LEFT JOIN competitions competition ON competition.id = page.competition_id
     ORDER BY page.position
-  `, [...(gender.length ? [...sourceValues, ...pageValues] : [...values]), rowLimit]);
+  `, [...pageValuesForQuery, rowLimit]);
 
   const counts = gender.length
     ? { rows: [] as Array<{ count: number }>, timings: { queueMs: 0, statementMs: 0 } }

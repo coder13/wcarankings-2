@@ -87,6 +87,7 @@ const SEARCH_ANIMATION_ROWS = 3;
 const VIM_JUMP_PAGE_COUNT = 2;
 const VIM_JUMP_SIZE = PAGE_SIZE * VIM_JUMP_PAGE_COUNT;
 const ROW_HEIGHT = 65.45;
+const EXPANDED_ROW_HEIGHT = 248;
 const MOBILE_CONTROLS_QUERY = "(max-width: 600px)";
 
 function subscribeMobileControls(listener: () => void) {
@@ -642,6 +643,7 @@ export function RankingsExplorer({
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadingPrevious, setLoadingPrevious] = useState(false);
   const [error, setError] = useState("");
+  const [focusNotice, setFocusNotice] = useState("");
   const [listOffset, setListOffset] = useState(0);
   const [pageReloadNonce, setPageReloadNonce] = useState(0);
   const [findOpen, setFindOpen] = useState(Boolean(normalizedInitialSearch && !initialRegexSearch));
@@ -659,6 +661,9 @@ export function RankingsExplorer({
   );
   const [findError, setFindError] = useState("");
   const [highlightedPersonId, setHighlightedPersonId] = useState(
+    initialData?.initialMatchPersonId ?? ""
+  );
+  const [focusedExpandedPersonId, setFocusedExpandedPersonId] = useState(
     initialData?.initialMatchPersonId ?? ""
   );
   const [hydrated, setHydrated] = useState(false);
@@ -680,7 +685,6 @@ export function RankingsExplorer({
     y: number;
   } | null>(null);
   const { topProgress: topRailProgress, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
-  const [debugScrollY, setDebugScrollY] = useState(0);
   const activeListKey = [
     subject,
     competitionRanking,
@@ -706,6 +710,7 @@ export function RankingsExplorer({
   const focusResolutionEpochRef = useRef(0);
   const focusedWcaIdRef = useRef("");
   const lastFocusRequestRef = useRef("");
+  const pendingFocusNoticeRef = useRef("");
   const pendingPersonFocusRef = useRef<PendingPersonFocus | null>(null);
   const pendingRankRef = useRef(1);
   const pendingFocusLastRef = useRef(false);
@@ -813,23 +818,39 @@ export function RankingsExplorer({
   }, [memberContextMenu]);
   const queuePersonFocus = useCallback((personId: string, animate: boolean) => {
     setHighlightedPersonId(personId);
+    setFocusedExpandedPersonId(personId);
     pendingPersonFocusRef.current = { personId, animate };
   }, []);
 
+  const focusedExpandedIndex = subject === "people" && focusedExpandedPersonId
+    ? entries.findIndex((entry) => entry.personId === focusedExpandedPersonId)
+    : -1;
+  const estimatedRowHeight = useCallback((index: number) => (
+    index === focusedExpandedIndex ? EXPANDED_ROW_HEIGHT : ROW_HEIGHT
+  ), [focusedExpandedIndex]);
+
   const rowVirtualizer = useWindowVirtualizer({
     count: entries.length + 1,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: estimatedRowHeight,
+    measureElement: (element, entry, instance) => {
+      const index = Number(element.getAttribute("data-index"));
+      if (element.getAttribute("data-accordion-measure-lock") === "true") {
+        const key = instance.options.getItemKey(index);
+        const cache = (instance as unknown as { itemSizeCache?: Map<unknown, number> }).itemSizeCache;
+        return cache?.get(key) ?? estimatedRowHeight(index);
+      }
+      if (entry?.borderBoxSize) {
+        const box = entry.borderBoxSize[0];
+        if (box) return Math.round(box.blockSize);
+      }
+      return (element as HTMLElement).offsetHeight;
+    },
     overscan: 12,
     scrollMargin: listOffset,
   });
   const rowVirtualizerRef = useRef(rowVirtualizer);
-
-  useEffect(() => {
-    if (process.env.NODE_ENV === "production") return;
-    const update = () => setDebugScrollY(window.scrollY);
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
+  const resizeVirtualRow = useCallback((index: number, size: number) => {
+    rowVirtualizerRef.current.resizeItem(index, size);
   }, []);
 
   useEffect(() => {
@@ -923,6 +944,7 @@ export function RankingsExplorer({
           list: listRef.current,
           index: targetIndex,
           alignment: "center",
+          rowHeight: EXPANDED_ROW_HEIGHT,
           requestedDuration: getScrollAnimationDuration(targetIndex),
           schedule: false,
           targetOffset: () =>
@@ -1032,6 +1054,7 @@ export function RankingsExplorer({
       setHasMore(true);
     }
     setError("");
+    if (!preserveList && !pendingFocusNoticeRef.current) setFocusNotice("");
     moreRequestRef.current = false;
     previousRequestRef.current = false;
     const focusLast = pendingFocusLastRef.current;
@@ -1202,6 +1225,7 @@ export function RankingsExplorer({
               requestedDuration: getScrollAnimationDuration(
                 Math.abs(rankForStep - currentSubRank)
               ),
+              rowHeight: focusedTargetIndex >= 0 ? EXPANDED_ROW_HEIGHT : ROW_HEIGHT,
               targetOffset: focusLast
                 ? undefined
                 : () =>
@@ -1225,6 +1249,50 @@ export function RankingsExplorer({
           active &&
           requestNavigationEpoch === navigationEpochRef.current
         ) {
+          if (focusMatch) {
+            void locateRanking(eventId, rankingType, regionSelection, focusMatch.personId, rankingSource, gender)
+              .then(({ located }) => {
+                if (
+                  !active ||
+                  requestNavigationEpoch !== navigationEpochRef.current
+                )
+                  return;
+                if (located) {
+                  pendingFocusNoticeRef.current = "";
+                  setFocusNotice("");
+                  resetToRank(located.subRank, false, located.personId);
+                  return;
+                }
+                const notice = "That person is not ranked for the selected event or filters.";
+                setFocusedExpandedPersonId("");
+                pendingPersonFocusRef.current = null;
+                pendingFocusNoticeRef.current = notice;
+                pendingRankRef.current = 1;
+                pendingScrollToTopRef.current = true;
+                pendingScrollDirectionRef.current = null;
+                pendingNavigationAppendRef.current = false;
+                preserveListDuringLoadRef.current = true;
+                setPreserveListDuringLoad(true);
+                setFocusNotice(notice);
+                setStartRank(1);
+                setPageReloadNonce((nonce) => nonce + 1);
+                finishPagerNavigation();
+              })
+              .catch((locateError: unknown) => {
+                if (
+                  !active ||
+                  requestNavigationEpoch !== navigationEpochRef.current
+                )
+                  return;
+                setError(
+                  locateError instanceof Error
+                    ? locateError.message
+                    : "Rankings are unavailable."
+                );
+                finishPagerNavigation();
+              });
+            return;
+          }
           if (shouldFallbackToTop) pendingFirstPageFallbackRef.current = false;
           setError(
             requestError instanceof Error
@@ -2118,14 +2186,19 @@ export function RankingsExplorer({
     entries[virtualRows[0]?.index ?? 0]?.subRank ?? startRank;
   const renderedRows = hydrated
     ? virtualRows
-    : entries.map((_, index) => ({
-        index,
-        start: index * ROW_HEIGHT,
-        key: index,
-      }));
+    : entries.map((_, index) => {
+        const start = entries
+          .slice(0, index)
+          .reduce((totalHeight, _entry, rowIndex) => totalHeight + estimatedRowHeight(rowIndex), 0);
+        return {
+          index,
+          start,
+          key: index,
+        };
+      });
   const renderedListHeight = hydrated
     ? rowVirtualizer.getTotalSize()
-    : entries.length * ROW_HEIGHT + (hasMore ? ROW_HEIGHT : 0);
+    : entries.reduce((totalHeight, _entry, index) => totalHeight + estimatedRowHeight(index), hasMore ? ROW_HEIGHT : 0);
 
   const resetToRank = useCallback(
     (rank: number, animate = true, focusedPersonId: string | null = null) => {
@@ -2223,6 +2296,7 @@ export function RankingsExplorer({
           requestedDuration: getScrollAnimationDuration(
             Math.abs(normalizedRank - currentRank)
           ),
+          rowHeight: focusedTargetIndex >= 0 ? EXPANDED_ROW_HEIGHT : ROW_HEIGHT,
           targetOffset: () =>
             (focusedPersonId
               ? getRenderedPersonTop(focusedPersonId)
@@ -2262,9 +2336,16 @@ export function RankingsExplorer({
       .then(({ located }) => {
         if (resolutionEpoch !== focusResolutionEpochRef.current) return;
         if (!located) {
+          const notice = "That person is not ranked for the selected event or filters.";
+          setFocusedExpandedPersonId("");
+          pendingFocusNoticeRef.current = notice;
+          setFocusNotice(notice);
           resetToRank(1, false);
           return;
         }
+        pendingFocusNoticeRef.current = "";
+        setFocusNotice("");
+        setFocusedExpandedPersonId(located.personId);
         resetToRank(
           located.subRank,
           animate,
@@ -2279,6 +2360,7 @@ export function RankingsExplorer({
 
   const focusMyRanking = useCallback((wcaId: string) => {
     focusedWcaIdRef.current = wcaId;
+    setFocusedExpandedPersonId(wcaId);
     updateQueryParams({ focus: "me", wcaId: null });
     lastFocusRequestRef.current = [
       eventId,
@@ -2291,6 +2373,30 @@ export function RankingsExplorer({
     focusWcaId(wcaId);
   }, [eventId, focusWcaId, rankingType, regionSelection]);
 
+  const updateFocusedPersonParam = useCallback((personId: string | null) => {
+    if (personId) {
+      lastFocusRequestRef.current = [
+        eventId,
+        rankingType,
+        regionSelection.scope,
+        regionSelection.regionId,
+        personId,
+        "",
+      ].join(":");
+      focusedWcaIdRef.current = personId;
+      setHighlightedPersonId(personId);
+      setFocusedExpandedPersonId(personId);
+      updateQueryParams({ wcaId: personId, focus: null });
+      return;
+    }
+    focusedWcaIdRef.current = "";
+    setHighlightedPersonId("");
+    setFocusedExpandedPersonId("");
+    pendingFocusNoticeRef.current = "";
+    setFocusNotice("");
+    updateQueryParams({ wcaId: null, focus: null });
+  }, [eventId, rankingType, regionSelection]);
+
   useEffect(() => {
     if (subject !== "people") return;
     const url = new URL(window.location.href);
@@ -2301,6 +2407,8 @@ export function RankingsExplorer({
 
     if (explicitWcaId) {
       lastFocusRequestRef.current = requestKey;
+      focusedWcaIdRef.current = explicitWcaId;
+      setFocusedExpandedPersonId(explicitWcaId);
       void Promise.resolve().then(() => {
         if (lastFocusRequestRef.current === requestKey)
           focusWcaId(explicitWcaId, false);
@@ -2311,6 +2419,7 @@ export function RankingsExplorer({
     if (focusedWcaIdRef.current) {
       lastFocusRequestRef.current = requestKey;
       const wcaId = focusedWcaIdRef.current;
+      setFocusedExpandedPersonId(wcaId);
       void Promise.resolve().then(() => {
         if (lastFocusRequestRef.current === requestKey)
           focusWcaId(wcaId, false);
@@ -2325,6 +2434,7 @@ export function RankingsExplorer({
         const { profile } = await response.json() as { profile: { wcaId: string } | null };
         if (!profile) throw new Error("Sign in with WCA to jump to your ranking.");
         focusedWcaIdRef.current = profile.wcaId;
+        setFocusedExpandedPersonId(profile.wcaId);
         lastFocusRequestRef.current = requestKey;
         focusWcaId(profile.wcaId, false);
       })
@@ -2935,6 +3045,7 @@ export function RankingsExplorer({
         <div className="outerListWrapper" ref={listRef}>
           <div className="listContainer">
             {listNotice && <div className="listMessage">{listNotice}</div>}
+            {focusNotice && <div className="listMessage listMessage--notice">{focusNotice}</div>}
             {listMembershipRequests && <ListMembershipRequestRows listId={listMembershipRequests.listId} initialRequests={listMembershipRequests.requests} />}
             {loadingPrevious && (
               <div className="listMessage">Loading earlier rankings…</div>
@@ -2965,6 +3076,7 @@ export function RankingsExplorer({
                 searchMatchPersonIds={searchMatchPersonIds}
                 highlightedPersonId={highlightedPersonId}
                 measureElement={rowVirtualizer.measureElement}
+                resizeRow={resizeVirtualRow}
                 onRowNavigate={handleRowNavigate}
                 memberSelectionMode={memberSelectionMode}
                 selectedMemberIds={selectedMemberIds}
@@ -2976,6 +3088,9 @@ export function RankingsExplorer({
                     y: Math.max(8, Math.min(position.y, window.innerHeight - 56)),
                   });
                 } : undefined}
+                enablePersonDetails={subject === "people" && WCA_EVENTS.some((event) => event.id === eventId)}
+                initialExpandedPersonId={subject === "people" ? focusedExpandedPersonId : ""}
+                onFocusedPersonChange={subject === "people" ? updateFocusedPersonParam : undefined}
               />
             )}
           </div>
@@ -3032,9 +3147,6 @@ export function RankingsExplorer({
         <span>
           {formatRankingsFreshness(exportDate)}
         </span>
-        {process.env.NODE_ENV !== "production" && (
-          <span className="debugScrollY">scrollY: {Math.round(debugScrollY)}</span>
-        )}
       </footer>
     </div>
   );

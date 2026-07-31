@@ -20,7 +20,7 @@ const thumbUrlCache = new LRUCache<string, string | null>({
   sizeCalculation: (value, key) => Buffer.byteLength(key) + (value ? Buffer.byteLength(value) : 0),
 });
 
-async function fetchWcaThumbs(search: string, personIds: string[], page = 1, limit = 10) {
+export async function fetchWcaThumbs(search: string, personIds: string[], page = 1, limit = 10) {
   const response = await fetch(`https://www.worldcubeassociation.org/api/v0/search?q=${encodeURIComponent(search)}&page=${page}&per_page=${limit}`, {
     headers: { Accept: "application/json", "User-Agent": "WCA Rankings person search" },
     signal: AbortSignal.timeout(2500),

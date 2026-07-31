@@ -14,6 +14,7 @@
 @import "./styles/search.css";
 @import "./styles/controls.css";
 @import "./styles/rankings.css";
+@import "./styles/profile.css";
 @import "./styles/vim.css";
 
 :root,:root[data-theme="light"],:root[data-theme="dark"],:root:not([data-theme]){--surface-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--search-match-hover:var(--search-match)}
@@ -23,7 +24,7 @@
 .listSettingsMenu{min-width:10.5rem}
 .listSettingsMenu>button{min-height:40px;padding:.4rem .55rem;border:0;border-radius:.4rem;background:transparent;color:var(--text-strong);cursor:pointer;font:inherit;text-align:left;white-space:nowrap}
 .listSettingsMenu>button:hover,.listSettingsMenu>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 6%,transparent);outline:2px solid var(--focus-ring);outline-offset:-2px}
-.row:has(.memberSelectionToggle){cursor:pointer;user-select:none}
+.rowHeader:has(.memberSelectionToggle){cursor:pointer;user-select:none}
 .row--contextMenu{user-select:none;-webkit-user-select:none}
 .memberSelectionToggle{width:36px;height:36px;font-size:1.125rem;line-height:1}
 .listMemberContextMenu{position:fixed;z-index:40;min-width:11rem;padding:.3rem;border:1px solid var(--border-subtle);border-radius:.6rem;background:var(--surface);box-shadow:0 8px 24px var(--shadow)}
@@ -294,14 +295,6 @@ main {
   box-shadow: none;
 }
 
-.debugScrollY {
-  margin-left: auto;
-  color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.75em;
-  font-variant-numeric: tabular-nums;
-}
-
 .themeToggle {
   display: inline-grid;
   width: 2.5em;
@@ -482,7 +475,7 @@ main {
 }
 
 @media only screen and (min-width: 1024px) {
-  .row {
+  .rowHeader {
     padding-left: 0.25em;
     padding-right: 0.75em;
   }
@@ -654,15 +647,4 @@ main {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-.debugScrollY {
-  position: fixed;
-  z-index: 11;
-  top: 0.75em;
-  left: 1em;
-  color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.75em;
-  pointer-events: none;
 }
