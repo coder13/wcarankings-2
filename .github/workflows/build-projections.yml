@@ -218,6 +218,7 @@ jobs:
           docker compose run --rm flyway migrate
           docker compose run --rm \
             -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+            -e FLYWAY_OUT_OF_ORDER=true \
             flyway migrate
           node scripts/projection-build-plan.mjs --groups="$SELECTED_GROUPS" > /tmp/projection-build-plan.json
           projection_names_csv=$(jq -r '.projectionNames | join(",")' /tmp/projection-build-plan.json)

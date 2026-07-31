@@ -85,6 +85,7 @@ jobs:
           docker compose run --rm flyway migrate
           docker compose run --rm \
             -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+            -e FLYWAY_OUT_OF_ORDER=true \
             flyway migrate
           docker compose run --rm flyway info
           docker compose run --rm \
