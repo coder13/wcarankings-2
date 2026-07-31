@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { useState } from "react";
 import type { RankingEntry } from "../RankingsExplorer/types";
 import { ResultsTable } from "./ResultsTable";
 
@@ -41,6 +42,39 @@ const entries: RankingEntry[] = [
   },
 ];
 
+function RearrangingStory() {
+  const [reversed, setReversed] = useState(false);
+  const orderedEntries = reversed ? [entries[2], entries[0], entries[1]] : entries;
+
+  return (
+    <div>
+      <button type="button" onClick={() => setReversed((value) => !value)}>
+        Rearrange rows
+      </button>
+      <ResultsTable
+        entries={orderedEntries}
+        renderedRows={orderedEntries.map((_, index) => ({
+          index,
+          key: index,
+          start: index * 65.45,
+        }))}
+        renderedListHeight={orderedEntries.length * 65.45}
+        listOffset={0}
+        eventId="333"
+        rankingType="single"
+        loading={false}
+        showLoading={false}
+        preserveListDuringLoad={false}
+        hasMore={false}
+        loadingMore={false}
+        highlightedPersonId=""
+        measureElement={() => undefined}
+        onRowNavigate={() => undefined}
+      />
+    </div>
+  );
+}
+
 const meta = {
   title: "Core UI/Molecules/ResultsTable",
   component: ResultsTable,
@@ -67,5 +101,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+export const Rearranging: Story = { render: () => <RearrangingStory /> };
 export const Loading: Story = { args: { loading: true } };
 export const Highlighted: Story = { args: { highlightedPersonId: "2024TIED02" } };
