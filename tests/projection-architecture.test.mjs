@@ -58,6 +58,12 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /projectionBuildPlan/);
   assert.match(schema, /WCA_PROJECTION_BUILD_CONCURRENCY/);
   assert.match(schema, /buildRegisteredProjectionsConcurrently/);
+  assert.match(schema, /runDependencyAwareTasks/);
+  assert.match(schema, /COMPATIBILITY_PROJECTION_TASKS/);
+  assert.match(schema, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-single/);
+  assert.match(schema, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-average/);
+  assert.match(schema, /compatibility-result-counts[\s\S]*compatibility-result-entries-single/);
+  assert.match(schema, /process\.env\.WCA_PROJECTION_BUILD_CONCURRENCY \?\? 2/);
   assert.match(schema, /createConnection/);
   assert.match(schema, /build:/);
   assert.match(schema, /validate:/);
