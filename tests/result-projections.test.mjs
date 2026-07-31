@@ -40,6 +40,7 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(schema, /\(\?!\[A-Za-z0-9_\]\)/);
   assert.doesNotMatch(schema, /replaceAll\(table, `\$\{table\}\$\{suffix\}`\)/);
   assert.match(schema, /idx_results_single_event_best/);
+  assert.match(schema, /Skipping \$\{table\} index \$\{name\}; table is not present/);
   assert.match(importer, /result_entries_single_staging/);
   assert.match(importer, /result_counts_staging/);
   assert.match(importer, /published_result_count/);

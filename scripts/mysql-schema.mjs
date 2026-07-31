@@ -437,6 +437,14 @@ async function ensureIndexes(connection, indexes) {
       process.stdout.write(`Skipping large results index ${name} in constrained mode\n`);
       continue;
     }
+    const [tables] = await connection.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
+      [table],
+    );
+    if (tables.length === 0) {
+      process.stdout.write(`Skipping ${table} index ${name}; table is not present\n`);
+      continue;
+    }
     const [existing] = await connection.query(
       "SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ? LIMIT 1",
       [table, name],
