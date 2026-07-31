@@ -55,7 +55,7 @@
 @media (hover:hover){:where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(.97);outline:0}}
 @media (hover:hover){:root[data-theme="dark"] :where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(1.08)}}
 @media (prefers-color-scheme:dark){@media (hover:hover){:root:not([data-theme]) :where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(1.08)}}}
-.stickyRankingsRail{--list-owner-control-height:calc(52px - (12px * var(--rail-scroll-progress, 0)))}
+.stickyRankingsRail{--rail-lift-progress:clamp(0,calc(var(--rail-scroll-progress,0) * 2),1);--rail-shrink-progress:clamp(0,calc((var(--rail-scroll-progress,0) - .5) * 2),1);--list-owner-control-height:calc(52px - (12px * var(--rail-shrink-progress)))}
 .stickyRankingsRail>.listOwnerControls{top:0}
 .stickyRankingsRail>.listOwnerControls>button{display:grid;width:var(--list-owner-control-height);height:var(--list-owner-control-height);min-height:var(--list-owner-control-height);padding:0;place-items:center;border-radius:50%;background:transparent;box-shadow:none}
 .stickyRankingsRail>.listOwnerControls>button:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:0}
@@ -276,12 +276,18 @@ main {
 .stickyRankingsRail > .RankingsRailTransition > .Jump {
   background: var(--surface);
   box-shadow:
-    0 calc(1px * (1 - var(--rail-scroll-progress)))
-      calc(4px * (1 - var(--rail-scroll-progress))) var(--shadow-soft),
-    0 calc(7px * var(--rail-scroll-progress))
-      calc(24px * var(--rail-scroll-progress)) var(--shadow);
-  transform: translateY(calc(-6px * var(--rail-scroll-progress)));
+    0 calc(1px * (1 - var(--rail-lift-progress)))
+      calc(4px * (1 - var(--rail-lift-progress))) var(--shadow-soft),
+    0 calc(7px * var(--rail-lift-progress))
+      calc(24px * var(--rail-lift-progress)) var(--shadow);
+  transform: translateY(calc(-6px * var(--rail-lift-progress)));
   transition: none;
+}
+
+@media (max-width: 600px) {
+  .stickyRankingsRail {
+    --list-owner-control-height: calc(48px - (4px * var(--rail-shrink-progress)));
+  }
 }
 
 .stickyRankingsRail > .RankingsRailTransition,
