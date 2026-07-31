@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { AnimatePresence, MotionConfig, motion, useIsPresent } from "motion/react";
 import { EventPicker, type EventPickerOption } from "../EventPicker/EventPicker";
 import { RegionPicker } from "../RegionPicker/RegionPicker";
 import ArrowDownIcon from "../Icon/arrow-down.svg?react";
@@ -16,12 +17,37 @@ type AuthProfileResponse = {
   profile: { wcaId: string } | null;
 };
 
+const railLayoutTransition = { type: "spring", stiffness: 520, damping: 42, mass: 0.55 } as const;
+
 export const RankingsRail = forwardRef<HTMLDivElement, { children: ReactNode; className?: string; direction: "up" | "down"; searchNavigation?: boolean; compactResultType?: boolean }>(
-  ({ children, className = "", direction, searchNavigation, compactResultType }, ref) => (
-    <div ref={ref} className={`Jump RankingsRail ${className}`} data-direction={direction} data-search-navigation={searchNavigation || undefined} data-compact-result-type={compactResultType || undefined}>
-      {children}
-    </div>
-  )
+  ({ children, className = "", direction, searchNavigation, compactResultType }, ref) => {
+    const isPresent = useIsPresent();
+
+    return (
+      <MotionConfig reducedMotion="user">
+        <motion.div
+          ref={ref}
+          layout
+          initial={false}
+          animate={{
+            opacity: isPresent ? 1 : 0,
+            scale: isPresent ? 1 : 0.97,
+          }}
+          transition={{
+            layout: railLayoutTransition,
+            opacity: { duration: 0.14, ease: "easeOut" },
+            scale: { duration: 0.14, ease: "easeOut" },
+          }}
+          className={`Jump RankingsRail ${className}`}
+          data-direction={direction}
+          data-search-navigation={searchNavigation || undefined}
+          data-compact-result-type={compactResultType || undefined}
+        >
+          {children}
+        </motion.div>
+      </MotionConfig>
+    );
+  }
 );
 
 RankingsRail.displayName = "RankingsRail";
@@ -76,13 +102,15 @@ function RailSearch({ searchInputRef, findOpen, findQuery, findError, findLoadin
     onSearchOpen();
   };
 
+  const isExpanded = findOpen || Boolean(findQuery);
+
   return (
-    <div ref={searchBarRef} className="findBar findBar--rail" data-open={findOpen} data-has-text={findQuery.length > 0} role="search">
+    <motion.div layout className="findBar findBar--rail" ref={searchBarRef} data-open={findOpen} data-has-text={findQuery.length > 0} role="search" animate={{ scale: isExpanded ? 1 : 0.985 }} transition={{ layout: railLayoutTransition, scale: { duration: 0.16, ease: "easeOut" } }}>
       <button className="findIcon" type="button" onMouseDown={(event) => event.preventDefault()} onClick={openSearch} aria-label="Search names or WCA IDs" title="Search names or WCA IDs (Ctrl+F)"><SearchIcon /></button>
       <input ref={inputRef} className="findInput" type="text" tabIndex={findOpen || findQuery ? 0 : -1} value={findQuery} onChange={(event) => onSearchQueryChange(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") { event.preventDefault(); onSearchCycle(event.shiftKey ? -1 : 1); } }} aria-label="Find a name or WCA ID" />
       <span className={`findStatus${findError ? " isError" : ""}`} aria-live="polite">{findLoading || findPending ? <span className="searchSpinner" aria-label="Searching" /> : status}</span>
       <button className="findClose" type="button" tabIndex={findOpen || findQuery ? 0 : -1} onMouseDown={(event) => event.preventDefault()} onClick={() => { inputRef.current?.blur(); onSearchClose(); }} aria-label="Close search"><CloseIcon /></button>
-    </div>
+    </motion.div>
   );
 }
 
@@ -113,7 +141,13 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
   const nextType = rankingType === "single" ? "average" : "single";
   return (
     <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType}>
-      <div className="Jump-railSettings">
+      <motion.div
+        layout
+        className="Jump-railSettings"
+        animate={{ opacity: findOpen || Boolean(findQuery) ? 0 : 1 }}
+        transition={{ layout: railLayoutTransition, opacity: { duration: 0.16, ease: "easeOut" } }}
+        aria-hidden={findOpen || Boolean(findQuery) ? true : undefined}
+      >
         {showEventPicker ? (
           <EventPicker event={event} options={eventOptions} additionalOptions={additionalEventOptions} onChange={onEventChange} onTriggerReady={onEventPickerTrigger} />
         ) : hemisphere ? (
@@ -128,7 +162,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
         {showGender && <GenderPicker className="Jump-genderPicker" value={gender} onChange={onGenderChange} />}
         {showRegion && <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} disabled={regionDisabled} />}
         {listAddAction && <button className="Jump-listAddButton" type="button" onClick={listAddAction}>+ Add</button>}
-      </div>
+      </motion.div>
       {showSearch && <RailSearch {...searchProps} />}
     </RankingsRail>
   );
@@ -157,17 +191,43 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
 
   const nearTop = currentPosition <= 5000;
   const nearEnd = Number.isFinite(total) && currentPosition >= total - 5000;
-  return <RankingsRail className="Jump--pager" direction="down" searchNavigation={searchActive}>
-    <div className="Jump-pagerActions" aria-hidden={searchActive}>
-      <button className="Jump-pagerButton" onClick={onJumpUp} type="button" disabled={searchActive || busy}><span>{upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}</span><ArrowUpIcon /></button>
-      {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={searchActive || busy} aria-label="Jump to my ranking"><span>My rank</span></button>}
-      <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={searchActive || busy}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></button>
-    </div>
-    <div className="Jump-searchNavigation" aria-hidden={!searchActive}><div className="Jump-searchNavigationContent">
-      <button className="Jump-searchNavigationButton" onClick={onSearchPrevious} type="button" disabled={!searchActive}><ArrowUpIcon /><span>Previous person</span></button>
-      <button className="Jump-searchNavigationButton" onClick={onSearchNext} type="button" disabled={!searchActive}><span>Next person</span><ArrowDownIcon /></button>
-    </div></div>
-  </RankingsRail>;
+  return (
+    <RankingsRail className="Jump--pager" direction="down" searchNavigation={searchActive}>
+      <AnimatePresence initial={false} mode="wait">
+        {searchActive ? (
+          <motion.div
+            key="search-navigation"
+            className="Jump-searchNavigation"
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -8 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            aria-hidden={false}
+            style={{ pointerEvents: "auto" }}
+          >
+            <div className="Jump-searchNavigationContent">
+              <button className="Jump-searchNavigationButton" onClick={onSearchPrevious} type="button"><ArrowUpIcon /><span>Previous person</span></button>
+              <button className="Jump-searchNavigationButton" onClick={onSearchNext} type="button"><span>Next person</span><ArrowDownIcon /></button>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="pager-actions"
+            className="Jump-pagerActions"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            aria-hidden={false}
+          >
+            <button className="Jump-pagerButton" onClick={onJumpUp} type="button" disabled={busy}><span>{upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}</span><ArrowUpIcon /></button>
+            {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={busy} aria-label="Jump to my ranking"><span>My rank</span></button>}
+            <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={busy}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </RankingsRail>
+  );
 }
 
 export function ListBrowseControlsRail({ query, onQueryChange }: {
