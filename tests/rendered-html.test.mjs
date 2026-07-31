@@ -304,9 +304,10 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(globalCss, /--edge-blur-filter:\s*blur\(10px\) saturate\(0\.9\)/);
   assert.match(globalCss, /--edge-blur-start-level:\s*1;/);
-  assert.match(globalCss, /--edge-blur-end-level:\s*0;/);
+  assert.match(globalCss, /--edge-blur-end-level:\s*[\d.]+;/);
+  assert.match(globalCss, /@media \(max-width:\s*600px\)[\s\S]*--phone-system-bar-color:\s*#fffcff;[\s\S]*--edge-blur-color:\s*var\(--phone-system-bar-color\)/);
   assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before,[\s\S]*width:\s*100vw;[\s\S]*backdrop-filter:\s*var\(--edge-blur-filter\)/);
-  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before\s*\{[\s\S]*top:\s*-1em;[\s\S]*bottom:\s*-1em;/);
+  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before\s*\{[\s\S]*top:\s*calc\(-1em - var\(--edge-blur-top-overlap\)\);[\s\S]*bottom:\s*calc\(0px - var\(--edge-blur-top-extension\)\);/);
   assert.match(globalCss, /\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\)\s*>\s*\.RankingsRailTransition::before\s*\{[\s\S]*top:\s*-1em;[\s\S]*--jump-controls-bottom-offset/);
   assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before\s*\{[^}]*mask-image:\s*linear-gradient\(\s*to bottom/);
   assert.match(globalCss, /\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\)\s*>\s*\.RankingsRailTransition::before\s*\{[^}]*mask-image:\s*linear-gradient\(\s*to top/);
@@ -331,15 +332,16 @@ test("binds rail scroll progress directly to Motion scroll state", async () => {
   assert.match(component, /style\.setProperty\("--rail-scroll-progress", String\(progress\)\)/);
 });
 
-test("uses a symmetric 160ms pager layout transition", async () => {
-  const component = await readFile(
-    new URL("../components/RankingsRail/RankingsRail.tsx", import.meta.url),
-    "utf8",
-  );
+test("uses a stable pager width with 160ms cubic-enter content transitions", async () => {
+  const [component, css] = await Promise.all([
+    readFile(new URL("../components/RankingsRail/RankingsRail.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/RankingsRail/RankingsRail.css", import.meta.url), "utf8"),
+  ]);
 
-  assert.match(component, /const pagerLayoutTransition = \{ duration: 0\.16,/);
-  assert.match(component, /layout: pagerLayoutTransition,[\s\S]*opacity: pagerLayoutTransition,[\s\S]*scale: pagerLayoutTransition/);
-  assert.match(component, /transition=\{\{ layout: pagerLayoutTransition \}\}/);
+  assert.match(component, /const cubicEnter = \[0, 0, 0\.2, 1\]/);
+  assert.match(component, /duration: 0\.16, ease: cubicEnter/);
+  assert.match(css, /\.Jump-pagerButton--up \{[^}]*width: 9\.5em;/);
+  assert.doesNotMatch(css, /\.Jump-pagerButton--up \{[^}]*transition: width/);
 });
 
 test("hides the site footer after leaving the top of the rankings", async () => {

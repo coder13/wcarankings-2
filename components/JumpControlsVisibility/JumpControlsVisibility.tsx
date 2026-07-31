@@ -24,6 +24,11 @@ export function JumpControlsVisibility({
   const [isInteractive, setIsInteractive] = useState(() => activeProgress.get() >= 0.99);
 
   useEffect(() => fallbackProgress.set(resolvedProgress), [fallbackProgress, resolvedProgress]);
+  useEffect(() => {
+    const nextProgress = activeProgress.get();
+    setIsVisible(nextProgress > 0);
+    setIsInteractive(nextProgress >= 0.99);
+  }, [activeProgress]);
   useMotionValueEvent(activeProgress, "change", (nextProgress) => {
     setIsVisible((current) => current === nextProgress > 0 ? current : nextProgress > 0);
     setIsInteractive((current) => current === nextProgress >= 0.99 ? current : nextProgress >= 0.99);

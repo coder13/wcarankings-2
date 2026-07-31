@@ -33,7 +33,9 @@ export function useRailScrollProgress({
         setTopCompact(nextTopCompact);
       }
       const distanceToEnd = Math.max(0, document.documentElement.scrollHeight - (window.scrollY + window.innerHeight));
-      const nextBottom = Math.max(0, Math.min(1, distanceToEnd / revealDistance));
+      const nextBottom = nextAtTop
+        ? 0
+        : Math.max(0, Math.min(1, distanceToEnd / revealDistance));
       if (nextBottom !== bottomRef.current) {
         bottomRef.current = nextBottom;
         bottomProgress.set(nextBottom);

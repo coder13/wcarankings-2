@@ -19,7 +19,7 @@ type AuthProfileResponse = {
 };
 
 const railLayoutTransition = { type: "spring", stiffness: 520, damping: 42, mass: 0.55 } as const;
-const pagerLayoutTransition = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
+const cubicEnter = [0, 0, 0.2, 1] as const;
 
 export const RankingsRail = forwardRef<HTMLDivElement, { children: ReactNode; className?: string; direction: "up" | "down"; searchNavigation?: boolean; compactResultType?: boolean; animateLayout?: boolean }>(
   ({ children, className = "", direction, searchNavigation, compactResultType, animateLayout = false }, ref) => {
@@ -190,7 +190,6 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
 
   const nearTop = currentPosition <= 5000;
   const nearEnd = Number.isFinite(total) && currentPosition >= total - 5000;
-  const showJumpUp = currentPosition > RESULTS_PAGE_SIZE;
   return (
     <RankingsRail className="Jump--pager" direction="down" searchNavigation={searchActive}>
       <AnimatePresence initial={false} mode="wait">
@@ -201,7 +200,10 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.16, ease: "easeOut" }}
+            transition={{
+              opacity: { duration: 0.16, ease: cubicEnter },
+              x: { duration: 0.16, ease: cubicEnter },
+            }}
             aria-hidden={false}
             style={{ pointerEvents: "auto" }}
           >
@@ -214,40 +216,28 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
           <motion.div
             key="pager-actions"
             className="Jump-pagerActions"
-            layout
-            layoutDependency={showJumpUp}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16, ease: "easeOut" }}
+            transition={{
+              opacity: { duration: 0.16, ease: cubicEnter },
+              y: { duration: 0.16, ease: cubicEnter },
+            }}
             aria-hidden={false}
           >
-            <AnimatePresence initial={false} mode="popLayout">
-              {showJumpUp && (
-                <motion.button
-                  key="jump-up"
-                  layout
-                  layoutDependency={showJumpUp}
-                  className="Jump-pagerButton"
-                  initial={{ opacity: 0, scaleX: 0.7 }}
-                  animate={{ opacity: 1, scaleX: 1 }}
-                  exit={{ opacity: 0, scaleX: 0.7 }}
-                  transition={{
-                    layout: pagerLayoutTransition,
-                    opacity: pagerLayoutTransition,
-                    scale: pagerLayoutTransition,
-                  }}
-                  style={{ transformOrigin: "left center" }}
-                  onClick={onJumpUp}
-                  type="button"
-                  disabled={busy}
-                >
-                  <span>{upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}</span><ArrowUpIcon />
-                </motion.button>
-              )}
-            </AnimatePresence>
+            <button
+              className="Jump-pagerButton Jump-pagerButton--up"
+              aria-label={upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}
+              onClick={onJumpUp}
+              type="button"
+              disabled={busy && !upArmed}
+            >
+              <span className="Jump-pagerButtonContent">
+                <span>{upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}</span><ArrowUpIcon />
+              </span>
+            </button>
             {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={busy} aria-label="Jump to my ranking"><span>My rank</span></button>}
-            <motion.button layout layoutDependency={showJumpUp} transition={{ layout: pagerLayoutTransition }} className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={busy}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></motion.button>
+            <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={busy && !downArmed}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></button>
           </motion.div>
         )}
       </AnimatePresence>

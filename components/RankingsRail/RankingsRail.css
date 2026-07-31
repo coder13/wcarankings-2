@@ -178,9 +178,13 @@
 .Jump .findBar--rail .findStatus { padding-right: 0; }
 
 .Jump--pager { display: grid; overflow: hidden; }
-.Jump-pagerActions, .Jump-searchNavigationContent { display: flex; width: min(26em, calc(100vw - 2em)); min-width: 0; }
-.Jump-pagerActions { grid-area: 1 / 1; opacity: 1; }
-.Jump-pagerButton, .Jump-searchNavigationButton { flex: 1; }
+.Jump-pagerActions, .Jump-searchNavigationContent { display: flex; min-width: 0; }
+.Jump-pagerActions { grid-area: 1 / 1; width: max-content; max-width: calc(100vw - 2em); opacity: 1; }
+.Jump-searchNavigationContent { width: min(26em, calc(100vw - 2em)); }
+.Jump-pagerButton { flex: 0 0 auto; }
+.Jump-pagerButton--up { box-sizing: border-box; width: 9.5em; min-width: 40px; overflow: hidden; padding: 0; }
+.Jump-pagerButtonContent { display: flex; width: 9.5em; height: 100%; flex: 0 0 9.5em; align-items: center; justify-content: center; gap: .5em; }
+.Jump-searchNavigationButton { flex: 1; }
 .Jump-pagerButton svg { flex: 0 0 auto; }
 .Jump-pagerButton--me { padding-inline: .375em; text-align: center; }
 .Jump-pagerButton + .Jump-pagerButton, .Jump-searchNavigationButton + .Jump-searchNavigationButton { border-left: 1px solid var(--border-subtle); }

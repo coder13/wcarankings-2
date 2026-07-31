@@ -683,12 +683,13 @@ export function RankingsExplorer({
   const [vimSearchQuery, setVimSearchQuery] = useState(
     initialRegexSearch ? initialSearch : ""
   );
+  const [jumpUpArmed, setJumpUpArmed] = useState(false);
+  const [jumpDownArmed, setJumpDownArmed] = useState(false);
   const [pagerNavigationBusy, setPagerNavigationBusy] = useState(false);
   const [memberRemovalOpen, setMemberRemovalOpen] = useState(false);
   const [memberRemovalBusy, setMemberRemovalBusy] = useState(false);
   const [memberRemovalError, setMemberRemovalError] = useState("");
   const [memberRemovalPersonIds, setMemberRemovalPersonIds] = useState<string[]>([]);
-  const [footerHeight, setFooterHeight] = useState(0);
   const [memberContextMenu, setMemberContextMenu] = useState<{
     personId: string;
     x: number;
@@ -706,7 +707,6 @@ export function RankingsExplorer({
     regionSelection.regionId,
   ].join(":");
   const listRef = useRef<HTMLDivElement>(null);
-  const footerRef = useRef<HTMLElement>(null);
   const stickyRankingsRailRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
   useMotionValueEvent(scrollY, "change", (scrollPosition) => {
@@ -715,15 +715,6 @@ export function RankingsExplorer({
   });
   const railFindInputRef = useRef<HTMLInputElement>(null);
 
-  useLayoutEffect(() => {
-    const footer = footerRef.current;
-    if (!footer) return;
-    const measureFooter = () => setFooterHeight(footer.getBoundingClientRect().height);
-    measureFooter();
-    const observer = new ResizeObserver(measureFooter);
-    observer.observe(footer);
-    return () => observer.disconnect();
-  }, []);
   const setRailFindInputRef = useCallback((input: HTMLInputElement | null) => {
     railFindInputRef.current = input;
   }, []);
@@ -744,6 +735,10 @@ export function RankingsExplorer({
   const pendingScrollDirectionRef = useRef<-1 | 1 | null>(null);
   const pendingNavigationAppendRef = useRef(false);
   const navigationTargetRankRef = useRef<number | null>(null);
+  const jumpUpArmedRef = useRef(false);
+  const jumpUpTimerRef = useRef<number | null>(null);
+  const jumpDownArmedRef = useRef(false);
+  const jumpDownTimerRef = useRef<number | null>(null);
   const pagerNavigationBusyRef = useRef(false);
   const preserveListDuringLoadRef = useRef(false);
   const initialPageKeyRef = useRef(
@@ -2564,20 +2559,82 @@ export function RankingsExplorer({
   }, []);
 
   const handleJumpUp = () => {
+    if (jumpUpArmedRef.current) {
+      if (jumpUpTimerRef.current !== null)
+        window.clearTimeout(jumpUpTimerRef.current);
+      jumpUpTimerRef.current = null;
+      jumpUpArmedRef.current = false;
+      setJumpUpArmed(false);
+      resetToRank(1);
+      return;
+    }
     if (pagerNavigationBusyRef.current) return;
     pagerNavigationBusyRef.current = true;
     setPagerNavigationBusy(true);
     const baseRank = getNavigationBaseSubRank();
+    if (baseRank <= 5_000) {
+      resetToRank(1);
+      return;
+    }
+    if (jumpDownTimerRef.current !== null)
+      window.clearTimeout(jumpDownTimerRef.current);
+    jumpDownTimerRef.current = null;
+    jumpDownArmedRef.current = false;
+    setJumpDownArmed(false);
+    jumpUpArmedRef.current = true;
+    setJumpUpArmed(true);
+    jumpUpTimerRef.current = window.setTimeout(() => {
+      jumpUpTimerRef.current = null;
+      jumpUpArmedRef.current = false;
+      setJumpUpArmed(false);
+    }, 500);
     resetToRank(getPagerJumpTarget(baseRank, -1, total));
   };
 
   const handleJumpDown = () => {
+    if (jumpDownArmedRef.current) {
+      if (jumpDownTimerRef.current !== null)
+        window.clearTimeout(jumpDownTimerRef.current);
+      jumpDownTimerRef.current = null;
+      jumpDownArmedRef.current = false;
+      setJumpDownArmed(false);
+      jumpToEnd();
+      return;
+    }
     if (pagerNavigationBusyRef.current) return;
     pagerNavigationBusyRef.current = true;
     setPagerNavigationBusy(true);
     const baseRank = getNavigationBaseSubRank();
+    if (Number.isFinite(total) && baseRank >= total - 5_000) {
+      jumpToEnd();
+      return;
+    }
+    if (jumpUpTimerRef.current !== null)
+      window.clearTimeout(jumpUpTimerRef.current);
+    jumpUpTimerRef.current = null;
+    jumpUpArmedRef.current = false;
+    setJumpUpArmed(false);
+    jumpDownArmedRef.current = true;
+    setJumpDownArmed(true);
+    jumpDownTimerRef.current = window.setTimeout(() => {
+      jumpDownTimerRef.current = null;
+      jumpDownArmedRef.current = false;
+      setJumpDownArmed(false);
+    }, 500);
     resetToRank(getPagerJumpTarget(baseRank, 1, total));
   };
+
+  useEffect(
+    () => () => {
+      if (jumpUpTimerRef.current !== null)
+        window.clearTimeout(jumpUpTimerRef.current);
+      if (jumpDownTimerRef.current !== null)
+        window.clearTimeout(jumpDownTimerRef.current);
+      jumpUpArmedRef.current = false;
+      jumpDownArmedRef.current = false;
+    },
+    []
+  );
 
   const jumpToEndRef = useRef(jumpToEnd);
   useEffect(() => {
@@ -3128,13 +3185,12 @@ export function RankingsExplorer({
         </div>
 
         {!memberSelectionMode && (!rankingSource || total > PAGE_SIZE) && <JumpControlsVisibility
-          progress={pagerNavigationBusy ? 1 : undefined}
-          progressValue={pagerNavigationBusy ? undefined : bottomRailProgress}
-          bottomOffset={footerAtTop ? footerHeight : 0}
+          progress={footerAtTop ? 0 : pagerNavigationBusy ? 1 : undefined}
+          progressValue={footerAtTop || pagerNavigationBusy ? undefined : bottomRailProgress}
         >
           <RankingsPagerRail
-            upArmed={false}
-            downArmed={false}
+            upArmed={jumpUpArmed}
+            downArmed={jumpDownArmed}
             busy={pagerNavigationBusy}
             currentPosition={visibleSubRank}
             total={total}
@@ -3174,7 +3230,7 @@ export function RankingsExplorer({
       {(vimMode || vimSearchActive) && vimHelpOpen && (
         <VimHelp onClose={() => setVimHelpOpen(false)} />
       )}
-      <footer ref={footerRef} className="siteFooter" data-at-top={footerAtTop} aria-hidden={!footerAtTop}>
+      <footer className="siteFooter" data-at-top={footerAtTop} aria-hidden={!footerAtTop}>
         <span>By Adam Walker and Cailyn Sinclair</span>
         {offlineStale && <span role="status">Offline cached rankings may be stale</span>}
         <span>

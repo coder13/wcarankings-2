@@ -14,10 +14,15 @@ test("renders paired pager actions with useful labels", () => {
   assert.match(markup, /data-direction="down"/);
 });
 
-test("keeps the down action full width until the second page", () => {
+test("shows both pager actions from the first page", () => {
   const markup = renderToStaticMarkup(<RankingsPagerRail upArmed={false} downArmed={false} currentPosition={50} total={10_000} onJumpUp={() => undefined} onJumpDown={() => undefined} searchActive={false} onSearchPrevious={() => undefined} onSearchNext={() => undefined} />);
-  assert.doesNotMatch(markup, /Jump to top/);
+  assert.match(markup, /aria-label="Jump to top"/);
   assert.match(markup, /Down 5,000/);
+});
+
+test("keeps an armed jump-to-end action available while navigation settles", () => {
+  const markup = renderToStaticMarkup(<RankingsPagerRail upArmed={false} downArmed busy currentPosition={5_001} total={100_000} onJumpUp={() => undefined} onJumpDown={() => undefined} searchActive={false} onSearchPrevious={() => undefined} onSearchNext={() => undefined} />);
+  assert.match(markup, /<button class="Jump-pagerButton"><svg[\s\S]*?Jump to end/);
 });
 
 test("disables pager actions while a jump is settling", () => {
