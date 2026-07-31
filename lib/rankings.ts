@@ -146,12 +146,12 @@ async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata) {
       LEFT JOIN countries country ON country.id = facts.person_country_id
       LEFT JOIN competitions competition ON competition.id = facts.competition_id
       WHERE ${conditions.join(" AND ")} AND ranking.position >= ? AND ranking.position < ?
-      ORDER BY ranking.position`, [...values, input.startRank, input.startRank + PAGE_SIZE], { rankingStatementTimeout: true });
+      ORDER BY ranking.position`, [...values, input.startRank, input.startRank + PAGE_SIZE]);
     return { data: normalPageResponse(result.rows, input, metadata), timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
   }
   const { rank, subRank, conditions, values } = filters(input);
   const pageValues = [...values, input.startRank, input.startRank + PAGE_SIZE];
-  const result = await query<RankingRow>(`SELECT ${columns(rank, subRank)} FROM ${table(input.type)} WHERE ${conditions.join(" AND ")} AND ${subRank} >= ? AND ${subRank} < ? ORDER BY ${subRank}`, pageValues, { rankingStatementTimeout: true });
+  const result = await query<RankingRow>(`SELECT ${columns(rank, subRank)} FROM ${table(input.type)} WHERE ${conditions.join(" AND ")} AND ${subRank} >= ? AND ${subRank} < ? ORDER BY ${subRank}`, pageValues);
   return { data: normalPageResponse(result.rows, input, metadata), timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
 }
 

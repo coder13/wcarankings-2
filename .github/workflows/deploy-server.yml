@@ -211,7 +211,41 @@ jobs:
             docker tag 'wcarankings-data-tools:${SOURCE_SHA}' wcarankings-data-tools:latest
             cd /srv/wcarankings
             docker compose run --rm data-tools /app/scripts/prepare-flyway-history.mjs
-            docker compose run --rm flyway migrate"
+            docker compose run --rm flyway migrate
+            docker compose exec -T db sh -c '
+              mariadb --user="\$MARIADB_USER" --password="\$MARIADB_PASSWORD" "\$MARIADB_DATABASE" --execute="
+                CREATE TABLE IF NOT EXISTS result_attempts (
+                  result_id BIGINT NOT NULL,
+                  attempt_number INT NOT NULL
+                );
+              "
+            '
+            docker compose run --rm \
+              -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+              -e FLYWAY_TABLE=flyway_schema_history_results \
+              -e FLYWAY_OUT_OF_ORDER=true \
+              flyway migrate
+            db_container=\$(docker compose ps -q db)
+            cool_samples=0
+            attempt=1
+            while [ "\$attempt" -le 60 ]; do
+              cpu=\$(docker stats --no-stream --format '{{.CPUPerc}}' "\$db_container" | tr -d '%')
+              if printf '%s\n' "\$cpu" | grep -Eq '^[0-9]+([.][0-9]+)?\$' \
+                && awk "BEGIN { exit !(\$cpu < 50) }"; then
+                cool_samples=\$((cool_samples + 1))
+                echo "MariaDB cooldown sample \${cool_samples}/3: \${cpu}% CPU."
+                if [ "\$cool_samples" -ge 3 ]; then break; fi
+              else
+                cool_samples=0
+                echo "MariaDB is still settling after migrations: \${cpu:-unknown}% CPU."
+              fi
+              if [ "\$attempt" -eq 60 ]; then
+                echo 'MariaDB did not cool below 50% CPU before server cutover.' >&2
+                exit 1
+              fi
+              attempt=\$((attempt + 1))
+              sleep 5
+            done"
           echo "CANDIDATE_STAGED=true" >> "$GITHUB_ENV"
 
       - name: Inject failure after migrations

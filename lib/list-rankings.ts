@@ -136,7 +136,6 @@ async function loadScopedRankings(
      ORDER BY sub_rank
      LIMIT ?`,
     [input.eventId, ...scopedValues, ...values],
-    { rankingStatementTimeout: true },
   );
 
   const selectedRows = result.rows.slice(0, input.locate ? 1 : input.limit);

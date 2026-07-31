@@ -276,6 +276,27 @@ jobs:
                 "/tmp/wcarankings-${ARTIFACT_ID}-raw.sql.zip" \
                 "$release_file"
             }
+            wait_for_database_cooldown() {
+              db_container=$(docker compose ps -q db)
+              cool_samples=0
+              attempt=1
+              while [ "$attempt" -le 60 ]; do
+                cpu=$(docker stats --no-stream --format '{{.CPUPerc}}' "$db_container" | tr -d '%')
+                if printf '%s\n' "$cpu" | grep -Eq '^[0-9]+([.][0-9]+)?$' \
+                  && awk "BEGIN { exit !($cpu < 50) }"; then
+                  cool_samples=$((cool_samples + 1))
+                  echo "MariaDB cooldown sample ${cool_samples}/3: ${cpu}% CPU."
+                  if [ "$cool_samples" -ge 3 ]; then return 0; fi
+                else
+                  cool_samples=0
+                  echo "MariaDB is still settling after projection preparation: ${cpu}% CPU."
+                fi
+                attempt=$((attempt + 1))
+                sleep 5
+              done
+              echo "MariaDB did not cool below 50% CPU for three consecutive samples." >&2
+              return 1
+            }
             rollback_on_failure() {
               status=$?
               if [ -n "$heartbeat_pid" ]; then kill "$heartbeat_pid" 2>/dev/null || true; fi
@@ -407,6 +428,7 @@ jobs:
             fi
 
             if [ "$phase" = projections_prepared ]; then
+              wait_for_database_cooldown
               docker compose run --rm -T \
                 -e FAILURE_INJECTION_POINT="$FAILURE_INJECTION_POINT" \
                 data-tools /app/scripts/activate-ranking-generation.mjs activate \
