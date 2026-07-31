@@ -27,6 +27,7 @@ CREATE TABLE round_types (
 CREATE TABLE competitions (
   id VARCHAR(50) NOT NULL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
+  venue VARCHAR(255) NOT NULL DEFAULT '',
   city_name VARCHAR(100) NOT NULL,
   country_id VARCHAR(50) NOT NULL,
   year SMALLINT NOT NULL,

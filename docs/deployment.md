@@ -56,18 +56,15 @@ SSH. Those scripts are packaged in the approved data-tools image for GitHub
 Actions-controlled deploy/refresh commands and local development only; they are
 not present in the application image.
 
-To keep the self-hosted database current, use the `Refresh Ranking Data` GitHub
-Actions workflow. It runs daily at 05:17 UTC and can also be started manually
-from the Actions tab. The manual run has one control:
+To keep the self-hosted database current, use the `Projection Release` GitHub
+Actions workflow. It runs daily at 05:17 UTC, runs semantic change detection on
+main pushes, and can also be started manually from the Actions tab. Manual runs
+can force group selection or explicitly bypass reusable group artifacts.
 
-- `dry_run=true` downloads or verifies the latest export archive in production's
-  Actions cache without importing or rebuilding production data.
-
-Deploys and refreshes share the `production-mutation` GitHub Actions
-concurrency group so only one workflow can update production data at a time.
-Queued runs are not cancelled. Each run plans against production when it starts
-and may become a no-op. The host also uses `flock`, and database activation uses
-a MariaDB advisory lock.
+Server and projection releases have independent GitHub Actions queues. A short
+host mutation lock coordinates only Compose changes, migrations, activation,
+smoke checks, and rollback; projection generation and candidate staging do not
+block server releases. Database activation also uses a MariaDB advisory lock.
 
 The included `ops/wcarankings-sync.service` and `.timer` files are deprecated
 stubs. They are retained only to prevent older operational notes from silently
@@ -79,14 +76,13 @@ maintenance and rely on the daily GitHub Actions schedule instead.
 
 ## GitHub Actions deployment
 
-`.github/workflows/deploy.yml` deploys automatically after pushes to `main`; it can
-also be started with `workflow_dispatch`. Deploys are serialized so two production
-deploys do not overlap.
+`.github/workflows/server-production.yml` deploys the server after pushes to
+`main` and supports manual dispatch. `.github/workflows/projection-release.yml`
+updates projection data independently.
 
-Pull-request checks build the application, Flyway, and data-tools images from the checked-out
-merge result and tag them with the Git tree SHA, rather than a commit SHA,
-because GitHub can create a different commit SHA when a pull request is merged
-while retaining the same source tree. Before publishing either image, the job
+Pull-request checks fingerprint the application, Flyway, data-tools, and
+configuration independently. They restore already validated component images and
+build only changed components. Before publishing a changed image, the job
 runs the Flyway image against temporary MariaDB, loads a small WCA-like fixture,
 refreshes ranking projections using the application image, starts that exact
 image, and runs a Chromium smoke test against it. The test asserts a seeded
@@ -94,22 +90,16 @@ ranking is visible and uploads a screenshot plus Playwright report as a
 14-day workflow artifact. Only a successful same-repository pull request pushes
 those already-tested image tags to GitHub Container Registry.
 
-The deployment workflow does the following:
+The two deployment workflows together do the following:
 
-1. Checks out the merged commit and calculates its Git tree SHA.
-2. Resolves the matching PR-verified application, Flyway, and data-tools images
+1. Checks out the merged commit and calculates component fingerprints.
+2. Resolves matching PR-verified application, Flyway, and data-tools images
    from GitHub Container Registry. Missing images fail the release; production
    releases never build an unverified fallback.
-3. Resolves the latest WCA export from the WCA export API, then restores that
-   dated SQL archive and any matching completed projection artifact from GitHub
-   Actions caches. On an archive-cache miss, Actions downloads the export into
-   the Actions cache. Projection artifacts are keyed by export date and
-   projection-schema hash.
-4. On a projection-cache miss, imports the WCA archive into ephemeral MariaDB
-   and builds and validates the complete generation. Secondary indexes are
-   recorded and removed before the logical dump.
-5. Retains the compressed SQL plus its export-date and deferred-index manifest
-   as both a reusable cache entry and seven-day workflow artifact.
+3. Detects projection semantic changes before resolving the latest WCA export.
+4. Restores exact checksummed group artifacts from GHCR, hydrates cached
+   dependencies, and builds only cache-miss tables in runner-local MariaDB.
+5. Retains immutable per-group artifacts and a checksummed release manifest.
 6. Uses repository-configured SSH credentials and host verification to establish
    non-interactive access to the production host.
 7. Verifies server/dataset schema compatibility and copies checksummed

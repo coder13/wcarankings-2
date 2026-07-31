@@ -2,6 +2,11 @@ import { createHash } from "node:crypto";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  MARIADB_COMPATIBILITY_VERSION,
+  PROJECTION_ARTIFACT_FORMAT_VERSION,
+  projectionGroup,
+} from "./projection-groups.mjs";
 import { normalizeExportDate } from "./projection-transfer-date.mjs";
 
 export const PROJECTION_RELEASE_MANIFEST = "projection-release.json";
@@ -34,6 +39,7 @@ export async function createProjectionReleaseManifest({
   sourceTree,
   compatibility,
   rawFile,
+  artifactDigests = {},
 } = {}) {
   if (!directory) throw new Error("directory is required");
   if (!exportId) throw new Error("exportId is required");
@@ -50,8 +56,13 @@ export async function createProjectionReleaseManifest({
   const manifestGroups = {};
 
   for (const group of groups) {
-    const fingerprint = fingerprints?.groups?.[group]?.fingerprint;
-    if (!fingerprint) throw new Error(`Missing fingerprint for projection group ${group}`);
+    const definition = projectionGroup(group);
+    const desired = fingerprints?.groups?.[group];
+    const artifactFingerprint = desired?.artifactFingerprint ?? desired?.fingerprint;
+    const semanticFingerprint = desired?.semanticFingerprint;
+    if (!artifactFingerprint || !semanticFingerprint) {
+      throw new Error(`Missing semantic or artifact fingerprint for projection group ${group}`);
+    }
     const prefix = prefixForGroup(group);
     const metadataFile = `${prefix}-projection-transfer.json`;
     const archiveFile = `${prefix}-projection-transfer.sql.gz`;
@@ -64,9 +75,20 @@ export async function createProjectionReleaseManifest({
         `Transfer metadata export ${transfer.exportDate || "(missing)"} does not match ${exportId}`,
       );
     }
+    const expectedTransferTables = [
+      ...definition.tables.map((table) => `${table}_transfer`),
+      `projection_transfer_manifest_${group.replaceAll("-", "_")}`,
+      `projection_transfer_indexes_${group.replaceAll("-", "_")}`,
+    ].sort();
+    if (JSON.stringify([...transfer.tables].sort()) !== JSON.stringify(expectedTransferTables)) {
+      throw new Error(`Transfer metadata table ownership does not match ${group}`);
+    }
     manifestGroups[group] = {
-      fingerprint,
-      tables: transfer.tables,
+      semanticFingerprint,
+      artifactFingerprint,
+      artifactDigest: artifactDigests[group] ?? null,
+      tables: definition.tables,
+      transferTables: transfer.tables,
       exportDate: transfer.exportDate,
       archive: await artifactMetadata(directory, archiveFile),
       metadata: await artifactMetadata(directory, metadataFile),
@@ -74,11 +96,12 @@ export async function createProjectionReleaseManifest({
   }
 
   const manifest = {
-    version: 2,
+    version: 3,
     compatibility: {
       artifactFormatVersion: Number(compatibility.artifactFormatVersion),
       datasetSchemaVersion: Number(compatibility.datasetSchemaVersion),
     },
+    mariaDbCompatibilityVersion: MARIADB_COMPATIBILITY_VERSION,
     exportId: String(exportId),
     exportDate: String(exportDate || exportId).slice(0, 10),
     sourceSha: sourceSha || null,
@@ -102,6 +125,7 @@ export async function verifyProjectionReleaseManifest({
   expectedGroups,
   expectedExportId,
   expectedSourceSha,
+  expectedFingerprints,
 } = {}) {
   if (!directory) throw new Error("directory is required");
   const manifestPath = join(directory, PROJECTION_RELEASE_MANIFEST);
@@ -111,12 +135,18 @@ export async function verifyProjectionReleaseManifest({
     throw new Error(`Projection release manifest checksum ${actualSha256} does not match ${expectedSha256}`);
   }
   const manifest = JSON.parse(content);
-  if (manifest.version !== 2) throw new Error(`Unsupported projection release manifest version: ${manifest.version}`);
+  if (manifest.version !== 3) throw new Error(`Unsupported projection release manifest version: ${manifest.version}`);
   if (
     !Number.isInteger(manifest.compatibility?.artifactFormatVersion)
     || !Number.isInteger(manifest.compatibility?.datasetSchemaVersion)
   ) {
     throw new Error("Projection release compatibility metadata is invalid");
+  }
+  if (manifest.compatibility.artifactFormatVersion !== PROJECTION_ARTIFACT_FORMAT_VERSION) {
+    throw new Error("Projection release artifact format is not compatible with this data-tools build");
+  }
+  if (manifest.mariaDbCompatibilityVersion !== MARIADB_COMPATIBILITY_VERSION) {
+    throw new Error("Projection release MariaDB compatibility is invalid");
   }
   if (expectedExportId && String(manifest.exportId) !== String(expectedExportId)) {
     throw new Error(`Projection export ${manifest.exportId} does not match ${expectedExportId}`);
@@ -137,7 +167,20 @@ export async function verifyProjectionReleaseManifest({
   for (const group of groups) {
     const entry = manifest.groups?.[group];
     if (!entry) throw new Error(`Projection release manifest is missing group ${group}`);
-    if (!entry.fingerprint) throw new Error(`Projection release group ${group} has no fingerprint`);
+    if (!entry.semanticFingerprint || !entry.artifactFingerprint) {
+      throw new Error(`Projection release group ${group} has incomplete fingerprints`);
+    }
+    const desired = expectedFingerprints?.groups?.[group];
+    if (desired && entry.semanticFingerprint !== desired.semanticFingerprint) {
+      throw new Error(`Projection release group ${group} has an unexpected semantic fingerprint`);
+    }
+    if (desired && entry.artifactFingerprint !== desired.artifactFingerprint) {
+      throw new Error(`Projection release group ${group} has an unexpected artifact fingerprint`);
+    }
+    const definition = projectionGroup(group);
+    if (JSON.stringify([...entry.tables].sort()) !== JSON.stringify([...definition.tables].sort())) {
+      throw new Error(`Projection release group ${group} has invalid table ownership`);
+    }
     for (const artifact of [entry.archive, entry.metadata]) {
       if (!artifact?.file || basename(artifact.file) !== artifact.file) {
         throw new Error(`Projection release group ${group} contains an invalid artifact path`);
@@ -150,6 +193,9 @@ export async function verifyProjectionReleaseManifest({
     const transfer = JSON.parse(await readFile(join(directory, entry.metadata.file), "utf8"));
     if (transfer.group !== group) {
       throw new Error(`Projection release metadata ${entry.metadata.file} does not describe ${group}`);
+    }
+    if (JSON.stringify([...transfer.tables].sort()) !== JSON.stringify([...entry.transferTables].sort())) {
+      throw new Error(`Projection release metadata ${entry.metadata.file} has unexpected tables`);
     }
   }
   return { manifest, manifestSha256: actualSha256 };
@@ -168,6 +214,9 @@ async function cli() {
   if (command === "create") {
     const fingerprints = JSON.parse(await readFile(argumentValue("fingerprints-file"), "utf8"));
     const compatibility = JSON.parse(await readFile(argumentValue("compatibility-file"), "utf8"));
+    const artifactDigests = argumentValue("artifact-digests-file")
+      ? JSON.parse(await readFile(argumentValue("artifact-digests-file"), "utf8"))
+      : {};
     const result = await createProjectionReleaseManifest({
       directory,
       exportId: argumentValue("export-id"),
@@ -178,6 +227,7 @@ async function cli() {
       sourceTree: argumentValue("source-tree"),
       compatibility,
       rawFile: argumentValue("raw-file") || undefined,
+      artifactDigests,
     });
     process.stdout.write(`${JSON.stringify({
       manifest: result.manifestPath,
@@ -186,12 +236,16 @@ async function cli() {
     return;
   }
   if (command === "verify") {
+    const expectedFingerprints = argumentValue("fingerprints-file")
+      ? JSON.parse(await readFile(argumentValue("fingerprints-file"), "utf8"))
+      : undefined;
     const result = await verifyProjectionReleaseManifest({
       directory,
       expectedSha256: argumentValue("sha256"),
       expectedGroups: groups,
       expectedExportId: argumentValue("export-id"),
       expectedSourceSha: argumentValue("source-sha"),
+      expectedFingerprints,
     });
     process.stdout.write(`${JSON.stringify({
       manifest: join(directory, PROJECTION_RELEASE_MANIFEST),

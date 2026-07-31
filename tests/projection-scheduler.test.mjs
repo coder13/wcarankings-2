@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  DEFAULT_PROJECTION_NAMES,
+  projectionBuildPlan,
   projectionConcurrency,
+  projectionNamesForRefresh,
   runDependencyAwareTasks,
 } from "../scripts/mysql-schema.mjs";
 
@@ -51,6 +54,32 @@ test("dependency scheduler bounds and overlaps independent tasks", async () => {
   assert.ok(events.indexOf("start:counts") > events.indexOf("finish:average"));
   assert.deepEqual(result, ["single", "average", "result", "counts"]);
   assert.equal(closed.length, 4);
+});
+
+test("hydrated dependencies count as complete without executing them", async () => {
+  const started = [];
+  await runDependencyAwareTasks([{
+    name: "city",
+    dependencies: ["facts", "competitions"],
+    async run() { started.push("city"); },
+  }], {
+    connection: {},
+    satisfiedDependencies: ["facts", "competitions"],
+  });
+  assert.deepEqual(started, ["city"]);
+});
+
+test("a city-only build plans only owned tasks and reports hydrated projections separately", () => {
+  const plan = projectionBuildPlan(
+    ["city-rankings"],
+    ["result-facts", "competition-rankings"],
+  );
+  assert.deepEqual(plan.groups, ["city-rankings"]);
+  assert.deepEqual(plan.projectionNames, ["city-event-stats", "entity-ranking-counts"]);
+  assert.ok(plan.satisfiedProjectionNames.includes("result-facts"));
+  assert.ok(plan.satisfiedProjectionNames.includes("competition-event-stats"));
+  assert.equal(plan.tables.length, 2);
+  assert.equal(plan.includeCompatibility, false);
 });
 
 test("duration-aware scheduling pairs a long task with the shortest ready task", async () => {
@@ -145,4 +174,9 @@ test("projection build concurrency defaults to two and accepts configured bounds
     if (previous === undefined) delete process.env.WCA_PROJECTION_BUILD_CONCURRENCY;
     else process.env.WCA_PROJECTION_BUILD_CONCURRENCY = previous;
   }
+});
+
+test("a full schema refresh keeps the default semantic projections when selection is omitted", () => {
+  assert.deepEqual(projectionNamesForRefresh(undefined), DEFAULT_PROJECTION_NAMES);
+  assert.deepEqual(projectionNamesForRefresh([]), []);
 });

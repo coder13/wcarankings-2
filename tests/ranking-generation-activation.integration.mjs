@@ -38,16 +38,25 @@ if (!applicationUrl && !adminUrl) {
     candidate: `wcarankings_it_candidate_${suffix}`,
   };
   schemas.previous = `${schemas.candidate}_previous`;
+  const release = (name, value) => ({
+    semanticFingerprint: `${name}-semantic-${value}`,
+    artifactFingerprint: `${name}-artifact-${value}`,
+    artifactDigest: `sha256:${name}-${value}`,
+  });
   const fullManifest = {
-    version: 2,
+    version: 3,
     exportId: "2026-07-30T00:00:23Z",
     sourceSha: "a".repeat(40),
-    compatibility: { artifactFormatVersion: 2, datasetSchemaVersion: 1 },
+    compatibility: { artifactFormatVersion: 3, datasetSchemaVersion: 1 },
     raw: { file: "wca-export.sql.zip" },
     groups: {
-      core: { fingerprint: "core-new" },
-      "sum-of-ranks": { fingerprint: "sum-new" },
-      "yearly-person-rankings": { fingerprint: "yearly-new" },
+      compatibility: release("compatibility", "new"),
+      "result-facts": release("result-facts", "new"),
+      "result-rankings": release("result-rankings", "new"),
+      "competition-rankings": release("competition-rankings", "new"),
+      "city-rankings": release("city-rankings", "new"),
+      "sum-of-ranks": release("sum-of-ranks", "new"),
+      "yearly-person-rankings": release("yearly-person-rankings", "new"),
     },
   };
   const oldExportId = "2026-07-29T00:00:23Z";
@@ -78,6 +87,7 @@ if (!applicationUrl && !adminUrl) {
       if (marker !== null) {
         await execute(connection, "INSERT INTO export_metadata (`key`, `value`) VALUES ('export_date', ?), ('fetched_at', ?)", [exportId, "2026-07-29T01:00:00Z"]);
       }
+      await execute(connection, "ALTER TABLE ranking_generation_state ADD COLUMN capabilities_json LONGTEXT NOT NULL DEFAULT '{}'");
     } finally {
       await connection.end();
     }
@@ -88,12 +98,17 @@ if (!applicationUrl && !adminUrl) {
     try {
       await execute(connection, `INSERT INTO ranking_generation_state
         (id, generation_id, export_id, artifact_format_version, dataset_schema_version,
-         fingerprints_json, source_sha, artifact_run_id, artifact_id,
+         fingerprints_json, capabilities_json, source_sha, artifact_run_id, artifact_id,
          activation_tables_json, previous_tables_json, activated_at)
-        VALUES (1, ?, ?, 2, 1, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))`, [
+        VALUES (1, ?, ?, 3, 1, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))`, [
         state.generationId,
         state.exportId,
-        JSON.stringify(state.fingerprints),
+        JSON.stringify({
+          semantic: state.semanticFingerprints,
+          artifacts: state.artifactFingerprints,
+          digests: state.artifactDigests,
+        }),
+        JSON.stringify(state.capabilities),
         "b".repeat(40),
         9,
         state.artifactId,
@@ -129,7 +144,10 @@ if (!applicationUrl && !adminUrl) {
     await insertState(schemas.production, {
       generationId: "old-generation",
       exportId: oldExportId,
-      fingerprints: { core: "core-old", "sum-of-ranks": "sum-old", "yearly-person-rankings": "yearly-old" },
+      semanticFingerprints: Object.fromEntries(Object.keys(fullManifest.groups).map((name) => [name, `${name}-semantic-old`])),
+      artifactFingerprints: Object.fromEntries(Object.keys(fullManifest.groups).map((name) => [name, `${name}-artifact-old`])),
+      artifactDigests: Object.fromEntries(Object.keys(fullManifest.groups).map((name) => [name, `sha256:${name}-old`])),
+      capabilities: { core: true, resultRankings: true, competitionRankings: true, cityEventStats: true, sumOfRanks: true, yearlyPersonRankings: true },
       artifactId: 9,
       activationTables: fullTables,
     });
@@ -167,7 +185,7 @@ if (!applicationUrl && !adminUrl) {
       ...fullManifest,
       exportId: oldExportId,
       raw: null,
-      groups: { core: { fingerprint: "core-partial" } },
+      groups: { compatibility: release("compatibility", "partial") },
     };
     const partialTables = activationTables(partialManifest);
     const adminForPartial = await mysql.createConnection(connectionOptions(adminUrl, "mysql"));
@@ -195,11 +213,9 @@ if (!applicationUrl && !adminUrl) {
       assert.equal(await marker(partialConnection, schemas.production, "ranking_entries_single"), "partial");
       assert.equal(await marker(partialConnection, schemas.production, "person_year_rankings_single"), "old");
       const partialState = await state(partialConnection, schemas.production);
-      assert.deepEqual(JSON.parse(partialState.fingerprints_json), {
-        core: "core-partial",
-        "sum-of-ranks": "sum-old",
-        "yearly-person-rankings": "yearly-old",
-      });
+      const partialFingerprints = JSON.parse(partialState.fingerprints_json);
+      assert.equal(partialFingerprints.artifacts.compatibility, "compatibility-artifact-partial");
+      assert.equal(partialFingerprints.artifacts["sum-of-ranks"], "sum-of-ranks-artifact-old");
       const rolledBack = await rollbackGeneration({
         connection: partialConnection,
         productionSchema: schemas.production,

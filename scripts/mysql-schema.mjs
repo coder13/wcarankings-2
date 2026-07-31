@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEPLOYMENT_PROJECTION_GROUPS } from "./projection-groups.mjs";
+
+export { DEPLOYMENT_PROJECTION_GROUPS } from "./projection-groups.mjs";
 
 const INDEXES = [
   ["persons", "idx_persons_wca_sub", "(`wca_id`, `sub_id`)", "wca_id,sub_id"],
@@ -21,33 +24,6 @@ const INDEXES = [
 ];
 
 const projectionDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "sql", "ranking-projections");
-
-const COMPATIBILITY_PROJECTION_FILES = [
-  "wca_best_single.sql",
-  "wca_best_average.sql",
-  "ranking_entries_single_source.sql",
-  "ranking_entries_average_source.sql",
-  "result_entries_single_source.sql",
-  "ranking_entries_indexes.sql",
-  "result_entries_single_indexes.sql",
-  "ranking_counts.sql",
-  "result_counts.sql",
-];
-
-const SHARED_PROJECTION_FINGERPRINT_FILES = [
-  "release-compatibility.json",
-  "package-lock.json",
-  "docker-compose.yml",
-  "Dockerfile.flyway",
-  "scripts/mysql-schema.mjs",
-  "scripts/sync-wca-export.mjs",
-  "scripts/prepare-projection-transfer.mjs",
-  "scripts/publish-projection-transfer.mjs",
-  "scripts/projection-transfer-date.mjs",
-  "scripts/refresh-system-lists.mjs",
-  "scripts/refresh-board-list.mjs",
-  "scripts/system-list-definitions.mjs",
-];
 
 function statements(sql) {
   return sql.split(/;\s*(?:\n|$)/).map((statement) => statement.trim()).filter(Boolean);
@@ -206,6 +182,10 @@ export const SEMANTIC_PROJECTION_TABLES = projectionDefinitions.flatMap(({ table
 export const DEFAULT_PROJECTION_NAMES = projectionDefinitions
   .filter(({ enabledByDefault }) => enabledByDefault)
   .map(({ name }) => name);
+
+export function projectionNamesForRefresh(selectedNames) {
+  return selectedNames ?? DEFAULT_PROJECTION_NAMES;
+}
 export const ACTIVE_SEMANTIC_PROJECTION_TABLES = projectionDefinitions
   .filter(({ enabledByDefault }) => enabledByDefault)
   .flatMap(({ tables }) => tables);
@@ -219,26 +199,6 @@ export const COMPATIBILITY_PROJECTION_TABLES = [
 export const PUBLISHED_PROJECTION_TABLES = [
   ...COMPATIBILITY_PROJECTION_TABLES,
   ...ACTIVE_SEMANTIC_PROJECTION_TABLES,
-];
-export const DEPLOYMENT_PROJECTION_GROUPS = [
-  {
-    name: "core",
-    fingerprintVersion: 3,
-    projectionNames: DEFAULT_PROJECTION_NAMES.filter((name) => name !== "sum-of-ranks" && name !== "person-year-rankings"),
-    tables: PUBLISHED_PROJECTION_TABLES.filter((table) => table !== "person_sum_of_ranks_scores" && !table.startsWith("person_year_")),
-  },
-  {
-    name: "sum-of-ranks",
-    fingerprintVersion: 2,
-    projectionNames: ["sum-of-ranks"],
-    tables: ["person_sum_of_ranks_scores"],
-  },
-  {
-    name: "yearly-person-rankings",
-    fingerprintVersion: 3,
-    projectionNames: ["person-year-rankings"],
-    tables: ["person_year_ranking_cohorts", "person_year_rankings_single", "person_year_rankings_average", "person_year_ranking_counts"],
-  },
 ];
 export const RETIRED_PROJECTION_TABLES = [
   "person_sum_of_ranks_event_values",
@@ -356,39 +316,37 @@ function projectionDependencyClosure(selectedNames) {
   return ordered;
 }
 
-export function deploymentProjectionInputFiles(groupName) {
-  const group = DEPLOYMENT_PROJECTION_GROUPS.find(({ name }) => name === groupName);
-  if (!group) throw new Error(`Unknown deployment projection group: ${groupName}`);
-  const projectionFiles = projectionDependencyClosure(group.projectionNames)
-    .flatMap(({ files }) => files.map((file) => `sql/ranking-projections/${file}`));
-  const compatibilityFiles = group.name === "core"
-    ? COMPATIBILITY_PROJECTION_FILES.map((file) => `sql/ranking-projections/${file}`)
-    : [];
-  return [...new Set([
-    ...SHARED_PROJECTION_FINGERPRINT_FILES,
-    ...compatibilityFiles,
-    ...projectionFiles,
-  ])].sort();
-}
-
-export function projectionBuildPlan(groupNames = DEPLOYMENT_PROJECTION_GROUPS.map(({ name }) => name)) {
+export function projectionBuildPlan(
+  groupNames = DEPLOYMENT_PROJECTION_GROUPS.map(({ name }) => name),
+  satisfiedGroupNames = [],
+) {
   const selected = new Set(groupNames);
+  const satisfied = new Set(satisfiedGroupNames);
   const groups = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) => selected.has(name));
-  if (groups.length !== selected.size) {
+  const satisfiedGroups = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) => satisfied.has(name));
+  if (groups.length !== selected.size || satisfiedGroups.length !== satisfied.size) {
     const known = new Set(DEPLOYMENT_PROJECTION_GROUPS.map(({ name }) => name));
-    const unknown = [...selected].filter((name) => !known.has(name));
+    const unknown = [...selected, ...satisfied].filter((name) => !known.has(name));
     throw new Error(`Unknown deployment projection group: ${unknown.join(", ")}`);
   }
   return {
     groups: groups.map(({ name }) => name),
     projectionNames: [...new Set(groups.flatMap(({ projectionNames: names }) => names))],
+    satisfiedProjectionNames: [...new Set(
+      satisfiedGroups
+        .flatMap(({ projectionNames: names }) => names),
+    )],
+    includeCompatibility: groups.some(({ name }) => name === "compatibility"),
     tables: [...new Set(groups.flatMap(({ tables }) => tables))],
   };
 }
 
-function orderedProjections(selectedNames = DEFAULT_PROJECTION_NAMES) {
+function orderedProjections(selectedNames = DEFAULT_PROJECTION_NAMES, satisfiedNames = []) {
   const byName = new Map(PROJECTION_REGISTRY.map((projection) => [projection.name, projection]));
-  return projectionDependencyClosure(selectedNames).map(({ name }) => byName.get(name));
+  const satisfied = new Set(satisfiedNames);
+  return projectionDependencyClosure(selectedNames)
+    .filter(({ name }) => !satisfied.has(name))
+    .map(({ name }) => byName.get(name));
 }
 
 async function buildProjection(connection, projection, projectionSuffix, tableProgress) {
@@ -413,22 +371,15 @@ export function projectionConcurrency(value) {
   return Number.isFinite(parsed) && parsed > 1 ? Math.floor(parsed) : 1;
 }
 
-async function buildRegisteredProjectionsSerial(connection, projections, projectionSuffix, tableProgress) {
-  const timings = [];
-  for (const projection of projections) {
-    timings.push(await buildProjection(connection, projection, projectionSuffix, tableProgress));
-  }
-  return timings;
-}
-
 export async function runDependencyAwareTasks(
   tasks,
-  { connection, createConnection, concurrency = 1 } = {},
+  { connection, createConnection, concurrency = 1, satisfiedDependencies = [] } = {},
 ) {
   const taskByName = new Map(tasks.map((task) => [task.name, task]));
+  const initiallyCompleted = new Set(["raw-wca", ...satisfiedDependencies]);
   for (const task of tasks) {
     for (const dependency of task.dependencies) {
-      if (dependency !== "raw-wca" && !taskByName.has(dependency)) {
+      if (!initiallyCompleted.has(dependency) && !taskByName.has(dependency)) {
         throw new Error(`Unknown task dependency ${dependency} for ${task.name}`);
       }
     }
@@ -436,12 +387,15 @@ export async function runDependencyAwareTasks(
 
   if (!createConnection || concurrency === 1 || tasks.length <= 1) {
     const results = [];
-    const completed = new Set(["raw-wca"]);
-    for (const task of tasks) {
-      if (!task.dependencies.every((dependency) =>
-        dependency === "raw-wca" || completed.has(dependency))) {
-        throw new Error(`Task dependency cycle or missing dependency at ${task.name}`);
+    const completed = new Set(initiallyCompleted);
+    const pending = [...tasks];
+    while (pending.length > 0) {
+      const index = pending.findIndex((task) =>
+        task.dependencies.every((dependency) => completed.has(dependency)));
+      if (index < 0) {
+        throw new Error(`Task dependency cycle or missing dependency among: ${pending.map(({ name }) => name).join(", ")}`);
       }
+      const [task] = pending.splice(index, 1);
       results.push(await task.run(connection));
       completed.add(task.name);
     }
@@ -450,7 +404,7 @@ export async function runDependencyAwareTasks(
 
   const pending = [...tasks];
   const running = new Map();
-  const completed = new Set(["raw-wca"]);
+  const completed = new Set(initiallyCompleted);
   const timings = new Map();
   let failure;
 
@@ -465,8 +419,7 @@ export async function runDependencyAwareTasks(
   }
 
   function dependenciesComplete(task) {
-    return task.dependencies.every((dependency) =>
-      dependency === "raw-wca" || completed.has(dependency));
+    return task.dependencies.every((dependency) => completed.has(dependency));
   }
 
   function isLongTask(task) {
@@ -522,14 +475,26 @@ export async function runDependencyAwareTasks(
   return tasks.map(({ name }) => timings.get(name));
 }
 
-async function buildRegisteredProjectionsConcurrently(projections, { projectionSuffix, createConnection, concurrency, tableProgress }) {
+async function buildRegisteredProjectionsConcurrently(projections, {
+  connection,
+  projectionSuffix,
+  createConnection,
+  concurrency,
+  tableProgress,
+  satisfiedProjectionNames = [],
+}) {
   const tasks = projections.map((projection) => ({
     name: projection.name,
     dependencies: projection.dependencies,
     estimatedDurationMs: projectionDurationEstimate(projection.name),
     run: async (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
   }));
-  return runDependencyAwareTasks(tasks, { createConnection, concurrency });
+  return runDependencyAwareTasks(tasks, {
+    connection,
+    createConnection,
+    concurrency,
+    satisfiedDependencies: ["raw-wca", ...satisfiedProjectionNames],
+  });
 }
 
 /*
@@ -593,20 +558,27 @@ function compatibilityProjectionTasks({
 
 export async function buildRegisteredProjections(
   connection,
-  { projectionSuffix = "", projectionNames: selectedNames, createConnection, concurrency } = {},
+  {
+    projectionSuffix = "",
+    projectionNames: selectedNames,
+    satisfiedProjectionNames = [],
+    createConnection,
+    concurrency,
+  } = {},
 ) {
-  const projections = orderedProjections(selectedNames);
+  const projections = orderedProjections(selectedNames, satisfiedProjectionNames);
   const tableProgress = createTableProgress(await countProjectionTables(projections));
   const maxConcurrency = projectionConcurrency(concurrency);
-  if (!createConnection || maxConcurrency === 1 || projections.length <= 1) {
-    return buildRegisteredProjectionsSerial(connection, projections, projectionSuffix, tableProgress);
+  if (createConnection && maxConcurrency > 1 && projections.length > 1) {
+    writeBuildLog(`Building registered projections with concurrency ${maxConcurrency}.`);
   }
-  writeBuildLog(`Building registered projections with concurrency ${maxConcurrency}.`);
   return buildRegisteredProjectionsConcurrently(projections, {
+    connection,
     projectionSuffix,
-    createConnection,
+    createConnection: createConnection && maxConcurrency > 1 ? createConnection : undefined,
     concurrency: maxConcurrency,
     tableProgress,
+    satisfiedProjectionNames,
   });
 }
 
@@ -692,7 +664,14 @@ export async function promoteRegisteredProjections(
 
 export async function refreshMysqlSchema(
   connection,
-  { projectionSuffix = "", projectionNames: selectedNames, createConnection, concurrency } = {},
+  {
+    projectionSuffix = "",
+    projectionNames: selectedNames,
+    satisfiedProjectionNames = [],
+    includeCompatibility = true,
+    createConnection,
+    concurrency,
+  } = {},
 ) {
   const entriesTables = {
     single: `ranking_entries_single${projectionSuffix}`,
@@ -709,38 +688,44 @@ export async function refreshMysqlSchema(
   const resultCountsTable = `result_counts${projectionSuffix}`;
   const resultEntriesSource = `result_entries_single_source${projectionSuffix}`;
 
-  for (const name of [
-    countsTable,
-    resultCountsTable,
-    entriesTables.single,
-    entriesTables.average,
-    resultEntriesTable,
-    entriesSources.single,
-    entriesSources.average,
-    resultEntriesSource,
-    bestSingle,
-    bestAverage,
-  ]) {
-    await dropManagedObject(connection, name);
-  }
-
   await ensureIndexes(connection, INDEXES);
 
-  for (const file of ["wca_best_single.sql", "wca_best_average.sql", "ranking_entries_single_source.sql", "ranking_entries_average_source.sql", "result_entries_single_source.sql"]) {
-    const statement = await projectionSql(file);
-    const renamed = statement
-      .replaceAll("wca_best_single", bestSingle)
-      .replaceAll("wca_best_average", bestAverage)
-      .replaceAll("ranking_entries_single_source", entriesSources.single)
-      .replaceAll("ranking_entries_average_source", entriesSources.average)
-      .replaceAll("result_entries_single_source", resultEntriesSource);
-    await connection.query(renamed);
+  if (includeCompatibility) {
+    for (const name of [
+      countsTable,
+      resultCountsTable,
+      entriesTables.single,
+      entriesTables.average,
+      resultEntriesTable,
+      entriesSources.single,
+      entriesSources.average,
+      resultEntriesSource,
+      bestSingle,
+      bestAverage,
+    ]) {
+      await dropManagedObject(connection, name);
+    }
+
+    for (const file of ["wca_best_single.sql", "wca_best_average.sql", "ranking_entries_single_source.sql", "ranking_entries_average_source.sql", "result_entries_single_source.sql"]) {
+      const statement = await projectionSql(file);
+      const renamed = statement
+        .replaceAll("wca_best_single", bestSingle)
+        .replaceAll("wca_best_average", bestAverage)
+        .replaceAll("ranking_entries_single_source", entriesSources.single)
+        .replaceAll("ranking_entries_average_source", entriesSources.average)
+        .replaceAll("result_entries_single_source", resultEntriesSource);
+      await connection.query(renamed);
+    }
   }
 
   const maxConcurrency = projectionConcurrency(concurrency);
-  const semanticProjections = orderedProjections(selectedNames);
+  const semanticProjections = orderedProjections(
+    projectionNamesForRefresh(selectedNames),
+    satisfiedProjectionNames,
+  );
   const tableProgress = createTableProgress(
-    COMPATIBILITY_PROJECTION_TASKS.length + await countProjectionTables(semanticProjections),
+    (includeCompatibility ? COMPATIBILITY_PROJECTION_TASKS.length : 0)
+      + await countProjectionTables(semanticProjections),
   );
   const semanticTasks = semanticProjections.map((projection) => ({
     name: `projection:${projection.name}`,
@@ -749,8 +734,7 @@ export async function refreshMysqlSchema(
     estimatedDurationMs: projectionDurationEstimate(projection.name),
     run: (worker) => buildProjection(worker, projection, projectionSuffix, tableProgress),
   }));
-  await runDependencyAwareTasks([
-    ...compatibilityProjectionTasks({
+  const compatibilityTasks = includeCompatibility ? compatibilityProjectionTasks({
       entriesTables,
       entriesSources,
       countsTable,
@@ -758,12 +742,18 @@ export async function refreshMysqlSchema(
       resultCountsTable,
       resultEntriesSource,
       tableProgress,
-    }),
+    }) : [];
+  await runDependencyAwareTasks([
+    ...compatibilityTasks,
     ...semanticTasks,
   ], {
     connection,
     createConnection,
     concurrency: maxConcurrency,
+    satisfiedDependencies: [
+      "raw-wca",
+      ...satisfiedProjectionNames.map((name) => `projection:${name}`),
+    ],
   });
 }
 

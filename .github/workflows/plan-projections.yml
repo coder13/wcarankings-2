@@ -1,35 +1,47 @@
-name: Plan Ranking Projection Release
+name: Plan Incremental Projection Release
 
 on:
   workflow_call:
     inputs:
       ref:
-        description: Git ref whose projection inputs should be fingerprinted.
         required: true
         type: string
       groups:
-        description: Optional comma-separated projection groups to consider.
         required: false
         default: ""
         type: string
+      refresh_export:
+        description: Resolve the latest export even when source semantics are unchanged.
+        required: false
+        default: false
+        type: boolean
       force_rebuild:
-        description: Ignore active production fingerprints.
+        description: Select every group but still reuse valid exact artifacts.
+        required: false
+        default: false
+        type: boolean
+      bypass_artifact_cache:
+        description: Ignore exact GHCR group artifacts.
         required: false
         default: false
         type: boolean
     outputs:
       required:
         value: ${{ jobs.plan.outputs.required }}
-      groups:
-        value: ${{ jobs.plan.outputs.groups }}
+      release_groups:
+        value: ${{ jobs.plan.outputs.release_groups }}
+      build_groups:
+        value: ${{ jobs.plan.outputs.build_groups }}
+      hydrate_groups:
+        value: ${{ jobs.plan.outputs.hydrate_groups }}
       fingerprints:
         value: ${{ jobs.plan.outputs.fingerprints }}
+      available_artifacts:
+        value: ${{ jobs.plan.outputs.available_artifacts }}
       export_date:
         value: ${{ jobs.plan.outputs.export_date }}
       export_value:
         value: ${{ jobs.plan.outputs.export_value }}
-      export_version:
-        value: ${{ jobs.plan.outputs.export_version }}
       production_export_value:
         value: ${{ jobs.plan.outputs.production_export_value }}
       raw_required:
@@ -44,39 +56,39 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
-      required: ${{ steps.release-plan.outputs.required }}
-      groups: ${{ steps.release-plan.outputs.groups }}
-      fingerprints: ${{ steps.release-plan.outputs.fingerprints }}
-      export_date: ${{ steps.wca-export.outputs.date }}
-      export_value: ${{ steps.wca-export.outputs.value }}
-      export_version: ${{ steps.wca-export.outputs.version }}
-      production_export_value: ${{ steps.production-wca-export.outputs.value }}
-      raw_required: ${{ steps.release-plan.outputs.raw_required }}
+      required: ${{ steps.final.outputs.required }}
+      release_groups: ${{ steps.final.outputs.release_groups }}
+      build_groups: ${{ steps.final.outputs.build_groups }}
+      hydrate_groups: ${{ steps.final.outputs.hydrate_groups }}
+      fingerprints: ${{ steps.final.outputs.fingerprints }}
+      available_artifacts: ${{ steps.registry.outputs.available }}
+      export_date: ${{ steps.wca.outputs.date }}
+      export_value: ${{ steps.wca.outputs.value }}
+      production_export_value: ${{ steps.production.outputs.export_value }}
+      raw_required: ${{ steps.final.outputs.raw_required }}
     env:
       SERVER_IP: ${{ secrets.SERVER_IP }}
       SERVER_USER: www
 
     steps:
-      - name: Check out projection source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
 
-      - name: Install production dependencies
-        run: npm ci --omit=dev
+      - run: npm ci --omit=dev
 
-      - name: Configure read-only deployment SSH
+      - name: Configure read-only production access
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
@@ -86,90 +98,150 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
 
-      - name: Resolve target WCA export
-        id: wca-export
+      - name: Read active production projection state
+        id: production
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'cd /srv/wcarankings && docker compose run --rm -T data-tools \
+              /app/scripts/activate-ranking-generation.mjs state' \
+            > /tmp/production-projection-state.json
+          if ! jq -e 'type == "object"' /tmp/production-projection-state.json >/dev/null; then
+            printf '{}\n' > /tmp/production-projection-state.json
+          fi
+          export_value=$(jq -r '.exportId // empty' /tmp/production-projection-state.json)
+          test -n "$export_value"
+          echo "export_value=$export_value" >> "$GITHUB_OUTPUT"
+
+      - name: Detect semantic projection changes before contacting WCA
+        id: semantic
+        env:
+          SELECTED_GROUPS: ${{ inputs.groups }}
+          FORCE_REBUILD: ${{ inputs.force_rebuild }}
+        run: |
+          args=(semantic --state-file=/tmp/production-projection-state.json \
+            "--force-rebuild=$FORCE_REBUILD")
+          if [ -n "$SELECTED_GROUPS" ]; then args+=("--groups=$SELECTED_GROUPS"); fi
+          node scripts/projection-release-plan.mjs "${args[@]}" > /tmp/semantic-plan.json
+          echo "required=$(jq -r '.required' /tmp/semantic-plan.json)" >> "$GITHUB_OUTPUT"
+          echo "groups=$(jq -r '.changedGroupsCsv' /tmp/semantic-plan.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Finish cosmetic push without WCA resolution
+        if: steps.semantic.outputs.required != 'true' && inputs.refresh_export != true && inputs.force_rebuild != true
+        run: |
+          echo "No semantic projection inputs changed; the WCA export was not resolved." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve latest WCA export
+        id: wca
+        if: steps.semantic.outputs.required == 'true' || inputs.refresh_export == true || inputs.force_rebuild == true
         run: |
           node scripts/resolve-wca-export.mjs > /tmp/wca-export.json
           export_date=$(jq -r '.date' /tmp/wca-export.json)
           export_value=$(jq -r '.exportDate' /tmp/wca-export.json)
-          export_version=$(jq -r '.version' /tmp/wca-export.json)
-          if [ -z "$export_date" ] || [ "$export_date" = null ] || [ -z "$export_value" ] || [ "$export_value" = null ]; then
-            echo "The WCA export API did not return an export date." >&2
-            exit 1
-          fi
           [[ "$export_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
           [[ "$export_value" =~ ^[0-9TZUTC:+.\ -]+$ ]]
           echo "date=$export_date" >> "$GITHUB_OUTPUT"
           echo "value=$export_value" >> "$GITHUB_OUTPUT"
-          echo "version=$export_version" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve production projection state
-        id: production-wca-export
-        run: |
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'cd /srv/wcarankings && docker compose exec -T db sh -c '"'"'
-              mariadb --batch --skip-column-names \
-                --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" \
-                2>/dev/null || printf "{}\n"
-            '"'"'' \
-            > /tmp/production-projection-state.json <<'SQL'
-          SELECT JSON_OBJECT(
-            'version', 2,
-            'exportId', export_id,
-            'datasetSchemaVersion', dataset_schema_version,
-            'fingerprints', JSON_EXTRACT(fingerprints_json, '$')
-          )
-          FROM ranking_generation_state
-          WHERE id = 1;
-          SQL
-          if ! jq -e 'type == "object"' /tmp/production-projection-state.json >/dev/null; then
-            echo "::warning::Production projection state is invalid; rebuilding selected groups."
-            printf '{}\n' > /tmp/production-projection-state.json
-          fi
-          export_value=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'cd /srv/wcarankings && docker compose exec -T db sh -c '"'"'mariadb --batch --skip-column-names --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="SELECT value FROM export_metadata WHERE \`key\` = 0x6578706f72745f64617465 LIMIT 1"'"'"'')
-          if [ -z "$export_value" ] || [ "$export_value" = null ]; then
-            echo "Production did not return a WCA export identity." >&2
-            exit 1
-          fi
-          [[ "$export_value" =~ ^[0-9TZUTC:+.\ -]+$ ]]
-          echo "value=$export_value" >> "$GITHUB_OUTPUT"
+      - uses: oras-project/setup-oras@v1
+        if: steps.wca.outputs.value != '' && inputs.bypass_artifact_cache != true
 
-      - name: Calculate required projection groups
-        id: release-plan
+      - name: Log in to GHCR for immutable group artifacts
+        if: steps.wca.outputs.value != '' && inputs.bypass_artifact_cache != true
+        run: echo "${{ github.token }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Calculate desired artifact fingerprints
+        id: desired
+        if: steps.wca.outputs.value != ''
         env:
-          EXPORT_VALUE: ${{ steps.wca-export.outputs.value }}
-          PRODUCTION_EXPORT_VALUE: ${{ steps.production-wca-export.outputs.value }}
-          SELECTED_GROUPS: ${{ inputs.groups }}
+          EXPORT_VALUE: ${{ steps.wca.outputs.value }}
+          PRODUCTION_EXPORT_VALUE: ${{ steps.production.outputs.export_value }}
+          SEMANTIC_GROUPS: ${{ steps.semantic.outputs.groups }}
+          REQUESTED_GROUPS: ${{ inputs.groups }}
+          REFRESH_EXPORT: ${{ inputs.refresh_export }}
           FORCE_REBUILD: ${{ inputs.force_rebuild }}
         run: |
-          state_file=/tmp/production-projection-state.json
-          if [ "$FORCE_REBUILD" = true ]; then
-            printf '{}\n' > /tmp/forced-projection-state.json
-            state_file=/tmp/forced-projection-state.json
+          selected_groups="$SEMANTIC_GROUPS"
+          if [ "$REFRESH_EXPORT" = true ]; then selected_groups="$REQUESTED_GROUPS"; fi
+          args=("--export-id=$EXPORT_VALUE" "--production-export-id=$PRODUCTION_EXPORT_VALUE" \
+            --state-file=/tmp/production-projection-state.json "--force-rebuild=$FORCE_REBUILD")
+          if [ -n "$selected_groups" ]; then args+=("--groups=$selected_groups"); fi
+          node scripts/projection-release-plan.mjs "${args[@]}" > /tmp/desired-plan.json
+
+      - name: Resolve and validate exact GHCR group artifacts
+        id: registry
+        if: steps.wca.outputs.value != ''
+        env:
+          BYPASS_CACHE: ${{ inputs.bypass_artifact_cache }}
+          EXPORT_VALUE: ${{ steps.wca.outputs.value }}
+        run: |
+          printf '{}\n' > /tmp/available-artifacts.json
+          if [ "$BYPASS_CACHE" != true ]; then
+            owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+            while IFS= read -r group; do
+              fingerprint=$(jq -r --arg group "$group" '.groups[$group].artifactFingerprint' /tmp/desired-plan.json)
+              repository="ghcr.io/${owner}/wcarankings-projection-${group}"
+              destination="/tmp/registry/${group}"
+              mkdir -p "$destination"
+              candidates="$fingerprint"
+              repair_tags=$(oras repo tags "$repository" 2>/dev/null \
+                | grep -E "^${fingerprint}-repair-[0-9]+-[0-9]+$" \
+                | sort -t- -k3,3nr -k4,4nr || true)
+              if [ -n "$repair_tags" ]; then candidates=$(printf '%s\n%s\n' "$repair_tags" "$candidates"); fi
+              for tag in $candidates; do
+                find "$destination" -mindepth 1 -delete
+                ref="${repository}:${tag}"
+                if ! oras pull "$ref" -o "$destination"; then continue; fi
+                if node scripts/projection-release-artifact.mjs verify \
+                  --directory="$destination" --groups="$group" --export-id="$EXPORT_VALUE" \
+                  --fingerprints-file=/tmp/desired-plan.json; then
+                  digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
+                  jq --arg group "$group" --arg fingerprint "$fingerprint" \
+                    --arg ref "$ref" --arg digest "$digest" \
+                    '.[$group] = {valid:true, artifactFingerprint:$fingerprint, ref:$ref, digest:$digest}' \
+                    /tmp/available-artifacts.json > /tmp/available-artifacts.next
+                  mv /tmp/available-artifacts.next /tmp/available-artifacts.json
+                  break
+                else
+                  echo "::warning::Quarantining corrupt projection artifact $ref"
+                  jq --arg group "$group" --arg fingerprint "$fingerprint" --arg ref "$ref" \
+                    '.[$group] = {valid:false, artifactFingerprint:$fingerprint, ref:$ref}' \
+                    /tmp/available-artifacts.json > /tmp/available-artifacts.next
+                  mv /tmp/available-artifacts.next /tmp/available-artifacts.json
+                fi
+              done
+            done < <(jq -r '.groups | keys[]' /tmp/desired-plan.json)
           fi
-          arguments=(
-            "--export-id=$EXPORT_VALUE"
-            "--production-export-id=$PRODUCTION_EXPORT_VALUE"
-            "--state-file=$state_file"
-          )
-          if [ -n "$SELECTED_GROUPS" ]; then
-            arguments+=("--groups=$SELECTED_GROUPS")
-          fi
-          node scripts/projection-release-plan.mjs "${arguments[@]}" > /tmp/projection-release-plan.json
-          groups=$(jq -r '.requiredGroupsCsv' /tmp/projection-release-plan.json)
-          fingerprints=$(jq -c '.groups | with_entries(.value = .value.fingerprint)' /tmp/projection-release-plan.json)
-          required=$(jq -r '.required' /tmp/projection-release-plan.json)
-          expanded=$(jq -r '.expandedToAllGroups' /tmp/projection-release-plan.json)
-          raw_required=$(jq -r '.exportChanged' /tmp/projection-release-plan.json)
-          echo "groups=$groups" >> "$GITHUB_OUTPUT"
-          echo "fingerprints=$fingerprints" >> "$GITHUB_OUTPUT"
-          echo "required=$required" >> "$GITHUB_OUTPUT"
-          echo "raw_required=$raw_required" >> "$GITHUB_OUTPUT"
+          echo "available=$(jq -c . /tmp/available-artifacts.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Finalize active, cached, build, and hydrate groups
+        id: final
+        if: steps.wca.outputs.value != ''
+        env:
+          EXPORT_VALUE: ${{ steps.wca.outputs.value }}
+          PRODUCTION_EXPORT_VALUE: ${{ steps.production.outputs.export_value }}
+          SEMANTIC_GROUPS: ${{ steps.semantic.outputs.groups }}
+          REQUESTED_GROUPS: ${{ inputs.groups }}
+          REFRESH_EXPORT: ${{ inputs.refresh_export }}
+          FORCE_REBUILD: ${{ inputs.force_rebuild }}
+        run: |
+          selected_groups="$SEMANTIC_GROUPS"
+          if [ "$REFRESH_EXPORT" = true ]; then selected_groups="$REQUESTED_GROUPS"; fi
+          args=("--export-id=$EXPORT_VALUE" "--production-export-id=$PRODUCTION_EXPORT_VALUE" \
+            --state-file=/tmp/production-projection-state.json \
+            --available-artifacts-file=/tmp/available-artifacts.json \
+            "--force-rebuild=$FORCE_REBUILD")
+          if [ -n "$selected_groups" ]; then args+=("--groups=$selected_groups"); fi
+          node scripts/projection-release-plan.mjs "${args[@]}" > /tmp/final-plan.json
+          echo "required=$(jq -r '.required' /tmp/final-plan.json)" >> "$GITHUB_OUTPUT"
+          echo "release_groups=$(jq -r '.releaseGroups | join(",")' /tmp/final-plan.json)" >> "$GITHUB_OUTPUT"
+          echo "build_groups=$(jq -r '.buildGroupsCsv' /tmp/final-plan.json)" >> "$GITHUB_OUTPUT"
+          echo "hydrate_groups=$(jq -r '.hydrateGroupsCsv' /tmp/final-plan.json)" >> "$GITHUB_OUTPUT"
+          echo "fingerprints=$(jq -c '.groups' /tmp/final-plan.json)" >> "$GITHUB_OUTPUT"
+          echo "raw_required=$(jq -r '.exportChanged' /tmp/final-plan.json)" >> "$GITHUB_OUTPUT"
           {
-            echo "### Projection release plan"
-            echo "- WCA export: $EXPORT_VALUE"
-            echo "- Required groups: ${groups:-none}"
-            echo "- Forced rebuild: $FORCE_REBUILD"
-            echo "- Expanded partial request for new export: $expanded"
+            echo "### Incremental projection plan"
+            echo "- Active: $(jq -r '.activeGroups | join(", ") // "none"' /tmp/final-plan.json)"
+            echo "- Cached: $(jq -r '.cachedGroups | join(", ") // "none"' /tmp/final-plan.json)"
+            echo "- Hydrate: $(jq -r '.hydrateGroups | join(", ") // "none"' /tmp/final-plan.json)"
+            echo "- Build: $(jq -r '.buildGroups | join(", ") // "none"' /tmp/final-plan.json)"
           } >> "$GITHUB_STEP_SUMMARY"

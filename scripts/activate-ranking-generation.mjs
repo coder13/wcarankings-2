@@ -1,7 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
-import { DEPLOYMENT_PROJECTION_GROUPS } from "./mysql-schema.mjs";
+import {
+  DEPLOYMENT_PROJECTION_GROUPS,
+  PROJECTION_CAPABILITIES,
+} from "./projection-groups.mjs";
 import { normalizeExportDate } from "./projection-transfer-date.mjs";
 
 export const WCA_RAW_TABLES = [
@@ -78,15 +81,23 @@ export function activationTables(manifest) {
 }
 
 export function mergedGenerationState({ activeState, manifest, artifactRunId, artifactId }) {
-  if (manifest?.version !== 2) throw new Error("A version 2 generation manifest is required");
-  const activeFingerprints = activeState?.fingerprints
-    && typeof activeState.fingerprints === "object"
-    ? activeState.fingerprints
-    : {};
-  const fingerprints = { ...activeFingerprints };
+  if (manifest?.version !== 3) throw new Error("A version 3 generation manifest is required");
+  const semanticFingerprints = { ...activeState?.semanticFingerprints };
+  const artifactFingerprints = { ...activeState?.artifactFingerprints };
+  const artifactDigests = { ...activeState?.artifactDigests };
   for (const [group, release] of Object.entries(manifest.groups || {})) {
-    if (!release?.fingerprint) throw new Error(`Missing fingerprint for ${group}`);
-    fingerprints[group] = release.fingerprint;
+    if (!release?.semanticFingerprint || !release?.artifactFingerprint) {
+      throw new Error(`Missing fingerprints for ${group}`);
+    }
+    semanticFingerprints[group] = release.semanticFingerprint;
+    artifactFingerprints[group] = release.artifactFingerprint;
+    artifactDigests[group] = release.artifactDigest ?? null;
+  }
+  const capabilities = { ...activeState?.capabilities };
+  for (const [capability, requiredGroups] of Object.entries(PROJECTION_CAPABILITIES)) {
+    if (requiredGroups.some((group) => manifest.groups?.[group])) {
+      capabilities[capability] = requiredGroups.every((group) => artifactFingerprints[group]);
+    }
   }
   const generationId = `${manifest.exportId}:${artifactRunId}:${artifactId}`;
   if (
@@ -100,11 +111,30 @@ export function mergedGenerationState({ activeState, manifest, artifactRunId, ar
     exportId: String(manifest.exportId),
     artifactFormatVersion: Number(manifest.compatibility?.artifactFormatVersion),
     datasetSchemaVersion: Number(manifest.compatibility?.datasetSchemaVersion),
-    fingerprints,
+    semanticFingerprints,
+    artifactFingerprints,
+    artifactDigests,
+    capabilities,
     sourceSha: manifest.sourceSha,
     artifactRunId: Number(artifactRunId),
     artifactId: Number(artifactId),
   };
+}
+
+export function matchesActiveGeneration({ activeState: state, manifest, artifactRunId, artifactId }) {
+  if (!state || !manifest) return false;
+  if (
+    String(state.exportId) !== String(manifest.exportId)
+    || Number(state.artifactRunId) !== Number(artifactRunId)
+    || Number(state.artifactId) !== Number(artifactId)
+  ) {
+    return false;
+  }
+  return Object.entries(manifest.groups || {}).every(
+    ([group, release]) =>
+      state.semanticFingerprints?.[group] === release.semanticFingerprint
+      && state.artifactFingerprints?.[group] === release.artifactFingerprint,
+  );
 }
 
 async function tableNames(connection, schema) {
@@ -127,6 +157,7 @@ async function activeState(connection, schema) {
        artifact_format_version,
        dataset_schema_version,
        fingerprints_json,
+       capabilities_json,
        source_sha,
        artifact_run_id,
        artifact_id,
@@ -142,7 +173,10 @@ async function activeState(connection, schema) {
     exportId: row.export_id,
     artifactFormatVersion: Number(row.artifact_format_version),
     datasetSchemaVersion: Number(row.dataset_schema_version),
-    fingerprints: JSON.parse(row.fingerprints_json),
+    semanticFingerprints: JSON.parse(row.fingerprints_json)?.semantic ?? {},
+    artifactFingerprints: JSON.parse(row.fingerprints_json)?.artifacts ?? {},
+    artifactDigests: JSON.parse(row.fingerprints_json)?.digests ?? {},
+    capabilities: JSON.parse(row.capabilities_json || "{}"),
     sourceSha: row.source_sha,
     artifactRunId: Number(row.artifact_run_id),
     artifactId: Number(row.artifact_id),
@@ -229,15 +263,20 @@ export async function activateGeneration({
     await connection.query(
       `INSERT INTO ${qualified(candidateSchema, "ranking_generation_state")}
         (id, generation_id, export_id, artifact_format_version, dataset_schema_version,
-         fingerprints_json, source_sha, artifact_run_id, artifact_id,
+         fingerprints_json, capabilities_json, source_sha, artifact_run_id, artifact_id,
          activation_tables_json, previous_tables_json, activated_at)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))`,
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))`,
       [
         next.generationId,
         next.exportId,
         next.artifactFormatVersion,
         next.datasetSchemaVersion,
-        JSON.stringify(next.fingerprints),
+        JSON.stringify({
+          semantic: next.semanticFingerprints,
+          artifacts: next.artifactFingerprints,
+          digests: next.artifactDigests,
+        }),
+        JSON.stringify(next.capabilities),
         next.sourceSha,
         next.artifactRunId,
         next.artifactId,
@@ -335,6 +374,19 @@ async function main() {
       process.stdout.write(`${JSON.stringify(result)}\n`);
       return;
     }
+    if (command === "verify-active") {
+      const manifest = await readManifest(argumentValue("manifest") || "-");
+      const state = await activeState(connection, productionSchema);
+      const matches = matchesActiveGeneration({
+        activeState: state,
+        manifest,
+        artifactRunId: argumentValue("artifact-run-id"),
+        artifactId: argumentValue("artifact-id"),
+      });
+      process.stdout.write(`${JSON.stringify({ matches, state })}\n`);
+      if (!matches) process.exitCode = 2;
+      return;
+    }
     if (command === "rollback") {
       const result = await rollbackGeneration({
         connection,
@@ -349,7 +401,7 @@ async function main() {
       process.stdout.write(`${JSON.stringify(await activeState(connection, productionSchema) || {})}\n`);
       return;
     }
-    throw new Error("Use activate-ranking-generation.mjs activate, rollback, or state");
+    throw new Error("Use activate-ranking-generation.mjs activate, verify-active, rollback, or state");
   } finally {
     await connection.end();
   }

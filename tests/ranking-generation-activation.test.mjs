@@ -3,23 +3,28 @@ import test from "node:test";
 import {
   activateGeneration,
   activationTables,
+  matchesActiveGeneration,
   mergedGenerationState,
   rollbackGeneration,
 } from "../scripts/activate-ranking-generation.mjs";
 
 const manifest = {
-  version: 2,
+  version: 3,
   exportId: "2026-07-30T00:00:23Z",
   sourceSha: "a".repeat(40),
   compatibility: {
-    artifactFormatVersion: 2,
+    artifactFormatVersion: 3,
     datasetSchemaVersion: 1,
   },
   raw: { file: "wca-export.sql.zip" },
   groups: {
-    core: { fingerprint: "core-new" },
-    "sum-of-ranks": { fingerprint: "sum-new" },
-    "yearly-person-rankings": { fingerprint: "yearly-new" },
+    compatibility: { semanticFingerprint: "compat-semantic", artifactFingerprint: "compat-new", artifactDigest: "sha256:compat" },
+    "result-facts": { semanticFingerprint: "facts-semantic", artifactFingerprint: "facts-new", artifactDigest: "sha256:facts" },
+    "result-rankings": { semanticFingerprint: "result-semantic", artifactFingerprint: "result-new", artifactDigest: "sha256:result" },
+    "competition-rankings": { semanticFingerprint: "competition-semantic", artifactFingerprint: "competition-new", artifactDigest: "sha256:competition" },
+    "city-rankings": { semanticFingerprint: "city-semantic", artifactFingerprint: "city-new", artifactDigest: "sha256:city" },
+    "sum-of-ranks": { semanticFingerprint: "sum-semantic", artifactFingerprint: "sum-new", artifactDigest: "sha256:sum" },
+    "yearly-person-rankings": { semanticFingerprint: "yearly-semantic", artifactFingerprint: "yearly-new", artifactDigest: "sha256:yearly" },
   },
 };
 
@@ -31,13 +36,14 @@ function stateRow({
   return {
     generation_id: `old:${artifactId}`,
     export_id: "2026-07-29T00:00:23Z",
-    artifact_format_version: 2,
+    artifact_format_version: 3,
     dataset_schema_version: 1,
     fingerprints_json: JSON.stringify({
-      core: "core-old",
-      "sum-of-ranks": "sum-old",
-      "yearly-person-rankings": "yearly-old",
+      semantic: { compatibility: "compat-semantic-old", untouched: "same-semantic" },
+      artifacts: { compatibility: "compat-old", untouched: "same" },
+      digests: { compatibility: "sha256:old", untouched: "sha256:same" },
     }),
+    capabilities_json: JSON.stringify({ core: true, sumOfRanks: true }),
     source_sha: "b".repeat(40),
     artifact_run_id: 9,
     artifact_id: artifactId,
@@ -68,21 +74,55 @@ function fakeConnection({ activeRow = stateRow(), schemas = {} } = {}) {
   };
 }
 
-test("exact fingerprints are state, while compatibility is versioned separately", () => {
+test("partial activation preserves unchanged artifacts and capabilities", () => {
   const next = mergedGenerationState({
-    activeState: { fingerprints: { core: "old", untouched: "same" } },
+    activeState: {
+      semanticFingerprints: { compatibility: "old-semantic", untouched: "same-semantic" },
+      artifactFingerprints: { compatibility: "old", untouched: "same" },
+      artifactDigests: { compatibility: "sha256:old", untouched: "sha256:same" },
+      capabilities: { core: false, sumOfRanks: true },
+    },
     manifest: {
       ...manifest,
       raw: null,
-      groups: { core: manifest.groups.core },
+      groups: { compatibility: manifest.groups.compatibility },
     },
     artifactRunId: 20,
     artifactId: 30,
   });
-  assert.equal(next.fingerprints.core, "core-new");
-  assert.equal(next.fingerprints.untouched, "same");
-  assert.equal(next.artifactFormatVersion, 2);
+  assert.equal(next.artifactFingerprints.compatibility, "compat-new");
+  assert.equal(next.artifactFingerprints.untouched, "same");
+  assert.equal(next.artifactDigests.compatibility, "sha256:compat");
+  assert.equal(next.capabilities.core, true);
+  assert.equal(next.capabilities.sumOfRanks, true);
+  assert.equal(next.artifactFormatVersion, 3);
   assert.equal(next.datasetSchemaVersion, 1);
+});
+
+test("activated-phase recovery verifies the exact release identity and fingerprints", () => {
+  const activeState = mergedGenerationState({
+    activeState: null,
+    manifest,
+    artifactRunId: 20,
+    artifactId: 30,
+  });
+  assert.equal(matchesActiveGeneration({ activeState, manifest, artifactRunId: 20, artifactId: 30 }), true);
+  assert.equal(matchesActiveGeneration({ activeState, manifest, artifactRunId: 21, artifactId: 30 }), false);
+  assert.equal(matchesActiveGeneration({
+    activeState,
+    manifest: {
+      ...manifest,
+      groups: {
+        ...manifest.groups,
+        compatibility: {
+          ...manifest.groups.compatibility,
+          artifactFingerprint: "different",
+        },
+      },
+    },
+    artifactRunId: 20,
+    artifactId: 30,
+  }), false);
 });
 
 test("activation renames raw data, projections, export metadata, and state atomically", async () => {

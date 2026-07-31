@@ -9,6 +9,8 @@ import { normalizeExportDate } from "./projection-transfer-date.mjs";
 const selectedNames = (process.argv.find((value) => value.startsWith("--groups="))?.slice("--groups=".length) || "")
   .split(",").filter(Boolean);
 const prepareOnly = process.argv.includes("--prepare-only");
+const hydrate = process.argv.includes("--hydrate");
+if (prepareOnly && hydrate) throw new Error("--prepare-only and --hydrate cannot be combined.");
 const expectedExportDate = process.argv.find((value) => value.startsWith("--expected-export-date="))
   ?.slice("--expected-export-date=".length);
 const groups = selectedNames.length === 0
@@ -53,7 +55,7 @@ try {
   const transferDates = manifestResults.map(([rows]) => rows[0]?.export_date);
   const transferDate = transferDates[0];
   const normalizedTransferDate = normalizeExportDate(transferDate);
-  const expectedDate = prepareOnly
+  const expectedDate = prepareOnly || hydrate
     ? normalizeExportDate(expectedExportDate)
     : normalizeExportDate((await connection.query(
       "SELECT value AS export_date FROM export_metadata WHERE `key` = 'export_date' LIMIT 1",
@@ -65,7 +67,7 @@ try {
     || transferDates.some((date) => normalizeExportDate(date) !== normalizedTransferDate)
   ) {
     throw new Error(
-      `Projection export date ${transferDate || "(missing)"} does not match ${prepareOnly ? "expected" : "production raw"} export date ${expectedDate || "(missing)"}.`,
+      `Projection export date ${transferDate || "(missing)"} does not match ${prepareOnly || hydrate ? "expected" : "production raw"} export date ${expectedDate || "(missing)"}.`,
     );
   }
 
@@ -99,7 +101,18 @@ try {
       `Built ${indexes.length} indexes on ${table} in ${Math.round(performance.now() - startedAt)}ms (${builtIndexCount}/${deferredIndexes.length}).\n`,
     );
   }
-  if (prepareOnly) {
+  if (hydrate) {
+    const renames = [];
+    for (const table of transferTables) {
+      await dropManagedObject(connection, table);
+      renames.push(`\`${table}_transfer\` TO \`${table}\``);
+    }
+    await connection.query(`RENAME TABLE ${renames.join(", ")}`);
+    for (const table of [...indexesTables, ...manifestTables]) await dropManagedObject(connection, table);
+    process.stdout.write(
+      `Hydrated ${groups.map(({ name }) => name).join(", ")} for ${normalizedTransferDate}.\n`,
+    );
+  } else if (prepareOnly) {
     for (const table of indexesTables) await connection.query(`DELETE FROM \`${table}\``);
     process.stdout.write(
       `Prepared transferred projection generation for ${normalizedTransferDate}; publication was not requested.\n`,

@@ -8,9 +8,10 @@ The production pipeline is composed from five workflow blocks:
 - `deploy-server.yml` deploys a compatible server release.
 - `deploy-projections.yml` prepares, activates, verifies, or rolls back a ranking generation.
 
-`deploy.yml` composes all five for a main release. `refresh-rankings.yml` resolves the
-data-tools release approved by the last successful server deployment, then composes
-only the projection planner, builder, and deployer.
+`server-production.yml` composes the server builder and deployer on every main
+push. Independently, `projection-release.yml` composes the projection planner,
+builder, and deployer on main pushes, the daily schedule, and manual dispatches.
+A cosmetic main push exits projection planning before resolving a WCA export.
 
 ## Labeled PR projection builds
 
@@ -20,21 +21,19 @@ head, records the build in the Actions summary, and retains a checksummed releas
 artifact for 90 days. The artifact includes the raw WCA export so it remains a
 coherent dataset if production advances before the merge.
 
-When that labeled pull request is merged, the workflow finds the successful build
-by the PR head SHA, downloads that exact artifact, and sends its immutable
-coordinates through `deploy-projections.yml`. The deployer requires the raw
-export when production has advanced, and safely reuses it when production is
-still on the same export. A fork PR is intentionally ignored
-because the build requires the repository's deployment credentials and executes
-database-generation code.
+Merging the pull request does not deploy its retained artifact. The normal main
+projection release recomputes current semantic fingerprints, resolves the latest
+export when needed, and activates the desired generation. A fork PR is
+intentionally ignored because the build requires repository credentials and
+executes database-generation code.
 
 ## Identity and compatibility
 
 These are deliberately separate:
 
-- A group fingerprint is the exact content identity of a projection dataset. It
-  includes the WCA export identity, transitive SQL dependencies, migrations, and
-  generator/publisher inputs.
+- A semantic fingerprint includes only a group's output-affecting source inputs.
+- An artifact fingerprint adds the WCA export, compatibility versions, and
+  transitive dependency artifact fingerprints.
 - `artifactFormatVersion` describes the bundle/manifest contract.
 - `datasetSchemaVersion` describes the tables exposed to a server.
 - A server declares the minimum and maximum dataset schema versions it supports.
@@ -71,13 +70,14 @@ generation as failed.
 
 ## Serialization
 
-Both production orchestrators use the GitHub concurrency group
-`production-mutation` with `cancel-in-progress: false`. Queued runs are not
-superseded: each queued export is evaluated when it starts, and the planner may
-then determine that no work remains.
+The server and projection orchestrators use independent GitHub concurrency groups,
+both with `cancel-in-progress: false`. Long projection builds and candidate imports
+therefore never occupy the server release queue.
 
-Production hosts also use `/srv/wcarankings/production-mutation.lock` with `flock`.
-The atomic database activation additionally uses the MariaDB advisory lock
+The production host uses separate server and projection activation locks plus a
+short `/srv/wcarankings/production-mutation.lock` around Compose changes,
+migrations, tag cutover, atomic activation, smoke checks, and rollback. Long
+candidate work stays outside that shared lock. Atomic database activation also uses the MariaDB advisory lock
 `wcarankings-ranking-generation`. The server-side locks protect against a manually
 started or otherwise non-GitHub mutation bypassing the Actions queue.
 
@@ -101,17 +101,19 @@ The host records preparation phases by artifact ID:
 - `raw_prepared`
 - `projections_prepared`
 - `activated`
+- `superseded`
 
 A retry skips completed preparation. If activation or smoke verification fails,
 rollback returns the new tables to the candidate schema and resets the phase to
 `projections_prepared`, so retry starts at activation. A process crash after the
 atomic rename is recoverable because the active database state contains the
-artifact ID and activation receipt.
+artifact ID and activation receipt. If an `activated` receipt no longer matches
+production, the older release is marked `superseded` and cannot reactivate over a
+newer generation.
 
 ## Incrementality claim
 
-Planning and artifact caching are fingerprint-selective: unchanged groups do not
-need a new bundle, and a retry can reuse a bundle cache. The current generator may
-still rebuild shared prerequisites while producing one changed group. This design
-does **not** claim that table generation itself is incremental. Such a claim
-requires measured timing and tests proving unaffected generation work is skipped.
+Planning, artifact reuse, and table execution are fingerprint-selective. Cached
+dependency groups are hydrated into runner-local MariaDB, and only tables owned by
+cache-miss groups execute. Independent ready tables run with two workers while
+production imports remain sequential.

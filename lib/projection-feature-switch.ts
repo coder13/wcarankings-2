@@ -10,14 +10,18 @@ const CORE_TABLES = [
   "ranking_counts",
   "result_entries_single",
   "result_counts",
-  "competition_podium_members",
-  "competition_event_stats",
-  "result_facts",
+] as const;
+const RESULT_RANKINGS_TABLES = [
   "result_rankings_single",
   "result_rankings_average",
   "result_ranking_counts",
+] as const;
+const COMPETITION_RANKINGS_TABLES = [
+  "competition_podium_members",
+  "competition_event_stats",
   "competition_stats",
 ] as const;
+const CITY_EVENT_STATS_TABLES = ["city_event_stats", "entity_ranking_counts"] as const;
 const SUM_OF_RANKS_TABLES = ["person_sum_of_ranks_scores"] as const;
 const YEARLY_TABLES = [
   "person_year_ranking_cohorts",
@@ -42,6 +46,9 @@ export function featureSwitchFromTables(
   return {
     ...generation,
     core: allPresent(present, CORE_TABLES),
+    resultRankings: allPresent(present, RESULT_RANKINGS_TABLES),
+    competitionRankings: allPresent(present, COMPETITION_RANKINGS_TABLES),
+    cityEventStats: allPresent(present, CITY_EVENT_STATS_TABLES),
     sumOfRanks: allPresent(present, SUM_OF_RANKS_TABLES),
     yearlyPersonRankings: allPresent(present, YEARLY_TABLES),
   };
@@ -49,24 +56,25 @@ export function featureSwitchFromTables(
 
 async function loadProjectionFeatureSwitch() {
   try {
-    const [tables, state] = await Promise.all([
-      query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables
-         WHERE table_schema = DATABASE()
-           AND table_name IN (${[...CORE_TABLES, ...SUM_OF_RANKS_TABLES, ...YEARLY_TABLES].map(() => "?").join(", ")})`,
-        [...CORE_TABLES, ...SUM_OF_RANKS_TABLES, ...YEARLY_TABLES],
-      ),
-      query<{ generation_id: string; export_id: string }>(
-        `SELECT generation_id, export_id FROM ranking_generation_state WHERE id = 1 LIMIT 1`,
-      ).catch((error) => {
-        if ((error as { code?: string }).code === "ER_NO_SUCH_TABLE") return { rows: [] };
-        throw error;
-      }),
-    ]);
-    return featureSwitchFromTables(
-      tables.rows.map((row) => row.table_name),
-      { generationId: state.rows[0]?.generation_id ?? null, exportId: state.rows[0]?.export_id ?? null },
-    );
+    const state = await query<{
+      generation_id: string;
+      export_id: string;
+      capabilities_json: string;
+    }>(`SELECT generation_id, export_id, capabilities_json
+          FROM ranking_generation_state WHERE id = 1 LIMIT 1`);
+    const row = state.rows[0];
+    if (!row) return UNAVAILABLE_PROJECTION_FEATURE_SWITCH;
+    const capabilities = JSON.parse(row.capabilities_json) as Record<string, unknown>;
+    return {
+      generationId: row.generation_id,
+      exportId: row.export_id,
+      core: capabilities.core === true || capabilities.core === 1,
+      resultRankings: capabilities.resultRankings === true || capabilities.resultRankings === 1,
+      competitionRankings: capabilities.competitionRankings === true || capabilities.competitionRankings === 1,
+      cityEventStats: capabilities.cityEventStats === true || capabilities.cityEventStats === 1,
+      sumOfRanks: capabilities.sumOfRanks === true || capabilities.sumOfRanks === 1,
+      yearlyPersonRankings: capabilities.yearlyPersonRankings === true || capabilities.yearlyPersonRankings === 1,
+    };
   } catch {
     // Do not advertise projection-backed routes when the capability snapshot
     // cannot be read. Lists and other non-projection pages can still render.

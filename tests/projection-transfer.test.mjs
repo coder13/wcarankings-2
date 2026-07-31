@@ -19,6 +19,10 @@ const schema = await readFile(
   new URL("../scripts/mysql-schema.mjs", import.meta.url),
   "utf8",
 );
+const groups = await readFile(
+  new URL("../scripts/projection-groups.mjs", import.meta.url),
+  "utf8",
+);
 const syncWcaExport = await readFile(
   new URL("../scripts/sync-wca-export.mjs", import.meta.url),
   "utf8",
@@ -78,7 +82,9 @@ test("dry-run WCA export caching does not require a database connection", () => 
   );
 });
 
-test("publishes result facts with the core runtime transfer", () => {
+test("publishes result facts as an independent dependency artifact", () => {
   assert.match(schema, /name: "result-facts"[\s\S]*enabledByDefault: true/);
-  assert.match(schema, /tables: PUBLISHED_PROJECTION_TABLES\.filter\(\(table\) => table !== "person_sum_of_ranks_scores" && !table\.startsWith\("person_year_"\)\)/);
+  assert.match(groups, /name: "result-facts"[\s\S]*tables: \["result_facts"\]/);
+  assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts"\]/);
+  assert.match(groups, /name: "city-rankings"[\s\S]*dependencies: \["result-facts", "competition-rankings"\]/);
 });

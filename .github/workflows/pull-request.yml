@@ -43,11 +43,43 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Calculate source tree tag
-        id: source-tree
-        run: echo "sha=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
+      - name: Calculate independent component identities
+        id: components
+        run: |
+          fingerprints=$(node scripts/server-component-fingerprints.mjs)
+          echo "app=$(jq -r '.app' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
+          echo "flyway=$(jq -r '.flyway' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
+          echo "data_tools=$(jq -r '.dataTools' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore unchanged component images
+        id: existing
+        run: |
+          restore() {
+            component=$1
+            hash=$2
+            local_tag=$3
+            ref="ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-${component}:component-${hash}"
+            if docker pull "$ref"; then
+              docker tag "$ref" "$local_tag"
+              echo "${component//-/_}=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "${component//-/_}=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          restore flyway '${{ steps.components.outputs.flyway }}' wcarankings-flyway:pull-request
+          restore app '${{ steps.components.outputs.app }}' wcarankings-app:pull-request
+          restore data-tools '${{ steps.components.outputs.data_tools }}' wcarankings-data-tools:pull-request
 
       - name: Build Flyway image
+        if: steps.existing.outputs.flyway != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -56,11 +88,11 @@ jobs:
           push: false
           tags: |
             wcarankings-flyway:pull-request
-            ghcr.io/${{ github.repository_owner }}/wcarankings-flyway:tree-${{ steps.source-tree.outputs.sha }}
+            ghcr.io/${{ github.repository_owner }}/wcarankings-flyway:component-${{ steps.components.outputs.flyway }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.event.pull_request.head.sha }}
-            org.opencontainers.image.version=tree-${{ steps.source-tree.outputs.sha }}
+            org.opencontainers.image.version=component-${{ steps.components.outputs.flyway }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -105,6 +137,7 @@ jobs:
             flyway validate
 
       - name: Build production Docker image
+        if: steps.existing.outputs.app != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -112,17 +145,16 @@ jobs:
           push: false
           tags: |
             wcarankings-app:pull-request
-            ghcr.io/${{ github.repository_owner }}/wcarankings-app:tree-${{ steps.source-tree.outputs.sha }}
-          build-args: |
-            APP_COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+            ghcr.io/${{ github.repository_owner }}/wcarankings-app:component-${{ steps.components.outputs.app }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.event.pull_request.head.sha }}
-            org.opencontainers.image.version=tree-${{ steps.source-tree.outputs.sha }}
+            org.opencontainers.image.version=component-${{ steps.components.outputs.app }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Build data-tools Docker image
+        if: steps.existing.outputs.data_tools != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -131,11 +163,11 @@ jobs:
           push: false
           tags: |
             wcarankings-data-tools:pull-request
-            ghcr.io/${{ github.repository_owner }}/wcarankings-data-tools:tree-${{ steps.source-tree.outputs.sha }}
+            ghcr.io/${{ github.repository_owner }}/wcarankings-data-tools:component-${{ steps.components.outputs.data_tools }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.event.pull_request.head.sha }}
-            org.opencontainers.image.version=tree-${{ steps.source-tree.outputs.sha }}
+            org.opencontainers.image.version=component-${{ steps.components.outputs.data_tools }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -208,20 +240,18 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Log in to GitHub Container Registry
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish verified images
+      - name: Publish changed verified component images
         if: github.event.pull_request.head.repo.full_name == github.repository
         run: |
-          docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-flyway:tree-${{ steps.source-tree.outputs.sha }}"
-          docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-app:tree-${{ steps.source-tree.outputs.sha }}"
-          docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-data-tools:tree-${{ steps.source-tree.outputs.sha }}"
+          if [ '${{ steps.existing.outputs.flyway }}' != true ]; then
+            docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-flyway:component-${{ steps.components.outputs.flyway }}"
+          fi
+          if [ '${{ steps.existing.outputs.app }}' != true ]; then
+            docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-app:component-${{ steps.components.outputs.app }}"
+          fi
+          if [ '${{ steps.existing.outputs.data_tools }}' != true ]; then
+            docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/wcarankings-data-tools:component-${{ steps.components.outputs.data_tools }}"
+          fi
 
       - name: Clean up visual smoke-test containers
         if: always()

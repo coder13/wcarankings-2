@@ -7,134 +7,150 @@ import test from "node:test";
 import {
   projectionFingerprints,
   projectionReleasePlan,
+  projectionSemanticPlan,
+  semanticProjectionFingerprints,
 } from "../scripts/projection-release-plan.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
+const exportId = "2026-07-30 00:00:23 UTC";
 
-test("produces stable deployment fingerprints with transitive dependencies", async () => {
-  const first = await projectionFingerprints({
-    exportId: "2026-07-30 00:00:23 UTC",
-    repositoryRoot,
-  });
-  const second = await projectionFingerprints({
-    exportId: "2026-07-30 00:00:23 UTC",
-    repositoryRoot,
-  });
-  assert.deepEqual(first, second);
-  assert.ok(first.groups.core.inputs.includes("sql/ranking-projections/result_facts.sql"));
-  assert.ok(first.groups["yearly-person-rankings"].inputs.includes("sql/ranking-projections/result_facts.sql"));
-  assert.ok(first.groups["yearly-person-rankings"].inputs.includes("sql/ranking-projections/person_year_rankings_single.sql"));
-  assert.ok(!first.groups["sum-of-ranks"].inputs.includes("sql/ranking-projections/result_facts.sql"));
-  assert.ok(first.groups.core.inputs.includes("migrations/mysql/results/V8__result_attempts_lookup.sql"));
-  assert.ok(!first.groups.core.inputs.some((path) => path.startsWith("migrations/mysql/app/")));
-});
-
-test("selects only production groups whose fingerprints differ", async () => {
-  const desired = await projectionFingerprints({
-    exportId: "2026-07-30 00:00:23 UTC",
-    repositoryRoot,
-  });
-  const productionState = {
-    version: 1,
-    groups: {
-      core: { fingerprint: desired.groups.core.fingerprint },
-      "sum-of-ranks": { fingerprint: "stale" },
-      "yearly-person-rankings": {
-        fingerprint: desired.groups["yearly-person-rankings"].fingerprint,
-      },
-    },
+function productionState(fingerprints) {
+  return {
+    semanticFingerprints: Object.fromEntries(Object.entries(fingerprints.groups)
+      .map(([name, group]) => [name, group.semanticFingerprint])),
+    artifactFingerprints: Object.fromEntries(Object.entries(fingerprints.groups)
+      .map(([name, group]) => [name, group.artifactFingerprint])),
   };
-  const plan = await projectionReleasePlan({
-    exportId: desired.exportId,
-    productionState,
-    repositoryRoot,
-  });
-  assert.deepEqual(plan.requiredGroups, ["sum-of-ranks"]);
-});
+}
 
-test("changes dependent fingerprints when result facts change", async () => {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "projection-plan-"));
-  const baseline = await projectionFingerprints({
-    exportId: "2026-07-30 00:00:23 UTC",
-    repositoryRoot,
-  });
-  for (const group of Object.values(baseline.groups)) {
+function availableArtifacts(fingerprints, names = Object.keys(fingerprints.groups)) {
+  return Object.fromEntries(names.map((name) => [name, {
+    valid: true,
+    artifactFingerprint: fingerprints.groups[name].artifactFingerprint,
+    digest: `sha256:${name}`,
+  }]));
+}
+
+async function copySemanticInputs(destination, semantics) {
+  for (const group of Object.values(semantics.groups)) {
     for (const path of group.inputs) {
-      const destination = join(temporaryRoot, path);
-      await mkdir(dirname(destination), { recursive: true });
-      await writeFile(destination, await readFile(new URL(`../${path}`, import.meta.url)));
+      const target = join(destination, path);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, await readFile(join(repositoryRoot, path)));
     }
   }
-  const factsPath = join(temporaryRoot, "sql/ranking-projections/result_facts.sql");
-  await writeFile(factsPath, `${await readFile(factsPath, "utf8")}\n-- fingerprint test\n`);
-  const changed = await projectionFingerprints({
-    exportId: baseline.exportId,
-    repositoryRoot: temporaryRoot,
-  });
-  assert.notEqual(changed.groups.core.fingerprint, baseline.groups.core.fingerprint);
-  assert.notEqual(
-    changed.groups["yearly-person-rankings"].fingerprint,
-    baseline.groups["yearly-person-rankings"].fingerprint,
-  );
+}
+
+test("separates source-only semantic fingerprints from export artifacts", async () => {
+  const semantics = await semanticProjectionFingerprints({ repositoryRoot });
+  const first = await projectionFingerprints({ exportId, repositoryRoot, semanticFingerprints: semantics });
+  const second = await projectionFingerprints({ exportId, repositoryRoot, semanticFingerprints: semantics });
+  assert.deepEqual(first, second);
+  assert.ok(semantics.groups["result-facts"].inputs.includes("sql/ranking-projections/result_facts.sql"));
+  assert.ok(!semantics.groups["result-facts"].inputs.includes("package-lock.json"));
+  assert.ok(!semantics.groups["result-facts"].inputs.includes("docker-compose.yml"));
   assert.equal(
-    changed.groups["sum-of-ranks"].fingerprint,
-    baseline.groups["sum-of-ranks"].fingerprint,
+    first.groups["result-rankings"].dependencies["result-facts"],
+    first.groups["result-facts"].artifactFingerprint,
   );
 });
 
-test("a new raw export expands a partial request to every projection group", async () => {
+test("a cosmetic change finishes semantic planning without an export", async () => {
+  const desired = await projectionFingerprints({ exportId, repositoryRoot });
+  const plan = await projectionSemanticPlan({
+    productionState: productionState(desired),
+    repositoryRoot,
+  });
+  assert.equal(plan.required, false);
+  assert.deepEqual(plan.changedGroups, []);
+});
+
+test("a new city group hydrates cached dependencies and builds only city-owned tasks", async () => {
+  const desired = await projectionFingerprints({ exportId, repositoryRoot });
+  const state = productionState(desired);
+  state.semanticFingerprints["city-rankings"] = "stale";
+  state.artifactFingerprints["city-rankings"] = "stale";
   const plan = await projectionReleasePlan({
-    exportId: "2026-07-30 00:00:23 UTC",
-    productionExportId: "2026-07-29 00:00:22 UTC",
-    productionState: {},
-    selectedGroups: ["sum-of-ranks"],
+    exportId,
+    productionExportId: exportId,
+    productionState: state,
+    availableArtifacts: availableArtifacts(desired, ["result-facts", "competition-rankings"]),
+    repositoryRoot,
+  });
+  assert.deepEqual(plan.releaseGroups, ["city-rankings"]);
+  assert.deepEqual(plan.buildGroups, ["city-rankings"]);
+  assert.deepEqual(plan.hydrateGroups, ["result-facts", "competition-rankings"]);
+});
+
+test("a result-facts semantic change selects only its downstream closure", async () => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "projection-plan-"));
+  const baselineSemantics = await semanticProjectionFingerprints({ repositoryRoot });
+  await copySemanticInputs(temporaryRoot, baselineSemantics);
+  const baseline = await projectionFingerprints({ exportId, repositoryRoot });
+  const factsPath = join(temporaryRoot, "sql/ranking-projections/result_facts.sql");
+  await writeFile(factsPath, `${await readFile(factsPath, "utf8")}\n-- semantic test\n`);
+  const plan = await projectionSemanticPlan({
+    productionState: productionState(baseline),
+    repositoryRoot: temporaryRoot,
+  });
+  assert.deepEqual(plan.changedGroups, [
+    "result-facts",
+    "result-rankings",
+    "city-rankings",
+    "yearly-person-rankings",
+  ]);
+  assert.ok(!plan.changedGroups.includes("competition-rankings"));
+  assert.ok(!plan.changedGroups.includes("sum-of-ranks"));
+});
+
+test("an exact same-export artifact is restored without SQL execution", async () => {
+  const desired = await projectionFingerprints({ exportId, repositoryRoot });
+  const state = productionState(desired);
+  state.semanticFingerprints["sum-of-ranks"] = "stale";
+  state.artifactFingerprints["sum-of-ranks"] = "stale";
+  const plan = await projectionReleasePlan({
+    exportId,
+    productionExportId: exportId,
+    productionState: state,
+    availableArtifacts: availableArtifacts(desired, ["sum-of-ranks"]),
+    repositoryRoot,
+  });
+  assert.deepEqual(plan.cachedGroups, ["sum-of-ranks"]);
+  assert.deepEqual(plan.buildGroups, []);
+  assert.deepEqual(plan.releaseGroups, ["sum-of-ranks"]);
+});
+
+test("a new export selects every group while reusing exact artifacts", async () => {
+  const desired = await projectionFingerprints({ exportId, repositoryRoot });
+  const plan = await projectionReleasePlan({
+    exportId,
+    productionExportId: "2026-07-29T00:00:23Z",
+    productionState: productionState(desired),
+    availableArtifacts: availableArtifacts(desired),
     repositoryRoot,
   });
   assert.equal(plan.exportChanged, true);
-  assert.equal(plan.expandedToAllGroups, true);
-  assert.deepEqual(plan.requiredGroups, [
-    "core",
-    "sum-of-ranks",
-    "yearly-person-rankings",
-  ]);
+  assert.equal(plan.releaseGroups.length, 7);
+  assert.equal(plan.cachedGroups.length, 7);
+  assert.deepEqual(plan.buildGroups, []);
 });
 
-test("equivalent WCA export timestamps do not trigger a new raw export", async () => {
-  const exportId = "2026-07-30T00:00:23Z";
+test("a corrupt exact artifact is quarantined and rebuilt", async () => {
   const desired = await projectionFingerprints({ exportId, repositoryRoot });
-  const productionState = {
-    fingerprints: Object.fromEntries(
-      Object.entries(desired.groups).map(([group, value]) => [group, value.fingerprint]),
-    ),
-  };
+  const state = productionState(desired);
+  state.semanticFingerprints.compatibility = "stale";
+  state.artifactFingerprints.compatibility = "stale";
   const plan = await projectionReleasePlan({
     exportId,
-    productionExportId: "2026-07-30 00:00:23 UTC",
-    productionState,
+    productionExportId: exportId,
+    productionState: state,
+    availableArtifacts: {
+      compatibility: {
+        valid: false,
+        artifactFingerprint: desired.groups.compatibility.artifactFingerprint,
+      },
+    },
     repositoryRoot,
   });
-  assert.equal(plan.exportChanged, false);
-  assert.equal(plan.productionExportId, "2026-07-30 00:00:23 UTC");
-  assert.equal(plan.required, false);
-  assert.deepEqual(plan.requiredGroups, []);
-});
-
-test("a UI-only change invalidates no projection group", async () => {
-  const desired = await projectionFingerprints({
-    exportId: "2026-07-30 00:00:23 UTC",
-    repositoryRoot,
-  });
-  const productionState = {
-    fingerprints: Object.fromEntries(
-      Object.entries(desired.groups).map(([group, value]) => [group, value.fingerprint]),
-    ),
-  };
-  const plan = await projectionReleasePlan({
-    exportId: desired.exportId,
-    productionExportId: desired.exportId,
-    productionState,
-    repositoryRoot,
-  });
-  assert.equal(plan.required, false);
-  assert.deepEqual(plan.requiredGroups, []);
+  assert.deepEqual(plan.buildGroups, ["compatibility"]);
 });

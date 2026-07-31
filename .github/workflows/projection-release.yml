@@ -1,0 +1,116 @@
+name: Projection Production Release
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        required: false
+        default: false
+        type: boolean
+      force_rebuild:
+        description: Select all groups while retaining exact valid artifact reuse.
+        required: false
+        default: false
+        type: boolean
+      bypass_artifact_cache:
+        description: Rebuild all selected groups under fresh repair identities.
+        required: false
+        default: false
+        type: boolean
+      emergency_rebuild_data_tools:
+        description: Rebuild a missing data-tools component image.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.repository == 'coder13/wcarankings-2' && 'production-projection-release' || format('projection-release-noop-{0}', github.run_id) }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.repository == 'coder13/wcarankings-2'
+    uses: ./.github/workflows/plan-projections.yml
+    with:
+      ref: ${{ github.sha }}
+      refresh_export: ${{ github.event_name != 'push' }}
+      force_rebuild: ${{ inputs.force_rebuild == true }}
+      bypass_artifact_cache: ${{ inputs.bypass_artifact_cache == true }}
+    secrets: inherit
+
+  images:
+    if: needs.plan.outputs.required == 'true'
+    needs: plan
+    uses: ./.github/workflows/build-server.yml
+    with:
+      ref: ${{ github.sha }}
+      force_rebuild: ${{ inputs.emergency_rebuild_data_tools == true }}
+      require_existing: ${{ inputs.emergency_rebuild_data_tools != true }}
+      components: flyway,data-tools
+    secrets: inherit
+
+  build:
+    if: needs.plan.outputs.required == 'true'
+    needs: plan
+    uses: ./.github/workflows/build-projections.yml
+    with:
+      ref: ${{ github.sha }}
+      export_date: ${{ needs.plan.outputs.export_date }}
+      export_value: ${{ needs.plan.outputs.export_value }}
+      release_groups: ${{ needs.plan.outputs.release_groups }}
+      build_groups: ${{ needs.plan.outputs.build_groups }}
+      hydrate_groups: ${{ needs.plan.outputs.hydrate_groups }}
+      fingerprints: ${{ needs.plan.outputs.fingerprints }}
+      available_artifacts: ${{ needs.plan.outputs.available_artifacts }}
+      include_raw: ${{ needs.plan.outputs.raw_required == 'true' }}
+    secrets: inherit
+
+  supersession:
+    if: needs.build.result == 'success'
+    needs: [plan, build]
+    uses: ./.github/workflows/plan-projections.yml
+    with:
+      ref: main
+      groups: ${{ needs.plan.outputs.release_groups }}
+      refresh_export: ${{ github.event_name != 'push' }}
+    secrets: inherit
+
+  deploy:
+    if: >-
+      inputs.dry_run != true
+      && needs.build.result == 'success'
+      && needs.images.result == 'success'
+      && needs.supersession.outputs.required == 'true'
+      && needs.supersession.outputs.fingerprints == needs.plan.outputs.fingerprints
+    needs: [plan, images, build, supersession]
+    uses: ./.github/workflows/deploy-projections.yml
+    with:
+      ref: ${{ github.sha }}
+      artifact_name: ${{ needs.build.outputs.artifact_name }}
+      manifest_sha256: ${{ needs.build.outputs.manifest_sha256 }}
+      groups: ${{ needs.plan.outputs.release_groups }}
+      export_date: ${{ needs.plan.outputs.export_date }}
+      export_value: ${{ needs.plan.outputs.export_value }}
+      production_export_value: ${{ needs.plan.outputs.production_export_value }}
+      source_sha: ${{ needs.build.outputs.source_sha }}
+      artifact_run_id: ${{ needs.build.outputs.artifact_run_id }}
+      artifact_id: ${{ needs.build.outputs.artifact_id }}
+      data_tools_image: ${{ needs.images.outputs.data_tools_image }}
+      flyway_image: ${{ needs.images.outputs.flyway_image }}
+    secrets: inherit
+
+  superseded:
+    if: needs.build.result == 'success' && needs.deploy.result == 'skipped' && inputs.dry_run != true
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Built artifacts are valid and retained in GHCR; current main superseded activation."

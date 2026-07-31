@@ -1,0 +1,50 @@
+name: Server Production Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Resolve validated images without changing production.
+        required: false
+        default: false
+        type: boolean
+      emergency_rebuild:
+        description: Explicitly rebuild a missing component image.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.repository == 'coder13/wcarankings-2' && 'production-server-release' || format('server-release-noop-{0}', github.run_id) }}
+  cancel-in-progress: false
+
+jobs:
+  images:
+    if: github.repository == 'coder13/wcarankings-2'
+    uses: ./.github/workflows/build-server.yml
+    with:
+      ref: ${{ github.sha }}
+      force_rebuild: ${{ inputs.emergency_rebuild == true }}
+      require_existing: ${{ inputs.emergency_rebuild != true }}
+    secrets: inherit
+
+  deploy:
+    if: inputs.dry_run != true && needs.images.result == 'success'
+    needs: images
+    uses: ./.github/workflows/deploy-server.yml
+    with:
+      ref: ${{ github.sha }}
+      source_sha: ${{ needs.images.outputs.source_sha }}
+      app_image: ${{ needs.images.outputs.app_image }}
+      flyway_image: ${{ needs.images.outputs.flyway_image }}
+      data_tools_image: ${{ needs.images.outputs.data_tools_image }}
+      config_checksum: ${{ needs.images.outputs.config_checksum }}
+      compose_checksum: ${{ needs.images.outputs.compose_checksum }}
+      caddy_checksum: ${{ needs.images.outputs.caddy_checksum }}
+    secrets: inherit

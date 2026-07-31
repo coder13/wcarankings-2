@@ -142,43 +142,92 @@ jobs:
 
       - name: Copy deployment configuration
         run: |
+          scp -q -o BatchMode=yes docker-compose.yml \
+            "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-compose-${SOURCE_SHA}.yml"
+          scp -q -o BatchMode=yes ops/Caddyfile \
+            "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-Caddyfile-${SOURCE_SHA}"
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             'set -eu
-            install -d -m 0755 /srv/wcarankings/ops
-            if [ -f /srv/wcarankings/docker-compose.yml ]; then
-              cp /srv/wcarankings/docker-compose.yml /srv/wcarankings/docker-compose.yml.previous
-            fi
-            if [ -f /srv/wcarankings/ops/Caddyfile ]; then
-              cp /srv/wcarankings/ops/Caddyfile /srv/wcarankings/ops/Caddyfile.previous
-            fi'
-          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'if [ -f /srv/wcarankings/server-release-state.json ]; then
-              cp /srv/wcarankings/server-release-state.json \
-                /srv/wcarankings/server-release-state.json.previous
-            fi'
+            install -d -m 0755 /srv/wcarankings/ops'
           current_state=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             'cat /srv/wcarankings/server-release-state.json 2>/dev/null || printf "{}\n"')
           current_compose=$(jq -r '.composeChecksum // ""' <<<"$current_state")
           current_caddy=$(jq -r '.caddyChecksum // ""' <<<"$current_state")
+          current_app=$(jq -r '.appImage // ""' <<<"$current_state")
+          current_flyway=$(jq -r '.flywayImage // ""' <<<"$current_state")
+          current_data_tools=$(jq -r '.dataToolsImage // ""' <<<"$current_state")
+          current_source_sha=$(jq -r '.sourceSha // "unknown"' <<<"$current_state")
+          [ "$current_app" = "$APP_IMAGE" ] && app_changed=false || app_changed=true
+          [ "$current_flyway" = "$FLYWAY_IMAGE" ] && flyway_changed=false || flyway_changed=true
+          [ "$current_data_tools" = "$DATA_TOOLS_IMAGE" ] && data_tools_changed=false || data_tools_changed=true
+          [ "$current_compose" = "$COMPOSE_CHECKSUM" ] && compose_changed=false || compose_changed=true
+          echo "APP_IMAGE_CHANGED=$app_changed" >> "$GITHUB_ENV"
+          echo "FLYWAY_IMAGE_CHANGED=$flyway_changed" >> "$GITHUB_ENV"
+          echo "DATA_TOOLS_IMAGE_CHANGED=$data_tools_changed" >> "$GITHUB_ENV"
+          echo "COMPOSE_CONFIG_CHANGED=$compose_changed" >> "$GITHUB_ENV"
+          echo "PREVIOUS_SOURCE_SHA=$current_source_sha" >> "$GITHUB_ENV"
+          if [ "$app_changed" = true ] || [ "$compose_changed" = true ]; then
+            echo "APP_SERVICE_CHANGED=true" >> "$GITHUB_ENV"
+          else
+            echo "APP_SERVICE_CHANGED=false" >> "$GITHUB_ENV"
+          fi
           if [ "$current_caddy" != "$CADDY_CHECKSUM" ]; then
             echo "PROXY_CONFIG_CHANGED=true" >> "$GITHUB_ENV"
+            proxy_changed=true
           else
             echo "PROXY_CONFIG_CHANGED=false" >> "$GITHUB_ENV"
+            proxy_changed=false
           fi
-          scp -q -o BatchMode=yes docker-compose.yml \
-            "$SERVER_USER@$SERVER_IP:/srv/wcarankings/docker-compose.yml"
-          scp -q -o BatchMode=yes ops/Caddyfile \
-            "$SERVER_USER@$SERVER_IP:/srv/wcarankings/ops/Caddyfile"
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "SOURCE_SHA='$SOURCE_SHA' COMPOSE_CONFIG_CHANGED='$compose_changed' \
+             PROXY_CONFIG_CHANGED='$proxy_changed' sh -s" <<'REMOTE'
+            set -eu
+            exec 9>/srv/wcarankings/server-release.lock
+            flock -w 60 9
+            exec 8>/srv/wcarankings/production-mutation.lock
+            flock -w 360 8
+            if [ -f /srv/wcarankings/server-release-state.json ]; then
+              cp /srv/wcarankings/server-release-state.json \
+                /srv/wcarankings/server-release-state.json.previous
+            fi
+            if [ -f /srv/wcarankings/docker-compose.yml ]; then
+              cp /srv/wcarankings/docker-compose.yml \
+                /srv/wcarankings/docker-compose.yml.previous
+            else
+              rm -f /srv/wcarankings/docker-compose.yml.previous
+            fi
+            if [ -f /srv/wcarankings/ops/Caddyfile ]; then
+              cp /srv/wcarankings/ops/Caddyfile \
+                /srv/wcarankings/ops/Caddyfile.previous
+            else
+              rm -f /srv/wcarankings/ops/Caddyfile.previous
+            fi
+            if [ "$COMPOSE_CONFIG_CHANGED" = true ]; then
+              mv "/tmp/wcarankings-compose-${SOURCE_SHA}.yml" \
+                /srv/wcarankings/docker-compose.yml
+            else
+              rm -f "/tmp/wcarankings-compose-${SOURCE_SHA}.yml"
+            fi
+            if [ "$PROXY_CONFIG_CHANGED" = true ]; then
+              mv "/tmp/wcarankings-Caddyfile-${SOURCE_SHA}" \
+                /srv/wcarankings/ops/Caddyfile
+            else
+              rm -f "/tmp/wcarankings-Caddyfile-${SOURCE_SHA}"
+            fi
+          REMOTE
 
       - name: Stage server images and run migrations
         run: |
           set -o pipefail
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'set -eu
+            "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' sh -s" <<'REMOTE'
+            set -eu
             cd /srv/wcarankings
-            exec 9>/srv/wcarankings/production-mutation.lock
+            exec 9>/srv/wcarankings/server-release.lock
             flock -w 60 9
-            if docker image inspect wcarankings-app:latest >/dev/null 2>&1; then
+            exec 8>/srv/wcarankings/production-mutation.lock
+            flock -w 360 8
+            if [ "$APP_IMAGE_CHANGED" = true ] && docker image inspect wcarankings-app:latest >/dev/null 2>&1; then
               docker tag wcarankings-app:latest wcarankings-app:previous
             fi
             protected_images=$( {
@@ -187,31 +236,77 @@ jobs:
             } | sort -u )
             docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | while IFS=" " read -r image_ref image_id; do
               case "$image_ref" in
+                wcarankings-flyway:artifact-*|wcarankings-data-tools:artifact-*) continue ;;
                 wcarankings-app:*|wcarankings-flyway:*|wcarankings-data-tools:*) ;;
                 *) continue ;;
               esac
-              case " $protected_images " in
-                *" $image_id "*) continue ;;
-              esac
+              case " $protected_images " in *" $image_id "*) continue ;; esac
               docker image rm "$image_ref" || true
             done
-            docker image prune -f'
-          docker save \
-            "wcarankings-app:${SOURCE_SHA}" \
-            "wcarankings-flyway:${SOURCE_SHA}" \
-            "wcarankings-data-tools:${SOURCE_SHA}" \
-            | gzip -1 \
-            | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" 'gzip -d | docker load'
+            docker image prune -f
+          REMOTE
+          changed_images=()
+          if [ "$APP_IMAGE_CHANGED" = true ]; then changed_images+=("wcarankings-app:${SOURCE_SHA}"); fi
+          if [ "$FLYWAY_IMAGE_CHANGED" = true ]; then changed_images+=("wcarankings-flyway:${SOURCE_SHA}"); fi
+          if [ "$DATA_TOOLS_IMAGE_CHANGED" = true ]; then changed_images+=("wcarankings-data-tools:${SOURCE_SHA}"); fi
+          if [ "${#changed_images[@]}" -gt 0 ]; then
+            docker save "${changed_images[@]}" | gzip -1 \
+              | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" 'gzip -d | docker load'
+          fi
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "set -eu
-            exec 9>/srv/wcarankings/production-mutation.lock
+            "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' \
+             FLYWAY_IMAGE_CHANGED='$FLYWAY_IMAGE_CHANGED' \
+             DATA_TOOLS_IMAGE_CHANGED='$DATA_TOOLS_IMAGE_CHANGED' \
+             SOURCE_SHA='$SOURCE_SHA' sh -s" <<'REMOTE'
+            set -eu
+            wait_for_database_cooldown() {
+              db_container=$(docker compose ps -q db)
+              cool_samples=0
+              attempt=1
+              while [ "$attempt" -le 60 ]; do
+                cpu=$(docker stats --no-stream --format '{{.CPUPerc}}' "$db_container" | tr -d '%')
+                if printf '%s\n' "$cpu" | grep -Eq '^[0-9]+([.][0-9]+)?$' \
+                  && awk "BEGIN { exit !($cpu < 50) }"; then
+                  cool_samples=$((cool_samples + 1))
+                  echo "MariaDB cooldown sample ${cool_samples}/3: ${cpu}% CPU."
+                  if [ "$cool_samples" -ge 3 ]; then return 0; fi
+                else
+                  cool_samples=0
+                  echo "MariaDB is still settling after migrations: ${cpu:-unknown}% CPU."
+                fi
+                attempt=$((attempt + 1))
+                sleep 5
+              done
+              echo "MariaDB did not cool below 50% CPU before server cutover." >&2
+              return 1
+            }
+            exec 9>/srv/wcarankings/server-release.lock
             flock -w 60 9
-            docker tag 'wcarankings-app:${SOURCE_SHA}' wcarankings-app:latest
-            docker tag 'wcarankings-flyway:${SOURCE_SHA}' wcarankings-flyway:latest
-            docker tag 'wcarankings-data-tools:${SOURCE_SHA}' wcarankings-data-tools:latest
+            exec 8>/srv/wcarankings/production-mutation.lock
+            flock -w 360 8
+            if [ "$APP_IMAGE_CHANGED" = true ]; then docker tag "wcarankings-app:${SOURCE_SHA}" wcarankings-app:latest; fi
+            if [ "$FLYWAY_IMAGE_CHANGED" = true ]; then docker tag "wcarankings-flyway:${SOURCE_SHA}" wcarankings-flyway:latest; fi
+            if [ "$DATA_TOOLS_IMAGE_CHANGED" = true ]; then docker tag "wcarankings-data-tools:${SOURCE_SHA}" wcarankings-data-tools:latest; fi
             cd /srv/wcarankings
-            docker compose run --rm data-tools /app/scripts/prepare-flyway-history.mjs
-            docker compose run --rm flyway migrate"
+            if [ "$FLYWAY_IMAGE_CHANGED" = true ] || [ "$DATA_TOOLS_IMAGE_CHANGED" = true ]; then
+              docker compose run --rm data-tools /app/scripts/prepare-flyway-history.mjs
+              docker compose run --rm flyway migrate
+              docker compose exec -T db sh -c '
+                mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="
+                  CREATE TABLE IF NOT EXISTS result_attempts (
+                    result_id BIGINT NOT NULL,
+                    attempt_number INT NOT NULL
+                  );
+                "
+              '
+              docker compose run --rm \
+                -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+                -e FLYWAY_TABLE=flyway_schema_history_results \
+                -e FLYWAY_OUT_OF_ORDER=true \
+                flyway migrate
+              wait_for_database_cooldown
+            fi
+          REMOTE
           echo "CANDIDATE_STAGED=true" >> "$GITHUB_ENV"
 
       - name: Inject failure after migrations
@@ -221,14 +316,19 @@ jobs:
           exit 1
 
       - name: Switch production server
+        if: env.APP_SERVICE_CHANGED == 'true' || env.PROXY_CONFIG_CHANGED == 'true'
         run: |
           echo "SERVICES_SWITCHED=true" >> "$GITHUB_ENV"
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             "set -eu
             cd /srv/wcarankings
-            exec 9>/srv/wcarankings/production-mutation.lock
+            exec 9>/srv/wcarankings/server-release.lock
             flock -w 60 9
-            docker compose up -d --no-build --remove-orphans --force-recreate app
+            exec 8>/srv/wcarankings/production-mutation.lock
+            flock -w 360 8
+            if [ '$APP_SERVICE_CHANGED' = true ]; then
+              DEPLOYED_MAIN_SHA='$SOURCE_SHA' docker compose up -d --no-build --remove-orphans --force-recreate app
+            fi
             if [ '$PROXY_CONFIG_CHANGED' = true ] \
               || ! docker compose ps --status running --services | grep -qx proxy; then
               docker compose up -d --no-build --remove-orphans --force-recreate proxy
@@ -246,8 +346,10 @@ jobs:
             "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
-            exec 9>/srv/wcarankings/production-mutation.lock
+            exec 9>/srv/wcarankings/server-release.lock
             flock -w 60 9
+            exec 8>/srv/wcarankings/production-mutation.lock
+            flock -w 360 8
 
             retry_endpoint() {
               endpoint=$1
@@ -321,7 +423,12 @@ jobs:
         if: failure() && env.SERVICES_SWITCHED != 'true'
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'if docker image inspect wcarankings-app:previous >/dev/null 2>&1; then
+            'set -eu
+            exec 9>/srv/wcarankings/server-release.lock
+            flock -w 60 9
+            exec 8>/srv/wcarankings/production-mutation.lock
+            flock -w 360 8
+            if docker image inspect wcarankings-app:previous >/dev/null 2>&1; then
               docker tag wcarankings-app:previous wcarankings-app:latest
             fi
             if [ -f /srv/wcarankings/docker-compose.yml.previous ]; then
@@ -335,11 +442,14 @@ jobs:
         if: failure() && env.SERVICES_SWITCHED == 'true'
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' sh -s" <<'REMOTE'
+            "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' \
+             PREVIOUS_SOURCE_SHA='$PREVIOUS_SOURCE_SHA' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
-            exec 9>/srv/wcarankings/production-mutation.lock
+            exec 9>/srv/wcarankings/server-release.lock
             flock -w 60 9
+            exec 8>/srv/wcarankings/production-mutation.lock
+            flock -w 360 8
             if ! docker image inspect wcarankings-app:previous >/dev/null 2>&1; then
               echo "No previous server image is available for rollback." >&2
               exit 1
@@ -356,7 +466,8 @@ jobs:
             else
               rm -f server-release-state.json
             fi
-            docker compose up -d --no-build --remove-orphans --force-recreate app
+            DEPLOYED_MAIN_SHA="$PREVIOUS_SOURCE_SHA" \
+              docker compose up -d --no-build --remove-orphans --force-recreate app
             if [ "$PROXY_CONFIG_CHANGED" = true ]; then
               docker compose up -d --no-build --remove-orphans --force-recreate proxy
             fi
@@ -408,11 +519,14 @@ jobs:
         if: failure() && env.SERVICES_SWITCHED == 'true' && env.ROLLBACK_COMPLETED != 'true'
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' sh -s" <<'REMOTE'
+            "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' \
+             PREVIOUS_SOURCE_SHA='$PREVIOUS_SOURCE_SHA' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
-            exec 9>/srv/wcarankings/production-mutation.lock
+            exec 9>/srv/wcarankings/server-release.lock
             flock -w 60 9
+            exec 8>/srv/wcarankings/production-mutation.lock
+            flock -w 360 8
             docker tag wcarankings-app:previous wcarankings-app:latest
             if [ -f docker-compose.yml.previous ]; then cp docker-compose.yml.previous docker-compose.yml; fi
             if [ -f ops/Caddyfile.previous ]; then cp ops/Caddyfile.previous ops/Caddyfile; fi
@@ -421,7 +535,8 @@ jobs:
             else
               rm -f server-release-state.json
             fi
-            docker compose up -d --no-build --remove-orphans --force-recreate app
+            DEPLOYED_MAIN_SHA="$PREVIOUS_SOURCE_SHA" \
+              docker compose up -d --no-build --remove-orphans --force-recreate app
             if [ "$PROXY_CONFIG_CHANGED" = true ]; then
               docker compose up -d --no-build --remove-orphans --force-recreate proxy
             fi

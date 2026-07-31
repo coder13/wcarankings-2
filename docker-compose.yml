@@ -18,7 +18,7 @@ services:
       retries: 12
 
   flyway:
-    image: wcarankings-flyway:latest
+    image: ${FLYWAY_IMAGE_REF:-wcarankings-flyway:latest}
     build:
       context: .
       dockerfile: Dockerfile.flyway
@@ -45,6 +45,7 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
+      APP_COMMIT_SHA: ${DEPLOYED_MAIN_SHA:-unknown}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-5}
       DATABASE_QUEUE_LIMIT: ${DATABASE_QUEUE_LIMIT:-20}
@@ -59,7 +60,7 @@ services:
       - "127.0.0.1:3000:3000"
 
   data-tools:
-    image: wcarankings-data-tools:latest
+    image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
       WCA_EXPORT_CACHE_DIR: /var/cache/wcarankings

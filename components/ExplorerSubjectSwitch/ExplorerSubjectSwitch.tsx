@@ -26,7 +26,13 @@ export function ExplorerSubjectSwitch({
   variant?: "segmented" | "select" | "text";
 }) {
   const featureSwitch = useProjectionFeatureSwitch();
-  const subjects = NAVIGATION_SUBJECTS.filter((option) => featureSwitch.core || option.id === "lists");
+  const subjects = NAVIGATION_SUBJECTS.filter((option) => {
+    if (option.id === "lists") return true;
+    if (!featureSwitch.core) return false;
+    if (option.id === "results") return featureSwitch.resultRankings;
+    if (option.id === "competitions") return featureSwitch.competitionRankings;
+    return true;
+  });
   if (variant === "text") {
     return (
       <TextDropdown

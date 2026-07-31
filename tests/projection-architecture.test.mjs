@@ -43,9 +43,10 @@ test("formats table progress against the complete build workload", async () => {
 });
 
 test("keeps future grains registered while activating person metrics and competition bests", async () => {
-  const [schema, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, cities, counts, importer] =
+  const [schema, groups, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, cities, counts, importer] =
     await Promise.all([
       readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
+      readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
       readFile(new URL("sql/ranking-projections/result_facts.sql", root), "utf8"),
       readFile(new URL("sql/ranking-projections/person_event_rankings.sql", root), "utf8"),
       readFile(new URL("sql/ranking-projections/result_rankings_single.sql", root), "utf8"),
@@ -82,8 +83,10 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /DEFAULT_PROJECTION_NAMES/);
   assert.match(schema, /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/);
   assert.match(schema, /name: "sum-of-ranks"[\s\S]*dependencies: \[\]/);
-  assert.match(schema, /name: "core"[\s\S]*name !== "sum-of-ranks"/);
-  assert.match(schema, /name: "sum-of-ranks"[\s\S]*projectionNames: \["sum-of-ranks"\]/);
+  assert.match(groups, /name: "compatibility"/);
+  assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts"\]/);
+  assert.match(groups, /name: "city-rankings"[\s\S]*dependencies: \["result-facts", "competition-rankings"\]/);
+  assert.match(groups, /name: "sum-of-ranks"[\s\S]*projectionNames: \["sum-of-ranks"\]/);
   assert.match(schema, /enabledByDefault: true/);
   assert.match(importer, /promoteProjectionTables/);
 
@@ -167,6 +170,8 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(cities, /fastest_average_result_id/);
   assert.match(cities, /fastest_average_rank/);
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);
+  assert.match(counts, /FROM competition_event_stats WHERE podium_score IS NOT NULL/);
+  assert.doesNotMatch(counts, /podium_(?:single|average)_score/);
   assert.match(schema, /entity-ranking-counts/);
   assert.match(schema, /name: "competition-event-stats"[\s\S]*enabledByDefault: true/);
 });
