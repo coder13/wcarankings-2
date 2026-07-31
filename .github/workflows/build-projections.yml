@@ -203,6 +203,11 @@ jobs:
           started_at=$(date +%s)
           mkdir -p "$PROJECTION_ARTIFACT_DIR"
           docker compose up -d db
+          docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$MYSQL_DATABASE" \
+            --execute="CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL)"
           docker compose run --rm flyway migrate
           node scripts/projection-build-plan.mjs --groups="$SELECTED_GROUPS" > /tmp/projection-build-plan.json
           projection_names_csv=$(jq -r '.projectionNames | join(",")' /tmp/projection-build-plan.json)

@@ -15,6 +15,7 @@ const [
   planner,
   serverBuild,
   projectionBuild,
+  pullRequest,
   serverDeploy,
   projectionDeploy,
   approvedDataTools,
@@ -27,6 +28,7 @@ const [
   workflow("plan-projections.yml"),
   workflow("build-server.yml"),
   workflow("build-projections.yml"),
+  workflow("pull-request.yml"),
   workflow("deploy-server.yml"),
   workflow("deploy-projections.yml"),
   workflow("resolve-approved-data-tools.yml"),
@@ -93,6 +95,12 @@ test("builds one checksummed artifact containing only selected groups", () => {
   assert.match(projectionBuild, /artifact_run_id:/);
   assert.match(projectionBuild, /wca-export\.sql\.zip/);
   assert.match(projectionBuild, /docker compose down --volumes --remove-orphans/);
+  assert.match(projectionBuild, /CREATE TABLE IF NOT EXISTS result_attempts/);
+});
+
+test("keeps applied migrations immutable while preparing disposable validation databases", () => {
+  assert.match(pullRequest, /CREATE TABLE IF NOT EXISTS result_attempts/);
+  assert.match(pullRequest, /docker compose run --rm flyway migrate/);
 });
 
 test("builds labeled PR projections and deploys the exact merged artifact", () => {
