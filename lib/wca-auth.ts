@@ -1,4 +1,4 @@
-import type { WcaMeResponse } from "@/lib/data/wca-api-types";
+import type { WcaMeResponse } from "@/lib/data/types";
 
 export type WcaProfile = {
   wcaId: string;

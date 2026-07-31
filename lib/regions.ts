@@ -1,7 +1,7 @@
 import { query } from "@/db";
-import type { WcaCountry } from "@/lib/data/wca-api-types";
+import type { WcaCountry } from "@/lib/data/types";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
-import type { RankingRegionRow, RegionKind, RegionRecord } from "@/lib/data/region-types";
+import type { RankingRegionRow, RegionKind, RegionRecord } from "@/lib/data/types";
 
 const regionRequests = new Map<RegionKind, Promise<RegionRecord[]>>();
 let countriesRequest: Promise<WcaCountry[]> | null = null;

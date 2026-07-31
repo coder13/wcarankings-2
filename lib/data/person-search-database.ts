@@ -4,7 +4,7 @@ import type {
   PersonIdSearchInput,
   PersonSearchDatabaseInput,
   PersonSearchRow,
-} from "@/lib/data/person-search-types";
+} from "@/lib/data/types";
 
 function escapeLikePrefix(value: string) {
   return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
