@@ -38,8 +38,9 @@ const [
 ]);
 
 test("composes the main release from independently callable workflow blocks", () => {
-  assert.match(release, /group: production-mutation/);
-  assert.match(release, /group: production-mutation[\s\S]*cancel-in-progress: false/);
+  assert.match(release, /'production-mutation'/);
+  assert.match(release, /github\.repository == 'coder13\/wcarankings-2'/);
+  assert.match(release, /'production-mutation'[\s\S]*cancel-in-progress: false/);
   assert.doesNotMatch(release, /queue: max/);
   assert.match(release, /uses: \.\/\.github\/workflows\/plan-projections\.yml/);
   assert.match(release, /uses: \.\/\.github\/workflows\/build-server\.yml/);
@@ -61,10 +62,11 @@ test("composes the main release from independently callable workflow blocks", ()
 
 test("daily refresh reuses only the projection lego blocks", () => {
   assert.match(refresh, /workflow_dispatch:/);
+  assert.match(refresh, /github\.repository == 'coder13\/wcarankings-2'/);
   assert.match(refresh, /schedule:/);
   assert.match(refresh, /cron: "17 5 \* \* \*"/);
-  assert.match(refresh, /group: production-mutation/);
-  assert.match(refresh, /group: production-mutation[\s\S]*cancel-in-progress: false/);
+  assert.match(refresh, /'production-mutation'/);
+  assert.match(refresh, /'production-mutation'[\s\S]*cancel-in-progress: false/);
   assert.doesNotMatch(refresh, /queue: max/);
   assert.match(refresh, /plan-projections\.yml/);
   assert.match(refresh, /build-projections\.yml/);
@@ -110,6 +112,7 @@ test("keeps applied migrations immutable while preparing disposable validation d
 
 test("builds labeled PR projections and deploys the exact merged artifact", () => {
   assert.match(prProjectionRelease, /types:[\s\S]*- labeled[\s\S]*- closed/);
+  assert.match(prProjectionRelease, /github\.repository == 'coder13\/wcarankings-2'/);
   assert.match(prProjectionRelease, /github\.event\.label\.name == 'build-projections'/);
   assert.match(prProjectionRelease, /force_rebuild: true/);
   assert.match(prProjectionRelease, /include_raw: true/);
@@ -119,7 +122,7 @@ test("builds labeled PR projections and deploys the exact merged artifact", () =
   assert.match(prProjectionRelease, /actions\/download-artifact@v4/);
   assert.match(prProjectionRelease, /artifact_id:/);
   assert.match(prProjectionRelease, /deploy-projections\.yml/);
-  assert.match(prProjectionRelease, /production-mutation/);
+  assert.match(prProjectionRelease, /'production-mutation'/);
   assert.match(
     prProjectionRelease,
     /github\.event\.action == 'labeled'[\s\S]*github\.event\.label\.name == 'build-projections'[\s\S]*production-mutation/,
@@ -155,6 +158,8 @@ test("builds and verifies digest-addressed server images", () => {
 });
 
 test("server deployment retries real endpoints and rolls back with diagnostics", () => {
+  assert.match(serverDeploy, /github\.repository == 'coder13\/wcarankings-2'/);
+  assert.match(projectionDeploy, /github\.repository == 'coder13\/wcarankings-2'/);
   assert.match(serverDeploy, /@sha256:\[0-9a-f\]\{64\}/);
   assert.match(serverDeploy, /retry_endpoint "\/api\/health\/ready" 30 2/);
   assert.match(serverDeploy, /retry_endpoint "\/api\/rankings\?eventId=333&result=single&start=0&limit=1" 10 3 "Core ranking"/);

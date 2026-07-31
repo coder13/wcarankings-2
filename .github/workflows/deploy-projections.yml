@@ -67,7 +67,9 @@ permissions:
 
 jobs:
   deploy:
-    if: inputs.groups != ''
+    if: >-
+      github.repository == 'coder13/wcarankings-2'
+      && inputs.groups != ''
     runs-on: ubuntu-latest
     env:
       SERVER_IP: ${{ secrets.SERVER_IP }}

@@ -22,15 +22,20 @@ permissions:
   packages: read
 
 concurrency:
-  group: production-mutation
+  group: >-
+    ${{ github.repository == 'coder13/wcarankings-2'
+      && 'production-mutation'
+      || format('refresh-noop-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
   resolve_approved_data_tools:
+    if: github.repository == 'coder13/wcarankings-2'
     uses: ./.github/workflows/resolve-approved-data-tools.yml
     secrets: inherit
 
   plan_projections:
+    if: github.repository == 'coder13/wcarankings-2'
     needs: resolve_approved_data_tools
     uses: ./.github/workflows/plan-projections.yml
     with:
@@ -39,6 +44,7 @@ jobs:
     secrets: inherit
 
   build_projections:
+    if: github.repository == 'coder13/wcarankings-2'
     needs:
       - resolve_approved_data_tools
       - plan_projections
@@ -56,6 +62,7 @@ jobs:
   deploy_projections:
     if: >-
       inputs.dry_run != true
+      && github.repository == 'coder13/wcarankings-2'
       && needs.plan_projections.outputs.required == 'true'
       && needs.build_projections.result == 'success'
     needs:
