@@ -67,22 +67,24 @@ function getQueue() {
   return globalForDb.__cubeRanksQueue;
 }
 
+async function applyStatementTimeout(connection: PoolConnection) {
+  const timeoutSeconds = positiveNumber(process.env.DATABASE_STATEMENT_TIMEOUT_MS, 10_000) / 1000;
+  await connection.query(`SET SESSION max_statement_time = ${timeoutSeconds}`);
+}
+
 export async function query<T extends Record<string, unknown>>(
   text: string,
   values: unknown[] = [],
-  { rankingStatementTimeout = false }: { rankingStatementTimeout?: boolean } = {},
 ) {
   const releaseQueue = await getQueue().acquire();
   const queuedAt = performance.now();
   let connection: Awaited<ReturnType<Pool["getConnection"]>> | undefined;
   try {
     connection = await getPool().getConnection();
+    await applyStatementTimeout(connection);
     const queueMs = performance.now() - queuedAt;
     const statementAt = performance.now();
-    const statement = rankingStatementTimeout
-      ? `SET STATEMENT max_statement_time = ${positiveNumber(process.env.RANKINGS_STATEMENT_TIMEOUT_MS, 2000) / 1000} FOR ${text}`
-      : text;
-    const [rows] = await connection.query(statement, values) as [T[], unknown];
+    const [rows] = await connection.query(text, values) as [T[], unknown];
     return { rows, rowCount: rows.length, timings: { queueMs, statementMs: performance.now() - statementAt } };
   } finally {
     connection?.release();
@@ -97,12 +99,20 @@ export async function withTransaction<T>(
   let connection: PoolConnection | undefined;
   try {
     connection = await getPool().getConnection();
+    await applyStatementTimeout(connection);
     await connection.beginTransaction();
     const result = await callback(connection);
     await connection.commit();
     return result;
   } catch (error) {
-    await connection?.rollback();
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch {
+        connection.destroy();
+        connection = undefined;
+      }
+    }
     throw error;
   } finally {
     connection?.release();

@@ -21,7 +21,7 @@
     "db:backfill-person-year-rankings": "node --env-file-if-exists=.env.local scripts/backfill-person-year-rankings.mjs",
     "db:refresh-board-list": "node --env-file-if-exists=.env.local scripts/refresh-board-list.mjs",
     "db:refresh-delegates-list": "node --env-file-if-exists=.env.local scripts/refresh-board-list.mjs --delegates",
-    "test": "npm run build && node --test tests/deploy-workflow.test.mjs tests/projection-release-artifact.test.mjs tests/projection-release-plan.test.mjs tests/ranking-generation-activation.test.mjs tests/release-compatibility.test.mjs tests/projection-transfer.test.mjs tests/rendered-html.test.mjs tests/scroll-engine.test.mjs tests/result-projections.test.mjs tests/projection-architecture.test.mjs tests/projection-scheduler.test.mjs",
+    "test": "npm run build && node --test tests/database-timeout.test.mjs tests/deploy-workflow.test.mjs tests/projection-release-artifact.test.mjs tests/projection-release-plan.test.mjs tests/ranking-generation-activation.test.mjs tests/release-compatibility.test.mjs tests/projection-transfer.test.mjs tests/rendered-html.test.mjs tests/scroll-engine.test.mjs tests/result-projections.test.mjs tests/projection-architecture.test.mjs tests/projection-scheduler.test.mjs",
     "test:unit": "node --import ./tests/register-asset-loader.mjs --import tsx --test components/*/*.test.tsx tests/*.test.ts",
     "test:integration": "node tests/ranking-generation-activation.integration.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern storybook-static",

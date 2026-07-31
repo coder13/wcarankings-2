@@ -122,7 +122,13 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.ok(caddyBackup >= 0 && caddyBackup < caddyChange);
   assert.match(flywayHistoryRepair, /script NOT IN/);
   assert.match(flywayHistoryRepair, /script IN/);
+  assert.match(flywayHistoryRepair, /type = 'BASELINE' AND version IN/);
+  assert.match(flywayHistoryRepair, /type = 'BASELINE'[\s\S]*version NOT IN/);
   assert.doesNotMatch(flywayHistoryRepair, /SELECT \* FROM .* WHERE version IS NULL OR version IN/);
+  assert.match(pullRequest, /Exercise legacy Flyway baseline history split/);
+  assert.match(pullRequest, /V8__system_list_definitions\.sql/);
+  assert.match(pullRequest, /V8__result_attempts_lookup\.sql/);
+  assert.match(pullRequest, /type = 'BASELINE'/);
 });
 
 test("production staging remains sequential and activation is atomic", () => {

@@ -37,14 +37,29 @@ async function copyLane(connection, target, laneMigrations) {
   await connection.query(`CREATE TABLE IF NOT EXISTS ${identifier(target)} LIKE ${identifier(LEGACY_TABLE)}`);
   // Versions overlap across lanes. Match immutable filenames so an app V8
   // cannot impersonate a results V8 in the split history. Remove only rows
-  // whose version is owned by this lane but whose script is not.
+  // whose version is owned by this lane but whose script is not. Flyway's
+  // synthetic baseline row has no migration filename, so retain it only in
+  // the lane that owns its baseline version.
   await connection.query(
-    `DELETE FROM ${identifier(target)} WHERE version IN (${versionPlaceholders}) AND script NOT IN (${scriptPlaceholders})`,
-    [...versions, ...scripts],
+    `DELETE FROM ${identifier(target)}
+      WHERE type = 'BASELINE'
+        AND (version IS NULL OR version NOT IN (${versionPlaceholders}))`,
+    versions,
   );
   await connection.query(
-    `INSERT IGNORE INTO ${identifier(target)} SELECT * FROM ${identifier(LEGACY_TABLE)} WHERE version IS NULL OR script IN (${scriptPlaceholders})`,
-    scripts,
+    `DELETE FROM ${identifier(target)}
+      WHERE version IN (${versionPlaceholders})
+        AND script NOT IN (${scriptPlaceholders})
+        AND NOT (type = 'BASELINE' AND version IN (${versionPlaceholders}))`,
+    [...versions, ...scripts, ...versions],
+  );
+  await connection.query(
+    `INSERT IGNORE INTO ${identifier(target)}
+      SELECT * FROM ${identifier(LEGACY_TABLE)}
+      WHERE version IS NULL
+         OR script IN (${scriptPlaceholders})
+         OR (type = 'BASELINE' AND version IN (${versionPlaceholders}))`,
+    [...scripts, ...versions],
   );
 }
 

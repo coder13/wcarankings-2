@@ -136,6 +136,13 @@ jobs:
             -e FLYWAY_TABLE=flyway_schema_history_results \
             flyway validate
 
+      - name: Exercise application database timeout and rollback
+        env:
+          DATABASE_URL: mysql://wcarankings:local-development-password@127.0.0.1:13307/wcarankings
+          DATABASE_POOL_MAX: 1
+          DATABASE_STATEMENT_TIMEOUT_MS: 250
+        run: node --import tsx tests/database-timeout.integration.ts
+
       - name: Build production Docker image
         if: steps.existing.outputs.app != 'true'
         uses: docker/build-push-action@v6
@@ -175,6 +182,102 @@ jobs:
         run: |
           docker run --rm --entrypoint sh wcarankings-data-tools:pull-request -c \
             'test -f /app/release-compatibility.json && test -f /app/scripts/activate-ranking-generation.mjs && test -f /app/scripts/sync-wca-export.mjs'
+
+      - name: Exercise legacy Flyway baseline history split
+        run: |
+          compatibility_schema=flyway_history_compatibility
+          compatibility_url="jdbc:mariadb://db:3306/${compatibility_schema}"
+          compatibility_database_url="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${compatibility_schema}"
+          docker compose exec -T db mariadb \
+            --user=root \
+            --password="$MYSQL_ROOT_PASSWORD" \
+            --execute="
+              DROP DATABASE IF EXISTS \`${compatibility_schema}\`;
+              CREATE DATABASE \`${compatibility_schema}\`;
+              GRANT ALL PRIVILEGES ON \`${compatibility_schema}\`.* TO '${MYSQL_USER}'@'%';
+            "
+          docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$compatibility_schema" \
+            --execute="
+              CREATE TABLE export_metadata (
+                \`key\` VARCHAR(64) NOT NULL PRIMARY KEY,
+                \`value\` TEXT NOT NULL
+              );
+              CREATE TABLE result_attempts (
+                result_id BIGINT NOT NULL,
+                attempt_number INT NOT NULL
+              );
+            "
+          docker compose run --rm \
+            -e FLYWAY_URL="$compatibility_url" \
+            -e FLYWAY_TABLE=flyway_schema_history \
+            -e FLYWAY_TARGET=1 \
+            flyway migrate
+          docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$compatibility_schema" \
+            --execute="
+              INSERT INTO flyway_schema_history
+                (installed_rank, version, description, type, script, checksum,
+                 installed_by, execution_time, success)
+              VALUES
+                (2, '8', 'system list definitions', 'SQL',
+                 'V8__system_list_definitions.sql', NULL, '${MYSQL_USER}', 0, 1);
+              CREATE TABLE flyway_schema_history_results LIKE flyway_schema_history;
+              INSERT INTO flyway_schema_history_results
+                SELECT * FROM flyway_schema_history;
+            "
+          DATA_TOOLS_IMAGE_REF=wcarankings-data-tools:pull-request \
+            docker compose run --rm \
+              -e DATABASE_URL="$compatibility_database_url" \
+              data-tools /app/scripts/prepare-flyway-history.mjs
+          split_valid=$(docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$compatibility_schema" \
+            --batch \
+            --skip-column-names \
+            --execute="
+              SELECT
+                (SELECT COUNT(*) FROM flyway_schema_history_app
+                  WHERE version = '1' AND type = 'BASELINE') = 1
+                AND (SELECT COUNT(*) FROM flyway_schema_history_app
+                  WHERE version = '8') = 0
+                AND (SELECT COUNT(*) FROM flyway_schema_history_results
+                  WHERE type = 'BASELINE' OR version = '8') = 0;
+            ")
+          test "$split_valid" = 1
+          docker compose run --rm \
+            -e FLYWAY_URL="$compatibility_url" \
+            -e FLYWAY_TABLE=flyway_schema_history_app \
+            flyway migrate
+          docker compose run --rm \
+            -e FLYWAY_URL="$compatibility_url" \
+            -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+            -e FLYWAY_TABLE=flyway_schema_history_results \
+            flyway migrate
+          migrated_valid=$(docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$compatibility_schema" \
+            --batch \
+            --skip-column-names \
+            --execute="
+              SELECT
+                (SELECT COUNT(*) FROM flyway_schema_history_app
+                  WHERE version = '1' AND type = 'BASELINE') = 1
+                AND (SELECT COUNT(*) FROM flyway_schema_history_results
+                  WHERE version = '8'
+                    AND script = 'V8__result_attempts_lookup.sql') = 1;
+            ")
+          test "$migrated_valid" = 1
+          docker compose exec -T db mariadb \
+            --user=root \
+            --password="$MYSQL_ROOT_PASSWORD" \
+            --execute="DROP DATABASE \`${compatibility_schema}\`;"
 
       - name: Verify production image contents
         run: |
