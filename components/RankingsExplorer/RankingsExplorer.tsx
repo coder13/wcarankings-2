@@ -88,6 +88,7 @@ const VIM_JUMP_PAGE_COUNT = 2;
 const VIM_JUMP_SIZE = PAGE_SIZE * VIM_JUMP_PAGE_COUNT;
 const ROW_HEIGHT = 65.45;
 const EXPANDED_ROW_HEIGHT = 248;
+type ResetToRank = (rank: number, animate?: boolean, focusedPersonId?: string | null) => void;
 const MOBILE_CONTROLS_QUERY = "(max-width: 600px)";
 
 function subscribeMobileControls(listener: () => void) {
@@ -776,6 +777,7 @@ export function RankingsExplorer({
     settleTimer: null,
   });
   const scrollVelocityRef = useScrollVelocity();
+  const resetToRankRef = useRef<ResetToRank>(() => {});
   const finishPagerNavigation = useCallback(() => {
     pagerNavigationBusyRef.current = false;
     setPagerNavigationBusy(false);
@@ -1262,7 +1264,7 @@ export function RankingsExplorer({
                 if (located) {
                   pendingFocusNoticeRef.current = "";
                   setFocusNotice("");
-                  resetToRank(located.subRank, false, located.personId);
+                  resetToRankRef.current(located.subRank, false, located.personId);
                   return;
                 }
                 const notice = "That person is not ranked for the selected event or filters.";
@@ -2410,6 +2412,8 @@ export function RankingsExplorer({
     if (explicitWcaId) {
       lastFocusRequestRef.current = requestKey;
       focusedWcaIdRef.current = explicitWcaId;
+      // Apply an explicit URL focus before resolving its ranking position.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFocusedExpandedPersonId(explicitWcaId);
       void Promise.resolve().then(() => {
         if (lastFocusRequestRef.current === requestKey)
@@ -2552,7 +2556,6 @@ export function RankingsExplorer({
     resetToRank(getPagerJumpTarget(baseRank, 1, total));
   };
 
-  const resetToRankRef = useRef(resetToRank);
   const jumpToEndRef = useRef(jumpToEnd);
   useEffect(() => {
     resetToRankRef.current = resetToRank;

@@ -160,6 +160,8 @@ export function ResultsTable({
   }, []);
 
   useEffect(() => {
+    // These caches intentionally reset when the ranking context changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDetailsByKey({});
     setDetailErrorByKey({});
     if (!enablePersonDetails) setExpandedKey("");
@@ -228,7 +230,11 @@ export function ResultsTable({
   }, [activeExpandedKey, enablePersonDetails, entries, resizeRow]);
 
   useEffect(() => {
-    if (focusedExpansionKey && focusedExpansionKey !== expandedKey) setExpandedKey(focusedExpansionKey);
+    if (focusedExpansionKey && focusedExpansionKey !== expandedKey) {
+      // Sync the externally requested expansion into local interaction state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setExpandedKey(focusedExpansionKey);
+    }
   }, [expandedKey, focusedExpansionKey]);
 
   const toggleEntryDetails = useCallback((entry: RankingEntry) => {
@@ -243,6 +249,8 @@ export function ResultsTable({
     const entry = entries.find((candidate) => rankingEntryKey(candidate) === activeExpandedKey);
     if (!entry) return;
     const key = activeExpandedKey;
+    // Loading state begins as this effect starts the detail request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingKey(key);
     requestDetails(entry, key)
       .then(async (response) => {

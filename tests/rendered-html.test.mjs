@@ -292,8 +292,8 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(css, /\.row--alternate/);
   assert.doesNotMatch(css, /\.virtualRow:not\(:last-child\) \.row/);
   assert.doesNotMatch(css, /border-bottom: 1px solid #e5eaed/);
-  assert.match(css, /\.listItem:hover \.row/);
-  assert.match(css, /background-color 40ms ease/);
+  assert.match(css, /\.virtualRow:hover/);
+  assert.match(css, /background-color var\(--row-color-transition\)/);
   assert.match(css, /\.regionPickerMenu/);
   assert.match(css, /\.regionPickerTrigger/);
   assert.match(css, /\.regionOptions[\s\S]*overflow-y: auto/);

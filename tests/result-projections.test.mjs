@@ -77,6 +77,6 @@ test("normal rankings retain separate historical country and continent bests", a
   assert.match(sources, /FROM ranks_average r/);
   assert.match(sources, /UNION ALL/);
   assert.match(sources, /regional_record = 'NR'/);
-  assert.match(listRankings, /const rankingColumn = input\.region\.scope === "continent"/);
+  assert.match(listRankings, /let rankingColumn = "world_rank";[\s\S]*input\.region\.scope === "continent"/);
   assert.match(listRankings, /`ranking\.\$\{rankingColumn\} > 0`/);
 });
