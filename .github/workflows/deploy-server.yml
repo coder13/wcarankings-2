@@ -271,10 +271,11 @@ jobs:
 
             docker compose ps
             retry_endpoint "/api/health/ready" 30 2 "Readiness"
-            retry_endpoint "/api/rankings?eventId=333&result=single&year=2024&start=0&limit=1&paged=1" 10 3 "Year ranking"
-            retry_endpoint "/api/rankings?eventId=SOR&result=single&start=0&limit=10" 10 3 "Sum of ranks"
-            retry_endpoint "/api/rankings?eventId=sor-kinch&result=average&start=0&limit=10" 10 3 "Kinch ranks"
-            retry_endpoint "/api/rankings/competitions?ranking=competitor-count&start=0&limit=10" 10 3 "Competition ranking"
+            # Projection-specific endpoints are verified by deploy-projections
+            # after their candidate generation has been activated. Keep this
+            # server check limited to the core projection that every server
+            # release requires.
+            retry_endpoint "/api/rankings?eventId=333&result=single&start=0&limit=1" 10 3 "Core ranking"
 
             html=$(curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/)
             css=$(printf "%s" "$html" | sed -n 's/.*href="\([^"]*\.css\)".*/\1/p' | head -n 1)

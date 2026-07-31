@@ -10,6 +10,22 @@ import { isRankingEventId, isRankingType, parseRegionQuery } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
 
+function databaseErrorDetails(error: unknown) {
+  if (!(error instanceof Error)) return { name: "unknown" };
+  const databaseError = error as Error & {
+    code?: string;
+    errno?: number;
+    sqlState?: string;
+  };
+  return {
+    name: error.name,
+    ...(databaseError.code ? { code: databaseError.code } : {}),
+    ...(databaseError.errno ? { errno: databaseError.errno } : {}),
+    ...(databaseError.sqlState ? { sql_state: databaseError.sqlState } : {}),
+    message: error.message.slice(0, 240),
+  };
+}
+
 export async function GET(request: Request) {
   const startedAt = performance.now();
   const searchParams = new URL(request.url).searchParams;
@@ -89,7 +105,7 @@ export async function GET(request: Request) {
     if (listId) return apiError(error);
     const inputError = error instanceof ApiInputError || error instanceof DynamicListInputError;
     const status = inputError ? 400 : 503;
-    console.error(JSON.stringify({ operation: "rankings", eventId, result: type, region: scope, status, timings: { total_ms: performance.now() - startedAt }, query_count: 0, returned_rows: 0, cache: "bypass", data_version: null, error: error instanceof Error ? error.name : "unknown" }));
+    console.error(JSON.stringify({ operation: "rankings", eventId, result: type, region: scope, status, timings: { total_ms: performance.now() - startedAt }, query_count: 0, returned_rows: 0, cache: "bypass", data_version: null, error: databaseErrorDetails(error) }));
 
     return Response.json(
       { error: inputError ? error.message : "Rankings are unavailable." },
