@@ -11,6 +11,7 @@ import CompassIcon from "../Icon/compass.svg?react";
 import SearchIcon from "../Icon/search.svg?react";
 import { formatRankingNumber, type RankingEntry, type RegionOption, type RegionSelection } from "../RankingsExplorer/types";
 import type { GenderFilter } from "@/lib/wca";
+import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import { GenderPicker } from "../GenderPicker/GenderPicker";
 
 type AuthProfileResponse = {
@@ -187,6 +188,7 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
 
   const nearTop = currentPosition <= 5000;
   const nearEnd = Number.isFinite(total) && currentPosition >= total - 5000;
+  const showJumpUp = currentPosition > RESULTS_PAGE_SIZE;
   return (
     <RankingsRail className="Jump--pager" direction="down" searchNavigation={searchActive}>
       <AnimatePresence initial={false} mode="wait">
@@ -210,15 +212,34 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
           <motion.div
             key="pager-actions"
             className="Jump-pagerActions"
+            layout
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
             aria-hidden={false}
           >
-            <button className="Jump-pagerButton" onClick={onJumpUp} type="button" disabled={busy}><span>{upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}</span><ArrowUpIcon /></button>
+            <AnimatePresence initial={false} mode="popLayout">
+              {showJumpUp && (
+                <motion.button
+                  key="jump-up"
+                  layout
+                  className="Jump-pagerButton"
+                  initial={{ opacity: 0, scaleX: 0.7 }}
+                  animate={{ opacity: 1, scaleX: 1 }}
+                  exit={{ opacity: 0, scaleX: 0.7 }}
+                  transition={{ layout: railLayoutTransition, opacity: { duration: 0.14 }, scale: { duration: 0.18, ease: "easeOut" } }}
+                  style={{ transformOrigin: "left center" }}
+                  onClick={onJumpUp}
+                  type="button"
+                  disabled={busy}
+                >
+                  <span>{upArmed || nearTop ? "Jump to top" : `Up ${formatRankingNumber(5000)}`}</span><ArrowUpIcon />
+                </motion.button>
+              )}
+            </AnimatePresence>
             {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={busy} aria-label="Jump to my ranking"><span>My rank</span></button>}
-            <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={busy}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></button>
+            <motion.button layout transition={{ layout: railLayoutTransition }} className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={busy}><ArrowDownIcon /><span>{downArmed || nearEnd ? "Jump to end" : `Down ${formatRankingNumber(5000)}`}</span></motion.button>
           </motion.div>
         )}
       </AnimatePresence>
