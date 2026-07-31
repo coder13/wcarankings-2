@@ -14,6 +14,7 @@ RUN npm ci --omit=dev \
 COPY --chown=data-tools:data-tools release-compatibility.json ./
 COPY --chown=data-tools:data-tools scripts ./scripts
 COPY --chown=data-tools:data-tools sql ./sql
+COPY --chown=data-tools:data-tools migrations/mysql ./migrations/mysql
 
 RUN mkdir -p /var/cache/wcarankings \
   && chown data-tools:data-tools /var/cache/wcarankings

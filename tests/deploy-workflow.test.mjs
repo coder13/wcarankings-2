@@ -180,16 +180,22 @@ test("server deployment retries real endpoints and rolls back with diagnostics",
 });
 
 test("runs app and result migrations in separate deployment lanes", async () => {
-  const [dockerfile, compose] = await Promise.all([
+  const [dockerfile, compose, dataToolsDockerfile] = await Promise.all([
     readFile(new URL("../Dockerfile.flyway", import.meta.url), "utf8"),
     readFile(new URL("../docker-compose.yml", import.meta.url), "utf8"),
+    readFile(new URL("../Dockerfile.data-tools", import.meta.url), "utf8"),
   ]);
   assert.match(dockerfile, /COPY migrations\/mysql\/app \/flyway\/migrations\/app/);
   assert.match(dockerfile, /COPY migrations\/mysql\/results \/flyway\/migrations\/results/);
+  assert.match(dataToolsDockerfile, /COPY --chown=data-tools:data-tools migrations\/mysql \.\/migrations\/mysql/);
   assert.match(compose, /FLYWAY_LOCATIONS: filesystem:\/flyway\/migrations\/app/);
+  assert.match(compose, /FLYWAY_TABLE: flyway_schema_history_app/);
   assert.match(serverDeploy, /docker compose run --rm flyway migrate/);
+  assert.match(serverDeploy, /prepare-flyway-history\.mjs/);
   assert.match(projectionBuild, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
+  assert.match(projectionBuild, /FLYWAY_TABLE=flyway_schema_history_results/);
   assert.match(projectionDeploy, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
+  assert.match(projectionDeploy, /FLYWAY_TABLE=flyway_schema_history_results/);
   assert.match(pullRequest, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
 });
 
