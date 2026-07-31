@@ -56,8 +56,8 @@ test("composes the main release from independently callable workflow blocks", ()
   );
   assert.doesNotMatch(
     deployServer,
-    /needs\.build_projections\.result|- build_projections/,
-    "server deployment must not wait for projection artifacts",
+    /needs\.build_projections\.result|- build_projections|- plan_projections/,
+    "server deployment must not wait for projection planning or artifacts",
   );
   assert.match(
     release,

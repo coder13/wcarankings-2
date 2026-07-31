@@ -67,7 +67,6 @@ jobs:
       && github.repository == 'coder13/wcarankings-2'
       && needs.build_server.result == 'success'
     needs:
-      - plan_projections
       - build_server
     uses: ./.github/workflows/deploy-server.yml
     with:
