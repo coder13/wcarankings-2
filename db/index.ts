@@ -82,17 +82,19 @@ export async function query<T extends Record<string, unknown>>(
     const statement = rankingStatementTimeout
       ? `SET STATEMENT max_statement_time = ${positiveNumber(process.env.RANKINGS_STATEMENT_TIMEOUT_MS, 2000) / 1000} FOR ${text}`
       : text;
-    const [rows] = await connection.query(statement, values) as [T[], unknown];
-    return { rows, rowCount: rows.length, timings: { queueMs, statementMs: performance.now() - statementAt } };
+    const [rows] = (await connection.query(statement, values)) as [T[], unknown];
+    return {
+      rows,
+      rowCount: rows.length,
+      timings: { queueMs, statementMs: performance.now() - statementAt },
+    };
   } finally {
     connection?.release();
     releaseQueue();
   }
 }
 
-export async function withTransaction<T>(
-  callback: (connection: PoolConnection) => Promise<T>,
-) {
+export async function withTransaction<T>(callback: (connection: PoolConnection) => Promise<T>) {
   const releaseQueue = await getQueue().acquire();
   let connection: PoolConnection | undefined;
   try {

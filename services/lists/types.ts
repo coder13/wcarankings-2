@@ -116,7 +116,11 @@ export type MembershipDecisionRouteContext = {
 };
 export type ListRegionSelection = { scope: RegionScope; regionId: string };
 
-export type ListLookupQueryInput = { listColumns: string; byPublicId: boolean; forUpdate?: boolean };
+export type ListLookupQueryInput = {
+  listColumns: string;
+  byPublicId: boolean;
+  forUpdate?: boolean;
+};
 export type ListRankingQueryInput = {
   source: string;
   scopedConditions: string[];

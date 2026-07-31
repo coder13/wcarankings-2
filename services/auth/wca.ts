@@ -12,12 +12,23 @@ export function getWcaAuthConfig(request: Request) {
   const localDevelopment = isLocalDevelopment(request);
   const configuredOrigin = runtime.WCA_ORIGIN?.replace(/\/+$/, "");
   const clientId = runtime.WCA_CLIENT_ID ?? (localDevelopment ? LOCAL_WCA_CLIENT_ID : undefined);
-  const clientSecret = runtime.WCA_CLIENT_SECRET ?? (localDevelopment ? LOCAL_WCA_CLIENT_SECRET : undefined);
-  const redirectUri = runtime.WCA_REDIRECT_URI ?? `${getRequestOrigin(request)}/api/auth/wca/callback`;
-  const wcaOrigin = configuredOrigin ?? (localDevelopment ? LOCAL_WCA_ORIGIN : PRODUCTION_WCA_ORIGIN);
-  const exampleConfiguration = clientId === LOCAL_WCA_CLIENT_ID || clientSecret === LOCAL_WCA_CLIENT_SECRET || wcaOrigin === LOCAL_WCA_ORIGIN;
+  const clientSecret =
+    runtime.WCA_CLIENT_SECRET ?? (localDevelopment ? LOCAL_WCA_CLIENT_SECRET : undefined);
+  const redirectUri =
+    runtime.WCA_REDIRECT_URI ?? `${getRequestOrigin(request)}/api/auth/wca/callback`;
+  const wcaOrigin =
+    configuredOrigin ?? (localDevelopment ? LOCAL_WCA_ORIGIN : PRODUCTION_WCA_ORIGIN);
+  const exampleConfiguration =
+    clientId === LOCAL_WCA_CLIENT_ID ||
+    clientSecret === LOCAL_WCA_CLIENT_SECRET ||
+    wcaOrigin === LOCAL_WCA_ORIGIN;
   if (runtime.NODE_ENV === "production" && exampleConfiguration) {
-    return { clientId: undefined, clientSecret: undefined, redirectUri, wcaOrigin: PRODUCTION_WCA_ORIGIN };
+    return {
+      clientId: undefined,
+      clientSecret: undefined,
+      redirectUri,
+      wcaOrigin: PRODUCTION_WCA_ORIGIN,
+    };
   }
   return { clientId, clientSecret, redirectUri, wcaOrigin };
 }

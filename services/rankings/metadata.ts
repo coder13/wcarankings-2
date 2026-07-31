@@ -2,8 +2,21 @@ import { query } from "@/db";
 import type { RankingType, RegionScope } from "@/lib/wca";
 import { RANKINGS_CACHE_REFRESH_MS, rankingsPageCache } from "@/services/rankings/cache";
 import { countKey, yearCountKey } from "@/services/rankings/helpers";
-import { rankingCountsQuery, rankingMetadataQuery, rankingVersionQuery, requiredRankingColumnsQuery, requiredRankingIndexesQuery, requiredRankingTablesQuery, yearCountsQuery } from "@/services/rankings/queries";
-import type { CountRow, MetadataRow, RankingsMetadata, YearCountRow } from "@/services/rankings/types";
+import {
+  rankingCountsQuery,
+  rankingMetadataQuery,
+  rankingVersionQuery,
+  requiredRankingColumnsQuery,
+  requiredRankingIndexesQuery,
+  requiredRankingTablesQuery,
+  yearCountsQuery,
+} from "@/services/rankings/queries";
+import type {
+  CountRow,
+  MetadataRow,
+  RankingsMetadata,
+  YearCountRow,
+} from "@/services/rankings/types";
 
 let snapshot: RankingsMetadata | null = null;
 let loading: Promise<RankingsMetadata> | null = null;
@@ -38,20 +51,37 @@ async function loadSnapshot() {
   return {
     fetchedAt,
     exportDate: values.get("export_date") ?? null,
-    counts: new Map(counts.rows.map((row) => [countKey(row.event_id, row.ranking_type, row.scope, row.region_id), Number(row.count)])),
-    yearCounts: new Map(yearCounts.rows.map((row) => [yearCountKey(Number(row.year), row.event_id, row.ranking_type, row.scope, row.region_id), Number(row.count)])),
-    availableYears: [...new Set(yearCounts.rows.map((row) => Number(row.year)))].sort((left, right) => right - left),
+    counts: new Map(
+      counts.rows.map((row) => [
+        countKey(row.event_id, row.ranking_type, row.scope, row.region_id),
+        Number(row.count),
+      ]),
+    ),
+    yearCounts: new Map(
+      yearCounts.rows.map((row) => [
+        yearCountKey(Number(row.year), row.event_id, row.ranking_type, row.scope, row.region_id),
+        Number(row.count),
+      ]),
+    ),
+    availableYears: [...new Set(yearCounts.rows.map((row) => Number(row.year)))].sort(
+      (left, right) => right - left,
+    ),
     yearProjectionAvailable: yearCounts.available,
   };
 }
 
 export async function getRankingsMetadata() {
   if (snapshot) return snapshot;
-  if (!loading) loading = loadSnapshot().then((next) => {
-    snapshot = next;
-    lastVersionCheck = Date.now();
-    return next;
-  }).finally(() => { loading = null; });
+  if (!loading)
+    loading = loadSnapshot()
+      .then((next) => {
+        snapshot = next;
+        lastVersionCheck = Date.now();
+        return next;
+      })
+      .finally(() => {
+        loading = null;
+      });
   return loading;
 }
 
@@ -71,7 +101,9 @@ export async function refreshRankingsMetadata() {
           readiness = null;
         }
         return snapshot;
-      })().finally(() => { refreshing = null; });
+      })().finally(() => {
+        refreshing = null;
+      });
     }
     return refreshing;
   }
@@ -83,37 +115,81 @@ export async function getCurrentRankingsMetadata() {
   return refreshRankingsMetadata();
 }
 
-export function getRankingCount(metadata: RankingsMetadata, eventId: string, type: RankingType, scope: RegionScope, regionId: string) {
+export function getRankingCount(
+  metadata: RankingsMetadata,
+  eventId: string,
+  type: RankingType,
+  scope: RegionScope,
+  regionId: string,
+) {
   const count = metadata.counts.get(countKey(eventId, type, scope, regionId));
   if (count === undefined) throw new Error("Ranking count metadata is missing for this cohort.");
   return count;
 }
 
-export function getYearRankingCount(metadata: RankingsMetadata, year: number, eventId: string, type: RankingType, scope: RegionScope, regionId: string) {
+export function getYearRankingCount(
+  metadata: RankingsMetadata,
+  year: number,
+  eventId: string,
+  type: RankingType,
+  scope: RegionScope,
+  regionId: string,
+) {
   return metadata.yearCounts.get(yearCountKey(year, eventId, type, scope, regionId)) ?? 0;
 }
 
 export async function assertRankingsReady() {
-  if (!readiness) readiness = (async () => {
-    // Yearly projections are published by their own targeted backfill. Keep
-    // all-time rankings ready while an older deployment has not received that
-    // optional projection group yet; yearly requests report an unavailable
-    // year until it is present.
-    const tables = ["ranking_entries_single", "ranking_entries_average"];
-    const columns = ["event_id", "world_rank", "world_sub_rank", "continent_id", "continent_rank", "continent_sub_rank", "country_id", "country_rank", "country_sub_rank"];
-    const indexes = ["idx_ranking_entries_world", "idx_ranking_entries_continent", "idx_ranking_entries_country"];
-    const [tableRows, columnRows, indexRows] = await Promise.all([
-      query<{ name: string }>(requiredRankingTablesQuery(tables), tables),
-      query<{ table_name: string; column_name: string }>(requiredRankingColumnsQuery(tables, columns), [...tables, ...columns]),
-      query<{ table_name: string; index_name: string }>(requiredRankingIndexesQuery(tables, indexes), [...tables, ...indexes]),
-    ]);
-    for (const table of tables) {
-      if (!tableRows.rows.some((row) => row.name === table)) throw new Error(`Required projection ${table} is missing.`);
-      for (const column of columns) if (!columnRows.rows.some((row) => row.table_name === table && row.column_name === column)) throw new Error(`Required projection column ${table}.${column} is missing.`);
-      for (const index of indexes) if (!indexRows.rows.some((row) => row.table_name === table && row.index_name === index)) throw new Error(`Required projection index ${table}.${index} is missing.`);
-    }
-    await getRankingsMetadata();
-  })().catch((error) => { readiness = null; throw error; });
+  if (!readiness)
+    readiness = (async () => {
+      // Yearly projections are published by their own targeted backfill. Keep
+      // all-time rankings ready while an older deployment has not received that
+      // optional projection group yet; yearly requests report an unavailable
+      // year until it is present.
+      const tables = ["ranking_entries_single", "ranking_entries_average"];
+      const columns = [
+        "event_id",
+        "world_rank",
+        "world_sub_rank",
+        "continent_id",
+        "continent_rank",
+        "continent_sub_rank",
+        "country_id",
+        "country_rank",
+        "country_sub_rank",
+      ];
+      const indexes = [
+        "idx_ranking_entries_world",
+        "idx_ranking_entries_continent",
+        "idx_ranking_entries_country",
+      ];
+      const [tableRows, columnRows, indexRows] = await Promise.all([
+        query<{ name: string }>(requiredRankingTablesQuery(tables), tables),
+        query<{ table_name: string; column_name: string }>(
+          requiredRankingColumnsQuery(tables, columns),
+          [...tables, ...columns],
+        ),
+        query<{ table_name: string; index_name: string }>(
+          requiredRankingIndexesQuery(tables, indexes),
+          [...tables, ...indexes],
+        ),
+      ]);
+      for (const table of tables) {
+        if (!tableRows.rows.some((row) => row.name === table))
+          throw new Error(`Required projection ${table} is missing.`);
+        for (const column of columns)
+          if (
+            !columnRows.rows.some((row) => row.table_name === table && row.column_name === column)
+          )
+            throw new Error(`Required projection column ${table}.${column} is missing.`);
+        for (const index of indexes)
+          if (!indexRows.rows.some((row) => row.table_name === table && row.index_name === index))
+            throw new Error(`Required projection index ${table}.${index} is missing.`);
+      }
+      await getRankingsMetadata();
+    })().catch((error) => {
+      readiness = null;
+      throw error;
+    });
   return readiness;
 }
 

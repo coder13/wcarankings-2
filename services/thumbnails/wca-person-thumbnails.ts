@@ -13,17 +13,22 @@ export async function fetchPersonThumbnailsFromWca(
   page: number,
   limit: number,
 ) {
-  const response = await fetch(`https://www.worldcubeassociation.org/api/v0/search?q=${encodeURIComponent(search)}&page=${page}&per_page=${limit}`, {
-    headers: { Accept: "application/json", "User-Agent": "WCA Rankings person search" },
-    signal: AbortSignal.timeout(2500),
-  });
+  const response = await fetch(
+    `https://www.worldcubeassociation.org/api/v0/search?q=${encodeURIComponent(search)}&page=${page}&per_page=${limit}`,
+    {
+      headers: { Accept: "application/json", "User-Agent": "WCA Rankings person search" },
+      signal: AbortSignal.timeout(2500),
+    },
+  );
   if (!response.ok) return new Map<string, PersonThumbnail>();
-  const body = await response.json() as WcaPersonSearchResponse;
+  const body = (await response.json()) as WcaPersonSearchResponse;
   const thumbs: PersonThumbnailMap = new Map();
   for (const user of body.result ?? []) {
     if (user.class !== "person" || !user.wca_id) continue;
     const id = user.wca_id.toUpperCase();
-    const thumb = user.avatar?.is_default ? null : user.avatar?.thumb_url ?? user.avatar?.url ?? null;
+    const thumb = user.avatar?.is_default
+      ? null
+      : (user.avatar?.thumb_url ?? user.avatar?.url ?? null);
     thumbUrlCache.set(id, thumb);
     thumbs.set(id, thumb);
   }
@@ -31,13 +36,18 @@ export async function fetchPersonThumbnailsFromWca(
   const queue = [...missingIds];
   const worker = async () => {
     for (let id = queue.shift(); id; id = queue.shift()) {
-      const personResponse = await fetch(`https://www.worldcubeassociation.org/api/v0/persons/${id}`, {
-        headers: { Accept: "application/json", "User-Agent": "WCA Rankings person search" },
-        signal: AbortSignal.timeout(2500),
-      });
+      const personResponse = await fetch(
+        `https://www.worldcubeassociation.org/api/v0/persons/${id}`,
+        {
+          headers: { Accept: "application/json", "User-Agent": "WCA Rankings person search" },
+          signal: AbortSignal.timeout(2500),
+        },
+      );
       if (!personResponse.ok) continue;
-      const detail = await personResponse.json() as WcaPersonResponse;
-      const thumb = detail.person?.avatar?.is_default ? null : detail.person?.avatar?.thumb_url ?? detail.person?.avatar?.url ?? null;
+      const detail = (await personResponse.json()) as WcaPersonResponse;
+      const thumb = detail.person?.avatar?.is_default
+        ? null
+        : (detail.person?.avatar?.thumb_url ?? detail.person?.avatar?.url ?? null);
       thumbUrlCache.set(id, thumb);
       thumbs.set(id, thumb);
     }

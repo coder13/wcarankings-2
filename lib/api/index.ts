@@ -1,6 +1,4 @@
-import {
-  AuthenticationRequiredError,
-} from "@/services/auth/auth";
+import { AuthenticationRequiredError } from "@/services/auth/auth";
 import {
   ListConflictError,
   ListForbiddenError,

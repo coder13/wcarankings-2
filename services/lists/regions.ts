@@ -1,5 +1,10 @@
 import { query } from "@/db";
-import type { ListRegionRow, ListRegions, ListRegionSelection, ListSummary } from "@/services/lists/types";
+import type {
+  ListRegionRow,
+  ListRegions,
+  ListRegionSelection,
+  ListSummary,
+} from "@/services/lists/types";
 import { dynamicListRegionsQuery, listRegionsQuery } from "@/services/lists/queries";
 
 function toListRegions(rows: ListRegionRow[]): ListRegions {
@@ -19,33 +24,22 @@ function toListRegions(rows: ListRegionRow[]): ListRegions {
 }
 
 export async function getListRegions(list: ListSummary): Promise<ListRegions> {
-  const result = await query<ListRegionRow>(
-    listRegionsQuery(),
-    [list.id],
-  );
+  const result = await query<ListRegionRow>(listRegionsQuery(), [list.id]);
   return toListRegions(result.rows);
 }
 
 export async function getDynamicListRegions(personIds: string[]): Promise<ListRegions> {
   if (!personIds.length) return { continents: [], countries: [] };
-  const result = await query<ListRegionRow>(
-    dynamicListRegionsQuery(personIds.length),
-    personIds,
-  );
+  const result = await query<ListRegionRow>(dynamicListRegionsQuery(personIds.length), personIds);
   return toListRegions(result.rows);
 }
 
-export function normalizeListRegionSelection(
-  selection: ListRegionSelection,
-  regions: ListRegions,
-) {
+export function normalizeListRegionSelection(selection: ListRegionSelection, regions: ListRegions) {
   if (!hasMultipleListCountries(regions)) {
     return { scope: "world" as const, regionId: "" };
   }
   if (selection.scope === "world") return selection;
-  const allowed = selection.scope === "continent"
-    ? regions.continents
-    : regions.countries;
+  const allowed = selection.scope === "continent" ? regions.continents : regions.countries;
   return allowed.some((region) => region.id === selection.regionId)
     ? selection
     : { scope: "world" as const, regionId: "" };

@@ -13,9 +13,7 @@ async function loadRegions(kind: RegionKind): Promise<RegionRecord[]> {
       if (wcaCountries.length > 0) return wcaCountries;
     }
 
-    const result = await query<RankingRegionRow>(
-      rankingRegionsQuery(kind),
-    );
+    const result = await query<RankingRegionRow>(rankingRegionsQuery(kind));
     return result.rows;
   } catch {
     return kind === "continent" ? FALLBACK_CONTINENTS : FALLBACK_COUNTRIES;

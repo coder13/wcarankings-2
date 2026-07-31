@@ -39,23 +39,19 @@ export async function loadResultRankings(params: URLSearchParams) {
   const limit = parseLimit(params);
   const search = (params.get("search") ?? "").trim().slice(0, 80);
   const regexSearch = params.get("mode") === "vim";
-  const baseTable = resultType === "average"
-    ? "result_rankings_average"
-    : "result_rankings_single";
+  const baseTable = resultType === "average" ? "result_rankings_average" : "result_rankings_single";
   const gender = parseGender(params);
-  const table = gender.length
-    ? `worktree_gender_result_rankings_${resultType}`
-    : baseTable;
+  const table = gender.length ? `worktree_gender_result_rankings_${resultType}` : baseTable;
   const rankColumn = gender.length ? "filtered_rank" : `${scope}_rank`;
   const positionColumn = gender.length ? "filtered_position" : `${scope}_position`;
-  const conditions = [
-    "ranking.event_id = ?",
-  ];
+  const conditions = ["ranking.event_id = ?"];
   const values: unknown[] = [eventId];
   if (gender.length) {
-    const genderParts = gender.map((value) => value === "o"
-      ? "(ranking.person_gender = 'o' OR ranking.person_gender IS NULL)"
-      : "ranking.person_gender = ?");
+    const genderParts = gender.map((value) =>
+      value === "o"
+        ? "(ranking.person_gender = 'o' OR ranking.person_gender IS NULL)"
+        : "ranking.person_gender = ?",
+    );
     conditions.push(`(${genderParts.join(" OR ")})`);
     values.push(...gender.filter((value) => value !== "o"));
   }
@@ -103,14 +99,27 @@ export async function loadResultRankings(params: URLSearchParams) {
     pageValues.push(start);
   }
 
-  const rows = await query<ResultRankingRow>(resultRankingsQuery({ source: table, rankColumn, positionColumn, conditions: gender.length ? pageConditions : conditions, sourceConditions, gender, scope }), [...(gender.length ? [...sourceValues, ...pageValues] : [...values]), rowLimit]);
+  const rows = await query<ResultRankingRow>(
+    resultRankingsQuery({
+      source: table,
+      rankColumn,
+      positionColumn,
+      conditions: gender.length ? pageConditions : conditions,
+      sourceConditions,
+      gender,
+      scope,
+    }),
+    [...(gender.length ? [...sourceValues, ...pageValues] : [...values]), rowLimit],
+  );
 
   const counts = gender.length
     ? { rows: [] as Array<{ count: number }>, timings: { queueMs: 0, statementMs: 0 } }
-    : await query<{ count: number }>(
-      resultRankingCountsQuery(),
-      [eventId, resultType, scope, regionId],
-    );
+    : await query<{ count: number }>(resultRankingCountsQuery(), [
+        eventId,
+        resultType,
+        scope,
+        regionId,
+      ]);
   const pageRows = search ? rows.rows : rows.rows.slice(0, limit);
   const total = gender.length
     ? Number(rows.rows[0]?.total_count ?? 0)
@@ -142,12 +151,8 @@ export async function loadResultRankings(params: URLSearchParams) {
     data: {
       entries,
       hasMore: !search && rows.rows.length > limit,
-      nextPageStart: !search && rows.rows.length > limit && last
-        ? Number(last.position) + 1
-        : null,
-      previousPageStart: !search && start > 0
-        ? Math.max(0, start - limit)
-        : null,
+      nextPageStart: !search && rows.rows.length > limit && last ? Number(last.position) + 1 : null,
+      previousPageStart: !search && start > 0 ? Math.max(0, start - limit) : null,
       startPosition: Number(pageRows[0]?.position ?? start + 1) - 1,
       lastRank: pageRows.length ? Number(last?.rank) : null,
       total: search ? entries.length : total,

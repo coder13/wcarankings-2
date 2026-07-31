@@ -125,13 +125,16 @@ export function parseLimit(params: URLSearchParams) {
 }
 
 export function parseGender(params: URLSearchParams) {
-  const values = params.getAll("gender").flatMap((value) => value.split(",")).filter(Boolean);
+  const values = params
+    .getAll("gender")
+    .flatMap((value) => value.split(","))
+    .filter(Boolean);
   const unique = [...new Set(values)];
-  return normalizeGenderFilters(unique.map((value) => validateQueryParam(
-    value,
-    isGenderFilterValue,
-    "gender must contain only m, f, or o.",
-  )));
+  return normalizeGenderFilters(
+    unique.map((value) =>
+      validateQueryParam(value, isGenderFilterValue, "gender must contain only m, f, or o."),
+    ),
+  );
 }
 
 export function parseStart(params: URLSearchParams) {
@@ -183,13 +186,7 @@ export function parsePersonId(params: URLSearchParams, { required = false } = {}
 }
 
 export function optionalInteger(params: URLSearchParams, name: string) {
-  return parseIntegerQueryParam(
-    params,
-    name,
-    null,
-    isInteger,
-    `${name} must be an integer.`,
-  );
+  return parseIntegerQueryParam(params, name, null, isInteger, `${name} must be an integer.`);
 }
 
 export function optionalText(params: URLSearchParams, name: string, maxLength = 100) {
@@ -201,7 +198,10 @@ export function optionalText(params: URLSearchParams, name: string, maxLength = 
   );
 }
 
-export async function projectionEnvelope<T extends Record<string, unknown>>(data: T, diagnostics: ApiDiagnostics) {
+export async function projectionEnvelope<T extends Record<string, unknown>>(
+  data: T,
+  diagnostics: ApiDiagnostics,
+) {
   const metadata = await getCurrentRankingsMetadata();
   return {
     data,

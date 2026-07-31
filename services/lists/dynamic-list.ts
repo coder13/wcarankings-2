@@ -37,7 +37,9 @@ export function parseDynamicListIds(value: string | string[] | undefined) {
   }
 
   if (personIds.length > MAX_DYNAMIC_LIST_MEMBERS) {
-    throw new DynamicListInputError(`Dynamic lists support up to ${MAX_DYNAMIC_LIST_MEMBERS} people.`);
+    throw new DynamicListInputError(
+      `Dynamic lists support up to ${MAX_DYNAMIC_LIST_MEMBERS} people.`,
+    );
   }
   return { personIds, invalidIds };
 }

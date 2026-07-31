@@ -35,12 +35,25 @@ export async function loadPersonRankings(params: URLSearchParams) {
     values.push(start);
   }
 
-  const rows = await query<PersonRankingRow>(personRankingsQuery({ eventId, resultType, scope, regionId, rankColumn, positionColumn, conditions }), [...values, limit + 1]);
-
-  const counts = await query<{ count: number }>(
-    personRankingCountsQuery(),
-    [eventId, resultType, scope, regionId],
+  const rows = await query<PersonRankingRow>(
+    personRankingsQuery({
+      eventId,
+      resultType,
+      scope,
+      regionId,
+      rankColumn,
+      positionColumn,
+      conditions,
+    }),
+    [...values, limit + 1],
   );
+
+  const counts = await query<{ count: number }>(personRankingCountsQuery(), [
+    eventId,
+    resultType,
+    scope,
+    regionId,
+  ]);
   const pageRows = rows.rows.slice(0, limit);
   return {
     data: {
@@ -63,7 +76,14 @@ export async function loadPersonRankings(params: URLSearchParams) {
           roundTypeId: row.round_type_id,
         },
       })),
-      context: { resource: "people", eventId, result: resultType, scope, regionId, personId: personId || null },
+      context: {
+        resource: "people",
+        eventId,
+        result: resultType,
+        scope,
+        regionId,
+        personId: personId || null,
+      },
       page: {
         limit,
         hasMore: rows.rows.length > limit,

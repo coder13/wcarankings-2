@@ -10,7 +10,11 @@ export function generateSessionToken() {
 
 export function isLocalDevelopment(request: Request) {
   const hostname = new URL(request.url).hostname;
-  return process.env.NODE_ENV !== "production" && (
-    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]"
+  return (
+    process.env.NODE_ENV !== "production" &&
+    (hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "[::1]")
   );
 }

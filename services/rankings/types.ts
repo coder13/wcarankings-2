@@ -229,7 +229,22 @@ export type FilteredPersonMetricQueryInput = {
   pageConditions: string[];
 };
 export type EntityCountQueryInput = { kind: string; eventId: string; resultType: string };
-export type LatitudeQueryInput = { prefix: string; direction?: "ASC" | "DESC"; regionColumn?: string; scoped: boolean };
-export type CompetitionEntityQueryInput = { valueColumn: string; resultIdColumn: string; rankColumn: string; positionColumn: string };
+export type LatitudeQueryInput = {
+  prefix: string;
+  direction?: "ASC" | "DESC";
+  regionColumn?: string;
+  scoped: boolean;
+};
+export type CompetitionEntityQueryInput = {
+  valueColumn: string;
+  resultIdColumn: string;
+  rankColumn: string;
+  positionColumn: string;
+};
 export type PodiumEntityQueryInput = { positionColumn: string };
-export type CityEntityQueryInput = { valueColumn: string; resultIdColumn: string; rankColumn: string; cursor: string };
+export type CityEntityQueryInput = {
+  valueColumn: string;
+  resultIdColumn: string;
+  rankColumn: string;
+  cursor: string;
+};

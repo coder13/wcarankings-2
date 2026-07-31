@@ -13,9 +13,7 @@ import type { ListRankingRow, ListSummary, ScopedRankingSource } from "@/service
 import { listRankingsQuery } from "@/services/lists/queries";
 
 function rankingTable(type: RankingType) {
-  return type === "average"
-    ? "ranking_entries_average"
-    : "ranking_entries_single";
+  return type === "average" ? "ranking_entries_average" : "ranking_entries_single";
 }
 
 export function parseListRankingInput(searchParams: URLSearchParams) {
@@ -26,10 +24,7 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
   if (eventId !== "333mbf" && isRankingType(rawType)) type = rawType;
   const rawStart = Number(searchParams.get("start"));
   const start = Number.isFinite(rawStart) ? Math.max(0, Math.floor(rawStart)) : 0;
-  const pageLimit = Math.max(
-    1,
-    Math.min(100, Math.floor(Number(searchParams.get("limit")) || 50)),
-  );
+  const pageLimit = Math.max(1, Math.min(100, Math.floor(Number(searchParams.get("limit")) || 50)));
   const search = (searchParams.get("search") ?? "").trim().slice(0, 80);
   const locate = (searchParams.get("locate") ?? "").trim().toUpperCase();
   const searchLimit = Math.max(
@@ -39,7 +34,8 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
   const limit = search && !locate ? searchLimit : pageLimit;
   const region = parseRegionQuery(searchParams.get("region"));
   const gender = normalizeGenderFilters(
-    searchParams.getAll("gender")
+    searchParams
+      .getAll("gender")
       .flatMap((value) => value.split(","))
       .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
   );
@@ -108,27 +104,24 @@ async function loadScopedRankings(
       }),
     })),
     hasMore: !input.locate && result.rows.length > input.limit,
-    nextStart:
-      !input.locate && result.rows.length > input.limit
-        ? input.start + input.limit
-        : null,
+    nextStart: !input.locate && result.rows.length > input.limit ? input.start + input.limit : null,
     total,
     exportDate: metadata.exportDate,
   };
 }
 
-export async function loadListRankings(
-  list: ListSummary,
-  searchParams: URLSearchParams,
-) {
-  const rankings = await loadScopedRankings({
-    from: (source) => `list_members AS member
+export async function loadListRankings(list: ListSummary, searchParams: URLSearchParams) {
+  const rankings = await loadScopedRankings(
+    {
+      from: (source) => `list_members AS member
        JOIN ${source} AS ranking
          ON ranking.person_id = member.person_id
         AND ranking.event_id = ?`,
-    conditions: ["member.list_id = ?"],
-    values: [list.id],
-  }, searchParams);
+      conditions: ["member.list_id = ?"],
+      values: [list.id],
+    },
+    searchParams,
+  );
   return {
     list: {
       publicId: list.publicId,
@@ -142,18 +135,24 @@ export async function loadListRankings(
   };
 }
 
-export async function loadDynamicListRankings(
-  personIds: string[],
-  searchParams: URLSearchParams,
-) {
+export async function loadDynamicListRankings(personIds: string[], searchParams: URLSearchParams) {
   if (!personIds.length) {
     const metadata = await getCurrentRankingsMetadata();
-    return { entries: [], hasMore: false, nextStart: null, total: 0, exportDate: metadata.exportDate };
+    return {
+      entries: [],
+      hasMore: false,
+      nextStart: null,
+      total: 0,
+      exportDate: metadata.exportDate,
+    };
   }
   const placeholders = personIds.map(() => "?").join(",");
-  return loadScopedRankings({
-    from: (source) => `${source} AS ranking`,
-    conditions: ["ranking.event_id = ?", `ranking.person_id IN (${placeholders})`],
-    values: [...personIds],
-  }, searchParams);
+  return loadScopedRankings(
+    {
+      from: (source) => `${source} AS ranking`,
+      conditions: ["ranking.event_id = ?", `ranking.person_id IN (${placeholders})`],
+      values: [...personIds],
+    },
+    searchParams,
+  );
 }

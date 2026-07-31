@@ -1,6 +1,3 @@
 export function stripMarkdownLinks(value: string) {
-  return value.replace(
-    /\[([^\]]+)\]\((?:[^()]|\([^)]*\))*\)/g,
-    "$1",
-  );
+  return value.replace(/\[([^\]]+)\]\((?:[^()]|\([^)]*\))*\)/g, "$1");
 }

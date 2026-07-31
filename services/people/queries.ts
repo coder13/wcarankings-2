@@ -1,7 +1,9 @@
 import type { PersonIdSearchInput, PersonSearchDatabaseInput } from "@/services/people/types";
 
 export function personSearchRowsQuery(input: PersonSearchDatabaseInput) {
-  const nameCondition = input.regexSearch ? "person.name REGEXP ?" : "person.name LIKE ? ESCAPE '\\\\'";
+  const nameCondition = input.regexSearch
+    ? "person.name REGEXP ?"
+    : "person.name LIKE ? ESCAPE '\\\\'";
   return sql`SELECT person.wca_id, person.name, person.country_id, user.avatar_url,
        COUNT(*) OVER() AS total_count,
        COALESCE(competition_counts.competition_count, 0) AS competition_count,

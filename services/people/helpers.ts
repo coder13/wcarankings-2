@@ -10,17 +10,25 @@ export function parsePersonSearchInput(params: URLSearchParams): PersonSearchInp
   const search = (params.get("q") ?? "").trim().slice(0, 80);
   if (!search) throw new ApiInputError("q is required.");
   const mode = params.get("mode") ?? "prefix";
-  if (mode !== "prefix" && mode !== "regex") throw new ApiInputError("mode must be prefix or regex.");
+  if (mode !== "prefix" && mode !== "regex")
+    throw new ApiInputError("mode must be prefix or regex.");
   const regexSearch = mode === "regex";
-  if (regexSearch && !isValidRegexPattern(search)) throw new ApiInputError("Invalid regular expression.");
+  if (regexSearch && !isValidRegexPattern(search))
+    throw new ApiInputError("Invalid regular expression.");
   const limit = Number(params.get("limit") ?? 20);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new ApiInputError("limit must be between 1 and 50.");
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50)
+    throw new ApiInputError("limit must be between 1 and 50.");
   const offset = Number(params.get("offset") ?? 0);
-  if (!Number.isInteger(offset) || offset < 0) throw new ApiInputError("offset must be a non-negative integer.");
+  if (!Number.isInteger(offset) || offset < 0)
+    throw new ApiInputError("offset must be a non-negative integer.");
   return { search, regexSearch, limit, offset };
 }
 
-export function buildPersonSearchPayload(rows: PersonSearchRow[], input: PersonSearchInput, mode: string) {
+export function buildPersonSearchPayload(
+  rows: PersonSearchRow[],
+  input: PersonSearchInput,
+  mode: string,
+) {
   return {
     data: {
       entries: rows.map((row) => ({

@@ -1,4 +1,9 @@
-import { buildApiErrorResponse, buildApiJsonResponse, readJsonObject, assertSameOrigin } from "@/lib/api";
+import {
+  buildApiErrorResponse,
+  buildApiJsonResponse,
+  readJsonObject,
+  assertSameOrigin,
+} from "@/lib/api";
 import { getAuthUser, requireAuthUser } from "@/services/auth/auth";
 import {
   addListMembers,
@@ -51,9 +56,8 @@ export async function getPublicLists() {
 export async function getUserLists(request: Request) {
   const user = await requireAuthUser(request);
   const relation = new URL(request.url).searchParams.get("relation");
-  const lists = relation === "containing"
-    ? await listContainingUser(user)
-    : await listOwnedLists(user);
+  const lists =
+    relation === "containing" ? await listContainingUser(user) : await listOwnedLists(user);
   return privateResponse({ lists });
 }
 
@@ -92,13 +96,15 @@ export async function getList(request: Request, context: ListRouteContext) {
       },
     });
   }
-  return buildApiJsonResponse({ list }, {
-    headers: {
-      "Cache-Control": list.visibility === "public"
-        ? "public, max-age=60, s-maxage=300"
-        : "private, no-store",
+  return buildApiJsonResponse(
+    { list },
+    {
+      headers: {
+        "Cache-Control":
+          list.visibility === "public" ? "public, max-age=60, s-maxage=300" : "private, no-store",
+      },
     },
-  });
+  );
 }
 
 export async function cloneUserList(request: Request, context: ListRouteContext) {
@@ -142,13 +148,15 @@ export async function getListMembers(request: Request, context: ListRouteContext
     after: params.get("after") ?? "",
     limit: Number(params.get("limit")) || 50,
   });
-  return buildApiJsonResponse({ list, ...page }, {
-    headers: {
-      "Cache-Control": list.visibility === "public"
-        ? "public, max-age=30, s-maxage=120"
-        : "private, no-store",
+  return buildApiJsonResponse(
+    { list, ...page },
+    {
+      headers: {
+        "Cache-Control":
+          list.visibility === "public" ? "public, max-age=30, s-maxage=120" : "private, no-store",
+      },
     },
-  });
+  );
 }
 
 export async function addMembersToList(request: Request, context: ListRouteContext) {
@@ -188,19 +196,22 @@ export async function getListRankings(request: Request, context: ListRouteContex
   assertCanViewList(list, user);
   const result = await loadListRankings(list, new URL(request.url).searchParams);
   const totalMs = performance.now() - startedAt;
-  console.info(JSON.stringify({
-    operation: "list-rankings",
-    list_id: list.id,
-    list_kind: list.kind,
-    member_count: list.memberCount,
-    returned_rows: result.entries.length,
-    total_ms: totalMs,
-  }));
+  console.info(
+    JSON.stringify({
+      operation: "list-rankings",
+      list_id: list.id,
+      list_kind: list.kind,
+      member_count: list.memberCount,
+      returned_rows: result.entries.length,
+      total_ms: totalMs,
+    }),
+  );
   return buildApiJsonResponse(result, {
     headers: {
-      "Cache-Control": list.visibility === "public"
-        ? "public, max-age=30, s-maxage=300, stale-while-revalidate=60"
-        : "private, no-store",
+      "Cache-Control":
+        list.visibility === "public"
+          ? "public, max-age=30, s-maxage=300, stale-while-revalidate=60"
+          : "private, no-store",
       "Server-Timing": `total;dur=${totalMs.toFixed(1)}`,
       "X-List-Membership-Version": String(list.membershipVersion),
       "X-Rankings-Data-Version": result.exportDate ?? "unknown",
@@ -223,7 +234,10 @@ export async function createMembershipRequest(request: Request, context: ListRou
   return privateResponse(result, 201);
 }
 
-export async function decideMembershipRequestForUser(request: Request, context: MembershipDecisionRouteContext) {
+export async function decideMembershipRequestForUser(
+  request: Request,
+  context: MembershipDecisionRouteContext,
+) {
   assertSameOrigin(request);
   const user = await requireAuthUser(request);
   const body = await readJsonObject(request);

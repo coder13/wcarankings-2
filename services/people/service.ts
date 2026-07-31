@@ -50,7 +50,10 @@ export async function loadPersonSearch(params: URLSearchParams) {
     ...parts.payload,
     data: {
       ...parts.payload.data,
-      entries: parts.payload.data.entries.map((entry) => ({ ...entry, avatarUrl: thumbs[entry.personId] ?? entry.avatarUrl })),
+      entries: parts.payload.data.entries.map((entry) => ({
+        ...entry,
+        avatarUrl: thumbs[entry.personId] ?? entry.avatarUrl,
+      })),
     },
   };
 }

@@ -17,10 +17,7 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const state = requestUrl.searchParams.get("state");
   const storedState = readCookie(request, "wca_oauth_state");
-  const returnTo = getSameOriginDestination(
-    request,
-    readCookie(request, "wca_oauth_return_to"),
-  );
+  const returnTo = getSameOriginDestination(request, readCookie(request, "wca_oauth_return_to"));
   const { clientId, clientSecret, redirectUri, wcaOrigin } = getWcaAuthConfig(request);
 
   if (!code || !state || state !== storedState || !clientId || !clientSecret) {
@@ -49,7 +46,7 @@ export async function GET(request: Request) {
     if (!tokenResponse.ok) {
       throw new Error(`WCA token exchange failed with status ${tokenResponse.status}`);
     }
-    const token = await tokenResponse.json() as WcaOAuthTokenResponse;
+    const token = (await tokenResponse.json()) as WcaOAuthTokenResponse;
     if (!token.access_token) throw new Error("Token was missing");
 
     const meResponse = await fetch(new URL("/api/v0/me", wcaOrigin), {

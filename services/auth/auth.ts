@@ -1,11 +1,14 @@
 import type { ResultSetHeader } from "mysql2/promise";
 import { query, withTransaction } from "@/db";
-import {
-  makeCookie,
-  readCookie,
-} from "@/services/auth/wca";
+import { makeCookie, readCookie } from "@/services/auth/wca";
 import { generateSessionToken, hashSessionToken } from "@/services/auth/helpers";
-import { authUserByIdQuery, authUserBySessionQuery, deleteAuthSessionQuery, insertAuthSessionQuery, upsertUserQuery } from "@/services/auth/queries";
+import {
+  authUserByIdQuery,
+  authUserBySessionQuery,
+  deleteAuthSessionQuery,
+  insertAuthSessionQuery,
+  upsertUserQuery,
+} from "@/services/auth/queries";
 import type { AuthUser, AuthUserRow, WcaProfile } from "@/services/auth/types";
 
 export { generateSessionToken } from "@/services/auth/helpers";
@@ -30,19 +33,15 @@ export async function createAuthSession(profile: WcaProfile) {
   const expiresAt = new Date(Date.now() + AUTH_SESSION_MAX_AGE_SECONDS * 1000);
 
   const user = await withTransaction(async (connection) => {
-    const [result] = await connection.execute<ResultSetHeader>(
-      upsertUserQuery(),
-      [profile.wcaId, profile.name, profile.countryIso2, profile.avatarUrl],
-    );
+    const [result] = await connection.execute<ResultSetHeader>(upsertUserQuery(), [
+      profile.wcaId,
+      profile.name,
+      profile.countryIso2,
+      profile.avatarUrl,
+    ]);
     const userId = Number(result.insertId);
-    await connection.execute(
-      insertAuthSessionQuery(),
-      [tokenHash, userId, expiresAt],
-    );
-    const [rows] = await connection.execute<AuthUserRow[]>(
-      authUserByIdQuery(),
-      [userId],
-    );
+    await connection.execute(insertAuthSessionQuery(), [tokenHash, userId, expiresAt]);
+    const [rows] = await connection.execute<AuthUserRow[]>(authUserByIdQuery(), [userId]);
     if (!rows[0]) throw new Error("The WCA user could not be persisted.");
     return toAuthUser(rows[0]);
   });
@@ -53,10 +52,7 @@ export async function createAuthSession(profile: WcaProfile) {
 export async function getAuthUser(request: Request) {
   const token = readCookie(request, AUTH_SESSION_COOKIE);
   if (!token) return null;
-  const result = await query<AuthUserRow>(
-    authUserBySessionQuery(),
-    [hashSessionToken(token)],
-  );
+  const result = await query<AuthUserRow>(authUserBySessionQuery(), [hashSessionToken(token)]);
   return result.rows[0] ? toAuthUser(result.rows[0]) : null;
 }
 
@@ -64,10 +60,7 @@ export async function deleteAuthSession(request: Request) {
   const token = readCookie(request, AUTH_SESSION_COOKIE);
   if (!token) return;
   await withTransaction(async (connection) => {
-    await connection.execute(
-      deleteAuthSessionQuery(),
-      [hashSessionToken(token)],
-    );
+    await connection.execute(deleteAuthSessionQuery(), [hashSessionToken(token)]);
   });
 }
 

@@ -14,9 +14,8 @@ export class RankingsPageCache<T extends object> {
   private pool(eventId: string) {
     let pool = this.pools.get(eventId);
     if (!pool) {
-      const capacity = eventId === "333"
-        ? RANKINGS_CACHE_CAPACITY_333
-        : RANKINGS_CACHE_CAPACITY_DEFAULT;
+      const capacity =
+        eventId === "333" ? RANKINGS_CACHE_CAPACITY_333 : RANKINGS_CACHE_CAPACITY_DEFAULT;
       pool = { cache: new LRUCache<string, T>({ max: capacity }), pinnedKeys: new Set() };
       this.pools.set(eventId, pool);
     }

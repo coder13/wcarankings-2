@@ -9,8 +9,14 @@ export function yearlyRankingTable(type: RankingType) {
 }
 
 export function rankingShape(scope: RegionScope) {
-  if (scope === "continent") return { rank: "continent_rank", subRank: "continent_sub_rank", region: "continent_id" } as const;
-  if (scope === "country") return { rank: "country_rank", subRank: "country_sub_rank", region: "country_id" } as const;
+  if (scope === "continent")
+    return {
+      rank: "continent_rank",
+      subRank: "continent_sub_rank",
+      region: "continent_id",
+    } as const;
+  if (scope === "country")
+    return { rank: "country_rank", subRank: "country_sub_rank", region: "country_id" } as const;
   return { rank: "world_rank", subRank: "world_sub_rank", region: null } as const;
 }
 
@@ -20,7 +26,9 @@ export function rankingColumns(rank: string, subRank: string) {
 
 export function genderCondition(alias: string, genders: readonly GenderFilter[]) {
   if (!genders.length) return { sql: "", values: [] as unknown[] };
-  const parts = genders.map((gender) => gender === "o" ? `(${alias}.gender = 'o' OR ${alias}.gender IS NULL)` : `${alias}.gender = ?`);
+  const parts = genders.map((gender) =>
+    gender === "o" ? `(${alias}.gender = 'o' OR ${alias}.gender IS NULL)` : `${alias}.gender = ?`,
+  );
   return { sql: `(${parts.join(" OR ")})`, values: genders.filter((gender) => gender !== "o") };
 }
 
@@ -28,11 +36,23 @@ export function countKey(eventId: string, type: RankingType, scope: RegionScope,
   return `${eventId}:${type}:${scope}:${regionId}`;
 }
 
-export function yearCountKey(year: number, eventId: string, type: RankingType, scope: RegionScope, regionId: string) {
+export function yearCountKey(
+  year: number,
+  eventId: string,
+  type: RankingType,
+  scope: RegionScope,
+  regionId: string,
+) {
   return `${year}:${countKey(eventId, type, scope, regionId)}`;
 }
 
-export function rankingPageKey({ year, type, scope, regionId, startRank }: {
+export function rankingPageKey({
+  year,
+  type,
+  scope,
+  regionId,
+  startRank,
+}: {
   year?: number | null;
   type: RankingType;
   scope: RegionScope;
