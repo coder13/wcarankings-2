@@ -311,6 +311,18 @@ test("uses the copied WCA Rankings visual language", async () => {
   await assert.rejects(access(new URL("public/_sites-preview", templateRoot)));
 });
 
+test("binds rail scroll progress through a MotionValue", async () => {
+  const component = await readFile(
+    new URL("../components/RankingsExplorer/RankingsExplorer.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(component, /useMotionValue\(0\)/);
+  assert.match(component, /topRailProgressValue\.set\(topRailProgress\)/);
+  assert.match(component, /<motion\.div[\s\S]*?className="stickyRankingsRail"/);
+  assert.doesNotMatch(component, /as unknown as CSSProperties/);
+});
+
 test("production build keeps rankings styles in the root stylesheet", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("../dist/client/.vite/ssr-manifest.json", import.meta.url), "utf8"),

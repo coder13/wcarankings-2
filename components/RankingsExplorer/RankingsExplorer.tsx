@@ -1,7 +1,7 @@
 "use client";
 
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { AnimatePresence, LayoutGroup, useSpring } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion, useMotionValue, useSpring } from "motion/react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -11,7 +11,6 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-  type CSSProperties,
 } from "react";
 import {
   animateScrollTo,
@@ -689,11 +688,15 @@ export function RankingsExplorer({
     y: number;
   } | null>(null);
   const { topProgress: topRailProgress, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
-  const animatedTopRailProgress = useSpring(topRailProgress, {
+  const topRailProgressValue = useMotionValue(0);
+  const animatedTopRailProgress = useSpring(topRailProgressValue, {
     stiffness: 700,
     damping: 62,
     mass: 0.22,
   });
+  useEffect(() => {
+    topRailProgressValue.set(topRailProgress);
+  }, [topRailProgress, topRailProgressValue]);
   const activeListKey = [
     subject,
     competitionRanking,
@@ -2997,10 +3000,10 @@ export function RankingsExplorer({
         )}
       </AppHeader>
 
-      <div
+      <motion.div
         ref={stickyRankingsRailRef}
         className="stickyRankingsRail"
-        style={{ "--rail-scroll-progress": animatedTopRailProgress } as unknown as CSSProperties}
+        style={{ "--rail-scroll-progress": animatedTopRailProgress }}
       >
         {listOwner && <ListOwnerControls listId={listOwner.listId} initialVisibility={listOwner.visibility} initialJoinPolicy={listOwner.joinPolicy} onManageMembers={() => { setMemberSelectionMode(true); setSelectedMemberIds(new Set()); }} />}
         {listActions && !listActions.isOwner && <ListCloneExportControls listId={listActions.listId} />}
@@ -3054,7 +3057,7 @@ export function RankingsExplorer({
         />}
           </AnimatePresence>
         </LayoutGroup>
-      </div>
+      </motion.div>
 
       <main>
         <div className="outerListWrapper" ref={listRef}>
