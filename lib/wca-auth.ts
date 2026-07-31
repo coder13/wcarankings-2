@@ -1,17 +1,10 @@
+import type { WcaMeResponse } from "@/lib/data/wca-api-types";
+
 export type WcaProfile = {
   wcaId: string;
   name: string;
   countryIso2: string;
   avatarUrl: string | null;
-};
-
-type WcaMeResponse = {
-  me?: {
-    wca_id?: string;
-    name?: string;
-    country_iso2?: string;
-    avatar?: { thumb_url?: string; url?: string };
-  };
 };
 
 const LOCAL_WCA_ORIGIN = "https://staging.worldcubeassociation.org";

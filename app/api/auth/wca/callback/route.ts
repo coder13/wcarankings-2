@@ -6,6 +6,7 @@ import {
   readCookie,
   toWcaProfile,
 } from "@/lib/wca-auth";
+import type { WcaOAuthTokenResponse } from "@/lib/data/wca-api-types";
 import { authSessionCookie, createAuthSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
     if (!tokenResponse.ok) {
       throw new Error(`WCA token exchange failed with status ${tokenResponse.status}`);
     }
-    const token = (await tokenResponse.json()) as { access_token?: string };
+    const token = await tokenResponse.json() as WcaOAuthTokenResponse;
     if (!token.access_token) throw new Error("Token was missing");
 
     const meResponse = await fetch(new URL("/api/v0/me", wcaOrigin), {

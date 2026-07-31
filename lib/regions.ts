@@ -1,15 +1,7 @@
 import { query } from "@/db";
+import type { WcaCountry } from "@/lib/data/wca-api-types";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
-
-export type RegionKind = "continent" | "country";
-
-export type RegionRecord = {
-  id: string;
-  name: string;
-  iso2?: string;
-};
-
-type WcaCountry = RegionRecord;
+import type { RankingRegionRow, RegionKind, RegionRecord } from "@/lib/data/region-types";
 
 const regionRequests = new Map<RegionKind, Promise<RegionRecord[]>>();
 let countriesRequest: Promise<WcaCountry[]> | null = null;
@@ -24,8 +16,8 @@ function getWcaCountries() {
       if (!Array.isArray(data)) return [];
       return data.filter((country): country is WcaCountry => (
         typeof country === "object" && country !== null &&
-        typeof (country as { id?: unknown }).id === "string" &&
-        typeof (country as { name?: unknown }).name === "string"
+        "id" in country && typeof country.id === "string" &&
+        "name" in country && typeof country.name === "string"
       ));
     }).catch(() => []);
   }
@@ -42,7 +34,7 @@ async function loadRegions(kind: RegionKind): Promise<RegionRecord[]> {
     const idColumn = kind === "continent" ? "continent_id" : "country_id";
     const nameColumn = kind === "continent" ? "continent_id" : "country_name";
     const isoColumn = kind === "continent" ? "''" : "country_iso2";
-    const result = await query<{ id: string; name: string; iso2: string }>(
+    const result = await query<RankingRegionRow>(
       `SELECT DISTINCT ${idColumn} AS id, ${nameColumn} AS name, ${isoColumn} AS iso2
        FROM ranking_entries
        ORDER BY name`,

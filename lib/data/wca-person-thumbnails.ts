@@ -1,6 +1,11 @@
 import { LRUCache } from "lru-cache";
+import {
+  type WcaPersonResponse,
+  type WcaPersonSearchResponse,
+} from "@/lib/data/wca-api-types";
+import type { PersonThumbnail, PersonThumbnailMap } from "@/lib/data/person-thumbnail-types";
 
-const thumbUrlCache = new LRUCache<string, string | null>({
+const thumbUrlCache = new LRUCache<string, PersonThumbnail>({
   maxSize: 64 * 1024 * 1024,
   sizeCalculation: (value, key) => Buffer.byteLength(key) + (value ? Buffer.byteLength(value) : 0),
 });
@@ -15,9 +20,9 @@ export async function fetchPersonThumbnailsFromWca(
     headers: { Accept: "application/json", "User-Agent": "WCA Rankings person search" },
     signal: AbortSignal.timeout(2500),
   });
-  if (!response.ok) return new Map<string, string | null>();
-  const body = await response.json() as { result?: Array<{ wca_id?: string; class?: string; avatar?: { thumb_url?: string; url?: string; is_default?: boolean } }> };
-  const thumbs = new Map<string, string | null>();
+  if (!response.ok) return new Map<string, PersonThumbnail>();
+  const body = await response.json() as WcaPersonSearchResponse;
+  const thumbs: PersonThumbnailMap = new Map();
   for (const user of body.result ?? []) {
     if (user.class !== "person" || !user.wca_id) continue;
     const id = user.wca_id.toUpperCase();
@@ -34,7 +39,7 @@ export async function fetchPersonThumbnailsFromWca(
         signal: AbortSignal.timeout(2500),
       });
       if (!personResponse.ok) continue;
-      const detail = await personResponse.json() as { person?: { avatar?: { thumb_url?: string; url?: string; is_default?: boolean } } };
+      const detail = await personResponse.json() as WcaPersonResponse;
       const thumb = detail.person?.avatar?.is_default ? null : detail.person?.avatar?.thumb_url ?? detail.person?.avatar?.url ?? null;
       thumbUrlCache.set(id, thumb);
       thumbs.set(id, thumb);
