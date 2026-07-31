@@ -313,6 +313,16 @@ jobs:
                 -e FLYWAY_URL="jdbc:mariadb://db:3306/${candidate}" \
                 -e FLYWAY_TABLE=flyway_schema_history_app \
                 flyway migrate
+              docker compose exec -T \
+                -e CANDIDATE_SCHEMA="$candidate" \
+                db sh -c '
+                  mariadb --user=root --password="$MARIADB_ROOT_PASSWORD" "$CANDIDATE_SCHEMA" --execute="
+                    CREATE TABLE IF NOT EXISTS result_attempts (
+                      result_id BIGINT NOT NULL,
+                      attempt_number INT NOT NULL
+                    );
+                  "
+                '
               docker compose run --rm \
                 -e FLYWAY_URL="jdbc:mariadb://db:3306/${candidate}" \
                 -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \

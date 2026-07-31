@@ -210,6 +210,7 @@ test("runs app and result migrations in separate deployment lanes", async () => 
   assert.match(projectionBuild, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
   assert.match(projectionBuild, /FLYWAY_TABLE=flyway_schema_history_results/);
   assert.match(projectionDeploy, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
+  assert.match(projectionDeploy, /CREATE TABLE IF NOT EXISTS result_attempts/);
   assert.match(projectionDeploy, /FLYWAY_TABLE=flyway_schema_history_results/);
   assert.match(pullRequest, /FLYWAY_LOCATIONS=filesystem:\/flyway\/migrations\/results/);
 });

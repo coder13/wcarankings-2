@@ -323,6 +323,17 @@ export const PROJECTION_REGISTRY = projectionDefinitions.map((definition) => ({
   validate: (connection, suffix) => validateProjection(connection, definition, suffix),
 }));
 
+export async function countProjectionTables(projections) {
+  let total = 0;
+  for (const projection of projections) {
+    for (const file of projection.files) {
+      const sql = projectionNames(await projectionSql(file), "");
+      total += statements(sql).filter((statement) => createdTableName(statement)).length;
+    }
+  }
+  return total;
+}
+
 function projectionDependencyClosure(selectedNames) {
   const byName = new Map(projectionDefinitions.map((projection) => [projection.name, projection]));
   const ordered = [];
@@ -585,10 +596,7 @@ export async function buildRegisteredProjections(
   { projectionSuffix = "", projectionNames: selectedNames, createConnection, concurrency } = {},
 ) {
   const projections = orderedProjections(selectedNames);
-  const tableProgress = createTableProgress(projections.reduce(
-    (total, projection) => total + projection.tables.length,
-    0,
-  ));
+  const tableProgress = createTableProgress(await countProjectionTables(projections));
   const maxConcurrency = projectionConcurrency(concurrency);
   if (!createConnection || maxConcurrency === 1 || projections.length <= 1) {
     return buildRegisteredProjectionsSerial(connection, projections, projectionSuffix, tableProgress);
@@ -732,8 +740,7 @@ export async function refreshMysqlSchema(
   const maxConcurrency = projectionConcurrency(concurrency);
   const semanticProjections = orderedProjections(selectedNames);
   const tableProgress = createTableProgress(
-    COMPATIBILITY_PROJECTION_TASKS.length
-      + semanticProjections.reduce((total, projection) => total + projection.tables.length, 0),
+    COMPATIBILITY_PROJECTION_TASKS.length + await countProjectionTables(semanticProjections),
   );
   const semanticTasks = semanticProjections.map((projection) => ({
     name: `projection:${projection.name}`,

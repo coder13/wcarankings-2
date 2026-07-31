@@ -34,11 +34,12 @@ test("logs projection build step starts, completions, failures, and elapsed time
 });
 
 test("formats table progress against the complete build workload", async () => {
-  const { createTableProgress } = await import(new URL("scripts/mysql-schema.mjs", root));
+  const { createTableProgress, countProjectionTables, PROJECTION_REGISTRY } = await import(new URL("scripts/mysql-schema.mjs", root));
   const progress = createTableProgress(17);
 
   assert.equal(progress.start("first_table"), "[1/17]");
   assert.equal(progress.start("second_table"), "[2/17]");
+  assert.ok(await countProjectionTables(PROJECTION_REGISTRY) >= PROJECTION_REGISTRY.length);
 });
 
 test("keeps future grains registered while activating person metrics and competition bests", async () => {
