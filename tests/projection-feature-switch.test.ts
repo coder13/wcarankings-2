@@ -7,12 +7,14 @@ test("derives projection feature switches from active projection tables", () => 
     "ranking_entries_single", "ranking_entries_average", "ranking_counts", "result_entries_single", "result_counts",
     "competition_podium_members", "competition_event_stats", "result_facts", "result_rankings_single",
     "result_rankings_average", "result_ranking_counts", "competition_stats", "person_sum_of_ranks_scores",
+    "entity_ranking_counts", "city_event_stats",
     "person_year_ranking_cohorts", "person_year_rankings_single",
     "person_year_rankings_average", "person_year_ranking_counts",
   ], { generationId: "generation-123", exportId: "2026-07-30T00:00:30Z" });
   assert.deepEqual(featureSwitch, {
     generationId: "generation-123", exportId: "2026-07-30T00:00:30Z",
     core: true, sumOfRanks: true, yearlyPersonRankings: true,
+    resultRankings: true, competitionRankings: true, cityEventStats: true,
   });
 });
 
@@ -21,8 +23,11 @@ test("keeps unavailable feature switches hidden when a projection is absent", ()
     "ranking_entries_single", "ranking_entries_average", "ranking_counts", "result_entries_single", "result_counts",
     "competition_podium_members", "competition_event_stats", "result_facts", "result_rankings_single",
     "result_rankings_average", "result_ranking_counts", "competition_stats",
+    "entity_ranking_counts",
   ]);
   assert.equal(featureSwitch.core, true);
+  assert.equal(featureSwitch.resultRankings, true);
+  assert.equal(featureSwitch.competitionRankings, true);
   assert.equal(featureSwitch.sumOfRanks, false);
   assert.equal(featureSwitch.yearlyPersonRankings, false);
 });
@@ -39,4 +44,16 @@ test("keeps core rankings available while newer semantic projections are absent"
     "ranking_entries_single", "ranking_entries_average", "ranking_counts", "result_entries_single", "result_counts",
   ]);
   assert.equal(featureSwitch.core, true);
+});
+
+test("switches optional projection features independently", () => {
+  const featureSwitch = featureSwitchFromTables([
+    "ranking_entries_single", "ranking_entries_average", "ranking_counts", "result_entries_single", "result_counts",
+    "result_rankings_single", "result_rankings_average", "result_ranking_counts",
+  ]);
+  assert.equal(featureSwitch.resultRankings, true);
+  assert.equal(featureSwitch.competitionRankings, false);
+  assert.equal(featureSwitch.cityEventStats, false);
+  assert.equal(featureSwitch.sumOfRanks, false);
+  assert.equal(featureSwitch.yearlyPersonRankings, false);
 });

@@ -315,7 +315,13 @@ export async function RankingsPage({
   const gender = (initialSubject === "people" || initialSubject === "results") ? getGenderFilters(resolvedSearchParams) : [];
   const initialYear = initialYearOverride ?? (/^\d{4}$/.test(getSearchParam(resolvedSearchParams, "year")) ? Number(getSearchParam(resolvedSearchParams, "year")) : null);
   const featureSwitch = await getProjectionFeatureSwitch();
-  if (!featureSwitch.core || (initialYear !== null && !featureSwitch.yearlyPersonRankings) || ((initialAllEventRankingId || eventId === "sor-kinch") && !featureSwitch.sumOfRanks)) {
+  if (
+    !featureSwitch.core
+    || (initialSubject === "results" && !featureSwitch.resultRankings)
+    || (initialSubject === "competitions" && !featureSwitch.competitionRankings)
+    || (initialYear !== null && !featureSwitch.yearlyPersonRankings)
+    || ((initialAllEventRankingId || eventId === "sor-kinch") && !featureSwitch.sumOfRanks)
+  ) {
     notFound();
   }
   const rankingsMetadata = await getCurrentRankingsMetadata();

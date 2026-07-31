@@ -15,6 +15,18 @@ const CORE_TABLES = [
   "result_entries_single",
   "result_counts",
 ] as const;
+const RESULT_RANKINGS_TABLES = [
+  "result_rankings_single",
+  "result_rankings_average",
+  "result_ranking_counts",
+] as const;
+const COMPETITION_RANKINGS_TABLES = [
+  "competition_podium_members",
+  "competition_event_stats",
+  "competition_stats",
+  "entity_ranking_counts",
+] as const;
+const CITY_EVENT_STATS_TABLES = ["city_event_stats"] as const;
 const SUM_OF_RANKS_TABLES = ["person_sum_of_ranks_scores"] as const;
 const YEARLY_TABLES = [
   "person_year_ranking_cohorts",
@@ -39,6 +51,9 @@ export function featureSwitchFromTables(
   return {
     ...generation,
     core: allPresent(present, CORE_TABLES),
+    resultRankings: allPresent(present, RESULT_RANKINGS_TABLES),
+    competitionRankings: allPresent(present, COMPETITION_RANKINGS_TABLES),
+    cityEventStats: allPresent(present, CITY_EVENT_STATS_TABLES),
     sumOfRanks: allPresent(present, SUM_OF_RANKS_TABLES),
     yearlyPersonRankings: allPresent(present, YEARLY_TABLES),
   };
@@ -50,8 +65,8 @@ async function loadProjectionFeatureSwitch() {
       query<{ table_name: string }>(
         `SELECT table_name FROM information_schema.tables
          WHERE table_schema = DATABASE()
-           AND table_name IN (${[...CORE_TABLES, ...SUM_OF_RANKS_TABLES, ...YEARLY_TABLES].map(() => "?").join(", ")})`,
-        [...CORE_TABLES, ...SUM_OF_RANKS_TABLES, ...YEARLY_TABLES],
+           AND table_name IN (${[...CORE_TABLES, ...RESULT_RANKINGS_TABLES, ...COMPETITION_RANKINGS_TABLES, ...CITY_EVENT_STATS_TABLES, ...SUM_OF_RANKS_TABLES, ...YEARLY_TABLES].map(() => "?").join(", ")})`,
+        [...CORE_TABLES, ...RESULT_RANKINGS_TABLES, ...COMPETITION_RANKINGS_TABLES, ...CITY_EVENT_STATS_TABLES, ...SUM_OF_RANKS_TABLES, ...YEARLY_TABLES],
       ),
       query<{ generation_id: string; export_id: string }>(
         `SELECT generation_id, export_id FROM ranking_generation_state WHERE id = 1 LIMIT 1`,
