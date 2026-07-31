@@ -851,6 +851,7 @@ export function RankingsExplorer({
     overscan: 12,
     scrollMargin: listOffset,
   });
+  const rowVirtualizerRef = useRef(rowVirtualizer);
 
   useEffect(() => {
     activeListKeyRef.current = activeListKey;
