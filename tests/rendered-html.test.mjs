@@ -302,11 +302,14 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(css, /\.siteFooter/);
   assert.match(css, /\.row--searchMatch/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before,[\s\S]*width:\s*100vw;[\s\S]*backdrop-filter:\s*blur\(10px\)/);
+  assert.match(globalCss, /--edge-blur-filter:\s*blur\(10px\) saturate\(0\.9\)/);
+  assert.match(globalCss, /--edge-blur-start-level:\s*1;/);
+  assert.match(globalCss, /--edge-blur-end-level:\s*0;/);
+  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before,[\s\S]*width:\s*100vw;[\s\S]*backdrop-filter:\s*var\(--edge-blur-filter\)/);
   assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before\s*\{[\s\S]*top:\s*-1em;[\s\S]*bottom:\s*-1em;/);
-  assert.match(globalCss, /\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\) > \.RankingsRailTransition::before\s*\{[\s\S]*top:\s*-1em;[\s\S]*--jump-controls-bottom-offset/);
-  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before\s*\{[^}]*mask-image:\s*linear-gradient\(to bottom/);
-  assert.match(globalCss, /\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\) > \.RankingsRailTransition::before\s*\{[^}]*mask-image:\s*linear-gradient\(to top/);
+  assert.match(globalCss, /\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\)\s*>\s*\.RankingsRailTransition::before\s*\{[\s\S]*top:\s*-1em;[\s\S]*--jump-controls-bottom-offset/);
+  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before\s*\{[^}]*mask-image:\s*linear-gradient\(\s*to bottom/);
+  assert.match(globalCss, /\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\)\s*>\s*\.RankingsRailTransition::before\s*\{[^}]*mask-image:\s*linear-gradient\(\s*to top/);
   assert.doesNotMatch(globalCss, /\.RankingsRailTransition::before,[^{]*\{[^}]*border-radius/);
   assert.doesNotMatch(css, /app-header|table-quick-jump|jump-overlay/);
   assert.doesNotMatch(layout, /codex-preview|_sites-preview|Starter Project/);
