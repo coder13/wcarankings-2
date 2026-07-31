@@ -302,7 +302,7 @@ test("uses the copied WCA Rankings visual language", async () => {
   assert.match(css, /\.siteFooter/);
   assert.match(css, /\.row--searchMatch/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before,\s*\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\) > \.RankingsRailTransition::before\s*\{[\s\S]*inset:\s*-1\.5rem;[\s\S]*mask-image:\s*radial-gradient\(ellipse 120% 100% at center, #000 72%, transparent 100%\);[\s\S]*backdrop-filter:\s*blur\(24px\);/);
+  assert.match(globalCss, /\.stickyRankingsRail > \.RankingsRailTransition::before,\s*\.JumpControlsVisibility:has\(\.Jump\[data-direction="down"\]\) > \.RankingsRailTransition::before\s*\{[\s\S]*inset:\s*-0\.5rem;[\s\S]*box-shadow:[\s\S]*var\(--surface\) 82%[\s\S]*var\(--surface\) 50%[\s\S]*filter:\s*blur\(3px\);/);
   assert.doesNotMatch(css, /app-header|table-quick-jump|jump-overlay/);
   assert.doesNotMatch(layout, /codex-preview|_sites-preview|Starter Project/);
 
