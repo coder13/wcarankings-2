@@ -11,6 +11,7 @@ import {
 import { searchPersonIds } from "@/services/people/service";
 import { getRecordBadges } from "@/lib/wca";
 import type { ResultRankingRow } from "@/services/rankings/types";
+import { resultRankingCountsQuery, resultRankingsQuery } from "@/services/rankings/queries";
 
 function parsePageStart(params: URLSearchParams) {
   const raw = params.get("start") ?? "0";
@@ -102,44 +103,12 @@ export async function loadResultRankings(params: URLSearchParams) {
     pageValues.push(start);
   }
 
-  const source = gender.length
-    ? `(SELECT ranking.*, RANK() OVER (PARTITION BY ranking.event_id${scope === "world" ? "" : `, ranking.${scope}_id`} ORDER BY ranking.result_value) AS filtered_rank, ROW_NUMBER() OVER (PARTITION BY ranking.event_id${scope === "world" ? "" : `, ranking.${scope}_id`} ORDER BY ranking.result_value, ranking.result_id) AS filtered_position, COUNT(*) OVER (PARTITION BY ranking.event_id${scope === "world" ? "" : `, ranking.${scope}_id`}) AS filtered_total FROM ${table} ranking WHERE ${sourceConditions.join(" AND ")})`
-    : table;
-  const rows = await query<ResultRankingRow>(`
-    WITH page AS (
-      SELECT
-        ranking.result_id,
-        ranking.result_value,
-        ranking.${rankColumn} AS rank,
-        ranking.${positionColumn} AS position,
-        ${gender.length ? "ranking.filtered_total AS total_count," : ""}
-        ranking.person_id,
-        ranking.country_id,
-        ranking.continent_id,
-        ranking.competition_id,
-        ranking.record_code
-      FROM ${source} ranking
-      WHERE ${(gender.length ? pageConditions : conditions).join(" AND ")}
-      ORDER BY ranking.${positionColumn}
-      LIMIT ?
-    )
-    SELECT
-      page.*,
-      COALESCE(person.name, page.person_id) AS person_name,
-      COALESCE(country.name, page.country_id) AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2,
-      COALESCE(competition.name, page.competition_id) AS competition_name
-    FROM page
-    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-    LEFT JOIN countries country ON country.id = page.country_id
-    LEFT JOIN competitions competition ON competition.id = page.competition_id
-    ORDER BY page.position
-  `, [...(gender.length ? [...sourceValues, ...pageValues] : [...values]), rowLimit]);
+  const rows = await query<ResultRankingRow>(resultRankingsQuery({ source: table, rankColumn, positionColumn, conditions: gender.length ? pageConditions : conditions, sourceConditions, gender, scope }), [...(gender.length ? [...sourceValues, ...pageValues] : [...values]), rowLimit]);
 
   const counts = gender.length
     ? { rows: [] as Array<{ count: number }>, timings: { queueMs: 0, statementMs: 0 } }
     : await query<{ count: number }>(
-      `SELECT count FROM result_ranking_counts WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?`,
+      resultRankingCountsQuery(),
       [eventId, resultType, scope, regionId],
     );
   const pageRows = search ? rows.rows : rows.rows.slice(0, limit);

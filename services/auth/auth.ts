@@ -5,6 +5,7 @@ import {
   readCookie,
 } from "@/services/auth/wca";
 import { generateSessionToken, hashSessionToken } from "@/services/auth/helpers";
+import { authUserByIdQuery, authUserBySessionQuery, deleteAuthSessionQuery, insertAuthSessionQuery, upsertUserQuery } from "@/services/auth/queries";
 import type { AuthUser, AuthUserRow, WcaProfile } from "@/services/auth/types";
 
 export { generateSessionToken } from "@/services/auth/helpers";
@@ -30,27 +31,16 @@ export async function createAuthSession(profile: WcaProfile) {
 
   const user = await withTransaction(async (connection) => {
     const [result] = await connection.execute<ResultSetHeader>(
-      `INSERT INTO app_users
-        (wca_id, name, country_iso2, avatar_url, last_login_at)
-       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(6))
-       ON DUPLICATE KEY UPDATE
-        id = LAST_INSERT_ID(id),
-        name = VALUES(name),
-        country_iso2 = VALUES(country_iso2),
-        avatar_url = VALUES(avatar_url),
-        last_login_at = CURRENT_TIMESTAMP(6)`,
+      upsertUserQuery(),
       [profile.wcaId, profile.name, profile.countryIso2, profile.avatarUrl],
     );
     const userId = Number(result.insertId);
     await connection.execute(
-      `INSERT INTO auth_sessions (token_hash, user_id, expires_at)
-       VALUES (?, ?, ?)`,
+      insertAuthSessionQuery(),
       [tokenHash, userId, expiresAt],
     );
     const [rows] = await connection.execute<AuthUserRow[]>(
-      `SELECT id, wca_id, name, country_iso2, avatar_url, allow_list_inclusion
-       FROM app_users
-       WHERE id = ?`,
+      authUserByIdQuery(),
       [userId],
     );
     if (!rows[0]) throw new Error("The WCA user could not be persisted.");
@@ -64,18 +54,7 @@ export async function getAuthUser(request: Request) {
   const token = readCookie(request, AUTH_SESSION_COOKIE);
   if (!token) return null;
   const result = await query<AuthUserRow>(
-    `SELECT
-      u.id,
-      u.wca_id,
-      u.name,
-      u.country_iso2,
-      u.avatar_url,
-      u.allow_list_inclusion
-     FROM auth_sessions AS s
-     JOIN app_users AS u ON u.id = s.user_id
-     WHERE s.token_hash = ?
-       AND s.expires_at > CURRENT_TIMESTAMP(6)
-     LIMIT 1`,
+    authUserBySessionQuery(),
     [hashSessionToken(token)],
   );
   return result.rows[0] ? toAuthUser(result.rows[0]) : null;
@@ -86,7 +65,7 @@ export async function deleteAuthSession(request: Request) {
   if (!token) return;
   await withTransaction(async (connection) => {
     await connection.execute(
-      "DELETE FROM auth_sessions WHERE token_hash = ?",
+      deleteAuthSessionQuery(),
       [hashSessionToken(token)],
     );
   });

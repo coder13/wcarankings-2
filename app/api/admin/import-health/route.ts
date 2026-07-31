@@ -1,36 +1,9 @@
 import { query } from "@/db";
 import { getImportHealthStatus } from "@/lib/helpers/text/import-health";
+import type { ImportRunRow, ProjectionTableRow } from "@/services/import-health/types";
+import { exportMetadataQuery, failedImportRunsQuery, latestImportRunQuery, projectionTablesQuery, successfulImportRunQuery } from "@/services/import-health/queries";
 
 export const dynamic = "force-dynamic";
-
-type ImportRunRow = {
-  id: number;
-  export_date: string | null;
-  export_format_version: string | null;
-  status: string;
-  started_at: string;
-  fetch_started_at: string | null;
-  fetched_at: string | null;
-  projection_build_started_at: string | null;
-  projection_built_at: string | null;
-  projection_build_duration_ms: number | null;
-  completed_at: string | null;
-  duration_ms: number | null;
-  failure_message: string | null;
-  projection_swap_status: string;
-  source_person_count: number | null;
-  source_result_count: number | null;
-  published_ranking_count: number | null;
-  published_result_count: number | null;
-  event_count: number | null;
-  region_count: number | null;
-  aggregate_count: number | null;
-  result_aggregate_count: number | null;
-};
-
-type ProjectionTableRow = {
-  name: string;
-};
 
 const expectedProjectionTables = [
   "ranking_entries_single",
@@ -80,25 +53,11 @@ function serializeRun(run: ImportRunRow | null) {
 export async function GET() {
   try {
     const [metadata, latest, successful, failures, projectionTables] = await Promise.all([
-      query<{ key: string; value: string }>("SELECT `key`, value FROM export_metadata WHERE `key` IN ('export_date', 'export_format_version', 'fetched_at')"),
-      query<ImportRunRow>("SELECT * FROM import_runs ORDER BY id DESC LIMIT 1"),
-      query<ImportRunRow>("SELECT * FROM import_runs WHERE status = 'succeeded' ORDER BY id DESC LIMIT 1"),
-      query<ImportRunRow>("SELECT * FROM import_runs WHERE status = 'failed' ORDER BY id DESC LIMIT 5"),
-      query<ProjectionTableRow>(`
-        SELECT table_name AS name
-        FROM information_schema.tables
-        WHERE table_schema = DATABASE()
-          AND table_name IN (
-            'ranking_entries_single',
-            'ranking_entries_average',
-            'ranking_counts',
-            'result_entries_single',
-            'result_counts',
-            'person_sum_of_ranks_scores',
-            'competition_podium_members',
-            'competition_event_stats'
-          )
-      `),
+      query<{ key: string; value: string }>(exportMetadataQuery()),
+      query<ImportRunRow>(latestImportRunQuery()),
+      query<ImportRunRow>(successfulImportRunQuery()),
+      query<ImportRunRow>(failedImportRunsQuery()),
+      query<ProjectionTableRow>(projectionTablesQuery()),
     ]);
     const currentExport = Object.fromEntries(metadata.rows.map((row) => [row.key, row.value]));
     const latestRun = latest.rows[0] ?? null;

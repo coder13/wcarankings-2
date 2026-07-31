@@ -12,11 +12,15 @@ import {
 } from "@/lib/api/projection";
 
 import type { CityRow, CompetitionRow, LatitudeRow, PodiumRow } from "@/services/rankings/types";
+import {
+  competitionEntityCountQuery,
+  competitorCountRowsQuery, competitorCountTotalQuery, entityCountQuery,
+  latitudeCountQuery, latitudeRowsQuery, podiumEntityCountQuery,
+} from "@/services/rankings/queries";
 
 async function entityCount(kind: string, eventId = "", resultType = "") {
   return query<{ count: number }>(
-    `SELECT count FROM entity_ranking_counts
-     WHERE ranking_kind = ? AND event_id = ? AND result_type = ?`,
+    entityCountQuery(),
     [kind, eventId, resultType],
   );
 }
@@ -37,31 +41,9 @@ async function loadCompetitorCountRankings(params: URLSearchParams, limit: numbe
   if (!Number.isInteger(start) || start < 0) {
     throw new ApiInputError("start must be a non-negative integer.");
   }
-  const rows = await query<LatitudeRow & { competitor_count: number }>(`
-    WITH page AS (
-      SELECT stats.competition_id, stats.competitor_count,
-        stats.competitor_count_rank AS rank,
-        stats.competitor_count_position AS position
-      FROM competition_stats stats
-      WHERE stats.competitor_count_position > ?
-      ORDER BY stats.competitor_count_position
-      LIMIT ?
-    )
-    SELECT page.*,
-      COALESCE(competition.name, page.competition_id) AS competition_name,
-      COALESCE(competition.venue, '') AS venue,
-      COALESCE(competition.city_name, '') AS city_name,
-      COALESCE(country.name, competition.country_id, '') AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2
-    FROM page
-    LEFT JOIN competitions competition ON competition.id = page.competition_id
-    LEFT JOIN countries country ON country.id = competition.country_id
-    ORDER BY page.position
-  `, [start, limit + 1]);
+  const rows = await query<LatitudeRow & { competitor_count: number }>(competitorCountRowsQuery(), [start, limit + 1]);
   const counts = await query<{ count: number }>(
-    `SELECT COUNT(*) AS count
-     FROM competition_stats
-     WHERE competitor_count_position IS NOT NULL`,
+    competitorCountTotalQuery(),
   );
   const pageRows = rows.rows.slice(0, limit);
   const last = pageRows.at(-1);
@@ -115,67 +97,14 @@ async function loadLatitudeRankings(params: URLSearchParams, limit: number) {
     ? "country.continent_id"
     : "competition.country_id";
   const rows = scope === "world"
-    ? await query<LatitudeRow>(`
-    WITH page AS (
-      SELECT stats.competition_id, stats.latitude,
-        stats.${prefix}_rank AS rank,
-        stats.${prefix}_position AS position
-      FROM competition_stats stats
-      WHERE stats.${prefix}_position > ?
-      ORDER BY stats.${prefix}_position
-      LIMIT ?
-    )
-    SELECT page.*,
-      COALESCE(competition.name, page.competition_id) AS competition_name,
-      COALESCE(competition.venue, '') AS venue,
-      COALESCE(competition.city_name, '') AS city_name,
-      COALESCE(country.name, competition.country_id, '') AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2
-    FROM page
-    LEFT JOIN competitions competition ON competition.id = page.competition_id
-    LEFT JOIN countries country ON country.id = competition.country_id
-    ORDER BY page.position
-  `, [start, limit + 1])
-    : await query<LatitudeRow>(`
-    WITH scoped AS (
-      SELECT stats.competition_id, stats.start_date, stats.latitude,
-        COALESCE(competition.name, stats.competition_id) AS competition_name,
-        COALESCE(competition.venue, '') AS venue,
-        COALESCE(competition.city_name, '') AS city_name,
-        COALESCE(country.name, competition.country_id, '') AS country_name,
-        COALESCE(country.iso2, '') AS country_iso2
-      FROM competition_stats stats
-      JOIN competitions competition ON competition.id = stats.competition_id
-      JOIN countries country ON country.id = competition.country_id
-      WHERE stats.${prefix}_position IS NOT NULL
-        AND ${regionColumn} = ?
-    ), ranked AS (
-      SELECT scoped.*,
-        DENSE_RANK() OVER (ORDER BY latitude ${direction}) AS rank,
-        ROW_NUMBER() OVER (
-          ORDER BY latitude ${direction}, start_date, competition_id
-        ) AS position
-      FROM scoped
-    )
-    SELECT *
-    FROM ranked
-    WHERE position > ?
-    ORDER BY position
-    LIMIT ?
-  `, [regionId, start, limit + 1]);
+    ? await query<LatitudeRow>(latitudeRowsQuery({ prefix, scoped: false }), [start, limit + 1])
+    : await query<LatitudeRow>(latitudeRowsQuery({ prefix, direction, regionColumn, scoped: true }), [regionId, start, limit + 1]);
   const counts = scope === "world"
     ? await query<{ count: number }>(
-      `SELECT COUNT(*) AS count
-       FROM competition_stats
-       WHERE ${prefix}_position IS NOT NULL`,
+      latitudeCountQuery({ prefix, scoped: false }),
     )
     : await query<{ count: number }>(
-      `SELECT COUNT(*) AS count
-       FROM competition_stats stats
-       JOIN competitions competition ON competition.id = stats.competition_id
-       JOIN countries country ON country.id = competition.country_id
-       WHERE stats.${prefix}_position IS NOT NULL
-         AND ${regionColumn} = ?`,
+      latitudeCountQuery({ prefix, regionColumn, scoped: true }),
       [regionId],
     );
   const pageRows = rows.rows.slice(0, limit);
@@ -252,9 +181,7 @@ async function loadFastestCompetitions(params: URLSearchParams, limit: number) {
     ORDER BY page.position
   `, [eventId, start, limit + 1]);
   const counts = await query<{ count: number }>(
-    `SELECT COUNT(*) AS count
-     FROM competition_event_stats
-     WHERE event_id = ? AND ${positionColumn} IS NOT NULL`,
+    competitionEntityCountQuery({ valueColumn, resultIdColumn, rankColumn, positionColumn }),
     [eventId],
   );
   const pageRows = rows.rows.slice(0, limit);
@@ -334,9 +261,7 @@ export async function loadPodiumRankings(params: URLSearchParams, limit = parseL
     ORDER BY page.position, member.podium_position, member.result_id
   `, [eventId, start, limit + 1, eventId, resultType]);
   const counts = await query<{ count: number }>(
-    `SELECT COUNT(*) AS count
-     FROM competition_event_stats
-     WHERE event_id = ? AND ${positionColumn} IS NOT NULL`,
+    podiumEntityCountQuery({ positionColumn }),
     [eventId],
   );
   const byCompetition = new Map<string, {

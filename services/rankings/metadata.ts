@@ -2,6 +2,7 @@ import { query } from "@/db";
 import type { RankingType, RegionScope } from "@/lib/wca";
 import { RANKINGS_CACHE_REFRESH_MS, rankingsPageCache } from "@/services/rankings/cache";
 import { countKey, yearCountKey } from "@/services/rankings/helpers";
+import { rankingCountsQuery, rankingMetadataQuery, rankingVersionQuery, requiredRankingColumnsQuery, requiredRankingIndexesQuery, requiredRankingTablesQuery, yearCountsQuery } from "@/services/rankings/queries";
 import type { CountRow, MetadataRow, RankingsMetadata, YearCountRow } from "@/services/rankings/types";
 
 let snapshot: RankingsMetadata | null = null;
@@ -12,9 +13,7 @@ let readiness: Promise<void> | null = null;
 
 async function loadYearCounts() {
   try {
-    const result = await query<YearCountRow>(`SELECT counts.year, counts.event_id, counts.ranking_type, counts.cohort_id, cohorts.scope, cohorts.region_id, counts.count
-      FROM person_year_ranking_counts counts
-      JOIN person_year_ranking_cohorts cohorts ON cohorts.cohort_id = counts.cohort_id`);
+    const result = await query<YearCountRow>(yearCountsQuery());
     return { rows: result.rows, available: true };
   } catch (error) {
     // Deploying the application before a targeted yearly backfill must not
@@ -29,9 +28,9 @@ async function loadYearCounts() {
 
 async function loadSnapshot() {
   const [counts, yearCounts, metadata] = await Promise.all([
-    query<CountRow>("SELECT event_id, ranking_type, scope, region_id, count FROM ranking_counts"),
+    query<CountRow>(rankingCountsQuery()),
     loadYearCounts(),
-    query<MetadataRow>("SELECT `key`, value FROM export_metadata WHERE `key` IN ('export_date', 'fetched_at')"),
+    query<MetadataRow>(rankingMetadataQuery()),
   ]);
   const values = new Map(metadata.rows.map((row) => [row.key, row.value]));
   const fetchedAt = values.get("fetched_at");
@@ -62,7 +61,7 @@ export async function refreshRankingsMetadata() {
     lastVersionCheck = now;
     if (!refreshing) {
       refreshing = (async () => {
-        const version = await query<{ value: string }>("SELECT value FROM export_metadata WHERE `key` = 'fetched_at'");
+        const version = await query<{ value: string }>(rankingVersionQuery());
         const fetchedAt = version.rows[0]?.value;
         if (!fetchedAt) throw new Error("Ranking metadata is missing fetched_at.");
         if (!snapshot || fetchedAt !== snapshot.fetchedAt || !snapshot.yearProjectionAvailable) {
@@ -104,9 +103,9 @@ export async function assertRankingsReady() {
     const columns = ["event_id", "world_rank", "world_sub_rank", "continent_id", "continent_rank", "continent_sub_rank", "country_id", "country_rank", "country_sub_rank"];
     const indexes = ["idx_ranking_entries_world", "idx_ranking_entries_continent", "idx_ranking_entries_country"];
     const [tableRows, columnRows, indexRows] = await Promise.all([
-      query<{ name: string }>(`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")})`, tables),
-      query<{ table_name: string; column_name: string }>("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name IN (?, ?) AND column_name IN (?, ?, ?, ?, ?, ?, ?, ?, ?)", [...tables, ...columns]),
-      query<{ table_name: string; index_name: string }>("SELECT table_name, index_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name IN (?, ?) AND index_name IN (?, ?, ?)", [...tables, ...indexes]),
+      query<{ name: string }>(requiredRankingTablesQuery(tables), tables),
+      query<{ table_name: string; column_name: string }>(requiredRankingColumnsQuery(tables, columns), [...tables, ...columns]),
+      query<{ table_name: string; index_name: string }>(requiredRankingIndexesQuery(tables, indexes), [...tables, ...indexes]),
     ]);
     for (const table of tables) {
       if (!tableRows.rows.some((row) => row.name === table)) throw new Error(`Required projection ${table} is missing.`);

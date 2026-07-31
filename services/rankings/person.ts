@@ -10,6 +10,7 @@ import {
 } from "@/lib/api/projection";
 
 import type { PersonRankingRow } from "@/services/rankings/types";
+import { personRankingCountsQuery, personRankingsQuery } from "@/services/rankings/queries";
 
 export async function loadPersonRankings(params: URLSearchParams) {
   const eventId = parseEvent(params)!;
@@ -34,33 +35,10 @@ export async function loadPersonRankings(params: URLSearchParams) {
     values.push(start);
   }
 
-  const rows = await query<PersonRankingRow>(`
-    WITH page AS (
-      SELECT ranking.person_id, ranking.result_id, ranking.result_value,
-        ranking.country_id, ranking.continent_id,
-        ranking.${rankColumn} AS rank, ranking.${positionColumn} AS page_position
-      FROM person_event_rankings ranking
-      WHERE ${conditions.join(" AND ")}
-      ORDER BY ranking.${positionColumn}, ranking.person_id
-      LIMIT ?
-    )
-    SELECT page.person_id, COALESCE(person.name, page.person_id) AS person_name,
-      page.country_id, COALESCE(country.name, page.country_id) AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2, page.continent_id,
-      page.rank, page.result_id, page.result_value,
-      facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name,
-      facts.competition_start_date, facts.round_type_id
-    FROM page
-    INNER JOIN result_facts facts ON facts.result_id = page.result_id
-    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-    LEFT JOIN countries country ON country.id = page.country_id
-    LEFT JOIN competitions competition ON competition.id = facts.competition_id
-    ORDER BY page.page_position, page.person_id
-  `, [...values, limit + 1]);
+  const rows = await query<PersonRankingRow>(personRankingsQuery({ eventId, resultType, scope, regionId, rankColumn, positionColumn, conditions }), [...values, limit + 1]);
 
   const counts = await query<{ count: number }>(
-    `SELECT count FROM person_ranking_counts
-     WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?`,
+    personRankingCountsQuery(),
     [eventId, resultType, scope, regionId],
   );
   const pageRows = rows.rows.slice(0, limit);

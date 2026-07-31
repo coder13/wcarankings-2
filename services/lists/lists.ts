@@ -17,6 +17,20 @@ import type {
   RequestRow,
   ListMembershipState,
 } from "@/services/lists/types";
+import {
+  blockedPersonIdsQuery, cancelUserMembershipRequestsQuery, containingUserListsQuery,
+  createListQuery, decrementListMemberCountQuery, deleteListExclusionQuery,
+  deleteListMemberQuery, deleteListQuery, excludedPersonIdsQuery, existingListMemberIdsQuery,
+  incrementListMemberCountQuery, insertBulkListMembersQuery, insertListExclusionQuery,
+  insertListMembersQuery, insertMembershipRequestQuery, insertSelfRequestMemberQuery,
+  listLookupQuery, listMemberIdsQuery, listMembershipQuery, listMembersQuery,
+  listInclusionPreferenceQuery, membershipRequestForUpdateQuery, membershipRequestsQuery,
+  optedOutPersonIdsQuery, ownedListsQuery, pendingMembershipRequestQuery, personIdsForListQuery,
+  publicListsQuery, removeUserFromListsQuery, removeUserListMembersQuery, updateListInclusionPreferenceQuery,
+  updateListMemberCountQuery, updateListQuery, updateMembershipRequestQuery, validPersonIdsQuery,
+  cloneListMembersQuery, cloneListQuery, listActivityQuery,
+  LIST_COLUMNS,
+} from "@/services/lists/queries";
 
 export class ListValidationError extends Error {
   constructor(message: string) {
@@ -85,26 +99,6 @@ function toListSummary(row: ListRow): ListSummary {
   };
 }
 
-const LIST_COLUMNS = `
-  l.id,
-  l.public_id,
-  l.system_alias,
-  l.kind,
-  l.owner_user_id,
-  owner.name AS owner_name,
-  owner.wca_id AS owner_wca_id,
-  l.name,
-  l.slug,
-  l.description,
-  l.visibility,
-  l.join_policy,
-  l.member_count,
-  l.membership_version,
-  l.system_definition_version,
-  l.created_at,
-  l.updated_at
-`;
-
 function validateName(value: unknown) {
   if (typeof value !== "string") {
     throw new ListValidationError("List name is required.");
@@ -152,13 +146,7 @@ async function selectListForUpdate(
   if (!normalized) throw new ListNotFoundError();
   const publicId = normalizeListPublicId(normalized);
   const [rows] = await connection.execute<(ListRow & RowDataPacket)[]>(
-    `SELECT ${LIST_COLUMNS}
-     FROM lists AS l
-     LEFT JOIN app_users AS owner ON owner.id = l.owner_user_id
-     WHERE ${publicId ? "l.public_id = ?" : "l.system_alias = ?"}
-       AND l.deleted_at IS NULL
-     LIMIT 1
-     FOR UPDATE`,
+    listLookupQuery({ listColumns: LIST_COLUMNS, byPublicId: Boolean(publicId), forUpdate: true }),
     [normalized],
   );
   if (!rows[0]) throw new ListNotFoundError();
@@ -170,12 +158,7 @@ export async function resolveList(lookup: string) {
   if (!normalized) throw new ListNotFoundError();
   const publicId = normalizeListPublicId(normalized);
   const result = await query<ListRow>(
-    `SELECT ${LIST_COLUMNS}
-     FROM lists AS l
-     LEFT JOIN app_users AS owner ON owner.id = l.owner_user_id
-     WHERE ${publicId ? "l.public_id = ?" : "l.system_alias = ?"}
-       AND l.deleted_at IS NULL
-     LIMIT 1`,
+    listLookupQuery({ listColumns: LIST_COLUMNS, byPublicId: Boolean(publicId) }),
     [normalized],
   );
   if (!result.rows[0]) throw new ListNotFoundError();
@@ -215,9 +198,7 @@ async function activity(
   },
 ) {
   await connection.execute(
-    `INSERT INTO list_activity_events
-      (list_id, actor_user_id, event_type, person_id, event_data)
-     VALUES (?, ?, ?, ?, ?)`,
+    listActivityQuery(),
     [
       listId,
       actorUserId,
@@ -256,38 +237,33 @@ export async function createList(
     try {
       const membership = await withTransaction(async (connection) => {
         const [result] = await connection.execute<ResultSetHeader>(
-          `INSERT INTO lists
-            (kind, public_id, owner_user_id, name, slug, description, visibility, join_policy)
-           VALUES ('user', ?, ?, ?, ?, ?, ?, ?)`,
+          createListQuery(),
           [publicId, user.id, name, slug, description, visibility, joinPolicy],
         );
         const listId = Number(result.insertId);
         const valid = new Set<string>();
         const blocked = new Set<string>();
         if (normalizedPersonIds.length) {
-          const placeholders = normalizedPersonIds.map(() => "?").join(",");
           const [people] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
-            `SELECT wca_id FROM persons WHERE sub_id = 1 AND wca_id IN (${placeholders})`,
+            personIdsForListQuery(normalizedPersonIds.length),
             normalizedPersonIds,
           );
           people.forEach((person) => valid.add(person.wca_id));
           const validIds = normalizedPersonIds.filter((personId) => valid.has(personId));
           if (validIds.length) {
-            const validPlaceholders = validIds.map(() => "?").join(",");
             const [optedOut] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
-              `SELECT wca_id FROM app_users WHERE allow_list_inclusion = FALSE AND wca_id IN (${validPlaceholders})`,
+              optedOutPersonIdsQuery(validIds.length),
               validIds,
             );
             optedOut.forEach((person) => blocked.add(person.wca_id));
             const added = validIds.filter((personId) => !blocked.has(personId));
             if (added.length) {
               await connection.execute(
-                `INSERT INTO list_members (list_id, person_id, added_by_user_id, source)
-                 VALUES ${added.map(() => "(?, ?, ?, 'bulk_import')").join(",")}`,
+                insertBulkListMembersQuery(added.length),
                 added.flatMap((personId) => [listId, personId, user.id]),
               );
               await connection.execute(
-                "UPDATE lists SET member_count = ?, membership_version = membership_version + 1 WHERE id = ?",
+                updateListMemberCountQuery(),
                 [added.length, listId],
               );
             }
@@ -320,21 +296,16 @@ export async function cloneList(user: AuthUser, source: ListSummary) {
     try {
       await withTransaction(async (connection) => {
         const [created] = await connection.execute<ResultSetHeader>(
-          `INSERT INTO lists
-            (kind, public_id, owner_user_id, name, slug, description, visibility, join_policy)
-           VALUES ('user', ?, ?, ?, ?, ?, 'private', 'closed')`,
+          cloneListQuery(),
           [publicId, user.id, name, slug, source.description],
         );
         const listId = Number(created.insertId);
         const [members] = await connection.execute<ResultSetHeader>(
-          `INSERT INTO list_members (list_id, person_id, added_by_user_id, source)
-           SELECT ?, person_id, ?, 'bulk_import'
-           FROM list_members
-           WHERE list_id = ?`,
+          cloneListMembersQuery(),
           [listId, user.id, source.id],
         );
         await connection.execute(
-          "UPDATE lists SET member_count = ?, membership_version = membership_version + 1 WHERE id = ?",
+          updateListMemberCountQuery(),
           [members.affectedRows, listId],
         );
         await activity(connection, {
@@ -354,7 +325,7 @@ export async function cloneList(user: AuthUser, source: ListSummary) {
 
 export async function listMemberIds(list: ListSummary) {
   const result = await query<RowDataPacket & { person_id: string }>(
-    "SELECT person_id FROM list_members WHERE list_id = ? ORDER BY person_id",
+    listMemberIdsQuery(),
     [list.id],
   );
   return result.rows.map((row) => row.person_id);
@@ -387,9 +358,7 @@ export async function updateList(
         ? row.join_policy
         : validateJoinPolicy(input.joinPolicy);
     await connection.execute(
-      `UPDATE lists
-       SET name = ?, slug = ?, description = ?, visibility = ?, join_policy = ?
-       WHERE id = ?`,
+      updateListQuery(),
       [name, slugifyListName(name), description, visibility, joinPolicy, row.id],
     );
     await activity(connection, {
@@ -412,7 +381,7 @@ export async function deleteList(user: AuthUser, lookup: string) {
       eventType: "list.deleted",
     });
     await connection.execute(
-      "UPDATE lists SET deleted_at = CURRENT_TIMESTAMP(6) WHERE id = ?",
+      deleteListQuery(),
       [row.id],
     );
   });
@@ -420,12 +389,7 @@ export async function deleteList(user: AuthUser, lookup: string) {
 
 export async function listOwnedLists(user: AuthUser) {
   const result = await query<ListRow>(
-    `SELECT ${LIST_COLUMNS}
-     FROM lists AS l
-     LEFT JOIN app_users AS owner ON owner.id = l.owner_user_id
-     WHERE l.owner_user_id = ?
-       AND l.deleted_at IS NULL
-     ORDER BY l.updated_at DESC, l.id DESC`,
+    ownedListsQuery(),
     [user.id],
   );
   return result.rows.map(toListSummary);
@@ -433,12 +397,7 @@ export async function listOwnedLists(user: AuthUser) {
 
 export async function listPublicLists() {
   const result = await query<ListRow>(
-    `SELECT ${LIST_COLUMNS}
-     FROM lists AS l
-     LEFT JOIN app_users AS owner ON owner.id = l.owner_user_id
-     WHERE l.visibility = 'public'
-       AND l.deleted_at IS NULL
-     ORDER BY l.kind = 'system' DESC, l.name ASC, l.id ASC`,
+    publicListsQuery(),
   );
   return result.rows.map((row): PublicListSummary => {
     const list = toListSummary(row);
@@ -456,13 +415,7 @@ export async function listPublicLists() {
 
 export async function listContainingUser(user: AuthUser) {
   const result = await query<ListRow>(
-    `SELECT ${LIST_COLUMNS}
-     FROM list_members AS member
-     JOIN lists AS l ON l.id = member.list_id
-     LEFT JOIN app_users AS owner ON owner.id = l.owner_user_id
-     WHERE member.person_id = ?
-       AND l.deleted_at IS NULL
-     ORDER BY l.updated_at DESC, l.id DESC`,
+    containingUserListsQuery(),
     [user.wcaId],
   );
   return result.rows.map(toListSummary);
@@ -474,10 +427,7 @@ export async function getListMembershipState(
 ): Promise<ListMembershipState | null> {
   if (!user) return null;
   const membership = await query<RowDataPacket>(
-    `SELECT 1
-     FROM list_members
-     WHERE list_id = ? AND person_id = ?
-     LIMIT 1`,
+    listMembershipQuery(),
     [list.id, user.wcaId],
   );
   if (membership.rows.length > 0) return "member";
@@ -487,10 +437,7 @@ export async function getListMembershipState(
   if (list.kind !== "user") return "not_member";
 
   const request = await query<RowDataPacket>(
-    `SELECT 1
-     FROM list_membership_requests
-     WHERE list_id = ? AND person_id = ? AND status = 'pending'
-     LIMIT 1`,
+    pendingMembershipRequestQuery(),
     [list.id, user.wcaId],
   );
   return request.rows.length > 0 ? "pending" : "not_member";
@@ -508,20 +455,7 @@ export async function listMembers(
 ) {
   const pageSize = Math.max(1, Math.min(100, Math.floor(limit)));
   const result = await query<MemberRow>(
-    `SELECT
-      member.person_id,
-      person.name AS person_name,
-      person.country_id,
-      member.source,
-      member.created_at
-     FROM list_members AS member
-     LEFT JOIN persons AS person
-       ON person.wca_id = member.person_id
-      AND person.sub_id = 1
-     WHERE member.list_id = ?
-       AND member.person_id > ?
-     ORDER BY member.person_id
-     LIMIT ?`,
+    listMembersQuery(),
     [list.id, after.trim().toUpperCase(), pageSize + 1],
   );
   const rows = result.rows.slice(0, pageSize);
@@ -561,14 +495,10 @@ export async function addListMembers(
     if (normalized.length === 0) {
       return { added: [], duplicates: [], invalid, blocked: [] };
     }
-    const placeholders = normalized.map(() => "?").join(",");
     const [personRows] = await connection.execute<
       (RowDataPacket & { wca_id: string })[]
     >(
-      `SELECT wca_id
-       FROM persons
-       WHERE sub_id = 1
-         AND wca_id IN (${placeholders})`,
+      validPersonIdsQuery(normalized.length),
       normalized,
     );
     const valid = new Set(personRows.map((person) => person.wca_id));
@@ -579,35 +509,22 @@ export async function addListMembers(
     if (candidates.length === 0) {
       return { added: [], duplicates: [], invalid, blocked: [] };
     }
-    const candidatePlaceholders = candidates.map(() => "?").join(",");
     const [blockedRows] = await connection.execute<
       (RowDataPacket & { wca_id: string })[]
     >(
-      `SELECT user.wca_id
-       FROM app_users AS user
-       WHERE user.wca_id IN (${candidatePlaceholders})
-         AND user.allow_list_inclusion = FALSE
-       FOR UPDATE`,
+      blockedPersonIdsQuery(candidates.length),
       candidates,
     );
     const [excludedRows] = await connection.execute<
       (RowDataPacket & { person_id: string })[]
     >(
-      `SELECT person_id
-       FROM list_exclusions
-       WHERE list_id = ?
-         AND person_id IN (${candidatePlaceholders})
-       FOR UPDATE`,
+      excludedPersonIdsQuery(candidates.length),
       [row.id, ...candidates],
     );
     const [existingRows] = await connection.execute<
       (RowDataPacket & { person_id: string })[]
     >(
-      `SELECT person_id
-       FROM list_members
-       WHERE list_id = ?
-         AND person_id IN (${candidatePlaceholders})
-       FOR UPDATE`,
+      existingListMemberIdsQuery(candidates.length),
       [row.id, ...candidates],
     );
     const blockedSet = new Set([
@@ -619,18 +536,12 @@ export async function addListMembers(
       (personId) => !blockedSet.has(personId) && !existing.has(personId),
     );
     if (added.length > 0) {
-      const values = added.map(() => "(?, ?, ?, ?)").join(",");
       await connection.execute(
-        `INSERT INTO list_members
-          (list_id, person_id, added_by_user_id, source)
-         VALUES ${values}`,
+        insertListMembersQuery(added.length),
         added.flatMap((personId) => [row.id, personId, user.id, source]),
       );
       await connection.execute(
-        `UPDATE lists
-         SET member_count = member_count + ?,
-             membership_version = membership_version + 1
-         WHERE id = ?`,
+        incrementListMemberCountQuery(),
         [added.length, row.id],
       );
       await activity(connection, {
@@ -660,15 +571,12 @@ export async function removeListMember(
     const row = await selectListForUpdate(connection, lookup);
     assertOwner(row, user);
     const [result] = await connection.execute<ResultSetHeader>(
-      "DELETE FROM list_members WHERE list_id = ? AND person_id = ?",
+      deleteListMemberQuery(),
       [row.id, personId],
     );
     if (result.affectedRows > 0) {
       await connection.execute(
-        `UPDATE lists
-         SET member_count = GREATEST(0, member_count - 1),
-             membership_version = membership_version + 1
-         WHERE id = ?`,
+        decrementListMemberCountQuery(),
         [row.id],
       );
       await activity(connection, {
@@ -686,23 +594,18 @@ export async function removeSelfFromList(user: AuthUser, lookup: string) {
   return withTransaction(async (connection) => {
     const row = await selectListForUpdate(connection, lookup);
     const [result] = await connection.execute<ResultSetHeader>(
-      "DELETE FROM list_members WHERE list_id = ? AND person_id = ?",
+      deleteListMemberQuery(),
       [row.id, user.wcaId],
     );
     if (result.affectedRows === 0) {
       throw new ListConflictError("You are not currently included in this list.");
     }
     await connection.execute(
-      `INSERT INTO list_exclusions (list_id, person_id)
-       VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE created_at = CURRENT_TIMESTAMP(6)`,
+      insertListExclusionQuery(),
       [row.id, user.wcaId],
     );
     await connection.execute(
-      `UPDATE lists
-       SET member_count = GREATEST(0, member_count - 1),
-           membership_version = membership_version + 1
-       WHERE id = ?`,
+      decrementListMemberCountQuery(),
       [row.id],
     );
     await activity(connection, {
@@ -724,7 +627,7 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
       throw new ListNotFoundError();
     }
     const [memberRows] = await connection.execute<RowDataPacket[]>(
-      "SELECT 1 FROM list_members WHERE list_id = ? AND person_id = ? LIMIT 1",
+      listMembershipQuery(),
       [row.id, user.wcaId],
     );
     if (memberRows.length > 0) {
@@ -732,21 +635,16 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
     }
     if (row.join_policy === "open") {
       await connection.execute(
-        "DELETE FROM list_exclusions WHERE list_id = ? AND person_id = ?",
+        deleteListExclusionQuery(),
         [row.id, user.wcaId],
       );
       const [insert] = await connection.execute<ResultSetHeader>(
-        `INSERT IGNORE INTO list_members
-          (list_id, person_id, added_by_user_id, source)
-         VALUES (?, ?, ?, 'self_request')`,
+        insertSelfRequestMemberQuery(),
         [row.id, user.wcaId, user.id],
       );
       if (insert.affectedRows > 0) {
         await connection.execute(
-          `UPDATE lists
-           SET member_count = member_count + 1,
-               membership_version = membership_version + 1
-           WHERE id = ?`,
+          incrementListMemberCountQuery(),
           [row.id],
         );
       }
@@ -759,15 +657,7 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
       return { status: "joined" as const };
     }
     await connection.execute(
-      `INSERT INTO list_membership_requests
-        (list_id, requester_user_id, person_id, status, created_at, resolved_at, resolved_by_user_id)
-       VALUES (?, ?, ?, 'pending', CURRENT_TIMESTAMP(6), NULL, NULL)
-       ON DUPLICATE KEY UPDATE
-        requester_user_id = VALUES(requester_user_id),
-        status = 'pending',
-        created_at = CURRENT_TIMESTAMP(6),
-        resolved_at = NULL,
-        resolved_by_user_id = NULL`,
+      insertMembershipRequestQuery(),
       [row.id, user.id, user.wcaId],
     );
     await activity(connection, {
@@ -786,21 +676,7 @@ export async function listMembershipRequests(user: AuthUser, lookup: string) {
     throw new ListForbiddenError();
   }
   const result = await query<RequestRow>(
-    `SELECT
-      request.id,
-      request.list_id,
-      request.requester_user_id,
-      request.person_id,
-      requester.name AS requester_name,
-      request.status,
-      request.created_at,
-      request.resolved_at
-     FROM list_membership_requests AS request
-     JOIN app_users AS requester ON requester.id = request.requester_user_id
-     WHERE request.list_id = ?
-       AND request.status = 'pending'
-     ORDER BY
-      request.created_at`,
+    membershipRequestsQuery(),
     [list.id],
   );
   return result.rows.map((row) => ({
@@ -825,21 +701,7 @@ export async function decideMembershipRequest(
     const [requests] = await connection.execute<
       (RequestRow & RowDataPacket)[]
     >(
-      `SELECT
-        request.id,
-        request.list_id,
-        request.requester_user_id,
-        request.person_id,
-        requester.name AS requester_name,
-        request.status,
-        request.created_at,
-        request.resolved_at
-       FROM list_membership_requests AS request
-       JOIN app_users AS requester ON requester.id = request.requester_user_id
-       WHERE request.id = ?
-         AND request.list_id = ?
-       LIMIT 1
-       FOR UPDATE`,
+      membershipRequestForUpdateQuery(),
       [requestId, list.id],
     );
     const request = requests[0];
@@ -852,42 +714,30 @@ export async function decideMembershipRequest(
       const [preferenceRows] = await connection.execute<
         (RowDataPacket & { allow_list_inclusion: number })[]
       >(
-        `SELECT allow_list_inclusion
-         FROM app_users
-         WHERE id = ?
-         FOR UPDATE`,
+        listInclusionPreferenceQuery(),
         [request.requester_user_id],
       );
       if (!preferenceRows[0]?.allow_list_inclusion) {
         throw new ListConflictError("This person cannot be added.");
       }
       await connection.execute(
-        "DELETE FROM list_exclusions WHERE list_id = ? AND person_id = ?",
+        deleteListExclusionQuery(),
         [list.id, request.person_id],
       );
       const [insert] = await connection.execute<ResultSetHeader>(
-        `INSERT IGNORE INTO list_members
-          (list_id, person_id, added_by_user_id, source)
-         VALUES (?, ?, ?, 'self_request')`,
+        insertSelfRequestMemberQuery(),
         [list.id, request.person_id, user.id],
       );
       added = insert.affectedRows > 0;
       if (added) {
         await connection.execute(
-          `UPDATE lists
-           SET member_count = member_count + 1,
-               membership_version = membership_version + 1
-           WHERE id = ?`,
+          incrementListMemberCountQuery(),
           [list.id],
         );
       }
     }
     await connection.execute(
-      `UPDATE list_membership_requests
-       SET status = ?,
-           resolved_at = CURRENT_TIMESTAMP(6),
-           resolved_by_user_id = ?
-       WHERE id = ?`,
+      updateMembershipRequestQuery(),
       [decision, user.id, request.id],
     );
     await activity(connection, {
@@ -906,37 +756,21 @@ export async function setListInclusionPreference(
 ) {
   await withTransaction(async (connection) => {
     await connection.execute(
-      `UPDATE app_users
-       SET allow_list_inclusion = ?
-       WHERE id = ?`,
+      updateListInclusionPreferenceQuery(),
       [allowListInclusion, user.id],
     );
     if (allowListInclusion) return;
 
     await connection.execute(
-      `UPDATE lists AS list_record
-       JOIN (
-         SELECT list_id, COUNT(*) AS removed_count
-         FROM list_members
-         WHERE person_id = ?
-         GROUP BY list_id
-       ) AS removed ON removed.list_id = list_record.id
-       SET
-         list_record.member_count = GREATEST(0, list_record.member_count - removed.removed_count),
-         list_record.membership_version = list_record.membership_version + 1`,
+      removeUserFromListsQuery(),
       [user.wcaId],
     );
     await connection.execute(
-      "DELETE FROM list_members WHERE person_id = ?",
+      removeUserListMembersQuery(),
       [user.wcaId],
     );
     await connection.execute(
-      `UPDATE list_membership_requests
-       SET status = 'cancelled',
-           resolved_at = CURRENT_TIMESTAMP(6),
-           resolved_by_user_id = ?
-       WHERE person_id = ?
-         AND status = 'pending'`,
+      cancelUserMembershipRequestsQuery(),
       [user.id, user.wcaId],
     );
     await activity(connection, {

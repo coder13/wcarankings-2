@@ -10,6 +10,7 @@ import {
   type RankingType,
 } from "@/lib/wca";
 import type { ListRankingRow, ListSummary, ScopedRankingSource } from "@/services/lists/types";
+import { listRankingsQuery } from "@/services/lists/queries";
 
 function rankingTable(type: RankingType) {
   return type === "average"
@@ -78,36 +79,7 @@ async function loadScopedRankings(
   values.push(input.locate ? 1 : input.limit + 1);
 
   const result = await query<ListRankingRow>(
-    `WITH scoped_rankings AS (
-       SELECT
-         RANK() OVER (ORDER BY ranking.best) AS rank,
-         ROW_NUMBER() OVER (
-           ORDER BY ranking.best, ranking.person_name, ranking.person_id
-         ) AS sub_rank,
-         COUNT(*) OVER () AS total,
-         ranking.person_id,
-         ranking.person_name,
-         ranking.country_id,
-         ranking.country_name,
-         ranking.country_iso2,
-         ranking.continent_id,
-         ranking.best,
-         ranking.competition_id,
-         ranking.competition_name,
-         ranking.is_world_record,
-         ranking.is_continent_record,
-         ranking.is_country_record
-       FROM ${scopedSource.from(source)}
-       JOIN persons AS person_gender
-         ON person_gender.wca_id = ranking.person_id
-        AND person_gender.sub_id = 1
-       WHERE ${scopedConditions.join("\n         AND ")}
-     )
-     SELECT *
-     FROM scoped_rankings
-     WHERE ${conditions.join(" AND ")}
-     ORDER BY sub_rank
-     LIMIT ?`,
+    listRankingsQuery({ source: scopedSource.from(source), scopedConditions, conditions }),
     [input.eventId, ...scopedValues, ...values],
     { rankingStatementTimeout: true },
   );

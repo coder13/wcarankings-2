@@ -1,5 +1,6 @@
 import { query } from "@/db";
 import type { ListRegionRow, ListRegions, ListRegionSelection, ListSummary } from "@/services/lists/types";
+import { dynamicListRegionsQuery, listRegionsQuery } from "@/services/lists/queries";
 
 function toListRegions(rows: ListRegionRow[]): ListRegions {
   const continentIds = new Set<string>();
@@ -19,18 +20,7 @@ function toListRegions(rows: ListRegionRow[]): ListRegions {
 
 export async function getListRegions(list: ListSummary): Promise<ListRegions> {
   const result = await query<ListRegionRow>(
-    `SELECT DISTINCT
-       country.id AS country_id,
-       country.name AS country_name,
-       country.iso2 AS country_iso2,
-       country.continent_id
-     FROM list_members AS member
-     JOIN persons AS person
-       ON person.wca_id = member.person_id
-      AND person.sub_id = 1
-     JOIN countries AS country ON country.id = person.country_id
-     WHERE member.list_id = ?
-     ORDER BY country.name, country.id`,
+    listRegionsQuery(),
     [list.id],
   );
   return toListRegions(result.rows);
@@ -38,17 +28,8 @@ export async function getListRegions(list: ListSummary): Promise<ListRegions> {
 
 export async function getDynamicListRegions(personIds: string[]): Promise<ListRegions> {
   if (!personIds.length) return { continents: [], countries: [] };
-  const placeholders = personIds.map(() => "?").join(",");
   const result = await query<ListRegionRow>(
-    `SELECT DISTINCT
-       country.id AS country_id,
-       country.name AS country_name,
-       country.iso2 AS country_iso2,
-       country.continent_id
-     FROM persons AS person
-     JOIN countries AS country ON country.id = person.country_id
-     WHERE person.sub_id = 1 AND person.wca_id IN (${placeholders})
-     ORDER BY country.name, country.id`,
+    dynamicListRegionsQuery(personIds.length),
     personIds,
   );
   return toListRegions(result.rows);

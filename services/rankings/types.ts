@@ -177,3 +177,59 @@ export type CachePool<T extends object> = {
   cache: LRUCache<string, T>;
   pinnedKeys: Set<string>;
 };
+
+export type PersonRankingsQueryInput = {
+  eventId: string;
+  resultType: string;
+  scope: string;
+  regionId: string;
+  rankColumn: string;
+  positionColumn: string;
+  conditions: string[];
+};
+
+export type ResultRankingsQueryInput = {
+  source: string;
+  rankColumn: string;
+  positionColumn: string;
+  conditions: string[];
+  sourceConditions: string[];
+  gender: string[];
+  scope: string;
+};
+
+export type GenderRankingQueryInput = {
+  source: string;
+  baseConditions: string[];
+  conditions: string[];
+};
+
+export type RankingPageQueryInput = {
+  selectColumns: string;
+  from: string;
+  predicate: string;
+  qualifiedSubRank: string;
+  personColumn: string;
+};
+
+export type RankingSearchQueryInput = RankingPageQueryInput & { personIds: string[] };
+export type RankingCursorQueryInput = RankingPageQueryInput & { cursor: string };
+
+export type PersonMetricQueryInput = {
+  rankColumn: string;
+  positionColumn: string;
+  scoreExpression: string;
+  conditions: string[];
+};
+
+export type FilteredPersonMetricQueryInput = {
+  scoreValue: string;
+  scoreOrder: string;
+  conditions: string[];
+  pageConditions: string[];
+};
+export type EntityCountQueryInput = { kind: string; eventId: string; resultType: string };
+export type LatitudeQueryInput = { prefix: string; direction?: "ASC" | "DESC"; regionColumn?: string; scoped: boolean };
+export type CompetitionEntityQueryInput = { valueColumn: string; resultIdColumn: string; rankColumn: string; positionColumn: string };
+export type PodiumEntityQueryInput = { positionColumn: string };
+export type CityEntityQueryInput = { valueColumn: string; resultIdColumn: string; rankColumn: string; cursor: string };

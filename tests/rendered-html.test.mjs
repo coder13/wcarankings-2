@@ -6,7 +6,7 @@ const templateRoot = new URL("../", import.meta.url);
 const previewRoot = new URL("../app/_sites-preview/", import.meta.url);
 
 test("builds the original WCA Rankings UI on the self-hosted API", async () => {
-  const [component, layout, rankingsRoute, wca, schema] = await Promise.all([
+  const [component, layout, rankingsRoute, rankingQueries, wca, schema] = await Promise.all([
     Promise.all([
       "../components/RankingsExplorer/RankingsExplorer.tsx",
       "../components/AppHeader/AppHeader.tsx",
@@ -32,6 +32,7 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
       readFile(new URL("../services/rankings/service.ts", import.meta.url), "utf8"),
       readFile(new URL("../services/rankings/helpers.ts", import.meta.url), "utf8"),
     ]).then((files) => files.join("\n")),
+    readFile(new URL("../services/rankings/queries.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/wca.ts", import.meta.url), "utf8"),
     Promise.all([
       "../scripts/mysql-schema.mjs",
@@ -164,14 +165,14 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
   assert.doesNotMatch(normalRankingsRoute, /ROW_NUMBER\(\) OVER/);
   assert.match(rankingsRoute, /async function queryGenderPage/);
   assert.match(rankingsRoute, /searchPersonIds/);
-  assert.match(rankingsRoute, /personColumn} IN \(\$\{placeholders\}\)/);
+  assert.match(rankingQueries, /personColumn} IN \(\$\{placeholders\}\)/);
   assert.doesNotMatch(rankingsRoute, /person_name \$\{operator\}/);
   assert.match(rankingsRoute, /competition_id/);
   assert.match(rankingsRoute, /conditions\.push\(`\$\{rank\} > 0`\)/);
   assert.match(rankingsRoute, /fetchedAt/);
   assert.match(rankingsRoute, /startPosition/);
   assert.match(rankingsRoute, /lastRank/);
-  assert.match(rankingsRoute, /ORDER BY \$\{subRank\}/);
+  assert.match(rankingQueries, /ORDER BY \$\{subRank\}/);
   assert.match(rankingsRoute, /is_world_record/);
   assert.match(rankingsRoute, /is_continent_record/);
   assert.match(rankingsRoute, /is_country_record/);

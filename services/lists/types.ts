@@ -115,3 +115,10 @@ export type MembershipDecisionRouteContext = {
   params: Promise<{ listId: string; requestId: string }>;
 };
 export type ListRegionSelection = { scope: RegionScope; regionId: string };
+
+export type ListLookupQueryInput = { listColumns: string; byPublicId: boolean; forUpdate?: boolean };
+export type ListRankingQueryInput = {
+  source: string;
+  scopedConditions: string[];
+  conditions: string[];
+};

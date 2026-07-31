@@ -6,6 +6,7 @@ import { searchPersonIds } from "@/services/people/service";
 import { ApiInputError, parseGender, parseYear } from "@/lib/api/projection";
 import { getRecordBadges, isRankingEventId, isRankingType, isValidRegexPattern, parseRegionQuery, type RankingEntry, type RankingType } from "@/lib/wca";
 import { genderCondition, rankingColumns, rankingShape, rankingTable, yearlyRankingTable } from "@/services/rankings/helpers";
+import { filteredPersonMetricQuery, genderRankingPageQuery, personMetricEndQuery, personMetricQuery, rankingCursorQuery, rankingLocateQuery, rankingPageQuery, rankingSearchQuery, yearlyRankingPageQuery } from "@/services/rankings/queries";
 import type { FilteredPersonMetricRow, PersonMetricRow, QueryInput, RankingRow } from "@/services/rankings/types";
 import type { RankingsMetadata } from "@/services/rankings/types";
 
@@ -73,18 +74,6 @@ async function queryGenderPage(input: QueryInput) {
   }
   const gender = genderCondition("gender_person", input.gender);
   if (gender.sql) { baseConditions.push(gender.sql); baseValues.push(...gender.values); }
-  const cte = `WITH filtered AS (
-    SELECT ranking.*,
-      RANK() OVER (ORDER BY ranking.best) AS filtered_rank,
-      ROW_NUMBER() OVER (ORDER BY ranking.best, ranking.person_name, ranking.person_id) AS filtered_position,
-      COUNT(*) OVER () AS total_count
-    FROM ${source} ranking
-    JOIN persons gender_person ON gender_person.wca_id = ranking.person_id AND gender_person.sub_id = 1
-    WHERE ${baseConditions.join(" AND ")}
-  )`;
-  const columns = `filtered_rank AS rank, filtered_position AS sub_rank, total_count,
-    person_id, person_name, country_id, country_name, country_iso2, continent_id, best,
-    competition_id, competition_name, is_world_record, is_continent_record, is_country_record`;
   const conditions: string[] = [];
   const values: unknown[] = [...baseValues];
   if (input.locate) {
@@ -100,7 +89,7 @@ async function queryGenderPage(input: QueryInput) {
     // Fetch one extra row so the caller can determine whether another page exists.
     values.push(input.startRank, input.startRank + input.limit + 1);
   }
-  const result = await query<RankingRow>(`${cte} SELECT ${columns} FROM filtered ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""} ORDER BY filtered_position LIMIT ?`, [...values, input.locate ? 1 : input.search ? input.searchLimit : input.limit + 1]);
+  const result = await query<RankingRow>(genderRankingPageQuery({ source, baseConditions, conditions }), [...values, input.locate ? 1 : input.search ? input.searchLimit : input.limit + 1]);
   const entries = result.rows.slice(0, input.locate ? 1 : input.limit).map(toRankingEntry);
   if (input.locate) return { data: { located: entries[0] ?? null }, timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
   const total = Number(result.rows[0]?.total_count ?? 0);
@@ -110,19 +99,12 @@ async function queryGenderPage(input: QueryInput) {
 async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata) {
   if (input.year !== null) {
     const { conditions, values } = yearlyFilters(input);
-    const result = await query<RankingRow>(`SELECT ${yearlyColumns(input.type)}
-      FROM ${yearlyRankingTable(input.type)} ranking
-      LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
-      LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id
-      LEFT JOIN countries country ON country.id = facts.person_country_id
-      LEFT JOIN competitions competition ON competition.id = facts.competition_id
-      WHERE ${conditions.join(" AND ")} AND ranking.position >= ? AND ranking.position < ?
-      ORDER BY ranking.position`, [...values, input.startRank, input.startRank + PAGE_SIZE], { rankingStatementTimeout: true });
+    const result = await query<RankingRow>(yearlyRankingPageQuery(yearlyRankingTable(input.type), yearlyColumns(input.type), conditions), [...values, input.startRank, input.startRank + PAGE_SIZE], { rankingStatementTimeout: true });
     return { data: normalPageResponse(result.rows, input, metadata), timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
   }
   const { rank, subRank, conditions, values } = filters(input);
   const pageValues = [...values, input.startRank, input.startRank + PAGE_SIZE];
-  const result = await query<RankingRow>(`SELECT ${rankingColumns(rank, subRank)} FROM ${rankingTable(input.type)} WHERE ${conditions.join(" AND ")} AND ${subRank} >= ? AND ${subRank} < ? ORDER BY ${subRank}`, pageValues, { rankingStatementTimeout: true });
+  const result = await query<RankingRow>(rankingPageQuery(rankingTable(input.type), rankingColumns(rank, subRank), conditions, subRank), pageValues, { rankingStatementTimeout: true });
   return { data: normalPageResponse(result.rows, input, metadata), timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
 }
 
@@ -143,7 +125,7 @@ export async function queryMysql(input: QueryInput) {
   const qualifiedSubRank = yearly ? `ranking.${subRank}` : subRank;
   const personColumn = yearly ? "ranking.person_id" : "ranking.person_id";
   if (input.locate) {
-    const result = await query<RankingRow>(`SELECT ${selectColumns} ${from} WHERE ${predicate} AND ${personColumn} = ? LIMIT 1`, [...values, input.locate]);
+    const result = await query<RankingRow>(rankingLocateQuery({ selectColumns, from, predicate, qualifiedSubRank, personColumn }), [...values, input.locate]);
     return { data: { located: result.rows[0] ? toRankingEntry(result.rows[0]) : null }, timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
   }
   if (input.search) {
@@ -151,11 +133,7 @@ export async function queryMysql(input: QueryInput) {
     if (people.personIds.length === 0) {
       return { data: { entries: [], hasMore: false, nextPageStart: null, previousPageStart: null, total: 0 }, timings: people.timings, queryCount: 1, returnedRows: 0 };
     }
-    const placeholders = people.personIds.map(() => "?").join(", ");
-    const result = await query<RankingRow>(
-      `SELECT ${selectColumns} ${from} WHERE ${predicate} AND ${personColumn} IN (${placeholders}) ORDER BY ${qualifiedSubRank} LIMIT ?`,
-      [...values, ...people.personIds, input.searchLimit],
-    );
+    const result = await query<RankingRow>(rankingSearchQuery({ selectColumns, from, predicate, qualifiedSubRank, personColumn, personIds: people.personIds }), [...values, ...people.personIds, input.searchLimit]);
     const entries = result.rows.map(toRankingEntry);
     return {
       data: { entries, hasMore: false, nextPageStart: null, previousPageStart: null, total: entries.length },
@@ -171,7 +149,7 @@ export async function queryMysql(input: QueryInput) {
     ? ` AND (${qualifiedSubRank} > ? OR (${qualifiedSubRank} = ? AND ${personColumn} > ?))`
     : ` AND ${qualifiedSubRank} >= ?`;
   const pageValues = input.cursorRank ? [...values, input.cursorRank, input.cursorRank, input.cursorId, input.limit + 1] : [...values, input.startRank, input.limit + 1];
-  const result = await query<RankingRow>(`SELECT ${selectColumns} ${from} WHERE ${predicate}${cursor} ORDER BY ${qualifiedSubRank} LIMIT ?`, pageValues);
+  const result = await query<RankingRow>(rankingCursorQuery({ selectColumns, from, predicate, qualifiedSubRank, personColumn, cursor }), pageValues);
   const entries = result.rows.slice(0, input.limit).map(toRankingEntry);
   return { data: { entries, hasMore: result.rows.length > input.limit, nextPageStart: null, previousPageStart: null, total: entries.length }, timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
 }
@@ -243,27 +221,7 @@ async function queryPersonMetric(input: QueryInput) {
   }
 
   const limit = input.locate ? 1 : input.search ? input.searchLimit : input.limit + 1;
-  const result = await query<PersonMetricRow>(
-    `SELECT score.${rankColumn} AS rank, score.${positionColumn} AS sub_rank, score.person_id,
-       COALESCE(person.name, score.person_id) AS person_name,
-       COALESCE(display_country.id, '') AS country_id,
-       COALESCE(display_country.name, display_country.id, '') AS country_name,
-       COALESCE(display_country.iso2, '') AS country_iso2,
-       COALESCE(display_country.continent_id, '') AS continent_id,
-       ${scoreExpression} AS best
-     FROM person_sum_of_ranks_scores score
-     LEFT JOIN persons person ON person.wca_id = score.person_id AND person.sub_id = 1
-     LEFT JOIN countries current_country ON current_country.id = person.country_id
-     LEFT JOIN countries display_country ON display_country.id = CASE
-       WHEN ? = 'country' THEN ?
-       WHEN ? = 'continent' AND current_country.continent_id <> ? THEN NULL
-       ELSE person.country_id
-     END
-     WHERE ${conditions.join(" AND ")}
-     ORDER BY score.${positionColumn}, score.person_id
-     LIMIT ?`,
-    [input.scope, input.regionId, input.scope, input.regionId, ...values, limit],
-  );
+  const result = await query<PersonMetricRow>(personMetricQuery({ rankColumn, positionColumn, scoreExpression, conditions }), [input.scope, input.regionId, input.scope, input.regionId, ...values, limit]);
   const timings = {
     queueMs: peopleTimings.queueMs + result.timings.queueMs,
     statementMs: peopleTimings.statementMs + result.timings.statementMs,
@@ -286,18 +244,7 @@ async function queryPersonMetric(input: QueryInput) {
     };
   }
 
-  const end = await query<{ position: number }>(
-    `SELECT ${positionColumn} AS position
-     FROM person_sum_of_ranks_scores
-     LEFT JOIN persons person ON person.wca_id = person_sum_of_ranks_scores.person_id AND person.sub_id = 1
-     WHERE metric_version = 1 AND event_set_version = 1
-       AND result_type = ? AND scope = ? AND region_id = ?
-       AND ${positionColumn} IS NOT NULL
-       ${genderCondition("person", input.gender).sql ? `AND ${genderCondition("person", input.gender).sql}` : ""}
-     ORDER BY ${positionColumn} DESC
-     LIMIT 1`,
-    [metricResultType, input.scope, input.regionId, ...genderCondition("person", input.gender).values],
-  );
+  const end = await query<{ position: number }>(personMetricEndQuery(positionColumn, gender.sql), [metricResultType, input.scope, input.regionId, ...gender.values]);
   return {
     data: {
       entries,
@@ -366,36 +313,7 @@ async function queryFilteredPersonMetric(input: QueryInput, kinch: boolean, gend
     pageValues.push(input.startRank);
   }
   const limit = input.locate ? 1 : search ? input.searchLimit : input.limit + 1;
-  const result = await query<FilteredPersonMetricRow>(
-    `WITH filtered AS (
-       SELECT score.person_id, ${scoreValue} AS best,
-         person.name AS person_name, person.country_id AS current_country_id,
-         DENSE_RANK() OVER (ORDER BY ${scoreOrder}) AS filtered_rank,
-         ROW_NUMBER() OVER (ORDER BY ${scoreOrder}, score.person_id) AS filtered_position,
-         COUNT(*) OVER () AS total_count
-       FROM person_sum_of_ranks_scores score
-       LEFT JOIN persons person ON person.wca_id = score.person_id AND person.sub_id = 1
-       WHERE ${conditions.join(" AND ")}
-     )
-     SELECT filtered.filtered_rank AS rank, filtered.filtered_position AS sub_rank, filtered.total_count,
-       filtered.person_id, COALESCE(filtered.person_name, filtered.person_id) AS person_name,
-       COALESCE(display_country.id, '') AS country_id,
-       COALESCE(display_country.name, display_country.id, '') AS country_name,
-       COALESCE(display_country.iso2, '') AS country_iso2,
-       COALESCE(display_country.continent_id, '') AS continent_id,
-       filtered.best
-     FROM filtered
-     LEFT JOIN countries current_country ON current_country.id = filtered.current_country_id
-     LEFT JOIN countries display_country ON display_country.id = CASE
-       WHEN ? = 'country' THEN ?
-       WHEN ? = 'continent' AND current_country.continent_id <> ? THEN NULL
-       ELSE filtered.current_country_id
-     END
-     WHERE ${pageConditions.join(" AND ")}
-     ORDER BY filtered.filtered_position
-     LIMIT ?`,
-    [...values, input.scope, input.regionId, input.scope, input.regionId, ...pageValues, limit],
-  );
+  const result = await query<FilteredPersonMetricRow>(filteredPersonMetricQuery({ scoreValue, scoreOrder, conditions, pageConditions }), [...values, input.scope, input.regionId, input.scope, input.regionId, ...pageValues, limit]);
   const timings = {
     queueMs: peopleTimings.queueMs + result.timings.queueMs,
     statementMs: peopleTimings.statementMs + result.timings.statementMs,

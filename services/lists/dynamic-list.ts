@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { query } from "@/db";
+import { dynamicListPeopleQuery } from "@/services/lists/queries";
 
 export const MAX_DYNAMIC_LIST_MEMBERS = 100;
 
@@ -43,11 +44,8 @@ export function parseDynamicListIds(value: string | string[] | undefined) {
 
 export async function resolveDynamicList(personIds: string[]) {
   if (!personIds.length) return { personIds: [], unknownIds: [] };
-  const placeholders = personIds.map(() => "?").join(",");
   const result = await query<RowDataPacket & { wca_id: string }>(
-    `SELECT wca_id
-     FROM persons
-     WHERE sub_id = 1 AND wca_id IN (${placeholders})`,
+    dynamicListPeopleQuery(personIds.length),
     personIds,
   );
   const known = new Set(result.rows.map((row) => row.wca_id));
