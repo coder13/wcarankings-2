@@ -331,6 +331,8 @@ main {
 .stickyRankingsRail > .RankingsRailTransition::before {
   top: -1em;
   bottom: -1em;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0 45%, transparent 100%);
 }
 
 .JumpControlsVisibility:has(.Jump[data-direction="down"]) > .RankingsRailTransition::before {
@@ -338,6 +340,8 @@ main {
   bottom: calc(
     -1em - var(--jump-controls-bottom-offset, 0px) - env(safe-area-inset-bottom)
   );
+  -webkit-mask-image: linear-gradient(to top, #000 0 45%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0 45%, transparent 100%);
 }
 
 .stickyRankingsRail > .RankingsRailTransition > .Jump,
