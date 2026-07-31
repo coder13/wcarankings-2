@@ -3,9 +3,9 @@
 import { RankingRow } from "../RankingRow/RankingRow";
 import { rankingEntryKey, type RankingEntry } from "../RankingsExplorer/types";
 import { animate } from "motion";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import type { Key, Ref } from "react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PersonEventDetails } from "@/lib/person-event-details";
 import { personDetailsCache } from "./personDetailsCache";
 
@@ -326,7 +326,7 @@ export function ResultsTable({
     };
   });
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const nextKeys = new Map<number, string>();
     for (const virtualRow of renderedRows) {
       nextKeys.set(
@@ -342,11 +342,12 @@ export function ResultsTable({
   }
 
   return (
-    <ol
-      ref={listRef}
-      className="list"
-      style={{ height: `${renderedListHeight}px` }}
-    >
+    <MotionConfig reducedMotion="user">
+      <ol
+        ref={listRef}
+        className="list"
+        style={{ height: `renderedListHeightpx` }}
+      >
       {renderedRowStates.map(({ virtualRow, entry, identity, shouldAnimate }) => {
         let content;
 
@@ -425,6 +426,6 @@ export function ResultsTable({
           </div>
         );
       })}
-    </ol>
-  );
-}
+      </ol>
+    </MotionConfig>
+  );}
