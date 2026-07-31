@@ -93,15 +93,15 @@ function AccordionSkeleton({ singleResultOnly = false }: { singleResultOnly?: bo
         <section className={`rowAccordionResult rowAccordionResult--single${singleResultOnly ? " rowAccordionResult--only" : ""}`}>
           <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--label" />
           <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--value" />
-          <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--competition" />
           <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--rank" />
+          <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--competition" />
         </section>
         {!singleResultOnly && (
           <section className="rowAccordionResult rowAccordionResult--average">
             <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--label" />
             <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--value" />
-            <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--competition" />
             <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--rank" />
+            <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--competition" />
             <span className="rowAccordionSkeletonLine rowAccordionSkeletonLine--solves" />
           </section>
         )}
