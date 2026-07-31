@@ -375,13 +375,21 @@ export async function runDependencyAwareTasks(
   tasks,
   { connection, createConnection, concurrency = 1 } = {},
 ) {
+  const taskByName = new Map(tasks.map((task) => [task.name, task]));
+  for (const task of tasks) {
+    for (const dependency of task.dependencies) {
+      if (dependency !== "raw-wca" && !taskByName.has(dependency)) {
+        throw new Error(`Unknown task dependency ${dependency} for ${task.name}`);
+      }
+    }
+  }
+
   if (!createConnection || concurrency === 1 || tasks.length <= 1) {
     const results = [];
     const completed = new Set(["raw-wca"]);
-    const taskByName = new Map(tasks.map((task) => [task.name, task]));
     for (const task of tasks) {
       if (!task.dependencies.every((dependency) =>
-        dependency === "raw-wca" || !taskByName.has(dependency) || completed.has(dependency))) {
+        dependency === "raw-wca" || completed.has(dependency))) {
         throw new Error(`Task dependency cycle or missing dependency at ${task.name}`);
       }
       results.push(await task.run(connection));
@@ -390,7 +398,6 @@ export async function runDependencyAwareTasks(
     return results;
   }
 
-  const taskByName = new Map(tasks.map((task) => [task.name, task]));
   const pending = [...tasks];
   const running = new Map();
   const completed = new Set(["raw-wca"]);
@@ -409,7 +416,7 @@ export async function runDependencyAwareTasks(
 
   function dependenciesComplete(task) {
     return task.dependencies.every((dependency) =>
-      dependency === "raw-wca" || !taskByName.has(dependency) || completed.has(dependency));
+      dependency === "raw-wca" || completed.has(dependency));
   }
 
   function startReadyTasks() {

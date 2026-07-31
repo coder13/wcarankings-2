@@ -92,6 +92,24 @@ test("dependency scheduler closes workers and does not start dependents after fa
   assert.equal(closed.length, 2);
 });
 
+test("dependency scheduler rejects unknown dependencies before starting tasks", async () => {
+  let started = false;
+  await assert.rejects(
+    runDependencyAwareTasks([{
+      name: "counts",
+      dependencies: ["missing-entries"],
+      async run() {
+        started = true;
+      },
+    }], {
+      connection: {},
+      concurrency: 1,
+    }),
+    /Unknown task dependency missing-entries for counts/,
+  );
+  assert.equal(started, false);
+});
+
 test("projection build concurrency defaults to two and accepts configured bounds", () => {
   const previous = process.env.WCA_PROJECTION_BUILD_CONCURRENCY;
   delete process.env.WCA_PROJECTION_BUILD_CONCURRENCY;
