@@ -53,6 +53,30 @@ test("dependency scheduler bounds and overlaps independent tasks", async () => {
   assert.equal(closed.length, 4);
 });
 
+test("duration-aware scheduling pairs a long task with the shortest ready task", async () => {
+  const started = [];
+  const task = (name, estimatedDurationMs, durationMs) => ({
+    name,
+    dependencies: [],
+    estimatedDurationMs,
+    async run() {
+      started.push(name);
+      await new Promise((resolve) => setTimeout(resolve, durationMs));
+    },
+  });
+
+  await runDependencyAwareTasks([
+    task("long-first", 120_000, 20),
+    task("long-second", 120_000, 5),
+    task("short", 15_000, 5),
+  ], {
+    createConnection: async () => fakeConnection(started.length + 1, []),
+    concurrency: 2,
+  });
+
+  assert.deepEqual(started.slice(0, 2), ["long-first", "short"]);
+});
+
 test("dependency scheduler closes workers and does not start dependents after failure", async () => {
   const started = [];
   const closed = [];

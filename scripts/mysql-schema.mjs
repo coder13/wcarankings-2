@@ -233,20 +233,47 @@ export const RETIRED_PROJECTION_TABLES = [
 ];
 
 export const COMPATIBILITY_PROJECTION_TASKS = [
-  { name: "compatibility-ranking-entries-single", dependencies: [], table: "ranking_entries_single" },
-  { name: "compatibility-ranking-entries-average", dependencies: [], table: "ranking_entries_average" },
-  { name: "compatibility-result-entries-single", dependencies: [], table: "result_entries_single" },
+  { name: "compatibility-ranking-entries-single", dependencies: [], table: "ranking_entries_single", estimatedDurationMs: 120_000 },
+  { name: "compatibility-ranking-entries-average", dependencies: [], table: "ranking_entries_average", estimatedDurationMs: 120_000 },
+  { name: "compatibility-result-entries-single", dependencies: [], table: "result_entries_single", estimatedDurationMs: 150_000 },
   {
     name: "compatibility-ranking-counts",
     dependencies: ["compatibility-ranking-entries-single", "compatibility-ranking-entries-average"],
     table: "ranking_counts",
+    estimatedDurationMs: 15_000,
   },
   {
     name: "compatibility-result-counts",
     dependencies: ["compatibility-result-entries-single"],
     table: "result_counts",
+    estimatedDurationMs: 15_000,
   },
 ];
+
+// Initial scheduling hints. The per-task logs provide the data to tune these
+// values as the projection workload evolves; they do not affect SQL semantics.
+const PROJECTION_DURATION_ESTIMATES_MS = {
+  "sum-of-ranks": 180_000,
+  "competition-podium-members": 30_000,
+  "competition-event-stats": 90_000,
+  "result-facts": 150_000,
+  "person-event-rankings": 90_000,
+  "person-year-rankings": 150_000,
+  "result-rankings": 150_000,
+  "result-ranking-counts": 15_000,
+  "person-ranking-counts": 15_000,
+  "person-metric-values": 90_000,
+  "person-metric-scores": 45_000,
+  "competition-stats": 30_000,
+  "city-event-stats": 90_000,
+  "entity-ranking-counts": 15_000,
+};
+
+const LONG_TASK_THRESHOLD_MS = 60_000;
+
+function projectionDurationEstimate(name) {
+  return PROJECTION_DURATION_ESTIMATES_MS[name] ?? 0;
+}
 
 function projectionNames(sql, suffix) {
   return [...SEMANTIC_PROJECTION_TABLES, ...COMPATIBILITY_PROJECTION_TABLES]
@@ -419,20 +446,34 @@ export async function runDependencyAwareTasks(
       dependency === "raw-wca" || completed.has(dependency));
   }
 
-  function startReadyTasks() {
-    for (let index = 0; index < pending.length && running.size < concurrency;) {
-      const task = pending[index];
-      if (!dependenciesComplete(task)) {
-        index += 1;
-        continue;
+  function isLongTask(task) {
+    return task.estimatedDurationMs >= LONG_TASK_THRESHOLD_MS;
+  }
+
+  function nextReadyTask() {
+    const ready = pending.filter(dependenciesComplete);
+    if (ready.length === 0) return undefined;
+    const longTaskRunning = [...running.values()].some(({ task }) => isLongTask(task));
+    const shortReady = ready.filter((task) => !isLongTask(task));
+    const candidates = longTaskRunning && shortReady.length > 0 ? shortReady : ready;
+    return candidates.reduce((selected, task) => {
+      if (!selected) return task;
+      if (longTaskRunning && shortReady.length > 0) {
+        return task.estimatedDurationMs < selected.estimatedDurationMs ? task : selected;
       }
-      pending.splice(index, 1);
-      running.set(
-        task.name,
-        runTask(task)
-          .then((result) => ({ task, result }))
-          .catch((error) => ({ task, error })),
-      );
+      return task.estimatedDurationMs > selected.estimatedDurationMs ? task : selected;
+    }, undefined);
+  }
+
+  function startReadyTasks() {
+    while (running.size < concurrency) {
+      const task = nextReadyTask();
+      if (!task) break;
+      pending.splice(pending.indexOf(task), 1);
+      const promise = runTask(task)
+        .then((result) => ({ task, result }))
+        .catch((error) => ({ task, error }));
+      running.set(task.name, { task, promise });
     }
   }
 
@@ -441,7 +482,7 @@ export async function runDependencyAwareTasks(
     if (running.size === 0) {
       throw new Error(`Task dependency cycle or missing dependency among: ${pending.map(({ name }) => name).join(", ")}`);
     }
-    const result = await Promise.race(running.values());
+    const result = await Promise.race([...running.values()].map(({ promise }) => promise));
     running.delete(result.task.name);
     if (result.error) {
       failure = result.error;
@@ -451,7 +492,9 @@ export async function runDependencyAwareTasks(
     timings.set(result.task.name, result.result);
   }
 
-  if (running.size > 0) await Promise.allSettled(running.values());
+  if (running.size > 0) {
+    await Promise.allSettled([...running.values()].map(({ promise }) => promise));
+  }
   if (failure) throw failure;
   return tasks.map(({ name }) => timings.get(name));
 }
@@ -460,6 +503,7 @@ async function buildRegisteredProjectionsConcurrently(projections, { projectionS
   const tasks = projections.map((projection) => ({
     name: projection.name,
     dependencies: projection.dependencies,
+    estimatedDurationMs: projectionDurationEstimate(projection.name),
     run: async (connection) => buildProjection(connection, projection, projectionSuffix),
   }));
   return runDependencyAwareTasks(tasks, { createConnection, concurrency });
@@ -669,6 +713,7 @@ export async function refreshMysqlSchema(
     name: `projection:${projection.name}`,
     dependencies: projection.dependencies.map((dependency) =>
       dependency === "raw-wca" ? dependency : `projection:${dependency}`),
+    estimatedDurationMs: projectionDurationEstimate(projection.name),
     run: (worker) => buildProjection(worker, projection, projectionSuffix),
   }));
   await runDependencyAwareTasks([
