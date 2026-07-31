@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { AuthSessionRefresh } from "@/components/AuthSessionRefresh";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics/GoogleAnalytics";
 import { PwaRegistration } from "@/components/PwaRegistration/PwaRegistration";
+import { ProjectionCapabilitiesProvider } from "@/components/ProjectionCapabilitiesProvider";
+import { getProjectionCapabilities } from "@/lib/projection-capabilities";
 import "./globals.css";
 
 const themeInitScript = `
@@ -51,11 +53,12 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const capabilities = await getProjectionCapabilities();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -67,10 +70,12 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <AuthSessionRefresh />
-        <GoogleAnalytics />
-        <PwaRegistration />
-        {children}
+        <ProjectionCapabilitiesProvider capabilities={capabilities}>
+          <AuthSessionRefresh />
+          <GoogleAnalytics />
+          <PwaRegistration />
+          {children}
+        </ProjectionCapabilitiesProvider>
       </body>
     </html>
   );

@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
 import type {
@@ -12,6 +12,7 @@ import { loadRankings } from "@/lib/rankings";
 import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
 import { loadResultRankings } from "@/lib/semantic-result-rankings";
 import { getAuthUser } from "@/lib/auth";
+import { getProjectionCapabilities } from "@/lib/projection-capabilities";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 
@@ -310,6 +311,10 @@ export async function RankingsPage({
   const { scope, regionId } = parseRegionQuery(getSearchParam(resolvedSearchParams, "region"));
   const gender = (initialSubject === "people" || initialSubject === "results") ? getGenderFilters(resolvedSearchParams) : [];
   const initialYear = initialYearOverride ?? (/^\d{4}$/.test(getSearchParam(resolvedSearchParams, "year")) ? Number(getSearchParam(resolvedSearchParams, "year")) : null);
+  const capabilities = await getProjectionCapabilities();
+  if (!capabilities.core || (initialYear !== null && !capabilities.yearlyPersonRankings) || ((initialAllEventRankingId || eventId === "sor-kinch") && !capabilities.sumOfRanks)) {
+    notFound();
+  }
   const requestedWcaId = getSearchParam(resolvedSearchParams, "wcaId")
     .trim()
     .toUpperCase();
