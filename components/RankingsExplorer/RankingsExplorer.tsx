@@ -1,7 +1,7 @@
 "use client";
 
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { AnimatePresence, LayoutGroup, motion, useScroll, useSpring, useTransform } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion, useScroll, useTransform } from "motion/react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -695,11 +695,6 @@ export function RankingsExplorer({
     [0, 1],
     { clamp: true },
   );
-  const animatedTopRailProgress = useSpring(topRailProgressValue, {
-    stiffness: 360,
-    damping: 34,
-    mass: 0.45,
-  });
   const activeListKey = [
     subject,
     competitionRanking,
@@ -3006,7 +3001,7 @@ export function RankingsExplorer({
       <motion.div
         ref={stickyRankingsRailRef}
         className="stickyRankingsRail"
-        style={{ "--rail-scroll-progress": animatedTopRailProgress }}
+        style={{ "--rail-scroll-progress": topRailProgressValue }}
       >
         {listOwner && <ListOwnerControls listId={listOwner.listId} initialVisibility={listOwner.visibility} initialJoinPolicy={listOwner.joinPolicy} onManageMembers={() => { setMemberSelectionMode(true); setSelectedMemberIds(new Set()); }} />}
         {listActions && !listActions.isOwner && <ListCloneExportControls listId={listActions.listId} />}
