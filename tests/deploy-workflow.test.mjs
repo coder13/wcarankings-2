@@ -20,6 +20,7 @@ const [
   approvedDataTools,
   activation,
   syncService,
+  prProjectionRelease,
 ] = await Promise.all([
   workflow("deploy.yml"),
   workflow("refresh-rankings.yml"),
@@ -31,6 +32,7 @@ const [
   workflow("resolve-approved-data-tools.yml"),
   readFile(new URL("../scripts/activate-ranking-generation.mjs", import.meta.url), "utf8"),
   readFile(new URL("../ops/wcarankings-sync.service", import.meta.url), "utf8"),
+  workflow("pr-projection-release.yml"),
 ]);
 
 test("composes the main release from independently callable workflow blocks", () => {
@@ -85,11 +87,26 @@ test("builds one checksummed artifact containing only selected groups", () => {
   assert.match(projectionBuild, /projection-release-group-core-/);
   assert.match(projectionBuild, /Determine projection cache misses/);
   assert.match(projectionBuild, /actions\/upload-artifact@v4/);
-  assert.match(projectionBuild, /retention-days: 7/);
+  assert.match(projectionBuild, /artifact_retention_days:/);
+  assert.match(projectionBuild, /retention-days: \$\{\{ inputs\.artifact_retention_days \}\}/);
   assert.match(projectionBuild, /artifact_id:/);
   assert.match(projectionBuild, /artifact_run_id:/);
   assert.match(projectionBuild, /wca-export\.sql\.zip/);
   assert.match(projectionBuild, /docker compose down --volumes --remove-orphans/);
+});
+
+test("builds labeled PR projections and deploys the exact merged artifact", () => {
+  assert.match(prProjectionRelease, /types:[\s\S]*- labeled[\s\S]*- closed/);
+  assert.match(prProjectionRelease, /github\.event\.label\.name == 'build-projections'/);
+  assert.match(prProjectionRelease, /force_rebuild: true/);
+  assert.match(prProjectionRelease, /include_raw: true/);
+  assert.match(prProjectionRelease, /artifact_retention_days: 90/);
+  assert.match(prProjectionRelease, /actions\/workflows\/pr-projection-release\.yml\/runs/);
+  assert.match(prProjectionRelease, /head_sha == \$sha/);
+  assert.match(prProjectionRelease, /actions\/download-artifact@v4/);
+  assert.match(prProjectionRelease, /artifact_id:/);
+  assert.match(prProjectionRelease, /deploy-projections\.yml/);
+  assert.match(prProjectionRelease, /production-mutation/);
 });
 
 test("builds and verifies digest-addressed server images", () => {

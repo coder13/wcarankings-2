@@ -12,6 +12,20 @@ The production pipeline is composed from five workflow blocks:
 data-tools release approved by the last successful server deployment, then composes
 only the projection planner, builder, and deployer.
 
+## Labeled PR projection builds
+
+Adding the `build-projections` label to a same-repository pull request starts
+`pr-projection-release.yml`. It force-builds all projection groups from the PR
+head, records the build in the Actions summary, and retains a checksummed release
+artifact for 90 days. The artifact includes the raw WCA export so it remains a
+coherent dataset if production advances before the merge.
+
+When that labeled pull request is merged, the workflow finds the successful build
+by the PR head SHA, downloads that exact artifact, and sends its immutable
+coordinates through `deploy-projections.yml`. A fork PR is intentionally ignored
+because the build requires the repository's deployment credentials and executes
+database-generation code.
+
 ## Identity and compatibility
 
 These are deliberately separate:
