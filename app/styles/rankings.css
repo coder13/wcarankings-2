@@ -309,6 +309,20 @@
   pointer-events: none;
   box-shadow: 0 -4px 16px var(--shadow);
   backdrop-filter: blur(4px);
+  transition: opacity 160ms var(--cubic-exit), transform 180ms var(--cubic-exit), visibility 0s;
+}
+
+.siteFooter[data-at-top="false"] {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(calc(100% + 0.5rem));
+  transition: opacity 160ms var(--cubic-exit), transform 180ms var(--cubic-exit), visibility 0s linear 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .siteFooter {
+    transition: none;
+  }
 }
 
 .siteFooter span:last-child {

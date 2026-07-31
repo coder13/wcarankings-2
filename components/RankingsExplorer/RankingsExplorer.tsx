@@ -687,7 +687,7 @@ export function RankingsExplorer({
     x: number;
     y: number;
   } | null>(null);
-  const { topCompact: topRailCompact, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
+  const { atTop: footerAtTop, topCompact: topRailCompact, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
   const activeListKey = [
     subject,
     competitionRanking,
@@ -3154,7 +3154,7 @@ export function RankingsExplorer({
       {(vimMode || vimSearchActive) && vimHelpOpen && (
         <VimHelp onClose={() => setVimHelpOpen(false)} />
       )}
-      <footer className="siteFooter">
+      <footer className="siteFooter" data-at-top={footerAtTop} aria-hidden={!footerAtTop}>
         <span>By Adam Walker and Cailyn Sinclair</span>
         {offlineStale && <span role="status">Offline cached rankings may be stale</span>}
         <span>

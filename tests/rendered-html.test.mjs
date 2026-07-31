@@ -323,6 +323,18 @@ test("binds rail scroll progress directly to Motion scroll state", async () => {
   assert.match(component, /style\.setProperty\("--rail-scroll-progress", String\(progress\)\)/);
 });
 
+test("hides the site footer after leaving the top of the rankings", async () => {
+  const [component, progressHook, rankingsCss] = await Promise.all([
+    readFile(new URL("../components/RankingsExplorer/RankingsExplorer.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/RankingsExplorer/useRailScrollProgress.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/styles/rankings.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(progressHook, /const nextAtTop = window\.scrollY === 0/);
+  assert.match(component, /<footer className="siteFooter" data-at-top=\{footerAtTop\}/);
+  assert.match(rankingsCss, /\.siteFooter\[data-at-top="false"\][\s\S]*opacity:\s*0;[\s\S]*translateY/);
+});
+
 test("production build keeps rankings styles in the root stylesheet", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("../dist/client/.vite/ssr-manifest.json", import.meta.url), "utf8"),
