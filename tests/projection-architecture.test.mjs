@@ -151,6 +151,9 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(competitions, /idx_competition_stats_south/);
   assert.match(cities, /fastest_average_result_id/);
   assert.match(cities, /fastest_average_rank/);
+  assert.match(cities, /CASE[\s\S]*person\.gender IN.*ELSE 'o'/);
+  assert.match(cities, /GROUP BY city_name, country_id, event_id, gender/);
+  assert.match(cities, /ADD PRIMARY KEY \(city_name, country_id, event_id, gender\)/);
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);
   assert.match(schema, /entity-ranking-counts/);
   assert.match(schema, /name: "competition-event-stats"[\s\S]*enabledByDefault: true/);
@@ -210,6 +213,10 @@ test("exposes bounded resource APIs without projection name scans", async () => 
   assert.match(entities, /stats\.\$\{positionColumn\} > \?/);
   assert.match(entities, /INNER JOIN results result ON result\.id = page\.result_id/);
   assert.match(entities, /FROM city_event_stats stats/);
+  assert.match(entities, /parseGender\(params\)/);
+  assert.match(entities, /parseScope\(params\)/);
+  assert.match(entities, /stats\.gender IN/);
+  assert.match(entities, /country\.continent_id/);
   assert.match(search, /FROM persons person/);
 
   for (const source of [people, results, rankings]) {

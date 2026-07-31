@@ -3,13 +3,13 @@ import { stripMarkdownLinks } from "@/lib/display-text";
 import {
   addTimings,
   ApiInputError,
-  optionalInteger,
-  optionalText,
   parseEvent,
+  parseGender,
   parseLimit,
   parseResultType,
   parseScope,
 } from "@/lib/projection-api";
+import { formatWcaResult } from "@/lib/wca";
 
 type CompetitionRow = {
   rank: number;
@@ -30,14 +30,6 @@ type CompetitionRow = {
   round_type_id: string | null;
   position: number;
 };
-
-async function entityCount(kind: string, eventId = "", resultType = "") {
-  return query<{ count: number }>(
-    `SELECT count FROM entity_ranking_counts
-     WHERE ranking_kind = ? AND event_id = ? AND result_type = ?`,
-    [kind, eventId, resultType],
-  );
-}
 
 export async function loadCompetitionRankings(params: URLSearchParams) {
   const ranking = params.get("ranking") ?? "fastest";
@@ -465,39 +457,59 @@ type CityRow = {
   competition_name: string;
   competition_start_date: string;
   round_type_id: string;
+  position: number;
 };
 
 export async function loadCityRankings(params: URLSearchParams) {
   const eventId = parseEvent(params)!;
   const resultType = parseResultType(params, eventId);
+  const gender = parseGender(params);
+  const { scope, regionId } = parseScope(params);
   const limit = parseLimit(params);
   const valueColumn = `fastest_${resultType}`;
   const resultIdColumn = `${valueColumn}_result_id`;
-  const rankColumn = `${valueColumn}_rank`;
-  const afterValue = optionalInteger(params, "afterValue");
-  const afterCountryId = optionalText(params, "afterCountryId");
-  const afterCity = optionalText(params, "afterCity");
-  const supplied = [afterValue, afterCountryId, afterCity].filter((value) => value !== null).length;
-  if (supplied !== 0 && supplied !== 3) throw new ApiInputError("All city cursor fields must be supplied together.");
-  const values: unknown[] = [eventId];
-  let cursor = "";
-  if (supplied === 3) {
-    cursor = ` AND (
-      stats.${valueColumn} > ?
-      OR (stats.${valueColumn} = ? AND stats.country_id > ?)
-      OR (stats.${valueColumn} = ? AND stats.country_id = ? AND stats.city_name > ?)
-    )`;
-    values.push(afterValue, afterValue, afterCountryId, afterValue, afterCountryId, afterCity);
+  const rawStart = params.get("start") ?? "0";
+  const start = Number(rawStart);
+  if (!Number.isInteger(start) || start < 0) {
+    throw new ApiInputError("start must be a non-negative integer.");
   }
-  const rows = await query<CityRow>(`
-    WITH page AS (
+  const genderFilter = gender.length
+    ? ` AND stats.gender IN (${gender.map(() => "?").join(", ")})`
+    : "";
+  const regionFilter = scope === "world"
+    ? ""
+    : ` AND country.${scope === "continent" ? "continent_id" : "id"} = ?`;
+  const filterValues: unknown[] = [eventId, ...gender, ...(scope === "world" ? [] : [regionId])];
+  const cityRankingSql = `
+    WITH candidates AS (
       SELECT stats.city_name, stats.country_id,
         stats.${valueColumn} AS result_value,
         stats.${resultIdColumn} AS result_id,
-        stats.${rankColumn} AS rank
+        stats.gender
       FROM city_event_stats stats
-      WHERE stats.event_id = ? AND stats.${valueColumn} IS NOT NULL${cursor}
-      ORDER BY stats.${valueColumn}, stats.country_id, stats.city_name
+      LEFT JOIN countries country ON country.id = stats.country_id
+      WHERE stats.event_id = ? AND stats.${valueColumn} IS NOT NULL${genderFilter}${regionFilter}
+    ), choices AS (
+      SELECT candidates.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY city_name, country_id
+          ORDER BY result_value, gender, result_id
+        ) AS choice
+      FROM candidates
+    ), city_values AS (
+      SELECT city_name, country_id, result_value, result_id
+      FROM choices
+      WHERE choice = 1
+    ), ranked AS (
+      SELECT city_values.*,
+        DENSE_RANK() OVER (ORDER BY result_value) AS rank,
+        ROW_NUMBER() OVER (ORDER BY result_value, country_id, city_name) AS position
+      FROM city_values
+    )`;
+  const rows = await query<CityRow>(`
+    ${cityRankingSql}, page AS (
+      SELECT * FROM ranked
+      WHERE position > ?
       LIMIT ?
     )
     SELECT page.*, COALESCE(country.name, page.country_id) AS country_name,
@@ -510,43 +522,35 @@ export async function loadCityRankings(params: URLSearchParams) {
     LEFT JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1
     LEFT JOIN competitions competition ON competition.id = facts.competition_id
     LEFT JOIN countries country ON country.id = page.country_id
-    ORDER BY page.result_value, page.country_id, page.city_name
-  `, [...values, limit + 1]);
-  const counts = await entityCount("city", eventId, resultType);
+    ORDER BY page.position
+  `, [...filterValues, start, limit + 1]);
+  const counts = await query<{ count: number }>(`
+    ${cityRankingSql}
+    SELECT COUNT(*) AS count FROM ranked
+  `, filterValues);
   const pageRows = rows.rows.slice(0, limit);
   const last = pageRows.at(-1);
   return {
     data: {
       entries: pageRows.map((row) => ({
         rank: Number(row.rank),
-        city: {
-          name: row.city_name,
-          country: { id: row.country_id, name: row.country_name, iso2: row.country_iso2 },
-        },
-        result: {
-          id: Number(row.result_id),
-          value: Number(row.result_value),
-          person: { id: row.person_id, name: row.person_name },
-          competition: {
-            id: row.competition_id,
-            name: row.competition_name,
-            startDate: row.competition_start_date,
-          },
-          roundTypeId: row.round_type_id,
-        },
+        subRank: Number(row.position),
+        personId: `city:${row.country_id}:${row.city_name}`,
+        personName: row.city_name,
+        identitySubtitle: row.person_name,
+        countryName: row.country_name,
+        countryIso2: row.country_iso2,
+        best: Number(row.result_value),
+        formattedValue: formatWcaResult(eventId, Number(row.result_value), resultType),
+        competitionId: row.competition_id,
+        competitionName: `${row.competition_name} · ${row.person_name}`,
+        recordBadges: [],
       })),
-      context: { resource: "cities", eventId, result: resultType },
-      page: {
-        limit,
-        hasMore: rows.rows.length > limit,
-        next: rows.rows.length > limit && last
-          ? {
-              afterValue: Number(last.result_value),
-              afterCountryId: last.country_id,
-              afterCity: last.city_name,
-            }
-          : null,
-      },
+      hasMore: rows.rows.length > limit,
+      nextPageStart: rows.rows.length > limit && last ? Number(last.position) : null,
+      previousPageStart: start > 0 ? Math.max(0, start - limit) : null,
+      startPosition: Number(pageRows[0]?.position ?? start + 1) - 1,
+      lastRank: pageRows.length ? Number(pageRows.at(-1)?.rank) : null,
       total: Number(counts.rows[0]?.count ?? 0),
     },
     diagnostics: {
