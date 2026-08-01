@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { AnimatePresence, MotionConfig, motion, useIsPresent } from "motion/react";
+import { AnimatePresence, MotionConfig, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { EventPicker, type EventPickerOption } from "../EventPicker/EventPicker";
 import { RegionPicker } from "../RegionPicker/RegionPicker";
 import ArrowDownIcon from "../Icon/arrow-down.svg?react";
@@ -24,6 +24,7 @@ const cubicEnter = [0, 0, 0.2, 1] as const;
 export const RankingsRail = forwardRef<HTMLDivElement, { children: ReactNode; className?: string; direction: "up" | "down"; searchNavigation?: boolean; compactResultType?: boolean; animateLayout?: boolean }>(
   ({ children, className = "", direction, searchNavigation, compactResultType, animateLayout = false }, ref) => {
     const isPresent = useIsPresent();
+    const reduceMotion = useReducedMotion();
     const shouldAnimateLayout = animateLayout || className.includes("Jump--listAdd");
 
     return (
@@ -37,7 +38,7 @@ export const RankingsRail = forwardRef<HTMLDivElement, { children: ReactNode; cl
           }}
           transition={{
             layout: railLayoutTransition,
-            opacity: { duration: 0.14, ease: "easeOut" },
+            opacity: { duration: reduceMotion ? 0 : 0.14, ease: "easeOut" },
           }}
           className="RankingsRailTransition"
         >
@@ -170,6 +171,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({ event, event
 export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPosition, total, onJumpUp, onJumpDown, onFocusMe, searchActive, onSearchPrevious, onSearchNext }: {
   upArmed: boolean; downArmed: boolean; busy?: boolean; currentPosition: number; total: number; onJumpUp: () => void; onJumpDown: () => void; onFocusMe?: (wcaId: string) => void; searchActive: boolean; onSearchPrevious: () => void; onSearchNext: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   const [wcaId, setWcaId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -201,8 +203,8 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
             transition={{
-              opacity: { duration: 0.16, ease: cubicEnter },
-              x: { duration: 0.16, ease: cubicEnter },
+              opacity: { duration: reduceMotion ? 0 : 0.16, ease: cubicEnter },
+              x: { duration: reduceMotion ? 0 : 0.16, ease: cubicEnter },
             }}
             aria-hidden={false}
             style={{ pointerEvents: "auto" }}
@@ -220,8 +222,8 @@ export function RankingsPagerRail({ upArmed, downArmed, busy = false, currentPos
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{
-              opacity: { duration: 0.16, ease: cubicEnter },
-              y: { duration: 0.16, ease: cubicEnter },
+              opacity: { duration: reduceMotion ? 0 : 0.16, ease: cubicEnter },
+              y: { duration: reduceMotion ? 0 : 0.16, ease: cubicEnter },
             }}
             aria-hidden={false}
           >

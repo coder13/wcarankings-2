@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { formatWcaResult, flagEmoji, RECORD_BADGE_LABELS } from "@/lib/wca";
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { formatRankingNumber, type RankingEntry } from "../RankingsExplorer/types";
@@ -126,6 +126,7 @@ function AccordionFrame({
   onCloseComplete?: () => void;
   children: ReactNode;
 }) {
+  const reduceMotion = useReducedMotion();
   return (
     <motion.div
       className={`rowAccordion${ready ? " rowAccordion--ready" : ""}`}
@@ -135,8 +136,8 @@ function AccordionFrame({
         : { height: "auto", marginBottom: "0.4rem" }}
       exit={{ height: 0, marginBottom: 0 }}
       transition={{
-        height: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
-        marginBottom: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
+        height: { duration: reduceMotion ? 0 : ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
+        marginBottom: { duration: reduceMotion ? 0 : ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
       }}
       onAnimationComplete={() => {
         if (closing) onCloseComplete?.();

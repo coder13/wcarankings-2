@@ -7,10 +7,12 @@ export function useRailScrollProgress({
   enabled,
   revealDistance,
   transformDistance,
+  reduceMotion = false,
 }: {
   enabled: boolean;
   revealDistance: number;
   transformDistance: number;
+  reduceMotion?: boolean;
 }) {
   const [atTop, setAtTop] = useState(true);
   const [topCompact, setTopCompact] = useState(false);
@@ -33,9 +35,12 @@ export function useRailScrollProgress({
         setTopCompact(nextTopCompact);
       }
       const distanceToEnd = Math.max(0, document.documentElement.scrollHeight - (window.scrollY + window.innerHeight));
-      const nextBottom = nextAtTop
-        ? 0
-        : Math.max(0, Math.min(1, distanceToEnd / revealDistance));
+      let nextBottom = 0;
+      if (!nextAtTop) {
+        nextBottom = reduceMotion
+          ? 1
+          : Math.max(0, Math.min(1, distanceToEnd / revealDistance));
+      }
       if (nextBottom !== bottomRef.current) {
         bottomRef.current = nextBottom;
         bottomProgress.set(nextBottom);
@@ -44,7 +49,7 @@ export function useRailScrollProgress({
     const frame = window.requestAnimationFrame(update);
     window.addEventListener("scroll", update, { passive: true });
     return () => { window.cancelAnimationFrame(frame); window.removeEventListener("scroll", update); };
-  }, [bottomProgress, enabled, revealDistance, transformDistance]);
+  }, [bottomProgress, enabled, reduceMotion, revealDistance, transformDistance]);
 
   return { atTop, topCompact, bottomProgress };
 }

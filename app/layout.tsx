@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { AuthSessionRefresh } from "@/components/AuthSessionRefresh";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics/GoogleAnalytics";
+import { MotionPreferences } from "@/components/MotionPreferences/MotionPreferences";
 import { PwaRegistration } from "@/components/PwaRegistration/PwaRegistration";
 import { ProjectionFeatureSwitchProvider } from "@/components/ProjectionFeatureSwitchProvider";
 import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
@@ -70,12 +71,14 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <ProjectionFeatureSwitchProvider featureSwitch={featureSwitch}>
-          <AuthSessionRefresh />
-          <GoogleAnalytics />
-          <PwaRegistration />
-          {children}
-        </ProjectionFeatureSwitchProvider>
+        <MotionPreferences>
+          <ProjectionFeatureSwitchProvider featureSwitch={featureSwitch}>
+            <AuthSessionRefresh />
+            <GoogleAnalytics />
+            <PwaRegistration />
+            {children}
+          </ProjectionFeatureSwitchProvider>
+        </MotionPreferences>
       </body>
     </html>
   );

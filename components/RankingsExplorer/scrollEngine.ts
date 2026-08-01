@@ -1,3 +1,5 @@
+import { prefersReducedMotion } from "@/lib/motion-preferences";
+
 export const SCROLL_SETTLE_DELAY_MS = 100;
 export const DEFAULT_ROW_HEIGHT = 65.45;
 export const MIN_LOCAL_SCROLL_DURATION_MS = 320;
@@ -144,9 +146,7 @@ export function animateScrollTo(
 ) {
   cancelScrollAnimation(state);
   state.programmatic = true;
-  const reducedMotion = window.matchMedia(
-    "(prefers-reduced-motion: reduce)"
-  ).matches;
+  const reducedMotion = prefersReducedMotion();
   if (requestedBehavior !== "smooth" || reducedMotion) {
     window.scrollTo({ top: targetTop, behavior: "auto" });
     finishProgrammaticScroll(state, onComplete);

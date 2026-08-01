@@ -1,7 +1,7 @@
 "use client";
 
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { AnimatePresence, LayoutGroup, motion, useMotionValueEvent, useScroll } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion, useMotionValueEvent, useReducedMotion, useScroll } from "motion/react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -41,6 +41,7 @@ import {
   WCA_EVENTS,
 } from "@/lib/wca";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
+import { prefersReducedMotion } from "@/lib/motion-preferences";
 import {
   notifyAnalyticsNavigation,
   trackGoogleAnalyticsEvent,
@@ -590,10 +591,7 @@ export function RankingsExplorer({
   const [gender, setGender] = useState<readonly GenderFilter[]>(initialGender);
   const navigateToPage = useCallback((path: string) => {
     const navigate = () => router.push(path);
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    if (!document.startViewTransition || reduceMotion) {
+    if (!document.startViewTransition || prefersReducedMotion()) {
       navigate();
       return;
     }
@@ -695,7 +693,8 @@ export function RankingsExplorer({
     x: number;
     y: number;
   } | null>(null);
-  const { atTop: footerAtTop, topCompact: topRailCompact, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE });
+  const reduceMotion = useReducedMotion() ?? false;
+  const { atTop: footerAtTop, topCompact: topRailCompact, bottomProgress: bottomRailProgress } = useRailScrollProgress({ enabled: true, revealDistance: RAIL_REVEAL_DISTANCE, transformDistance: TOP_RAIL_TRANSFORM_DISTANCE, reduceMotion });
   const activeListKey = [
     subject,
     competitionRanking,
@@ -710,9 +709,17 @@ export function RankingsExplorer({
   const stickyRankingsRailRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
   useMotionValueEvent(scrollY, "change", (scrollPosition) => {
-    const progress = Math.max(0, Math.min(1, scrollPosition / TOP_RAIL_TRANSFORM_DISTANCE));
+    const progress = reduceMotion
+      ? Number(scrollPosition > 0)
+      : Math.max(0, Math.min(1, scrollPosition / TOP_RAIL_TRANSFORM_DISTANCE));
     stickyRankingsRailRef.current?.style.setProperty("--rail-scroll-progress", String(progress));
   });
+  useEffect(() => {
+    const progress = reduceMotion
+      ? Number(window.scrollY > 0)
+      : Math.max(0, Math.min(1, window.scrollY / TOP_RAIL_TRANSFORM_DISTANCE));
+    stickyRankingsRailRef.current?.style.setProperty("--rail-scroll-progress", String(progress));
+  }, [reduceMotion]);
   const railFindInputRef = useRef<HTMLInputElement>(null);
 
   const setRailFindInputRef = useCallback((input: HTMLInputElement | null) => {
