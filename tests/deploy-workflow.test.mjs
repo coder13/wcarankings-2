@@ -45,6 +45,21 @@ function serverCooldownFunctions() {
     .join("\n");
 }
 
+function imageTransferRequiredFunction() {
+  const start = serverDeploy.indexOf("          image_transfer_required() {");
+  const end = serverDeploy.indexOf("          remote_image_id() {", start);
+  assert.ok(start >= 0 && end > start);
+  return serverDeploy.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {10}/, ""))
+    .join("\n");
+}
+
+function exerciseImageTransferRequired(changed, remoteImageId, candidateImageId) {
+  return spawnSync("sh", ["-eu", "-c", `${imageTransferRequiredFunction()}
+if image_transfer_required "$1" "$2" "$3"; then printf 'required\\n'; else printf 'reused\\n'; fi
+`, "sh", changed, remoteImageId, candidateImageId], { encoding: "utf8" });
+}
+
 function preSwitchTagRecoveryFunction() {
   const start = serverDeploy.indexOf("            restore_previous_app_tag() {");
   const end = serverDeploy.indexOf("            restore_previous_app_tag\n", start);
@@ -310,6 +325,11 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.ok(serverSwitchIndex > bootstrapIndex);
   assert.match(projectionDeploy, /flyway_schema_history_results/);
   assert.match(serverDeploy, /wcarankings-data-tools:artifact-\*\) continue/);
+  assert.match(serverDeploy, /docker images --no-trunc --format/);
+  assert.doesNotMatch(serverDeploy, /docker images --format "\{\{\.Repository\}\}:\{\{\.Tag\}\} \{\{\.ID\}\}"/);
+  const repairDataToolsTagIndex = serverDeploy.indexOf('docker tag "wcarankings-data-tools:${SOURCE_SHA}" wcarankings-data-tools:latest');
+  const serverImagePruneIndex = serverDeploy.indexOf("docker image prune -f");
+  assert.ok(repairDataToolsTagIndex >= 0 && repairDataToolsTagIndex < serverImagePruneIndex);
   assert.match(serverDeploy, /running_app_image=.*docker inspect.*\.Image/);
   assert.match(serverDeploy, /running_app_image.*=.*CANDIDATE_APP_IMAGE_ID/);
   assert.match(serverDeploy, /docker tag "\$running_app_image" wcarankings-app:previous/);
@@ -380,6 +400,16 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(pullRequest, /V8__system_list_definitions\.sql/);
   assert.match(pullRequest, /V8__result_attempts_lookup\.sql/);
   assert.match(pullRequest, /type = 'BASELINE'/);
+});
+
+test("server image transfer selection repairs missing unchanged tags", () => {
+  const imageId = `sha256:${"a".repeat(64)}`;
+  const otherImageId = `sha256:${"b".repeat(64)}`;
+  assert.equal(exerciseImageTransferRequired("false", imageId, imageId).stdout, "reused\n");
+  assert.equal(exerciseImageTransferRequired("true", imageId, imageId).stdout, "required\n");
+  assert.equal(exerciseImageTransferRequired("false", "", imageId).stdout, "required\n");
+  assert.equal(exerciseImageTransferRequired("false", otherImageId, imageId).stdout, "required\n");
+  assert.equal(exerciseImageTransferRequired("false", imageId.slice(0, 19), imageId).stdout, "required\n");
 });
 
 test("relative MariaDB cooldown accepts a stable high production baseline", async () => {

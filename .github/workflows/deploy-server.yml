@@ -303,10 +303,35 @@ jobs:
       - name: Stage server images and run migrations
         run: |
           set -o pipefail
-          candidate_app_image_id=
-          if [ "$APP_IMAGE_CHANGED" = true ]; then
-            candidate_app_image_id=$(docker image inspect --format '{{.Id}}' "wcarankings-app:${SOURCE_SHA}")
+          candidate_app_image_id=$(docker image inspect --format '{{.Id}}' "wcarankings-app:${SOURCE_SHA}")
+          candidate_flyway_image_id=$(docker image inspect --format '{{.Id}}' "wcarankings-flyway:${SOURCE_SHA}")
+          candidate_data_tools_image_id=$(docker image inspect --format '{{.Id}}' "wcarankings-data-tools:${SOURCE_SHA}")
+          image_transfer_required() {
+            changed=$1
+            remote_image_id=$2
+            candidate_image_id=$3
+            [ "$changed" = true ] || [ -z "$remote_image_id" ] || [ "$remote_image_id" != "$candidate_image_id" ]
+          }
+          remote_image_id() {
+            ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+              "docker image inspect --format '{{.Id}}' '$1' 2>/dev/null || true"
+          }
+          remote_app_image_id=$(remote_image_id wcarankings-app:latest)
+          remote_flyway_image_id=$(remote_image_id wcarankings-flyway:latest)
+          remote_data_tools_image_id=$(remote_image_id wcarankings-data-tools:latest)
+          APP_IMAGE_TRANSFER_REQUIRED=false
+          FLYWAY_IMAGE_TRANSFER_REQUIRED=false
+          DATA_TOOLS_IMAGE_TRANSFER_REQUIRED=false
+          if image_transfer_required "$APP_IMAGE_CHANGED" "$remote_app_image_id" "$candidate_app_image_id"; then
+            APP_IMAGE_TRANSFER_REQUIRED=true
           fi
+          if image_transfer_required "$FLYWAY_IMAGE_CHANGED" "$remote_flyway_image_id" "$candidate_flyway_image_id"; then
+            FLYWAY_IMAGE_TRANSFER_REQUIRED=true
+          fi
+          if image_transfer_required "$DATA_TOOLS_IMAGE_CHANGED" "$remote_data_tools_image_id" "$candidate_data_tools_image_id"; then
+            DATA_TOOLS_IMAGE_TRANSFER_REQUIRED=true
+          fi
+          echo "Image transfer requirements: app=${APP_IMAGE_TRANSFER_REQUIRED}, flyway=${FLYWAY_IMAGE_TRANSFER_REQUIRED}, data-tools=${DATA_TOOLS_IMAGE_TRANSFER_REQUIRED}."
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' \
              CANDIDATE_APP_IMAGE_ID='$candidate_app_image_id' sh -s" <<'REMOTE'
@@ -336,25 +361,11 @@ jobs:
                 docker tag "$running_app_image" wcarankings-app:previous
               fi
             fi
-            protected_images=$( {
-              docker ps -q | xargs -r docker inspect --format "{{.Image}}"
-              docker image inspect wcarankings-app:latest wcarankings-app:previous wcarankings-flyway:latest wcarankings-data-tools:latest --format "{{.Id}}" 2>/dev/null || true
-            } | sort -u )
-            docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | while IFS=" " read -r image_ref image_id; do
-              case "$image_ref" in
-                wcarankings-flyway:artifact-*|wcarankings-data-tools:artifact-*) continue ;;
-                wcarankings-app:*|wcarankings-flyway:*|wcarankings-data-tools:*) ;;
-                *) continue ;;
-              esac
-              case " $protected_images " in *" $image_id "*) continue ;; esac
-              docker image rm "$image_ref" || true
-            done
-            docker image prune -f
           REMOTE
           changed_images=()
-          if [ "$APP_IMAGE_CHANGED" = true ]; then changed_images+=("wcarankings-app:${SOURCE_SHA}"); fi
-          if [ "$FLYWAY_IMAGE_CHANGED" = true ]; then changed_images+=("wcarankings-flyway:${SOURCE_SHA}"); fi
-          if [ "$DATA_TOOLS_IMAGE_CHANGED" = true ]; then changed_images+=("wcarankings-data-tools:${SOURCE_SHA}"); fi
+          if [ "$APP_IMAGE_TRANSFER_REQUIRED" = true ]; then changed_images+=("wcarankings-app:${SOURCE_SHA}"); fi
+          if [ "$FLYWAY_IMAGE_TRANSFER_REQUIRED" = true ]; then changed_images+=("wcarankings-flyway:${SOURCE_SHA}"); fi
+          if [ "$DATA_TOOLS_IMAGE_TRANSFER_REQUIRED" = true ]; then changed_images+=("wcarankings-data-tools:${SOURCE_SHA}"); fi
           if [ "${#changed_images[@]}" -gt 0 ]; then
             docker save "${changed_images[@]}" | gzip -1 \
               | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" 'gzip -d | docker load'
@@ -363,6 +374,9 @@ jobs:
             "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' \
              FLYWAY_IMAGE_CHANGED='$FLYWAY_IMAGE_CHANGED' \
              DATA_TOOLS_IMAGE_CHANGED='$DATA_TOOLS_IMAGE_CHANGED' \
+             APP_IMAGE_TRANSFER_REQUIRED='$APP_IMAGE_TRANSFER_REQUIRED' \
+             FLYWAY_IMAGE_TRANSFER_REQUIRED='$FLYWAY_IMAGE_TRANSFER_REQUIRED' \
+             DATA_TOOLS_IMAGE_TRANSFER_REQUIRED='$DATA_TOOLS_IMAGE_TRANSFER_REQUIRED' \
              SOURCE_SHA='$SOURCE_SHA' sh -s" <<'REMOTE'
             set -eu
             read_database_cpu() {
@@ -427,9 +441,23 @@ jobs:
             flock -w 60 9
             exec 8>/srv/wcarankings/production-mutation.lock
             flock -w 360 8
-            if [ "$APP_IMAGE_CHANGED" = true ]; then docker tag "wcarankings-app:${SOURCE_SHA}" wcarankings-app:latest; fi
-            if [ "$FLYWAY_IMAGE_CHANGED" = true ]; then docker tag "wcarankings-flyway:${SOURCE_SHA}" wcarankings-flyway:latest; fi
-            if [ "$DATA_TOOLS_IMAGE_CHANGED" = true ]; then docker tag "wcarankings-data-tools:${SOURCE_SHA}" wcarankings-data-tools:latest; fi
+            if [ "$APP_IMAGE_TRANSFER_REQUIRED" = true ]; then docker tag "wcarankings-app:${SOURCE_SHA}" wcarankings-app:latest; fi
+            if [ "$FLYWAY_IMAGE_TRANSFER_REQUIRED" = true ]; then docker tag "wcarankings-flyway:${SOURCE_SHA}" wcarankings-flyway:latest; fi
+            if [ "$DATA_TOOLS_IMAGE_TRANSFER_REQUIRED" = true ]; then docker tag "wcarankings-data-tools:${SOURCE_SHA}" wcarankings-data-tools:latest; fi
+            protected_images=$( {
+              docker ps -q | xargs -r docker inspect --format "{{.Image}}"
+              docker image inspect wcarankings-app:latest wcarankings-app:previous wcarankings-flyway:latest wcarankings-data-tools:latest --format "{{.Id}}" 2>/dev/null || true
+            } | sort -u )
+            docker images --no-trunc --format "{{.Repository}}:{{.Tag}} {{.ID}}" | while IFS=" " read -r image_ref image_id; do
+              case "$image_ref" in
+                wcarankings-flyway:artifact-*|wcarankings-data-tools:artifact-*) continue ;;
+                wcarankings-app:*|wcarankings-flyway:*|wcarankings-data-tools:*) ;;
+                *) continue ;;
+              esac
+              case " $protected_images " in *" $image_id "*) continue ;; esac
+              docker image rm "$image_ref" || true
+            done
+            docker image prune -f
             cd /srv/wcarankings
             if [ "$FLYWAY_IMAGE_CHANGED" = true ] || [ "$DATA_TOOLS_IMAGE_CHANGED" = true ]; then
               measure_database_cpu_baseline
