@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   formatDate,
@@ -69,33 +69,18 @@ function Metric({ label, value }: { label: string; value: string | number | null
 }
 
 export function ImportHealth({ loadHealth = loadImportHealth }: { loadHealth?: () => Promise<HealthPayload> }) {
-  const [data, setData] = useState<HealthPayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    let refreshTimer: number | undefined;
-
-    async function refresh() {
-      try {
-        const payload = await loadHealth();
-        if (cancelled) return;
-        setData(payload);
-        setError(null);
-        refreshTimer = window.setTimeout(refresh, payload.status === "import_running" ? 5_000 : 30_000);
-      } catch (requestError) {
-        if (cancelled) return;
-        setError(requestError instanceof Error ? requestError.message : "Unable to load import health.");
-        refreshTimer = window.setTimeout(refresh, 30_000);
-      }
-    }
-
-    void refresh();
-    return () => {
-      cancelled = true;
-      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
-    };
-  }, [loadHealth]);
+  const healthQuery = useQuery({
+    queryKey: ["import-health"],
+    queryFn: loadHealth,
+    refetchInterval: (query) =>
+      query.state.data?.status === "import_running" ? 5_000 : 30_000,
+  });
+  const data = healthQuery.data ?? null;
+  const error = healthQuery.error instanceof Error
+    ? healthQuery.error.message
+    : healthQuery.isError
+      ? "Unable to load import health."
+      : null;
 
   if (error && !data) return <main className={styles.page}><p className={styles.alert}>{error}</p></main>;
   if (!data) return <main className={styles.page}><p>Loading import health…</p></main>;

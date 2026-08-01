@@ -7,30 +7,37 @@ import { VimSearchInput } from "./VimSearchInput";
 test("renders regex search status without internal ordering details", () => {
   const markup = renderToStaticMarkup(
     <VimSearchInput
-      inputRef={createRef<HTMLInputElement>()}
-      value="/Avery"
-      vimMode={false}
-      vimSearchActive
-      findLoading={false}
-      findPending={false}
-      findQuery="Avery"
-      activeFindMatch={{
-        rank: 3,
-        subRank: 3,
-        personId: "2024AVERY01",
-        personName: "Avery Chen",
-        countryName: "United States",
-        countryIso2: "US",
-        best: 700,
-        competitionId: "open",
-        competitionName: "Open",
-        recordBadges: [],
+      state={{
+        inputRef: createRef<HTMLInputElement>(),
+        mode: false,
+        command: "",
+        helpOpen: false,
       }}
-      findMatches={[]}
-      vimHelpOpen={false}
-      onChange={() => undefined}
-      onCycle={() => undefined}
-      onToggleHelp={() => undefined}
+      search={{
+        active: true,
+        query: "Avery",
+        loading: false,
+        pending: false,
+        activeMatch: {
+          rank: 3,
+          subRank: 3,
+          personId: "2024AVERY01",
+          personName: "Avery Chen",
+          countryName: "United States",
+          countryIso2: "US",
+          best: 700,
+          competitionId: "open",
+          competitionName: "Open",
+          recordBadges: [],
+        },
+        matches: [],
+      }}
+      actions={{
+        changeCommand: () => undefined,
+        closeSearch: () => undefined,
+        cycleSearch: () => undefined,
+        toggleHelp: () => undefined,
+      }}
     />,
   );
   assert.match(markup, /Avery Chen/);

@@ -1,0 +1,2 @@
+export const RANKING_ROW_HEIGHT = 65.45;
+export const EXPANDED_RANKING_ROW_HEIGHT = 248;

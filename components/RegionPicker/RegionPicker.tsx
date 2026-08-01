@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import CloseIcon from "../Icon/close.svg?react";
 import SelectChevronIcon from "../Icon/select-chevron.svg?react";
 import { Dropdown } from "../Dropdown/Dropdown";
@@ -51,7 +51,7 @@ export function RegionPicker({
       ]
     : [];
   const defaultActiveOption =
-    visibleOptions.find((option) => option.key === selectedOption?.key) ??
+    visibleOptions.find((option) => option.scope !== "world") ??
     visibleOptions[0];
   const effectiveActiveKey = visibleOptions.some(
     (option) => option.key === activeKey,
@@ -62,11 +62,6 @@ export function RegionPicker({
     (option) => option.key === effectiveActiveKey,
   );
 
-  useEffect(() => {
-    if (!open) return;
-    searchRef.current?.focus();
-  }, [open]);
-
   const setPickerOpen = (nextOpen: boolean) => {
     if (!nextOpen) {
       setQuery("");
@@ -74,13 +69,6 @@ export function RegionPicker({
     }
     setOpen(nextOpen);
   };
-
-  useEffect(() => {
-    if (!open || activeIndex === -1) return;
-    document
-      .getElementById(`${listboxId}-option-${activeIndex}`)
-      ?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex, listboxId, open]);
 
   const choose = (option: RegionOption) => {
     onChange(option);
@@ -98,6 +86,11 @@ export function RegionPicker({
 
     return (
       <button
+        ref={(element) => {
+          if (element && isActive && open) {
+            element.scrollIntoView({ block: "nearest" });
+          }
+        }}
         id={`${listboxId}-option-${optionIndex}`}
         className={`regionOption${isSelected ? " isSelected" : ""}${
           isActive ? " isActive" : ""
@@ -135,8 +128,14 @@ export function RegionPicker({
           if (disabled) return;
           if (!open) setQuery("");
           setActiveKey(
-            selectedOption?.key ?? options[0]?.key ?? null,
+            options.find((option) => option.scope !== "world")?.key ??
+              options[0]?.key ??
+              null,
           );
+          setPickerOpen(true);
+        }}
+        onClick={() => {
+          if (disabled) return;
           setPickerOpen(true);
         }}
         onBlur={() => {
@@ -172,7 +171,9 @@ export function RegionPicker({
             if (!open) {
               setQuery("");
               setActiveKey(
-                selectedOption?.key ?? options[0]?.key ?? null,
+                options.find((option) => option.scope !== "world")?.key ??
+                  options[0]?.key ??
+                  null,
               );
               setPickerOpen(true);
               return;

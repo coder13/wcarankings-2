@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { listPath } from "@/lib/list-path";
 
 export function ListCloneExportControls({ listId }: { listId: string }) {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const clone = async () => {
@@ -11,7 +13,11 @@ export function ListCloneExportControls({ listId }: { listId: string }) {
     const response = await fetch(`/api/lists/${listId}`, { method: "POST" });
     const body = await response.json() as { list?: { publicId: string; slug: string } };
     if (response.ok && body.list?.publicId) {
-      window.location.assign(listPath({ publicId: body.list.publicId, systemAlias: null, slug: body.list.slug }));
+      router.push(listPath({
+        publicId: body.list.publicId,
+        systemAlias: null,
+        slug: body.list.slug,
+      }));
       return;
     }
     setBusy(false);

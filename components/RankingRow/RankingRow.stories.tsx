@@ -26,9 +26,11 @@ const meta = {
   parameters: { layout: "fullscreen" },
   args: {
     entry,
-    eventId: "333",
-    rankingType: "single",
-    animationIndex: 0,
+    display: {
+      eventId: "333",
+      rankingType: "single",
+      animationIndex: 0,
+    },
   },
 } satisfies Meta<typeof RankingRow>;
 
@@ -36,6 +38,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-export const TiedRank: Story = { args: { rankIsDuplicate: true } };
-export const Highlighted: Story = { args: { highlighted: true } };
+export const TiedRank: Story = {
+  args: { display: { ...meta.args.display, rankIsDuplicate: true } },
+};
+export const Highlighted: Story = {
+  args: { display: { ...meta.args.display, highlighted: true } },
+};
 export const RecordBadges: Story = { args: { entry: recordEntry } };

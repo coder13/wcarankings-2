@@ -3,47 +3,52 @@
 import type { KeyboardEvent, RefObject } from "react";
 import { formatRankingNumber, type RankingEntry } from "../RankingsExplorer/types";
 
-export function VimSearchInput({
-  inputRef,
-  value,
-  vimMode,
-  vimSearchActive,
-  findLoading,
-  findPending,
-  findQuery,
-  activeFindMatch,
-  findMatches,
-  findIndex,
-  vimHelpOpen,
-  onChange,
-  onCycle,
-  onToggleHelp,
-}: {
+type VimInputState = {
   inputRef: RefObject<HTMLInputElement | null>;
-  value: string;
-  vimMode: boolean;
-  vimSearchActive: boolean;
-  findLoading: boolean;
-  findPending: boolean;
-  findQuery: string;
-  activeFindMatch: RankingEntry | null;
-  findMatches: RankingEntry[];
-  findIndex?: number;
-  vimHelpOpen: boolean;
-  onChange: (value: string) => void;
-  onCycle: (direction: -1 | 1) => void;
-  onToggleHelp: () => void;
+  mode: boolean;
+  command: string;
+  helpOpen: boolean;
+};
+
+type VimInputSearch = {
+  active: boolean;
+  query: string;
+  loading: boolean;
+  pending: boolean;
+  activeMatch: RankingEntry | null;
+  matches: RankingEntry[];
+  index?: number;
+};
+
+type VimInputActions = {
+  changeCommand: (value: string) => void;
+  closeSearch: () => void;
+  cycleSearch: (direction: -1 | 1) => void;
+  toggleHelp: () => void;
+};
+
+export function VimSearchInput({
+  state,
+  search,
+  actions,
+}: {
+  state: VimInputState;
+  search: VimInputSearch;
+  actions: VimInputActions;
 }) {
+  const { inputRef, mode, command, helpOpen } = state;
+  const { active, query, loading, pending, activeMatch, matches, index } = search;
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (
-      vimSearchActive &&
-      !vimMode &&
+      active &&
+      !mode &&
       (event.ctrlKey || event.metaKey) &&
       event.key.toLocaleLowerCase() === "g"
     ) {
       event.preventDefault();
       event.stopPropagation();
-      onCycle(event.shiftKey ? -1 : 1);
+      actions.closeSearch();
+      actions.cycleSearch(event.shiftKey ? -1 : 1);
       return;
     }
     if (
@@ -56,14 +61,14 @@ export function VimSearchInput({
     }
   };
   let matchStatus = "";
-  if (findLoading || findPending) matchStatus = "Searching…";
-  else if (findQuery.trim() && activeFindMatch) {
+  if (loading || pending) matchStatus = "Searching…";
+  else if (query.trim() && activeMatch) {
     matchStatus =
-      typeof findIndex === "number"
-        ? `${findIndex + 1} of ${findMatches.length}`
-        : `${activeFindMatch.personName} · rank ${formatRankingNumber(activeFindMatch.rank)}`;
-  } else if (findQuery.trim()) {
-    matchStatus = `${findMatches.length} ${findMatches.length === 1 ? "match" : "matches"}`;
+      typeof index === "number"
+        ? `${index + 1} of ${matches.length}`
+        : `${activeMatch.personName} · rank ${formatRankingNumber(activeMatch.rank)}`;
+  } else if (query.trim()) {
+    matchStatus = `${matches.length} ${matches.length === 1 ? "match" : "matches"}`;
   }
 
   return (
@@ -73,19 +78,19 @@ export function VimSearchInput({
           ref={inputRef}
           className="vimInput"
           type="text"
-          value={value}
-          readOnly={!vimMode}
-          aria-label={vimSearchActive && !vimMode ? "Vim regex search" : "Vim command"}
+          value={mode ? command : `/${query}`}
+          readOnly={!mode}
+          aria-label={active && !mode ? "Vim regex search" : "Vim command"}
           onChange={(event) => {
-            if (vimMode) onChange(event.target.value);
+            if (mode) actions.changeCommand(event.target.value);
           }}
           onFocus={(event) => {
-            if (!vimMode) event.currentTarget.blur();
+            if (!mode) event.currentTarget.blur();
           }}
           onKeyDown={handleKeyDown}
         />
       </div>
-      {vimSearchActive && (
+      {active && (
         <span className="vimMatchStatus" aria-live="polite">
           {matchStatus}
         </span>
@@ -94,9 +99,9 @@ export function VimSearchInput({
         className="vimHelpButton"
         type="button"
         aria-label="Show Vim keybindings"
-        aria-expanded={vimHelpOpen}
+        aria-expanded={helpOpen}
         aria-controls="vim-help-popup"
-        onClick={onToggleHelp}
+        onClick={actions.toggleHelp}
       >
         ?
       </button>

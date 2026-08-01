@@ -3,7 +3,7 @@ import { useState, type CSSProperties } from "react";
 import { WCA_EVENTS } from "@/lib/wca";
 import { ALL_EVENT_RANKING_OPTIONS } from "../EventPicker/allEventRankingOptions";
 import type { EventPickerOption } from "../EventPicker/EventPicker";
-import type { RankingEntry, RegionOption } from "../RankingsExplorer/types";
+import type { RankingEntry, RegionOption, RegionSelection } from "../RankingsExplorer/types";
 import { ListBrowseControlsRail, ListBrowsePagerRail, RankingsControlsRail, RankingsPagerRail } from "./RankingsRail";
 import { JumpControlsVisibility } from "../JumpControlsVisibility/JumpControlsVisibility";
 
@@ -20,7 +20,10 @@ const regions: RegionOption[] = [
 function TopRail({ scrollProgress = 0 }: { scrollProgress?: number }) {
   const [eventId, setEventId] = useState<RailEvent["id"]>("333");
   const [rankingType, setRankingType] = useState<"single" | "average">("single");
-  const [regionSelection, setRegionSelection] = useState({ scope: "world" as const, regionId: "" });
+  const [regionSelection, setRegionSelection] = useState<RegionSelection>({
+    scope: "world",
+    regionId: "",
+  });
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const event = allEventOptions.find((candidate) => candidate.id === eventId)!;
@@ -28,34 +31,40 @@ function TopRail({ scrollProgress = 0 }: { scrollProgress?: number }) {
 
   return <div style={{ "--rail-scroll-progress": scrollProgress } as CSSProperties}>
     <JumpControlsVisibility visible>
-      <RankingsControlsRail
-      event={event}
-      eventOptions={eventOptions}
-      additionalEventOptions={ALL_EVENT_RANKING_OPTIONS}
-      onEventChange={setEventId}
-      rankingType={rankingType}
-      onRankingTypeChange={setRankingType}
-      gender={[]}
-      onGenderChange={() => undefined}
-      regions={regions}
-      regionSelection={regionSelection}
-      onRegionChange={setRegionSelection}
-      compactResultType={scrollProgress >= 1}
-      findOpen={searchOpen}
-      findQuery={query}
-      findError=""
-      findLoading={false}
-      findPending={false}
-      findMatches={matches}
-      findIndex={0}
-      onSearchOpen={() => setSearchOpen(true)}
-      onSearchClose={() => setSearchOpen(false)}
-      onSearchQueryChange={setQuery}
-      onSearchCycle={() => undefined}
-      />
-      <p style={{ color: "var(--text-muted)", marginTop: "2rem" }}>
-        {isAllEventRanking ? `All-person rankings · ${event.name}` : `Event rankings · ${event.name}`}
-      </p>
+      <div>
+        <RankingsControlsRail
+          controls={{
+            event,
+            eventOptions,
+            additionalEventOptions: ALL_EVENT_RANKING_OPTIONS,
+            onEventChange: setEventId,
+            rankingType,
+            onRankingTypeChange: setRankingType,
+            gender: [],
+            onGenderChange: () => undefined,
+            regions,
+            regionSelection,
+            onRegionChange: (region) => setRegionSelection(region),
+            compactResultType: scrollProgress >= 1,
+          }}
+          search={{
+            findOpen: searchOpen,
+            findQuery: query,
+            findError: "",
+            findLoading: false,
+            findPending: false,
+            findMatches: matches,
+            findIndex: 0,
+            onSearchOpen: () => setSearchOpen(true),
+            onSearchClose: () => setSearchOpen(false),
+            onSearchQueryChange: setQuery,
+            onSearchCycle: () => undefined,
+          }}
+        />
+        <p style={{ color: "var(--text-muted)", marginTop: "2rem" }}>
+          {isAllEventRanking ? `All-person rankings · ${event.name}` : `Event rankings · ${event.name}`}
+        </p>
+      </div>
     </JumpControlsVisibility>
   </div>;
 }
@@ -88,9 +97,9 @@ function ScrollTransitionStory() {
 
 const meta = {
   title: "Core UI/Molecules/RankingsRail",
-  component: RankingsControlsRail,
+  component: TopRailStory,
   parameters: { layout: "fullscreen" },
-} satisfies Meta<typeof RankingsControlsRail>;
+} satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -110,15 +119,17 @@ export const Bottom: Story = {
     <div style={{ padding: "3rem" }}>
       <JumpControlsVisibility visible>
         <RankingsPagerRail
-          upArmed={false}
-          downArmed={false}
-          currentPosition={5_001}
-          total={10_000}
-          onJumpUp={() => undefined}
-          onJumpDown={() => undefined}
-          searchActive={false}
-          onSearchPrevious={() => undefined}
-          onSearchNext={() => undefined}
+          navigation={{
+            currentPosition: 5_001,
+            total: 10_000,
+            onJumpUp: () => undefined,
+            onJumpDown: () => undefined,
+          }}
+          search={{
+            active: false,
+            onPrevious: () => undefined,
+            onNext: () => undefined,
+          }}
         />
       </JumpControlsVisibility>
     </div>

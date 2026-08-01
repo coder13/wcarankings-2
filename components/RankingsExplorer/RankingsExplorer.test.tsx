@@ -2,19 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime.js";
+import {
+  PathnameContext,
+  SearchParamsContext,
+} from "next/dist/shared/lib/hooks-client-context.shared-runtime.js";
 import { EXPLORER_SUBJECTS } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import {
-  centeredRowScrollTop,
-  competitionRankingPath,
-  getSearchScrollDirection,
-  orderSearchMatches,
-  pageStartForViewportSubRank,
   RankingsExplorer,
-  shouldFallbackToFirstPage,
-  subjectPath,
 } from "./RankingsExplorer";
+import {
+  centeredRowScrollTop,
+  getSearchScrollDirection,
+  subjectPath,
+} from "./helpers/navigation";
+import { orderSearchMatches } from "./helpers/search";
+import { shouldFallbackToFirstPage } from "./useRankingPageLoader";
+import { competitionRankingPath } from "./useRankingFilterActions";
+import type { RankingsFilterState } from "./rankingsUrl";
+import { serializeRankingsUrl, type RankingsUrlState } from "./rankingsUrl";
+import type { RankingEntry } from "./types";
 
-const rankingEntry = {
+const rankingEntry: RankingEntry = {
   rank: 1,
   subRank: 1,
   personId: "2024AVERY01",
@@ -24,41 +32,74 @@ const rankingEntry = {
   best: 512,
   competitionId: "storybook-open",
   competitionName: "Storybook Open 2026",
-  recordBadges: ["NR"] as const,
+  recordBadges: ["NR"],
 };
+
+function pathnameForFilters(filters: RankingsFilterState) {
+  if (filters.subject === "results") return "/results";
+  if (filters.subject === "competitions") {
+    return `/competitions/${filters.competitionRanking}`;
+  }
+  if (filters.year) return `/persons/year/${filters.year}`;
+  return "/";
+}
 
 function renderExplorerMarkup(
   props: Partial<Parameters<typeof RankingsExplorer>[0]> = {},
+  state: Partial<RankingsFilterState> = {},
 ) {
+  const filters: RankingsFilterState = {
+    subject: "people",
+    competitionRanking: "best-result",
+    year: null,
+    eventId: "333",
+    rankingType: "single",
+    regionSelection: { scope: "world", regionId: "" },
+    gender: [],
+    latitudeHemisphere: "north",
+    search: "",
+    regexSearch: false,
+    ...state,
+  };
+  const pathname = pathnameForFilters(filters);
+  const urlState: RankingsUrlState = {
+    ...filters,
+    wcaId: "",
+    focusMe: false,
+    kinchOrder: "regional",
+  };
+  const searchParams = serializeRankingsUrl(pathname, urlState);
+
   return renderToStaticMarkup(
-    <AppRouterContext.Provider value={{
-      back() {},
-      forward() {},
-      refresh() {},
-      hmrRefresh() {},
-      push() {},
-      replace() {},
-      prefetch() {},
-    }}>
-      <RankingsExplorer
-        initialData={{
-          entries: [
-            rankingEntry,
-          ],
-          hasMore: false,
-          nextPageStart: null,
-          previousPageStart: null,
-          startRank: 1,
-          startPosition: 0,
-          lastRank: 1,
-          total: 1,
-          searchMatches: [],
-          initialMatchPersonId: "",
-        }}
-        initialRegions={{ continents: [], countries: [] }}
-        {...props}
-      />
-    </AppRouterContext.Provider>,
+    <PathnameContext.Provider value={pathname}>
+      <SearchParamsContext.Provider value={searchParams}>
+        <AppRouterContext.Provider value={{
+          back() {},
+          forward() {},
+          refresh() {},
+          push() {},
+          replace() {},
+          prefetch() {},
+        }}>
+          <RankingsExplorer
+              initial={{
+                data: {
+                  entries: [rankingEntry],
+                  hasMore: false,
+                  nextPageStart: null,
+                  previousPageStart: null,
+                  startRank: 1,
+                  startPosition: 0,
+                  lastRank: 1,
+                  total: 1,
+                },
+                regions: { continents: [], countries: [] },
+              }}
+              {...props}
+            />
+        </AppRouterContext.Provider>
+      </SearchParamsContext.Provider>
+    </PathnameContext.Provider>,
   );
 }
 
@@ -83,13 +124,6 @@ test("uses the actual rank direction when search results wrap around", () => {
     getSearchScrollDirection({ subRank: 100 }, { subRank: 900 }, -1),
     1
   );
-});
-
-test("keeps event and result-type changes on the current page", () => {
-  assert.equal(pageStartForViewportSubRank(1), 1);
-  assert.equal(pageStartForViewportSubRank(50), 1);
-  assert.equal(pageStartForViewportSubRank(51), 51);
-  assert.equal(pageStartForViewportSubRank(98), 51);
 });
 
 test("falls back to the first page only when a preserved page is absent", () => {
@@ -117,7 +151,11 @@ test("exposes active person, result, and competition ranking subjects", () => {
 
 test("renders the rankings shell with extracted components", () => {
   const markup = renderExplorerMarkup({
-    rankingSource: { kind: "saved", listId: "7K3M9Q2D", listName: "Pacific Northwest cubers" },
+    source: {
+      kind: "saved",
+      listId: "7K3M9Q2D",
+      listName: "Pacific Northwest cubers",
+    },
   });
   assert.match(markup, /WCA Rankings/);
   assert.match(markup, /Avery Chen/);
@@ -127,9 +165,8 @@ test("renders the rankings shell with extracted components", () => {
 
 test("keeps gender filters available for sum of ranks", () => {
   const markup = renderExplorerMarkup({
-    initialEventId: "SOR",
-    showAllEventRankingOptions: true,
-  });
+    options: { showAllEventRankingOptions: true },
+  }, { eventId: "SOR" });
   assert.match(markup, /aria-label="Gender"/);
   assert.match(markup, />Men</);
   assert.match(markup, />Women</);
@@ -138,9 +175,8 @@ test("keeps gender filters available for sum of ranks", () => {
 
 test("keeps gender filters available for Kinch", () => {
   const markup = renderExplorerMarkup({
-    initialEventId: "sor-kinch",
-    showAllEventRankingOptions: true,
-  });
+    options: { showAllEventRankingOptions: true },
+  }, { eventId: "sor-kinch" });
   assert.match(markup, /aria-label="Gender"/);
   assert.match(markup, />Men</);
   assert.match(markup, />Women</);

@@ -28,7 +28,6 @@ export default async function DynamicListPage({ searchParams }: {
   const eventId = isEventId(eventValue) ? eventValue : "333";
   const resultValue = typeof query.result === "string" ? query.result : "single";
   const rankingType = eventId === "333mbf" || !isRankingType(resultValue) ? "single" : resultValue;
-  const requestedRegion = parseRegionQuery(typeof query.region === "string" ? query.region : null);
   const gender = normalizeGenderFilters(
     (Array.isArray(query.gender) ? query.gender : query.gender ? [query.gender] : [])
       .flatMap((value) => value.split(","))
@@ -49,7 +48,10 @@ export default async function DynamicListPage({ searchParams }: {
     loadDynamicListRankings(personIds, new URLSearchParams({ eventId, result: rankingType, limit: "50", ...(gender.length ? { gender: gender.join(",") } : {}) })),
     getAuthUser(new Request("http://localhost", { headers: await headers() })),
   ]);
-  const regionSelection = normalizeListRegionSelection(requestedRegion, regions);
+  const regionSelection = normalizeListRegionSelection(
+    parseRegionQuery(typeof query.region === "string" ? query.region : null),
+    regions,
+  );
   if (regionSelection.scope !== "world") {
     const filtered = await loadDynamicListRankings(personIds, new URLSearchParams({ eventId, result: rankingType, region: regionSelection.regionId, limit: "50", ...(gender.length ? { gender: gender.join(",") } : {}) }));
     rankings.entries = filtered.entries;
@@ -57,6 +59,23 @@ export default async function DynamicListPage({ searchParams }: {
     rankings.nextStart = filtered.nextStart;
     rankings.total = filtered.total;
   }
-  const emptyNotice = !personIds.length && !notice ? "Add comma-separated WCA IDs with the wca_ids query parameter." : notice;
-  return <RankingsExplorer initialData={{ entries: rankings.entries, hasMore: rankings.hasMore, nextPageStart: rankings.nextStart === null ? null : rankings.nextStart + 1, previousPageStart: null, startPosition: 0, lastRank: rankings.entries.at(-1)?.subRank ?? null, total: rankings.total, exportDate: rankings.exportDate, startRank: 1, searchMatches: [], initialMatchPersonId: "" }} rankingSource={{ kind: "dynamic", personIds, listName: "Dynamic list" }} dynamicList={personIds.length ? { personIds } : undefined} listNotice={emptyNotice || undefined} showMyRank={Boolean(user && personIds.includes(user.wcaId))} initialEventId={eventId} initialRankingType={rankingType} initialGender={gender} initialRegionSelection={regionSelection} initialRegions={regions} regionSelectionDisabled={!hasMultipleListCountries(regions)} />;
+  return (
+    <RankingsExplorer
+        initial={{
+          data: { entries: rankings.entries, hasMore: rankings.hasMore, nextPageStart: rankings.nextStart === null ? null : rankings.nextStart + 1, previousPageStart: null, startPosition: 0, lastRank: rankings.entries.at(-1)?.subRank ?? null, total: rankings.total, exportDate: rankings.exportDate, startRank: 1 },
+          regions,
+        }}
+        source={{ kind: "dynamic", personIds, listName: "Dynamic list" }}
+        list={{
+          dynamic: personIds.length ? { personIds } : undefined,
+          notice: (!personIds.length && !notice
+            ? "Add comma-separated WCA IDs with the wca_ids query parameter."
+            : notice) || undefined,
+        }}
+        options={{
+          showMyRank: Boolean(user && personIds.includes(user.wcaId)),
+          regionSelectionDisabled: !hasMultipleListCountries(regions),
+        }}
+    />
+  );
 }

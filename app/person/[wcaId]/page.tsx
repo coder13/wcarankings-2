@@ -9,7 +9,11 @@ import {
   type PersonProfileMetricScore,
   type PersonProfileResult,
 } from "@/lib/person-profile";
-import { formatExportDate, formatRankingNumber } from "@/components/RankingsExplorer/types";
+import {
+  formatExportDate,
+  formatRankingNumber,
+  rankingScope,
+} from "@/components/RankingsExplorer/types";
 import { flagEmoji, formatWcaResult, type RankingType, type RegionScope } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +30,17 @@ function scopeLabel(scope: RegionScope, regionId: string, profile: Awaited<Retur
 
 function rankLine(result: PersonProfileResult, profile: NonNullable<Awaited<ReturnType<typeof loadPersonProfile>>>) {
   return [
-    { scope: "world", label: `#${formatRankingNumber(result.worldRank)}`, ariaLabel: `World #${formatRankingNumber(result.worldRank)}` },
-    { scope: "continent", label: `#${formatRankingNumber(result.continentRank)}`, ariaLabel: `${profile.person.continentName || profile.person.continentId} #${formatRankingNumber(result.continentRank)}` },
-    { scope: "national", label: `#${formatRankingNumber(result.countryRank)}`, ariaLabel: `${profile.person.countryName || profile.person.countryId} #${formatRankingNumber(result.countryRank)}` },
+    rankingScope("world", "World", result.worldRank),
+    rankingScope(
+      "continent",
+      profile.person.continentName || profile.person.continentId,
+      result.continentRank,
+    ),
+    rankingScope(
+      "national",
+      profile.person.countryName || profile.person.countryId,
+      result.countryRank,
+    ),
   ];
 }
 
@@ -50,8 +62,13 @@ function metricScore(profile: NonNullable<Awaited<ReturnType<typeof loadPersonPr
 }
 
 function initials(name: string) {
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((part) => part[0]).join("").toUpperCase() || "?";
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "?";
 }
 
 function ScoreRows({
@@ -71,10 +88,6 @@ function ScoreRows({
     <ul className="profileScoreRows">
       {scores.map((score) => {
         const isKinch = metric === "kinch";
-        const scoreValue = isKinch
-          ? formatWcaResult("sor-kinch", score.kinchScore / 17)
-          : formatWcaResult("SOR", score.score);
-        const rank = isKinch ? score.kinchRank : score.rank;
         return (
           <li key={`${score.resultType}:${score.scope}:${score.regionId}`}>
             <Link
@@ -87,8 +100,14 @@ function ScoreRows({
               })}
             >
               <span>{scopeLabel(score.scope, score.regionId, profile)}</span>
-              <strong>{scoreValue}</strong>
-              <span>#{formatRankingNumber(rank)}</span>
+              <strong>
+                {isKinch
+                  ? formatWcaResult("sor-kinch", score.kinchScore / 17)
+                  : formatWcaResult("SOR", score.score)}
+              </strong>
+              <span>
+                #{formatRankingNumber(isKinch ? score.kinchRank : score.rank)}
+              </span>
               <span>{score.coverage}/{score.requiredCoverage} events</span>
             </Link>
           </li>
@@ -114,8 +133,8 @@ export default async function PersonProfilePage({ params }: PageProps) {
   const { wcaId } = await params;
   const profile = await loadPersonProfile(wcaId);
   if (!profile) notFound();
-  const singleCoverage = profile.eventRows.filter((row) => row.single).length;
-  const averageCoverage = profile.eventRows.filter((row) => row.average).length;
+  const singleBestResults = bestResults(profile, "single");
+  const averageBestResults = bestResults(profile, "average");
 
   return (
     <main className="app profilePage">
@@ -160,9 +179,9 @@ export default async function PersonProfilePage({ params }: PageProps) {
       <section className="profileSummaryGrid" aria-label="Profile summary">
         <section className="profilePanel">
           <h2>Best Single Rankings</h2>
-          {bestResults(profile, "single").length ? (
+          {singleBestResults.length ? (
             <ul className="profileBestList">
-              {bestResults(profile, "single").map(({ event, result }) => (
+              {singleBestResults.map(({ event, result }) => (
                 <li key={event.eventId}>
                   <Link href={rankingHref({ eventId: event.eventId, resultType: "single", wcaId: profile.person.id })}>
                     <span>{event.eventShortName}</span>
@@ -176,9 +195,9 @@ export default async function PersonProfilePage({ params }: PageProps) {
         </section>
         <section className="profilePanel">
           <h2>Best Average Rankings</h2>
-          {bestResults(profile, "average").length ? (
+          {averageBestResults.length ? (
             <ul className="profileBestList">
-              {bestResults(profile, "average").map(({ event, result }) => (
+              {averageBestResults.map(({ event, result }) => (
                 <li key={event.eventId}>
                   <Link href={rankingHref({ eventId: event.eventId, resultType: "average", wcaId: profile.person.id })}>
                     <span>{event.eventShortName}</span>
@@ -207,11 +226,15 @@ export default async function PersonProfilePage({ params }: PageProps) {
           <div className="coverageMeters">
             <div>
               <span>Single</span>
-              <strong>{singleCoverage}/17</strong>
+              <strong>
+                {profile.eventRows.filter((row) => row.single).length}/17
+              </strong>
             </div>
             <div>
               <span>Average</span>
-              <strong>{averageCoverage}/16</strong>
+              <strong>
+                {profile.eventRows.filter((row) => row.average).length}/16
+              </strong>
             </div>
           </div>
         </section>

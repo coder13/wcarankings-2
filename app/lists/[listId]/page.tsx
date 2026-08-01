@@ -21,10 +21,9 @@ export const dynamic = "force-dynamic";
 
 async function getListPageData(listId: string) {
   try {
-    const request = new Request("http://localhost", { headers: await headers() });
     const [list, user] = await Promise.all([
       resolveList(listId),
-      getAuthUser(request),
+      getAuthUser(new Request("http://localhost", { headers: await headers() })),
     ]);
     assertCanViewList(list, user);
     const isOwner = list.kind === "user" && list.owner?.id === user?.id;
@@ -55,8 +54,6 @@ export default async function ListPage({
   const rankingType = eventId === "333mbf" || !isRankingType(resultValue)
     ? "single"
     : resultValue;
-  const regionValue = typeof query.region === "string" ? query.region : null;
-  const requestedRegionSelection = parseRegionQuery(regionValue);
   const gender = normalizeGenderFilters(
     (Array.isArray(query.gender) ? query.gender : query.gender ? [query.gender] : [])
       .flatMap((value) => value.split(","))
@@ -64,7 +61,7 @@ export default async function ListPage({
   );
   const { list, regions, user, isOwner, membershipState, membershipRequests } = await getListPageData(listId);
   const regionSelection = normalizeListRegionSelection(
-    requestedRegionSelection,
+    parseRegionQuery(typeof query.region === "string" ? query.region : null),
     regions,
   );
   const rankingParams = new URLSearchParams({
@@ -79,42 +76,56 @@ export default async function ListPage({
   if (!rankingListId) notFound();
   return (
     <RankingsExplorer
-      initialData={{
-        entries: rankings.entries,
-        hasMore: rankings.hasMore,
-        nextPageStart: rankings.nextStart === null ? null : rankings.nextStart + 1,
-        previousPageStart: null,
-        startPosition: 0,
-        lastRank: rankings.entries.at(-1)?.subRank ?? null,
-        total: rankings.total,
-        exportDate: rankings.exportDate,
-        startRank: 1,
-        searchMatches: [],
-        initialMatchPersonId: "",
-      }}
-      rankingSource={{ kind: "saved", listId: rankingListId, listName: list.name }}
-      showMyRank={membershipState === "member"}
-      listOwner={list.kind === "user" && list.owner?.id === user?.id && list.publicId ? { listId: list.publicId, visibility: list.visibility, joinPolicy: list.joinPolicy } : undefined}
-      listMembership={
-        list.kind === "user" &&
-        list.owner?.id !== user?.id &&
-        list.publicId &&
-        membershipState
-          ? { listId: list.publicId, joinPolicy: list.joinPolicy, state: membershipState }
-          : undefined
-      }
-      listMembershipRequests={
-        list.kind === "user" && list.owner?.id === user?.id && list.publicId
-          ? { listId: list.publicId, requests: membershipRequests }
-          : undefined
-      }
-      listActions={list.publicId ? { listId: list.publicId, isOwner } : undefined}
-      initialEventId={eventId}
-      initialRankingType={rankingType}
-      initialGender={gender}
-      initialRegionSelection={regionSelection}
-      initialRegions={regions}
-      regionSelectionDisabled={!hasMultipleListCountries(regions)}
+        initial={{
+          data: {
+            entries: rankings.entries,
+            hasMore: rankings.hasMore,
+            nextPageStart: rankings.nextStart === null
+              ? null
+              : rankings.nextStart + 1,
+            previousPageStart: null,
+            startPosition: 0,
+            lastRank: rankings.entries.at(-1)?.subRank ?? null,
+            total: rankings.total,
+            exportDate: rankings.exportDate,
+            startRank: 1,
+          },
+          regions,
+        }}
+        source={{ kind: "saved", listId: rankingListId, listName: list.name }}
+        options={{
+          showMyRank: membershipState === "member",
+          regionSelectionDisabled: !hasMultipleListCountries(regions),
+        }}
+        list={{
+          owner: list.kind === "user" &&
+              list.owner?.id === user?.id &&
+              list.publicId
+            ? {
+                listId: list.publicId,
+                visibility: list.visibility,
+                joinPolicy: list.joinPolicy,
+              }
+            : undefined,
+          membership: list.kind === "user" &&
+              list.owner?.id !== user?.id &&
+              list.publicId &&
+              membershipState
+            ? {
+                listId: list.publicId,
+                joinPolicy: list.joinPolicy,
+                state: membershipState,
+              }
+            : undefined,
+          membershipRequests: list.kind === "user" &&
+              list.owner?.id === user?.id &&
+              list.publicId
+            ? { listId: list.publicId, requests: membershipRequests }
+            : undefined,
+          actions: list.publicId
+            ? { listId: list.publicId, isOwner }
+            : undefined,
+        }}
     />
   );
 }

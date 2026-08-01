@@ -17,10 +17,10 @@ function VisibilityDemo() {
 
 const meta = {
   title: "Core UI/Molecules/JumpControlsVisibility",
-  component: JumpControlsVisibility,
+  component: VisibilityDemo,
   parameters: { layout: "centered" },
   render: () => <VisibilityDemo />,
-} satisfies Meta<typeof JumpControlsVisibility>;
+} satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

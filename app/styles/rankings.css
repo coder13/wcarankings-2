@@ -280,17 +280,21 @@
   text-align: center;
 }
 
+.listMessage--delayed {
+  animation: delayedListMessageReveal 1ms linear 200ms both;
+}
+
+@keyframes delayedListMessageReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .listMessage--notice {
   padding: 0.75rem var(--page-gutter);
   font-size: 0.95rem;
 }
 
 .siteFooter {
-  position: fixed;
-  z-index: 2;
-  right: 0;
-  bottom: 0;
-  left: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -305,6 +309,14 @@
   pointer-events: none;
   box-shadow: 0 -4px 16px var(--shadow);
   backdrop-filter: blur(4px);
+}
+
+.siteFooter--standalone {
+  position: fixed;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
 }
 
 .siteFooter span:last-child {

@@ -2,44 +2,22 @@
 
 import { ListCreateTrigger } from "@/components/ListOwnerControls/ListOwnerControls";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
-import {
-  ExplorerSubjectSwitch,
-  type NavigationSubject,
-} from "@/components/ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { ListRow } from "@/components/ListBrowse/ListRow";
-import type { ListSummary, PublicListSummary } from "@/lib/lists";
+import type { ListSummary } from "@/lib/lists";
 import "@/components/ListBrowse/ListBrowse.css";
-
-function changeSubject(value: NavigationSubject) {
-  window.location.assign(
-    value === "lists"
-      ? "/lists"
-      : value === "people"
-        ? "/"
-        : value === "competitions"
-          ? "/competitions/best-result"
-          : "/results",
-  );
-}
-
-function asRow(list: ListSummary): PublicListSummary {
-  return {
-    publicId: list.publicId,
-    systemAlias: list.systemAlias,
-    slug: list.slug,
-    name: list.name,
-    memberCount: list.memberCount,
-    kind: list.kind,
-    createdBy: null,
-  };
-}
+import { useRouter } from "next/navigation";
+import { subjectPath } from "@/components/RankingsExplorer/helpers/navigation";
 
 export function ListMine({ lists }: { lists: ListSummary[] }) {
+  const router = useRouter();
   return (
     <div className="app">
-      <AppHeader>
-        <ExplorerSubjectSwitch subject="lists" onChange={changeSubject} variant="text" />
-      </AppHeader>
+      <AppHeader
+        subject="lists"
+        onSubjectChange={(value) => {
+          router.push(value === "lists" ? "/lists" : subjectPath(value));
+        }}
+      />
       <main className="listBrowse">
         <div className="listMineHeading">
           <div>
@@ -53,9 +31,8 @@ export function ListMine({ lists }: { lists: ListSummary[] }) {
             {lists.map((list, index) => (
               <ListRow
                 key={list.id}
-                list={asRow(list)}
-                alternate={index % 2 === 1}
-                subtitle={list.visibility === "public" ? "Public" : "Private"}
+                list={list}
+                index={index}
               />
             ))}
           </ol>

@@ -1,33 +1,37 @@
-import type { CSSProperties, ReactElement } from "react";
+import type { ReactElement } from "react";
 
 export function JumpControlsVisibility({
   visible,
   progress,
+  fallback,
   children,
 }: {
   visible?: boolean;
   progress?: number;
+  fallback?: ReactElement;
   children: ReactElement;
 }) {
-  const resolvedProgress = Math.max(
-    0,
-    Math.min(1, progress ?? (visible ? 1 : 0))
-  );
-  const isVisible = resolvedProgress > 0;
-  const isInteractive = resolvedProgress >= 0.99;
+  const isVisible = visible ?? (progress ?? 0) > 0;
 
   return (
-    <div
-      className="JumpControlsVisibility"
-      data-visible={isVisible}
-      data-interactive={isInteractive}
-      aria-hidden={!isInteractive}
-      inert={!isInteractive}
-      style={
-        { "--jump-controls-progress": resolvedProgress } as CSSProperties
-      }
-    >
-      {children}
-    </div>
+    <>
+      <div
+        className="JumpControlsVisibility"
+        data-visible={isVisible}
+        aria-hidden={!isVisible}
+        inert={!isVisible}
+      >
+        {children}
+      </div>
+      {fallback && (
+        <div
+          className="JumpControlsFallback"
+          data-visible={!isVisible}
+          aria-hidden={isVisible}
+        >
+          {fallback}
+        </div>
+      )}
+    </>
   );
 }

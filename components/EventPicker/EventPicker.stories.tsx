@@ -25,7 +25,7 @@ function InteractiveEventPicker() {
 
 const meta = {
   title: "Core UI/Atoms/EventPicker",
-  component: EventPicker,
+  component: InteractiveEventPicker,
   parameters: { layout: "centered" },
   decorators: [
     (Story) => (
@@ -34,7 +34,7 @@ const meta = {
       </div>
     ),
   ],
-} satisfies Meta<typeof EventPicker>;
+} satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

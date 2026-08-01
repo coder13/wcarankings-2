@@ -12,9 +12,6 @@ export function GoogleAnalytics() {
 
   useEffect(() => {
     trackGoogleAnalyticsPageView(window.location.href);
-  }, [pathname]);
-
-  useEffect(() => {
     const trackCurrentPage = () => {
       trackGoogleAnalyticsPageView(window.location.href);
     };
@@ -25,7 +22,7 @@ export function GoogleAnalytics() {
       window.removeEventListener("popstate", trackCurrentPage);
       window.removeEventListener(ANALYTICS_NAVIGATION_EVENT, trackCurrentPage);
     };
-  }, []);
+  }, [pathname]);
 
   return null;
 }
