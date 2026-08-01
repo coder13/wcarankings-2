@@ -141,6 +141,29 @@
   color: var(--text-disabled);
 }
 
+.rankDelta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.12em;
+  margin-left: 0.35em;
+  color: var(--text-muted);
+  font-size: 0.68em;
+  font-weight: 600;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.rankDelta--up { color: var(--record-world); }
+.rankDelta--down { color: var(--record-national); }
+.rankDelta--new {
+  padding: 0.08em 0.25em;
+  border-radius: 0.25em;
+  background: var(--text-muted);
+  color: var(--surface);
+  font-size: 0.58em;
+  text-transform: uppercase;
+}
+
 .identity {
   display: flex;
   align-items: center;

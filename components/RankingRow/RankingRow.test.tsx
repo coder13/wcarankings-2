@@ -44,6 +44,41 @@ test("renders a result row without exposing internal ordering", () => {
   assert.doesNotMatch(markup, /sub-rank/);
 });
 
+test("renders an accessible upward rank delta", () => {
+  const markup = renderToStaticMarkup(
+    <RankingRow
+      entry={{ ...entry, rankDelta: 12, rankDeltaState: "changed" }}
+      display={{ eventId: "333", rankingType: "single", animationIndex: 0 }}
+    />,
+  );
+  assert.match(markup, /aria-label="up 12 places"/);
+  assert.match(markup, />↑<\/span>12/);
+  assert.match(markup, /, up 12 places"/);
+});
+
+test("renders a first-ranking state without inventing a delta", () => {
+  const markup = renderToStaticMarkup(
+    <RankingRow
+      entry={{ ...entry, rankDelta: null, rankDeltaState: "new" }}
+      display={{ eventId: "333", rankingType: "single", animationIndex: 0 }}
+    />,
+  );
+  assert.match(markup, /aria-label="new ranking"/);
+  assert.match(markup, />New<\/span>/);
+  assert.match(markup, /, new ranking"/);
+});
+
+test("adds the record streak to the badge text and accessible label", () => {
+  const markup = renderToStaticMarkup(
+    <RankingRow
+      entry={{ ...entry, recordBadges: ["WR"], recordStreakWeeks: 18 }}
+      display={{ eventId: "333", rankingType: "single", animationIndex: 0 }}
+    />,
+  );
+  assert.match(markup, /WR · 18w/);
+  assert.match(markup, /World Record, unbeaten for 18 competition weeks/);
+});
+
 test("can hide an identity ID for competition ranking rows", () => {
   const markup = renderToStaticMarkup(
     <RankingRow

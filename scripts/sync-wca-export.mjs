@@ -136,6 +136,10 @@ async function dropRankingViews() {
       "result_entries_single_source",
       "wca_best_single",
       "wca_best_average",
+      "weekly_rank_deltas_single",
+      "weekly_rank_deltas_average",
+      "record_streaks_single",
+      "record_streaks_average",
     ]) {
       await dropManagedObject(connection, name);
     }
