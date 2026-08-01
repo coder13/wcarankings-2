@@ -13,7 +13,8 @@ export function personSearchRowsQuery(input: PersonSearchDatabaseInput) {
      FROM persons person
      LEFT JOIN countries country ON country.id = person.country_id
      LEFT JOIN app_users user ON user.wca_id = person.wca_id
-     LEFT JOIN (SELECT person_id, COUNT(DISTINCT competition_id) AS competition_count FROM results GROUP BY person_id) competition_counts ON competition_counts.person_id = person.wca_id
+     LEFT JOIN person_competition_counts competition_counts
+       ON competition_counts.person_id = person.wca_id
      WHERE person.sub_id = 1
        AND (person.wca_id LIKE ? ESCAPE '\\\\' OR ${nameCondition})
      ORDER BY (person.wca_id = ?) DESC, person.name, person.wca_id

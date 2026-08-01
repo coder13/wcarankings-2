@@ -43,7 +43,7 @@ test("formats table progress against the complete build workload", async () => {
 });
 
 test("keeps future grains registered while activating person metrics and competition bests", async () => {
-  const [schema, groups, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, cities, counts, importer] =
+  const [schema, groups, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, personCompetitionRankings, cities, counts, importer] =
     await Promise.all([
       readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
       readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
@@ -57,6 +57,7 @@ test("keeps future grains registered while activating person metrics and competi
       readFile(new URL("sql/ranking-projections/competition_podium_members.sql", root), "utf8"),
       readFile(new URL("sql/ranking-projections/competition_event_stats.sql", root), "utf8"),
       readFile(new URL("sql/ranking-projections/competition_stats.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/person_competition_rankings.sql", root), "utf8"),
       readFile(new URL("sql/ranking-projections/city_event_stats.sql", root), "utf8"),
       readFile(new URL("sql/ranking-projections/entity_ranking_counts.sql", root), "utf8"),
       readFile(new URL("scripts/sync-wca-export.mjs", root), "utf8"),
@@ -167,6 +168,11 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(competitions, /idx_competition_stats_north/);
   assert.match(competitions, /idx_competition_stats_competitor_count/);
   assert.match(competitions, /idx_competition_stats_south/);
+  assert.match(personCompetitionRankings, /CREATE TABLE person_competition_counts AS/);
+  assert.match(personCompetitionRankings, /COUNT\(DISTINCT result\.competition_id\)/);
+  assert.match(personCompetitionRankings, /CREATE TABLE person_competition_rankings AS/);
+  assert.match(personCompetitionRankings, /PARTITION BY scope, region_id, gender/);
+  assert.match(personCompetitionRankings, /idx_person_competition_rankings_page/);
   assert.match(cities, /fastest_average_result_id/);
   assert.match(cities, /fastest_average_rank/);
   assert.match(cities, /person\.gender IN \('m', 'f'\)/);
@@ -193,6 +199,7 @@ test("does not introduce entries or sub-rank vocabulary in new schemas", async (
     "competition_podium_members.sql",
     "competition_event_stats.sql",
     "competition_stats.sql",
+    "person_competition_rankings.sql",
     "city_event_stats.sql",
     "entity_ranking_counts.sql",
     "person_sum_of_ranks_scores.sql",
@@ -297,6 +304,7 @@ test("person search resolves IDs before querying projections", async () => {
   ]);
 
   assert.match(searchQueries, /FROM persons/);
+  assert.match(searchQueries, /LEFT JOIN person_competition_counts competition_counts/);
   assert.match(searchQueries, /wca_id = \?/);
   assert.match(searchQueries, /name LIKE \?/);
   assert.match(rankings, /searchPersonIds/);
