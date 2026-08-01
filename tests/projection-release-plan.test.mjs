@@ -47,6 +47,7 @@ test("separates source-only semantic fingerprints from export artifacts", async 
   const second = await projectionFingerprints({ exportId, repositoryRoot, semanticFingerprints: semantics });
   assert.deepEqual(first, second);
   assert.ok(semantics.groups["result-facts"].inputs.includes("sql/ranking-projections/result_facts.sql"));
+  assert.ok(!semantics.groups["sum-of-ranks"].inputs.includes("migrations/mysql/app/V13__person_ranking_lookup.sql"));
   assert.ok(!semantics.groups["result-facts"].inputs.includes("package-lock.json"));
   assert.ok(!semantics.groups["result-facts"].inputs.includes("docker-compose.yml"));
   assert.equal(

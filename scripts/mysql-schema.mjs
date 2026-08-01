@@ -607,6 +607,11 @@ async function ensureIndexes(connection, indexes) {
   }
 }
 
+export async function ensureWcaPersonLookupIndex(connection) {
+  await ensureIndexes(connection, INDEXES.filter(([table, name]) =>
+    table === "persons" && name === "idx_persons_wca_sub"));
+}
+
 export async function dropManagedObject(connection, name) {
   const [rows] = await connection.query(
     "SELECT TABLE_TYPE AS type FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",

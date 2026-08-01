@@ -309,6 +309,10 @@ jobs:
           docker compose run --rm \
             -e INTEGRATION_ADMIN_DATABASE_URL="$INTEGRATION_ADMIN_DATABASE_URL" \
             -v "$GITHUB_WORKSPACE:/app/repo:ro" \
+            data-tools --test /app/repo/tests/person-lookup-index.integration.mjs
+          docker compose run --rm \
+            -e INTEGRATION_ADMIN_DATABASE_URL="$INTEGRATION_ADMIN_DATABASE_URL" \
+            -v "$GITHUB_WORKSPACE:/app/repo:ro" \
             data-tools /app/repo/tests/ranking-generation-activation.integration.mjs
 
       - name: Start visual smoke-test app

@@ -318,14 +318,12 @@ async function queryPersonMetric(input: QueryInput) {
   const end = await query<{ position: number }>(
     `SELECT ${positionColumn} AS position
      FROM person_sum_of_ranks_scores
-     LEFT JOIN persons person ON person.wca_id = person_sum_of_ranks_scores.person_id AND person.sub_id = 1
      WHERE metric_version = 1 AND event_set_version = 1
        AND result_type = ? AND scope = ? AND region_id = ?
        AND ${positionColumn} IS NOT NULL
-       ${genderCondition("person", input.gender).sql ? `AND ${genderCondition("person", input.gender).sql}` : ""}
      ORDER BY ${positionColumn} DESC
      LIMIT 1`,
-    [metricResultType, input.scope, input.regionId, ...genderCondition("person", input.gender).values],
+    [metricResultType, input.scope, input.regionId],
   );
   return {
     data: {

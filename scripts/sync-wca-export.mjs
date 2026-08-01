@@ -5,7 +5,12 @@ import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import mysql from "mysql2/promise";
 import * as unzipper from "unzipper";
-import { dropManagedObject, promoteProjectionTables, refreshMysqlSchema } from "./mysql-schema.mjs";
+import {
+  dropManagedObject,
+  ensureWcaPersonLookupIndex,
+  promoteProjectionTables,
+  refreshMysqlSchema,
+} from "./mysql-schema.mjs";
 
 const EXPORT_API = "https://www.worldcubeassociation.org/api/v0/export/public";
 const force = process.argv.includes("--force");
@@ -303,6 +308,15 @@ async function refreshRankingsSchema() {
   }
 }
 
+async function refreshRawPersonLookupIndex() {
+  const connection = await mysql.createConnection(databaseOptions());
+  try {
+    await ensureWcaPersonLookupIndex(connection);
+  } finally {
+    await connection.end();
+  }
+}
+
 async function main() {
   if (dryRun && rawOnly) throw new Error("--dry-run and --raw-only cannot be used together.");
   const suppliedPath = argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH;
@@ -336,6 +350,7 @@ async function main() {
     process.stdout.write("Importing WCA SQL tables into MariaDB…\n");
     await importSqlExport(zipPath);
     if (rawOnly) {
+      await refreshRawPersonLookupIndex();
       const completedAt = now();
       await writeExportMetadata(latest);
       await updateImportRun(runId, {

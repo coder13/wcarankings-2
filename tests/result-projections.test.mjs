@@ -40,6 +40,9 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(schema, /\(\?!\[A-Za-z0-9_\]\)/);
   assert.doesNotMatch(schema, /replaceAll\(table, `\$\{table\}\$\{suffix\}`\)/);
   assert.match(schema, /idx_results_single_event_best/);
+  assert.match(schema, /export async function ensureWcaPersonLookupIndex/);
+  assert.match(schema, /table === "persons" && name === "idx_persons_wca_sub"/);
+  assert.match(importer, /if \(rawOnly\) \{\s+await refreshRawPersonLookupIndex\(\)/);
   assert.match(schema, /Skipping \$\{table\} index \$\{name\}; table is not present/);
   assert.match(importer, /result_entries_single_staging/);
   assert.match(importer, /result_counts_staging/);
@@ -59,12 +62,13 @@ test("builds a result-level compatibility projection without unused secondary in
 });
 
 test("normal rankings retain separate historical country and continent bests", async () => {
-  const [single, average, listRankings, fixture, resultAttemptsMigration] = await Promise.all([
+  const [single, average, listRankings, fixture, resultAttemptsMigration, personLookupMigration] = await Promise.all([
     readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/ranking_entries_average_source.sql", root), "utf8"),
     readFile(new URL("lib/list-rankings.ts", root), "utf8"),
     readFile(new URL("tests/fixtures/regional-ranking-history.sql", root), "utf8"),
     readFile(new URL("migrations/mysql/results/V8__result_attempts_lookup.sql", root), "utf8"),
+    readFile(new URL("migrations/mysql/app/V13__person_ranking_lookup.sql", root), "utf8"),
   ]);
   const sources = `${single}\n${average}`;
 
@@ -84,4 +88,6 @@ test("normal rankings retain separate historical country and continent bests", a
   assert.match(resultAttemptsMigration, /ALTER TABLE result_attempts/);
   assert.match(resultAttemptsMigration, /ADD INDEX idx_result_attempts_result/);
   assert.doesNotMatch(resultAttemptsMigration, /information_schema\.tables/);
+  assert.match(personLookupMigration, /ALTER TABLE IF EXISTS persons/);
+  assert.match(personLookupMigration, /ADD INDEX IF NOT EXISTS idx_persons_wca_sub \(wca_id, sub_id\)/);
 });

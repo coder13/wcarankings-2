@@ -226,6 +226,7 @@ test("exposes bounded resource APIs without projection name scans", async () => 
   assert.doesNotMatch(rankings, /kinch_score \/ 16\.0/);
   assert.match(rankings, /queryFilteredPersonMetric/);
   assert.match(rankings, /DENSE_RANK\(\) OVER/);
+  assert.doesNotMatch(rankings, /FROM person_sum_of_ranks_scores\n\s+LEFT JOIN persons/);
   assert.match(entities, /FROM competition_event_stats stats/);
   assert.match(entities, /stats\.\$\{positionColumn\} > \?/);
   assert.match(entities, /INNER JOIN results result ON result\.id = page\.result_id/);
