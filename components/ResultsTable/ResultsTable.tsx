@@ -94,6 +94,7 @@ export function ResultsTable({
     );
     return entry ? rankingEntryKey(entry) : "";
   }, [enablePersonDetails, entries, initialExpandedPersonId]);
+  const [initialExpansionKey, setInitialExpansionKey] = useState(focusedExpansionKey);
   const activeExpandedKey = focusedExpansionKey || expandedKey;
   const previousExpandedKeyRef = useRef(activeExpandedKey);
   const expandedDetails = activeExpandedKey ? detailsByKey[activeExpandedKey] : null;
@@ -240,6 +241,9 @@ export function ResultsTable({
   const toggleEntryDetails = useCallback((entry: RankingEntry) => {
     const key = rankingEntryKey(entry);
     const next = activeExpandedKey === key ? "" : key;
+    // URL focus is also updated by row clicks. Consume the initial deep-link
+    // exemption before changing it so cached user expansions still animate.
+    setInitialExpansionKey("");
     setExpandedKey(next);
     onFocusedPersonChange?.(next ? entry.personId : null);
   }, [activeExpandedKey, onFocusedPersonChange]);
@@ -253,16 +257,11 @@ export function ResultsTable({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingKey(key);
     requestDetails(entry, key)
-      .then(async (response) => {
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({})) as { error?: string };
-          throw new Error(body.error ?? "Could not load this competitor.");
-        }
-        return response.json() as Promise<PersonEventDetails>;
-      })
       .then(() => {
         setDetailErrorByKey((current) => {
-          const { [key]: _removed, ...next } = current;
+          if (!(key in current)) return current;
+          const next = { ...current };
+          delete next[key];
           return next;
         });
       })
@@ -340,7 +339,7 @@ export function ResultsTable({
               onMemberContextMenu={onMemberContextMenu}
               expanded={expanded}
               closing={closingKeys.has(key)}
-              skipAccordionAnimation={Boolean(initialExpandedPersonId && focusedExpansionKey === key)}
+              skipAccordionAnimation={initialExpansionKey === key}
               eventDetails={detailsByKey[key] ?? null}
               onPrefetchDetails={enablePersonDetails ? prefetchDetails : undefined}
               onCancelPrefetchDetails={enablePersonDetails ? cancelPrefetchDetails : undefined}

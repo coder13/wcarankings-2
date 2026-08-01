@@ -22,7 +22,7 @@ test("shows both pager actions from the first page", () => {
 
 test("keeps an armed jump-to-end action available while navigation settles", () => {
   const markup = renderToStaticMarkup(<RankingsPagerRail upArmed={false} downArmed busy currentPosition={5_001} total={100_000} onJumpUp={() => undefined} onJumpDown={() => undefined} searchActive={false} onSearchPrevious={() => undefined} onSearchNext={() => undefined} />);
-  assert.match(markup, /<button class="Jump-pagerButton"><svg[\s\S]*?Jump to end/);
+  assert.match(markup, /<button class="Jump-pagerButton"[^>]*><svg[\s\S]*?Jump to end/);
 });
 
 test("disables pager actions while a jump is settling", () => {
