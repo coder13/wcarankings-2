@@ -44,6 +44,23 @@ function serverCooldownFunctions() {
     .join("\n");
 }
 
+function preSwitchTagRecoveryFunction() {
+  const start = serverDeploy.indexOf("            restore_previous_app_tag() {");
+  const end = serverDeploy.indexOf("            restore_previous_app_tag\n", start);
+  assert.ok(start >= 0 && end > start);
+  return serverDeploy.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {12}/, ""))
+    .join("\n");
+}
+
+function exercisePreSwitchTagRecovery(appImageChanged) {
+  return spawnSync("sh", ["-eu", "-c", `${preSwitchTagRecoveryFunction()}
+docker() { printf 'docker %s\\n' "$*"; }
+APP_IMAGE_CHANGED=${appImageChanged}
+restore_previous_app_tag
+`], { encoding: "utf8" });
+}
+
 async function exerciseServerCooldown(cpuSamples) {
   const directory = await mkdtemp(join(tmpdir(), "wcarankings-cooldown-"));
   const sequenceFile = join(directory, "sequence");
@@ -196,19 +213,37 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(projectionDeploy, /flyway_schema_history_results/);
   assert.match(serverDeploy, /wcarankings-data-tools:artifact-\*\) continue/);
   assert.match(serverDeploy, /running_app_image=.*docker inspect.*\.Image/);
-  assert.match(serverDeploy, /running_app_image.*=.*candidate_app_image/);
+  assert.match(serverDeploy, /running_app_image.*=.*CANDIDATE_APP_IMAGE_ID/);
   assert.match(serverDeploy, /docker tag "\$running_app_image" wcarankings-app:previous/);
   assert.doesNotMatch(serverDeploy, /docker tag wcarankings-app:latest wcarankings-app:previous/);
+  const candidateImageIdIndex = serverDeploy.indexOf("candidate_app_image_id=$(docker image inspect");
+  const stageTransferIndex = serverDeploy.indexOf('docker save "${changed_images[@]}"');
+  const runningImageCheckIndex = serverDeploy.indexOf('if [ "$running_app_image" = "$CANDIDATE_APP_IMAGE_ID" ]');
+  assert.ok(candidateImageIdIndex >= 0 && candidateImageIdIndex < runningImageCheckIndex);
+  assert.ok(stageTransferIndex > runningImageCheckIndex);
   assert.match(serverDeploy, /always\(\).*cancelled\(\).*SERVICES_SWITCHED != 'true'/);
   assert.match(serverDeploy, /recover_approved_config/);
   assert.match(serverDeploy, /PREVIOUS_COMPOSE_CHECKSUM/);
   assert.match(serverDeploy, /FLYWAY_IMAGE_CHANGED.*\|\|.*DATA_TOOLS_IMAGE_CHANGED/);
   assert.match(projectionDeploy, /compose_base=.*\.projection-compose-/);
+  const projectionFirstMutationIndex = projectionDeploy.indexOf("dc run --rm data-tools /app/scripts/prepare-flyway-history.mjs");
   const projectionImportIndex = projectionDeploy.indexOf("publish-projection-transfer.mjs");
-  const projectionBaselineIndex = projectionDeploy.lastIndexOf("measure_database_cpu_baseline", projectionImportIndex);
+  const projectionResetIndex = projectionDeploy.indexOf("reset_candidate() {");
+  const projectionBaselineIndex = projectionDeploy.lastIndexOf("load_or_measure_database_cpu_baseline", projectionFirstMutationIndex);
+  const projectionMutationLockIndex = projectionDeploy.lastIndexOf("production-mutation.lock", projectionBaselineIndex);
   const projectionCooldownIndex = projectionDeploy.lastIndexOf("wait_for_database_cooldown");
-  assert.ok(projectionBaselineIndex >= 0 && projectionBaselineIndex < projectionImportIndex);
+  assert.ok(projectionMutationLockIndex >= 0 && projectionBaselineIndex > projectionMutationLockIndex);
+  assert.ok(projectionBaselineIndex < projectionFirstMutationIndex);
+  assert.ok(projectionFirstMutationIndex < projectionResetIndex && projectionResetIndex < projectionImportIndex);
   assert.ok(projectionCooldownIndex > projectionImportIndex && lockIndex > projectionCooldownIndex);
+  assert.match(projectionDeploy, /projection-deploy-\$\{ARTIFACT_ID\}\.baseline/);
+  assert.match(projectionDeploy, /baseline_tmp=.*\.tmp\.\$\$/);
+  assert.match(projectionDeploy, /mv "\$baseline_tmp" "\$baseline_file"/);
+  assert.equal([...projectionDeploy.matchAll(/^\s+load_or_measure_database_cpu_baseline$/gm)].length, 1);
+  assert.equal([...projectionDeploy.matchAll(/^\s+load_persisted_database_cpu_baseline$/gm)].length, 2);
+  assert.equal([...projectionDeploy.matchAll(/mv "\$baseline_tmp" "\$baseline_file"/g)].length, 1);
+  const projectionPersistedLoadIndex = projectionDeploy.indexOf("load_persisted_database_cpu_baseline", projectionFirstMutationIndex);
+  assert.ok(projectionPersistedLoadIndex > projectionFirstMutationIndex);
   assert.match(projectionDeploy, /no longer matches this release; marking it superseded/);
   assert.doesNotMatch(projectionDeploy, /stale; rebuilding its candidate/);
   const composeBackup = serverDeploy.indexOf("cp /srv/wcarankings/docker-compose.yml");
@@ -258,6 +293,17 @@ test("relative MariaDB cooldown fails closed on invalid or unstable baselines", 
   assert.notEqual(unstable.status, 0);
   assert.match(unstable.stderr, /pre-migration CPU was unstable/);
   assert.doesNotMatch(unstable.stdout, /cooldown sample/);
+});
+
+test("config-only cancellation keeps the current app tag despite a stale previous tag", () => {
+  const configOnly = exercisePreSwitchTagRecovery("false");
+  assert.equal(configOnly.status, 0, configOnly.stderr);
+  assert.match(configOnly.stdout, /App image was unchanged/);
+  assert.doesNotMatch(configOnly.stdout, /docker tag/);
+
+  const imageRelease = exercisePreSwitchTagRecovery("true");
+  assert.equal(imageRelease.status, 0, imageRelease.stderr);
+  assert.match(imageRelease.stdout, /docker tag wcarankings-app:previous wcarankings-app:latest/);
 });
 
 test("server smoke tests retry the emitted local stylesheet after core readiness", () => {

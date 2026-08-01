@@ -251,8 +251,13 @@ jobs:
       - name: Stage server images and run migrations
         run: |
           set -o pipefail
+          candidate_app_image_id=
+          if [ "$APP_IMAGE_CHANGED" = true ]; then
+            candidate_app_image_id=$(docker image inspect --format '{{.Id}}' "wcarankings-app:${SOURCE_SHA}")
+          fi
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' SOURCE_SHA='$SOURCE_SHA' sh -s" <<'REMOTE'
+            "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' \
+             CANDIDATE_APP_IMAGE_ID='$candidate_app_image_id' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
             exec 9>/srv/wcarankings/server-release.lock
@@ -266,14 +271,18 @@ jobs:
                 exit 1
               fi
               running_app_image=$(docker inspect --format '{{.Image}}' "$app_container")
-              candidate_app_image=$(docker image inspect --format '{{.Id}}' \
-                "wcarankings-app:${SOURCE_SHA}" 2>/dev/null || true)
-              echo "Preserving running app image ${running_app_image}; local candidate image is ${candidate_app_image:-not-present}."
-              if [ -n "$candidate_app_image" ] && [ "$running_app_image" = "$candidate_app_image" ]; then
-                echo "The running app already uses the candidate image; refusing to overwrite the rollback tag." >&2
-                exit 1
+              echo "Running app image is ${running_app_image}; candidate image is ${CANDIDATE_APP_IMAGE_ID}."
+              if [ "$running_app_image" = "$CANDIDATE_APP_IMAGE_ID" ]; then
+                previous_app_image=$(docker image inspect --format '{{.Id}}' \
+                  wcarankings-app:previous 2>/dev/null || true)
+                if [ -z "$previous_app_image" ] || [ "$previous_app_image" = "$CANDIDATE_APP_IMAGE_ID" ]; then
+                  echo "The running app is already the candidate and no distinct rollback image is available." >&2
+                  exit 1
+                fi
+                echo "The running app already uses the candidate; preserving distinct rollback image ${previous_app_image}."
+              else
+                docker tag "$running_app_image" wcarankings-app:previous
               fi
-              docker tag "$running_app_image" wcarankings-app:previous
             fi
             protected_images=$( {
               docker ps -q | xargs -r docker inspect --format "{{.Image}}"
@@ -525,26 +534,36 @@ jobs:
         if: always() && (failure() || cancelled()) && env.SERVICES_SWITCHED != 'true'
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'set -eu
+            "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' sh -s" <<'REMOTE'
+            set -eu
             exec 9>/srv/wcarankings/server-release.lock
             flock -w 60 9
             exec 8>/srv/wcarankings/production-mutation.lock
             flock -w 360 8
-            if docker image inspect wcarankings-app:previous >/dev/null 2>&1; then
-              docker tag wcarankings-app:previous wcarankings-app:latest
-            fi
+            restore_previous_app_tag() {
+              if [ "$APP_IMAGE_CHANGED" != true ]; then
+                echo "App image was unchanged; retaining its current latest tag."
+                return 0
+              fi
+              if docker image inspect wcarankings-app:previous >/dev/null 2>&1; then
+                docker tag wcarankings-app:previous wcarankings-app:latest
+              fi
+            }
+            restore_previous_app_tag
             if [ -f /srv/wcarankings/docker-compose.yml.previous ]; then
               cp /srv/wcarankings/docker-compose.yml.previous /srv/wcarankings/docker-compose.yml
             fi
             if [ -f /srv/wcarankings/ops/Caddyfile.previous ]; then
               cp /srv/wcarankings/ops/Caddyfile.previous /srv/wcarankings/ops/Caddyfile
-            fi'
+            fi
+          REMOTE
 
       - name: Roll back failed server switch
         if: always() && (failure() || cancelled()) && env.SERVICES_SWITCHED == 'true'
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' \
+            "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' \
+             PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' \
              PREVIOUS_SOURCE_SHA='$PREVIOUS_SOURCE_SHA' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
@@ -552,11 +571,13 @@ jobs:
             flock -w 60 9
             exec 8>/srv/wcarankings/production-mutation.lock
             flock -w 360 8
-            if ! docker image inspect wcarankings-app:previous >/dev/null 2>&1; then
-              echo "No previous server image is available for rollback." >&2
-              exit 1
+            if [ "$APP_IMAGE_CHANGED" = true ]; then
+              if ! docker image inspect wcarankings-app:previous >/dev/null 2>&1; then
+                echo "No previous server image is available for rollback." >&2
+                exit 1
+              fi
+              docker tag wcarankings-app:previous wcarankings-app:latest
             fi
-            docker tag wcarankings-app:previous wcarankings-app:latest
             if [ -f docker-compose.yml.previous ]; then
               cp docker-compose.yml.previous docker-compose.yml
             fi
@@ -621,7 +642,8 @@ jobs:
         if: always() && (failure() || cancelled()) && env.SERVICES_SWITCHED == 'true' && env.ROLLBACK_COMPLETED != 'true'
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' \
+            "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' \
+             PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' \
              PREVIOUS_SOURCE_SHA='$PREVIOUS_SOURCE_SHA' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
@@ -629,7 +651,9 @@ jobs:
             flock -w 60 9
             exec 8>/srv/wcarankings/production-mutation.lock
             flock -w 360 8
-            docker tag wcarankings-app:previous wcarankings-app:latest
+            if [ "$APP_IMAGE_CHANGED" = true ]; then
+              docker tag wcarankings-app:previous wcarankings-app:latest
+            fi
             if [ -f docker-compose.yml.previous ]; then cp docker-compose.yml.previous docker-compose.yml; fi
             if [ -f ops/Caddyfile.previous ]; then cp ops/Caddyfile.previous ops/Caddyfile; fi
             if [ -f server-release-state.json.previous ]; then
