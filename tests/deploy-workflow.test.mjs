@@ -309,6 +309,9 @@ test("candidate staging is monitored and the activation lock stays short", () =>
     assert.doesNotMatch(workflow, /cpu < 50|cool below 50%/);
   }
   assert.match(projectionDeploy, /verify-active/);
+  assert.match(projectionDeploy, /normalizeExportDate/);
+  assert.match(projectionDeploy, /normalized_build_export.*!=.*normalized_production_export/);
+  assert.doesNotMatch(projectionDeploy, /if \[ "\$WCA_EXPORT_VALUE" != "\$PRODUCTION_WCA_EXPORT_VALUE" \]/);
   assert.match(serverDeploy, /flyway_schema_history_results/);
   const bootstrapIndex = serverDeploy.indexOf("activate-ranking-generation.mjs bootstrap");
   const mutationLockIndex = serverDeploy.lastIndexOf("production-mutation.lock", bootstrapIndex);

@@ -158,8 +158,21 @@ jobs:
             --groups="$PROJECTION_GROUPS" \
             --export-id="$WCA_EXPORT_VALUE" \
             --source-sha="$EXPECTED_SOURCE_SHA"
-          echo "Projection export identity: build=$WCA_EXPORT_VALUE; production=$PRODUCTION_WCA_EXPORT_VALUE"
-          if [ "$WCA_EXPORT_VALUE" != "$PRODUCTION_WCA_EXPORT_VALUE" ]; then
+          normalize_export_identity() {
+            node --input-type=module --eval '
+              import { normalizeExportDate } from "./scripts/projection-transfer-date.mjs";
+              const normalized = normalizeExportDate(process.argv[1]);
+              if (!normalized) {
+                console.error(`Invalid projection export identity: ${process.argv[1]}`);
+                process.exit(1);
+              }
+              process.stdout.write(normalized);
+            ' "$1"
+          }
+          normalized_build_export=$(normalize_export_identity "$WCA_EXPORT_VALUE")
+          normalized_production_export=$(normalize_export_identity "$PRODUCTION_WCA_EXPORT_VALUE")
+          echo "Projection export identity: build=$normalized_build_export; production=$normalized_production_export"
+          if [ "$normalized_build_export" != "$normalized_production_export" ]; then
             echo "Projection artifact must include the raw export because the build and production exports differ." >&2
             jq -e '.raw != null' "$PROJECTION_ARTIFACT_DIR/projection-release.json" >/dev/null
           fi
