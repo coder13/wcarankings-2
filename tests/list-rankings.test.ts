@@ -21,6 +21,8 @@ test("normalizes list ranking query parameters", () => {
     locate: "",
     region: { scope: "world", regionId: "" },
     gender: [],
+    membershipVersion: null,
+    rankingsDataVersion: null,
   });
 });
 

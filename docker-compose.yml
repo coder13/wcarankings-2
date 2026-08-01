@@ -70,6 +70,18 @@ services:
     volumes:
       - wca_export_cache:/var/cache/wcarankings
 
+  list-ranking-worker:
+    image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
+    restart: unless-stopped
+    command: ["/app/scripts/list-ranking-worker.mjs"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      LIST_RANKING_WORKER_POLL_MS: ${LIST_RANKING_WORKER_POLL_MS:-2000}
+    depends_on:
+      db:
+        condition: service_healthy
+
   proxy:
     image: caddy:2-alpine
     restart: unless-stopped

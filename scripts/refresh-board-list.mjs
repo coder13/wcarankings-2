@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
+import { enqueueListRankingRebuild } from "./list-ranking-jobs.mjs";
 
 const ROLE_LISTS = {
   board: {
@@ -73,7 +74,7 @@ async function refreshRoleList(connection, roleList, fetchImpl = fetch) {
       ],
     );
     const [listRows] = await connection.query(
-      `SELECT id, system_definition_version
+      `SELECT id, system_definition_version, membership_version
        FROM lists
        WHERE kind = 'system' AND system_key = ? AND system_alias = ? AND deleted_at IS NULL
        LIMIT 1 FOR UPDATE`,
@@ -129,6 +130,11 @@ async function refreshRoleList(connection, roleList, fetchImpl = fetch) {
        WHERE id = ?`,
       [listId, changed ? 1 : 0, roleList.version, roleList.name, roleList.description, listId],
     );
+    if (changed) {
+      await enqueueListRankingRebuild(connection, {
+        id: Number(listId), membershipVersion: Number(listRows[0].membership_version) + 1, kind: "system",
+      });
+    }
     await connection.commit();
   } catch (error) {
     await connection.rollback();

@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
 import { SYSTEM_LIST_DEFINITIONS } from "./system-list-definitions.mjs";
+import { enqueueListRankingRebuild } from "./list-ranking-jobs.mjs";
 
 function databaseOptions(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -19,7 +20,7 @@ export async function refreshSystemLists(connection) {
   try {
     for (const definition of SYSTEM_LIST_DEFINITIONS) {
       const [listRows] = await connection.query(
-        `SELECT id, system_definition_version
+        `SELECT id, system_definition_version, membership_version
          FROM lists
          WHERE kind = 'system'
            AND system_key = ?
@@ -109,6 +110,11 @@ export async function refreshSystemLists(connection) {
           listId,
         ],
       );
+      if (changed) {
+        await enqueueListRankingRebuild(connection, {
+          id: Number(listId), membershipVersion: Number(listRows[0].membership_version ?? 1) + 1, kind: "system",
+        });
+      }
     }
     await connection.commit();
   } catch (error) {

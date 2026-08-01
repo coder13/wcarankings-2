@@ -7,6 +7,7 @@ import {
   normalizeListPublicId,
   slugifyListName,
 } from "@/lib/list-identifiers";
+import { assertListMemberCapacity, enqueueListRankingRebuild, USER_LIST_MEMBER_LIMIT } from "@/lib/list-ranking-cache";
 
 export type ListVisibility = "public" | "private";
 export type ListJoinPolicy = "open" | "closed";
@@ -98,6 +99,14 @@ export class ListConflictError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ListConflictError";
+  }
+}
+
+function ensureListMemberCapacity(kind: ListKind, currentCount: number, additions: number) {
+  try {
+    assertListMemberCapacity(kind, currentCount, additions);
+  } catch (error) {
+    throw new ListValidationError(error instanceof Error ? error.message : "List member limit reached.");
   }
 }
 
@@ -302,6 +311,9 @@ export async function createList(
   const slug = slugifyListName(name);
   const rawPersonIds = Array.isArray(input.personIds) ? input.personIds : [];
   const normalizedPersonIds = [...new Set(rawPersonIds.map(normalizeWcaId).filter(Boolean))] as string[];
+  if (normalizedPersonIds.length > USER_LIST_MEMBER_LIMIT) {
+    throw new ListValidationError(`User lists can contain at most ${USER_LIST_MEMBER_LIMIT.toLocaleString()} members.`);
+  }
   const invalid = rawPersonIds
     .filter((personId) => !normalizeWcaId(personId))
     .map((personId) => String(personId).slice(0, 40));
@@ -319,6 +331,7 @@ export async function createList(
         const listId = Number(result.insertId);
         const valid = new Set<string>();
         const blocked = new Set<string>();
+        let addedCount = 0;
         if (normalizedPersonIds.length) {
           const placeholders = normalizedPersonIds.map(() => "?").join(",");
           const [people] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
@@ -336,6 +349,7 @@ export async function createList(
             optedOut.forEach((person) => blocked.add(person.wca_id));
             const added = validIds.filter((personId) => !blocked.has(personId));
             if (added.length) {
+              addedCount = added.length;
               await connection.execute(
                 `INSERT INTO list_members (list_id, person_id, added_by_user_id, source)
                  VALUES ${added.map(() => "(?, ?, ?, 'bulk_import')").join(",")}`,
@@ -354,6 +368,11 @@ export async function createList(
           eventType: "list.created",
           eventData: { visibility, joinPolicy, memberCount: normalizedPersonIds.length },
         });
+        await enqueueListRankingRebuild(connection, {
+          id: listId,
+          membershipVersion: addedCount ? 2 : 1,
+          kind: "user",
+        });
         return {
           invalid: [...invalid, ...normalizedPersonIds.filter((personId) => !valid.has(personId))],
           blocked: [...blocked],
@@ -368,12 +387,23 @@ export async function createList(
 }
 
 export async function cloneList(user: AuthUser, source: ListSummary) {
+  if (source.memberCount > USER_LIST_MEMBER_LIMIT) {
+    throw new ListValidationError(`Lists with more than ${USER_LIST_MEMBER_LIMIT.toLocaleString()} members cannot be cloned.`);
+  }
   const name = validateName(`${source.name.slice(0, 95)} copy`);
   const slug = slugifyListName(name);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const publicId = generateListPublicId();
     try {
       await withTransaction(async (connection) => {
+        const [sourceRows] = await connection.execute<(RowDataPacket & { member_count: number })[]>(
+          "SELECT member_count FROM lists WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
+          [source.id],
+        );
+        if (!sourceRows[0]) throw new ListNotFoundError();
+        if (Number(sourceRows[0].member_count) > USER_LIST_MEMBER_LIMIT) {
+          throw new ListValidationError(`Lists with more than ${USER_LIST_MEMBER_LIMIT.toLocaleString()} members cannot be cloned.`);
+        }
         const [created] = await connection.execute<ResultSetHeader>(
           `INSERT INTO lists
             (kind, public_id, owner_user_id, name, slug, description, visibility, join_policy)
@@ -398,6 +428,7 @@ export async function cloneList(user: AuthUser, source: ListSummary) {
           eventType: "list.cloned",
           eventData: { sourceListId: source.publicId ?? source.systemAlias, memberCount: members.affectedRows },
         });
+        await enqueueListRankingRebuild(connection, { id: listId, membershipVersion: 2, kind: "user" });
       });
       return resolveList(publicId);
     } catch (error) {
@@ -682,6 +713,7 @@ export async function addListMembers(
     const added = candidates.filter(
       (personId) => !blockedSet.has(personId) && !existing.has(personId),
     );
+    ensureListMemberCapacity(row.kind, Number(row.member_count), added.length);
     if (added.length > 0) {
       const values = added.map(() => "(?, ?, ?, ?)").join(",");
       await connection.execute(
@@ -703,6 +735,7 @@ export async function addListMembers(
         eventType: "members.added",
         eventData: { count: added.length, source },
       });
+      await enqueueListRankingRebuild(connection, { id: Number(row.id), membershipVersion: Number(row.membership_version) + 1, kind: row.kind });
     }
     return {
       added,
@@ -741,6 +774,7 @@ export async function removeListMember(
         eventType: "member.removed_by_owner",
         personId,
       });
+      await enqueueListRankingRebuild(connection, { id: Number(row.id), membershipVersion: Number(row.membership_version) + 1, kind: row.kind });
     }
     return result.affectedRows > 0;
   });
@@ -775,6 +809,7 @@ export async function removeSelfFromList(user: AuthUser, lookup: string) {
       eventType: "member.self_removed",
       personId: user.wcaId,
     });
+    await enqueueListRankingRebuild(connection, { id: Number(row.id), membershipVersion: Number(row.membership_version) + 1, kind: row.kind });
   });
 }
 
@@ -795,6 +830,7 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
       throw new ListConflictError("You are already included in this list.");
     }
     if (row.join_policy === "open") {
+      ensureListMemberCapacity(row.kind, Number(row.member_count), 1);
       await connection.execute(
         "DELETE FROM list_exclusions WHERE list_id = ? AND person_id = ?",
         [row.id, user.wcaId],
@@ -813,6 +849,7 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
            WHERE id = ?`,
           [row.id],
         );
+        await enqueueListRankingRebuild(connection, { id: Number(row.id), membershipVersion: Number(row.membership_version) + 1, kind: row.kind });
       }
       await activity(connection, {
         listId: Number(row.id),
@@ -913,6 +950,7 @@ export async function decideMembershipRequest(
 
     let added = false;
     if (decision === "accepted") {
+      ensureListMemberCapacity(list.kind, Number(list.member_count), 1);
       const [preferenceRows] = await connection.execute<
         (RowDataPacket & { allow_list_inclusion: number })[]
       >(
@@ -944,6 +982,7 @@ export async function decideMembershipRequest(
            WHERE id = ?`,
           [list.id],
         );
+        await enqueueListRankingRebuild(connection, { id: Number(list.id), membershipVersion: Number(list.membership_version) + 1, kind: list.kind });
       }
     }
     await connection.execute(
@@ -977,6 +1016,16 @@ export async function setListInclusionPreference(
     );
     if (allowListInclusion) return;
 
+    const [affectedLists] = await connection.execute<
+      (RowDataPacket & { id: number; kind: ListKind; membership_version: number })[]
+    >(
+      `SELECT list_record.id, list_record.kind, list_record.membership_version
+       FROM lists AS list_record
+       JOIN list_members AS member ON member.list_id = list_record.id
+       WHERE member.person_id = ? FOR UPDATE`,
+      [user.wcaId],
+    );
+
     await connection.execute(
       `UPDATE lists AS list_record
        JOIN (
@@ -994,6 +1043,13 @@ export async function setListInclusionPreference(
       "DELETE FROM list_members WHERE person_id = ?",
       [user.wcaId],
     );
+    for (const list of affectedLists) {
+      await enqueueListRankingRebuild(connection, {
+        id: Number(list.id),
+        membershipVersion: Number(list.membership_version) + 1,
+        kind: list.kind,
+      });
+    }
     await connection.execute(
       `UPDATE list_membership_requests
        SET status = 'cancelled',

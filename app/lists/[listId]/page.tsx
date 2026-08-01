@@ -88,6 +88,8 @@ export default async function ListPage({
         lastRank: rankings.entries.at(-1)?.subRank ?? null,
         total: rankings.total,
         exportDate: rankings.exportDate,
+        cacheMembershipVersion: rankings.cacheMembershipVersion,
+        cacheDataVersion: rankings.cacheDataVersion,
         startRank: 1,
         searchMatches: [],
         initialMatchPersonId: "",

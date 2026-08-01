@@ -108,6 +108,8 @@ type RankingSource =
   | { kind: "saved"; listId: string; listName: string }
   | { kind: "dynamic"; personIds: string[]; listName: string };
 
+const savedListVersionWindows = new Map<string, { membershipVersion: number; rankingsDataVersion: string }>();
+
 function addRankingSourceParams(params: URLSearchParams, source?: RankingSource) {
   if (!source) return;
   if (source.kind === "saved") params.set("list", source.listId);
@@ -241,6 +243,12 @@ function getPage(
   const year = activeYear();
   if (resource === "people" && year) params.set("year", year);
   addRankingSourceParams(params, source);
+  const versionKey = source?.kind === "saved" ? `${source.listId}:${eventId}:${rankingType}` : null;
+  const versionWindow = versionKey ? savedListVersionWindows.get(versionKey) : null;
+  if (versionWindow && selection.scope === "world" && gender.length === 0) {
+    params.set("membershipVersion", String(versionWindow.membershipVersion));
+    params.set("rankingsDataVersion", versionWindow.rankingsDataVersion);
+  }
   if ((resource === "people" || resource === "results") && gender.length) params.set("gender", gender.join(","));
   if (selection.scope !== "world") params.set("region", selection.regionId);
   if (resource === "podiums") params.set("ranking", "podium");
@@ -265,6 +273,12 @@ function getPage(
       throw new Error(body.error ?? "Rankings are unavailable.");
     }
     const data = (await response.json()) as RankingPage;
+    if (versionKey && data.cacheMembershipVersion && data.cacheDataVersion) {
+      savedListVersionWindows.set(versionKey, {
+        membershipVersion: data.cacheMembershipVersion,
+        rankingsDataVersion: data.cacheDataVersion,
+      });
+    }
     return {
       entries: data.entries,
       hasMore: data.hasMore,
@@ -567,6 +581,12 @@ export function RankingsExplorer({
   };
 }) {
   const featureSwitch = useProjectionFeatureSwitch();
+  if (rankingSource?.kind === "saved" && initialData?.cacheMembershipVersion && initialData.cacheDataVersion) {
+    savedListVersionWindows.set(
+      `${rankingSource.listId}:${initialEventId}:${initialRankingType}`,
+      { membershipVersion: initialData.cacheMembershipVersion, rankingsDataVersion: initialData.cacheDataVersion },
+    );
+  }
   const router = useRouter();
   const isMobileControls = useSyncExternalStore(
     subscribeMobileControls,
