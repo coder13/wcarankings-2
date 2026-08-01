@@ -47,6 +47,12 @@ async function tableExists(connection, table) {
 
 const connection = await mysql.createConnection(databaseOptions());
 try {
+  // Production constrains the shared application account so accidental ad-hoc
+  // queries cannot run indefinitely. Projection transfer indexes are expected
+  // to exceed that account limit, while the deployment's API monitor remains
+  // responsible for aborting work that affects the live site.
+  await connection.query("SET SESSION max_statement_time = 0");
+
   for (const table of manifestTables) if (!await tableExists(connection, table)) throw new Error(`The projection transfer manifest ${table} is missing.`);
 
   const manifestResults = await Promise.all(

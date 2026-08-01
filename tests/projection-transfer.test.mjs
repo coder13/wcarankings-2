@@ -41,6 +41,16 @@ test("defers secondary projection indexes until after bulk transfer import", () 
   assert.match(publish, /promoteProjectionTables/);
 });
 
+test("projection index publication overrides the application account timeout", () => {
+  const connectionIndex = publish.indexOf("mysql.createConnection");
+  const timeoutIndex = publish.indexOf("SET SESSION max_statement_time = 0");
+  const validationIndex = publish.indexOf("for (const table of manifestTables)");
+
+  assert.ok(connectionIndex >= 0);
+  assert.ok(timeoutIndex > connectionIndex);
+  assert.ok(validationIndex > timeoutIndex);
+});
+
 test("can preflight transfer rows, dates, and indexes before production cutover", () => {
   assert.match(publish, /prepareOnly = process\.argv\.includes\("--prepare-only"\)/);
   assert.match(publish, /expectedExportDate/);
