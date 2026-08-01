@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 
 export const SERVER_COMPONENT_PATHS = {
   app: [
-    "Dockerfile", "docker-entrypoint.sh", "package.json", "package-lock.json",
+    "Dockerfile", "docker-entrypoint.sh", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
     "app", "components", "lib", "db", "public", "next.config.*", "tsconfig.json",
     "vite.config.ts", "vite-env.d.ts", "postcss.config.mjs", ".dockerignore",
     "release-compatibility.json",
@@ -13,7 +13,7 @@ export const SERVER_COMPONENT_PATHS = {
   flyway: ["Dockerfile.flyway", "migrations/mysql"],
   dataTools: [
     "Dockerfile.data-tools", "scripts", "sql", "migrations/mysql",
-    "release-compatibility.json", "package.json", "package-lock.json",
+    "release-compatibility.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
   ],
 };
 

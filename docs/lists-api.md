@@ -29,7 +29,7 @@ User-created lists use eight-character Crockford Base32 public IDs. System alias
 
 ## System lists
 
-`npm run db:refresh-system-lists` rebuilds curated system memberships. The WCA importer also runs the rebuild transaction after publishing new ranking projections. A failed rebuild rolls back and leaves the prior memberships intact.
+`pnpm run db:refresh-system-lists` rebuilds curated system memberships. The WCA importer also runs the rebuild transaction after publishing new ranking projections. A failed rebuild rolls back and leaves the prior memberships intact.
 
 The first rules match an exact, case-insensitive first token from the primary WCA display name. They do not match prefixes, so `Max` matches and `Maxwell` does not.
 

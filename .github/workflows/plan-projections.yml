@@ -81,12 +81,16 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - uses: actions/setup-node@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci --omit=dev
+      - run: pnpm install --frozen-lockfile --prod
 
       - name: Configure read-only production access
         env:

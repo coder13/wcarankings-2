@@ -9,7 +9,7 @@ The app runs as a self-hosted Node service backed by MariaDB/MySQL. The importer
 Install dependencies and create a local environment:
 
 ```bash
-npm ci
+pnpm install
 cp .env.example .env.local
 ```
 
@@ -17,13 +17,13 @@ For a local Node process, change `DATABASE_URL` in `.env.local` from the Compose
 
 ```bash
 docker compose up -d db
-npm run dev
+pnpm run dev
 ```
 
 Open `http://localhost:3000`. Ranking data is available after the first WCA import. Import the current export with:
 
 ```bash
-npm run sync:wca:local
+pnpm run sync:wca:local
 ```
 
 Google Analytics uses measurement ID `G-83F787NWS9` in production builds. It is
@@ -31,21 +31,21 @@ disabled automatically in local development and tests.
 
 The importer compares export dates before downloading, so repeated runs are safe. Use `--force` when an explicit re-import is needed.
 
-App-owned MariaDB schema is managed by Flyway. Run `npm run db:migrate` to apply
-or validate pending migrations, or run `npm run db:refresh-rankings` to rebuild
+App-owned MariaDB schema is managed by Flyway. Run `pnpm run db:migrate` to apply
+or validate pending migrations, or run `pnpm run db:refresh-rankings` to rebuild
 the derived ranking projections from raw WCA tables already in MariaDB.
-`npm run sync:wca:local` runs Flyway first, then imports the export and rebuilds
+`pnpm run sync:wca:local` runs Flyway first, then imports the export and rebuilds
 the derived projections.
 
 Useful checks:
 
 ```bash
-npm run build
-npm test
-npm run lint
-npm run test:unit
-npm run storybook
-npm run build-storybook
+pnpm run build
+pnpm test
+pnpm run lint
+pnpm run test:unit
+pnpm run storybook
+pnpm run build-storybook
 ```
 
 Storybook runs the client-side rankings explorer with deterministic preview data

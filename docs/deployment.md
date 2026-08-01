@@ -182,7 +182,7 @@ for readiness before rendering the page.
 Run the repeatable local traffic mix after starting the app:
 
 ```bash
-npm run load:rankings
+pnpm run load:rankings
 ```
 
 It covers normal browsing, distant pages, incremental search typing, and unique

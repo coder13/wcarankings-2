@@ -373,6 +373,20 @@ test("component images are independently identified and production requires PR v
   assert.match(serverDeploy, /DEPLOYED_MAIN_SHA='\$SOURCE_SHA'/);
 });
 
+test("Node dependency consumers use the pinned pnpm lockfile", () => {
+  for (const nodeWorkflow of [pullRequest, planner, builder]) {
+    assert.match(nodeWorkflow, /pnpm\/action-setup@v4/);
+    assert.match(nodeWorkflow, /cache: pnpm/);
+    assert.match(nodeWorkflow, /pnpm install --frozen-lockfile/);
+    assert.doesNotMatch(nodeWorkflow, /npm ci|cache: npm|package-lock\.json/);
+  }
+  for (const component of [SERVER_COMPONENT_PATHS.app, SERVER_COMPONENT_PATHS.dataTools]) {
+    assert.ok(component.includes("pnpm-lock.yaml"));
+    assert.ok(component.includes("pnpm-workspace.yaml"));
+    assert.ok(!component.includes("package-lock.json"));
+  }
+});
+
 test("candidate staging is monitored and the activation lock stays short", () => {
   const importIndex = projectionDeploy.indexOf("during_projection_import");
   const lockIndex = projectionDeploy.indexOf("projection-activation.lock");
