@@ -2,7 +2,8 @@ import { createRequire } from "node:module";
 import type { Pool, PoolConnection } from "mysql2/promise";
 
 const require = createRequire(import.meta.url);
-const { createPool } = require("mysql2/promise") as typeof import("mysql2/promise");
+const { createPool } =
+  require("mysql2/promise") as typeof import("mysql2/promise");
 
 const globalForDb = globalThis as typeof globalThis & {
   __cubeRanksPool?: Pool;
@@ -23,7 +24,13 @@ export class DatabaseOverloadedError extends Error {
 
 class DatabaseQueue {
   private active = 0;
-  private readonly limit = Math.floor(positiveNumber(process.env.DATABASE_QUEUE_LIMIT, 20));
+  private readonly limit = Math.floor(
+    positiveNumber(process.env.DATABASE_QUEUE_LIMIT, 20),
+  );
+
+  snapshot() {
+    return { active: this.active, limit: this.limit };
+  }
 
   async acquire() {
     if (this.active >= this.limit) throw new DatabaseOverloadedError();
@@ -49,7 +56,9 @@ function getDatabaseOptions() {
     password: decodeURIComponent(url.password),
     database: decodeURIComponent(url.pathname.replace(/^\//, "")),
     waitForConnections: true,
-    connectionLimit: Math.floor(positiveNumber(process.env.DATABASE_POOL_MAX, 5)),
+    connectionLimit: Math.floor(
+      positiveNumber(process.env.DATABASE_POOL_MAX, 5),
+    ),
     idleTimeout: 30_000,
     enableKeepAlive: true,
     dateStrings: true,
@@ -63,12 +72,30 @@ export function getPool() {
 }
 
 function getQueue() {
-  if (!globalForDb.__cubeRanksQueue) globalForDb.__cubeRanksQueue = new DatabaseQueue();
+  if (!globalForDb.__cubeRanksQueue)
+    globalForDb.__cubeRanksQueue = new DatabaseQueue();
   return globalForDb.__cubeRanksQueue;
 }
 
+export function getDatabaseDiagnostics() {
+  const queue = getQueue().snapshot();
+  const poolLimit = Math.floor(
+    positiveNumber(process.env.DATABASE_POOL_MAX, 5),
+  );
+  return {
+    poolLimit,
+    queueLimit: queue.limit,
+    queueActive: queue.active,
+    queueUtilization: queue.limit === 0 ? 0 : queue.active / queue.limit,
+    statementTimeoutMs: Math.floor(
+      positiveNumber(process.env.DATABASE_STATEMENT_TIMEOUT_MS, 10_000),
+    ),
+  };
+}
+
 async function applyStatementTimeout(connection: PoolConnection) {
-  const timeoutSeconds = positiveNumber(process.env.DATABASE_STATEMENT_TIMEOUT_MS, 10_000) / 1000;
+  const timeoutSeconds =
+    positiveNumber(process.env.DATABASE_STATEMENT_TIMEOUT_MS, 10_000) / 1000;
   await connection.query(`SET SESSION max_statement_time = ${timeoutSeconds}`);
 }
 
@@ -84,8 +111,12 @@ export async function query<T extends Record<string, unknown>>(
     await applyStatementTimeout(connection);
     const queueMs = performance.now() - queuedAt;
     const statementAt = performance.now();
-    const [rows] = await connection.query(text, values) as [T[], unknown];
-    return { rows, rowCount: rows.length, timings: { queueMs, statementMs: performance.now() - statementAt } };
+    const [rows] = (await connection.query(text, values)) as [T[], unknown];
+    return {
+      rows,
+      rowCount: rows.length,
+      timings: { queueMs, statementMs: performance.now() - statementAt },
+    };
   } finally {
     connection?.release();
     releaseQueue();

@@ -14,9 +14,40 @@ export type RankingsPageKey = {
   startRank: number;
 };
 
-type CachePool<T> = {
+type CachePool<T extends object> = {
   cache: LRUCache<string, T>;
   pinnedKeys: Set<string>;
+  hits: number;
+  misses: number;
+  coalesced: number;
+  evictions: number;
+};
+
+export type RankingsCachePoolSnapshot = {
+  eventId: string;
+  capacity: number;
+  entries: number;
+  pinnedEntries: number;
+  estimatedBytes: number;
+  hits: number;
+  misses: number;
+  coalesced: number;
+  evictions: number;
+  hitRate: number;
+};
+
+export type RankingsCacheSnapshot = {
+  startedAt: string;
+  generationClears: number;
+  pools: RankingsCachePoolSnapshot[];
+  totals: Omit<
+    RankingsCachePoolSnapshot,
+    "eventId" | "capacity" | "entries" | "pinnedEntries" | "estimatedBytes"
+  > & {
+    entries: number;
+    pinnedEntries: number;
+    estimatedBytes: number;
+  };
 };
 
 function keyFor({ year, type, scope, regionId, startRank }: RankingsPageKey) {
@@ -28,17 +59,33 @@ function isPermanentPage(key: RankingsPageKey) {
 }
 
 /** Process-local LRU pools. First world pages are pinned so warm navigation stays fast. */
-export class RankingsPageCache<T> {
+export class RankingsPageCache<T extends object> {
   private readonly pools = new Map<string, CachePool<T>>();
   private readonly pending = new Map<string, Promise<T>>();
+  private readonly startedAt = new Date().toISOString();
+  private generationClears = 0;
 
   private pool(eventId: string) {
     let pool = this.pools.get(eventId);
     if (!pool) {
-      const capacity = eventId === "333"
-        ? RANKINGS_CACHE_CAPACITY_333
-        : RANKINGS_CACHE_CAPACITY_DEFAULT;
-      pool = { cache: new LRUCache<string, T>({ max: capacity }), pinnedKeys: new Set() };
+      const capacity =
+        eventId === "333"
+          ? RANKINGS_CACHE_CAPACITY_333
+          : RANKINGS_CACHE_CAPACITY_DEFAULT;
+      const nextPool: CachePool<T> = {
+        cache: new LRUCache<string, T>({
+          max: capacity,
+          dispose: (_value, _key, reason) => {
+            if (reason === "evict") nextPool.evictions += 1;
+          },
+        }),
+        pinnedKeys: new Set(),
+        hits: 0,
+        misses: 0,
+        coalesced: 0,
+        evictions: 0,
+      };
+      pool = nextPool;
       this.pools.set(eventId, pool);
     }
     return pool;
@@ -47,6 +94,7 @@ export class RankingsPageCache<T> {
   clear() {
     this.pools.clear();
     this.pending.clear();
+    this.generationClears += 1;
   }
 
   entryCount(eventId: string) {
@@ -62,15 +110,24 @@ export class RankingsPageCache<T> {
   }
 
   async getWithStatus(key: RankingsPageKey, load: () => Promise<T>) {
-    const normalized = { ...key, startRank: Math.max(1, Math.floor(key.startRank)) };
+    const normalized = {
+      ...key,
+      startRank: Math.max(1, Math.floor(key.startRank)),
+    };
     const cacheKey = `${normalized.eventId}:${keyFor(normalized)}`;
     const pool = this.pool(normalized.eventId);
     const cached = pool.cache.get(keyFor(normalized));
     if (cached !== undefined) {
+      pool.hits += 1;
       return { value: cached, outcome: "hit" as const };
     }
     const inFlight = this.pending.get(cacheKey);
-    if (inFlight) return { value: await inFlight, outcome: "coalesced" as const };
+    if (inFlight) {
+      pool.coalesced += 1;
+      return { value: await inFlight, outcome: "coalesced" as const };
+    }
+
+    pool.misses += 1;
 
     const request = load().then((value) => {
       this.put(normalized, value);
@@ -96,9 +153,68 @@ export class RankingsPageCache<T> {
     }
     pool.cache.set(pageKey, value);
   }
+
+  snapshot(): RankingsCacheSnapshot {
+    const pools = [...this.pools.entries()].map(([eventId, pool]) => {
+      const hits = pool.hits;
+      const misses = pool.misses;
+      const requests = hits + misses + pool.coalesced;
+      const estimatedBytes = [...pool.cache.values()].reduce((total, value) => {
+        try {
+          return total + Buffer.byteLength(JSON.stringify(value));
+        } catch {
+          return total;
+        }
+      }, 0);
+      return {
+        eventId,
+        capacity: pool.cache.max,
+        entries: pool.cache.size,
+        pinnedEntries: pool.pinnedKeys.size,
+        estimatedBytes,
+        hits,
+        misses,
+        coalesced: pool.coalesced,
+        evictions: pool.evictions,
+        hitRate: requests === 0 ? 0 : hits / requests,
+      };
+    });
+    const totals = pools.reduce(
+      (total, pool) => ({
+        entries: total.entries + pool.entries,
+        pinnedEntries: total.pinnedEntries + pool.pinnedEntries,
+        estimatedBytes: total.estimatedBytes + pool.estimatedBytes,
+        hits: total.hits + pool.hits,
+        misses: total.misses + pool.misses,
+        coalesced: total.coalesced + pool.coalesced,
+        evictions: total.evictions + pool.evictions,
+        hitRate: 0,
+      }),
+      {
+        entries: 0,
+        pinnedEntries: 0,
+        estimatedBytes: 0,
+        hits: 0,
+        misses: 0,
+        coalesced: 0,
+        evictions: 0,
+        hitRate: 0,
+      },
+    );
+    const requests = totals.hits + totals.misses + totals.coalesced;
+    totals.hitRate = requests === 0 ? 0 : totals.hits / requests;
+    return {
+      startedAt: this.startedAt,
+      generationClears: this.generationClears,
+      pools,
+      totals,
+    };
+  }
 }
 
-export const rankingsPageCache = new RankingsPageCache<unknown>();
+export const rankingsPageCache = new RankingsPageCache<
+  Record<string, unknown>
+>();
 
 export function normalPageKey(input: RankingsPageKey) {
   return { ...input, startRank: Math.max(1, Math.floor(input.startRank)) };
