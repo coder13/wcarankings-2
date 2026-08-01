@@ -81,6 +81,16 @@ function projectionComposeWrappers() {
     .join("\n");
 }
 
+function projectionActivationRemoteScript() {
+  const marker = "             FAILURE_INJECTION_POINT='$FAILURE_INJECTION_POINT' sh -s\" <<'REMOTE'\n";
+  const start = projectionDeploy.indexOf(marker);
+  const end = projectionDeploy.indexOf("\n          REMOTE", start + marker.length);
+  assert.ok(start >= 0 && end > start);
+  return projectionDeploy.slice(start + marker.length, end).split("\n")
+    .map((line) => line.replace(/^ {12}/, ""))
+    .join("\n");
+}
+
 async function exerciseProjectionResetCandidateAgainstStdinReader() {
   const directory = await mkdtemp(join(tmpdir(), "wcarankings-projection-stdin-"));
   const phaseFile = join(directory, "phase");
@@ -360,6 +370,17 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(projectionDeploy, /--max-time 2/);
   assert.match(projectionDeploy, /while sleep 5/);
   assert.match(projectionDeploy, /failures.*-ge 3/);
+  const monitorTrapIndex = projectionDeploy.indexOf("trap terminate_deployment TERM INT HUP");
+  const heartbeatIndex = projectionDeploy.indexOf("Ranking generation deployment is still running");
+  assert.ok(monitorTrapIndex >= 0 && heartbeatIndex > monitorTrapIndex);
+  assert.match(projectionDeploy, /stop_background_jobs\(\)[\s\S]*?kill "\$heartbeat_pid"[\s\S]*?wait "\$heartbeat_pid"[\s\S]*?kill "\$monitor_pid"[\s\S]*?wait "\$monitor_pid"/);
+  assert.match(projectionDeploy, /rollback_on_failure\(\)[\s\S]*?trap - EXIT TERM INT HUP[\s\S]*?stop_background_jobs/);
+  assert.match(projectionDeploy, /chunk-projection-dump\.mjs \\\n\s+--import --rows-per-insert=1000/);
+  assert.match(projectionDeploy, /candidate_work_label="wcarankings\.projection-artifact=\$\{ARTIFACT_ID\}"/);
+  assert.match(projectionDeploy, /candidate_work_pid=\$1[\s\S]*?wait "\$candidate_work_pid"/);
+  assert.match(projectionDeploy, /docker ps -q --filter "label=\$\{candidate_work_label\}"/);
+  assert.match(projectionDeploy, /docker kill "\$container_id"/);
+  assert.match(projectionDeploy, /terminate_deployment\(\)[\s\S]*?stop_candidate_work[\s\S]*?exit 143/);
   assert.match(projectionDeploy, /"rolledBack":true/);
   assert.match(projectionDeploy, /production-mutation\.lock/);
   assert.match(serverDeploy, /server-release\.lock/);
@@ -482,6 +503,11 @@ test("candidate staging is monitored and the activation lock stays short", () =>
 });
 
 test("projection deployment protects its remote heredoc from non-input compose children", async () => {
+  const syntax = spawnSync("sh", ["-n"], {
+    input: projectionActivationRemoteScript(),
+    encoding: "utf8",
+  });
+  assert.equal(syntax.status, 0, syntax.stderr);
   const result = await exerciseProjectionResetCandidateAgainstStdinReader();
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, "sentinel-after-candidate\n");
@@ -493,8 +519,11 @@ test("projection deployment protects its remote heredoc from non-input compose c
   assert.match(projectionDeploy, /dc_with_stdin\(\) \{\n\s+docker compose .* "\$@"\n/);
   assert.equal((projectionDeploy.match(/dc_with_stdin (?:run|exec)/g) || []).length, 4);
   assert.match(projectionDeploy, /dc_with_stdin run --rm -T data-tools[\s\S]*?verify-active[\s\S]*?< "\$release_file"/);
-  assert.match(projectionDeploy, /dc_with_stdin run --rm -T --entrypoint sh[\s\S]*?< "\/tmp\/wcarankings-\$\{ARTIFACT_ID\}-raw\.sql\.zip"/);
-  assert.match(projectionDeploy, /\| dc_with_stdin exec -T/);
+  assert.match(
+    projectionDeploy,
+    /dc_with_stdin run --rm -T --label "\$candidate_work_label" \\\n\s+--entrypoint sh[\s\S]*?< "\/tmp\/wcarankings-\$\{ARTIFACT_ID\}-raw\.sql\.zip"/,
+  );
+  assert.match(projectionDeploy, /gzip -dc[\s\S]*?\| dc_with_stdin run --rm -T[\s\S]*?chunk-projection-dump\.mjs/);
   assert.match(projectionDeploy, /--manifest=-\s*\\\n\s*< "\$release_file"/);
 });
 
