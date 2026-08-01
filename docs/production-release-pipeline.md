@@ -122,18 +122,26 @@ silently accepting an unavailable page.
 | --- | --- | --- |
 | 2026-08-01, server run `30708219708` | Sum-of-Ranks server fix with app migration V13 | Switched successfully. Public root, readiness, core rankings, results, yearly, Sum of Ranks, and competition endpoints all returned 200; the new `(wca_id, sub_id)` person lookup index was present. |
 | 2026-08-01, projection run `30705975286`, retry attempt 2 | Reused existing artifact `8820359138` after a prior Sum-of-Ranks timeout | All 25 group artifacts restored; no projection SQL or raw WCA import was repeated. The already-prepared candidate completed safely and all six capabilities became active. |
+| 2026-08-01, PR #149 / server run `30709139959` | CSS-only ranking-rail shadow polish | Merged at `16:53:42Z`; the new public CSS asset returned 200 at `16:57:00.643Z`, an observed merge-to-public latency of **3m 19s**. The server workflow completed at `16:57:05Z` (3m 23s after merge). |
+| 2026-08-01, projection run `30709139971` | Projection control path for the same CSS-only merge | Completed in 27 seconds. It calculated semantic fingerprints, emitted the cosmetic-gate message, and skipped WCA resolution, artifacts, build, and deployment. |
 
-The cosmetic benchmark added by this change should record four timestamps:
+The cosmetic benchmark recorded four timestamps:
 
-1. `T0`: GitHub merge completion;
-2. server workflow creation and completion;
-3. first public root response that references the new CSS asset hash and where
-   that asset returns 200;
-4. projection plan completion, including its no-WCA-resolution message.
+1. `T0` merge completion: `2026-08-01T16:53:42Z`;
+2. server workflow created at `16:53:44Z`; its image job took 45 seconds and
+   the entire workflow completed at `16:57:05Z`;
+3. server switch completed at `16:56:57Z`; the first external probe at
+   `16:57:00.643Z` saw `/assets/index-BWh7BXIH.css` and received 200;
+4. projection plan completed in 27 seconds with **“No semantic projection
+   inputs changed; the WCA export was not resolved.”**
 
-The elapsed value from `T0` to (3) is the real user-visible cosmetic-release
-latency. Record the exact run URLs and phase timings in this document after the
-benchmark completes.
+The measured user-visible cosmetic-release latency is therefore **at most 3m
+19s** from merge. The bound is conservative: the probe interval establishes
+that the cutover happened after the prior old-asset probe and no later than the
+first successful new-asset probe. The corresponding Actions runs are
+[server `30709139959`](https://github.com/coder13/wcarankings-2/actions/runs/30709139959)
+and
+[projection `30709139971`](https://github.com/coder13/wcarankings-2/actions/runs/30709139971).
 
 ## Investigated but not planned: pruning historical person names
 
