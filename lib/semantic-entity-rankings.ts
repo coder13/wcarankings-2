@@ -1,5 +1,6 @@
 import { query } from "@/db";
 import { stripMarkdownLinks } from "@/lib/display-text";
+import { formatWcaResult } from "@/lib/wca";
 import {
   addTimings,
   ApiInputError,
@@ -427,11 +428,15 @@ export async function loadPodiumRankings(params: URLSearchParams, limit = parseL
         subRank: entry.position,
         personId: entry.competition.id,
         personName: entry.competition.name,
+        identitySubtitle: entry.members.map((member) => member.person.name).join(" · "),
         countryName: entry.competition.country.name,
         countryIso2: entry.competition.country.iso2,
         best: entry.score,
         competitionId: entry.competition.id,
-        competitionName: entry.members.map((member) => member.person.name).join(" · "),
+        competitionName: "",
+        resultSubtitle: entry.members
+          .map((member) => formatWcaResult(eventId, member.value, resultType))
+          .join(", "),
         recordBadges: [],
       })),
       hasMore: byCompetition.size > limit,

@@ -131,7 +131,8 @@
   .Jump-railSettings > .EventPicker-preview .EventPicker-name { display: block; width: calc(6em * (1 - var(--rail-scroll-progress, 0))); min-width: 0; overflow: hidden; color: var(--text-muted); font-size: .875em; opacity: calc(1 - var(--rail-scroll-progress, 0)); text-overflow: ellipsis; white-space: nowrap; }
 }
 
-.Jump-resultTypeControl { position: relative; width: var(--result-type-width); min-width: 0; height: var(--rail-control-height); flex: 0 0 var(--result-type-width); }
+.Jump-resultTypeControl { position: relative; width: var(--result-type-width); min-width: 0; height: var(--rail-control-height); flex: 0 0 var(--result-type-width); border-right: 1px solid var(--border-subtle); }
+.Jump-resultTypeControl:has(+ .Jump-genderPicker) { border-right: 0; }
 .Jump-resultTypeToggle, .Jump-pagerButton, .Jump-searchNavigationButton {
   display: flex; min-width: 40px; min-height: 40px; align-items: center; justify-content: center; gap: .5em; padding: .5em .75em; border: 0; background: transparent; color: var(--text-strong); cursor: pointer; font: inherit; white-space: nowrap; transition: background 150ms var(--cubic-move), color 150ms var(--cubic-move);
 }

@@ -1679,7 +1679,12 @@ export function RankingsExplorer({
     const normalizedQuery = findQuery.trim();
     const isInitialSearch =
       initialSearchRef.current && normalizedQuery === normalizedInitialSearch;
-    const isInitialFocus = initialFocusRef.current && !normalizedQuery;
+    const isUrlFocus = Boolean(
+      initialData?.initialMatchPersonId &&
+      !normalizedInitialSearch &&
+      !normalizedQuery,
+    );
+    const isInitialFocus = initialFocusRef.current && isUrlFocus;
     const skipNavigationReset = skipNextFindResetRef.current;
     skipNextFindResetRef.current = false;
     const hasActiveOrResolvedSearch = Boolean(
@@ -1711,8 +1716,9 @@ export function RankingsExplorer({
     const timeout = window.setTimeout(
       () => {
         if (controller.signal.aborted) return;
-        if (isInitialFocus) {
+        if (isUrlFocus) {
           initialFocusRef.current = false;
+          setHighlightedPersonId(initialData?.initialMatchPersonId ?? "");
           setFindResolvedQuery("");
           setFindLoading(false);
           return;
@@ -1789,6 +1795,7 @@ export function RankingsExplorer({
     eventId,
     findQuery,
     findResolvedQuery,
+    initialData,
     normalizedInitialSearch,
     rankingType,
     regionSelection,
@@ -2239,8 +2246,10 @@ export function RankingsExplorer({
       if (focusedPersonId) queuePersonFocus(focusedPersonId, animate);
       else pendingPersonFocusRef.current = null;
       if (normalizedRank === 1) {
-        if (findQuery.trim()) skipNextFindResetRef.current = true;
-        resetFind();
+        if (findQuery.trim() || !focusedPersonId) {
+          if (findQuery.trim()) skipNextFindResetRef.current = true;
+          resetFind();
+        }
         setFindOpen(false);
         pendingFocusLastRef.current = false;
         pendingScrollDirectionRef.current = null;

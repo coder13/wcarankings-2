@@ -103,6 +103,28 @@ test("can show a venue beneath the row identity", () => {
   assert.match(markup, /class="competitionName" title="Longyearbyen"/);
 });
 
+test("shows podium names on the left and individual results on the right", () => {
+  const markup = renderToStaticMarkup(
+    <RankingRow
+      entry={{
+        ...entry,
+        personId: entry.competitionId,
+        personName: entry.competitionName,
+        identitySubtitle: "Avery Chen · Cailyn Sinclair · Max Park",
+        competitionName: "",
+        resultSubtitle: "3.74, 3.85, 5.02",
+      }}
+      eventId="333"
+      rankingType="average"
+      animationIndex={0}
+      hideIdentityId
+    />,
+  );
+
+  assert.match(markup, /Avery Chen · Cailyn Sinclair · Max Park/);
+  assert.match(markup, /class="competitionName" title="3\.74, 3\.85, 5\.02"/);
+});
+
 test("prioritizes the strongest available record badge", () => {
   assert.deepEqual(
     getRecordBadges({

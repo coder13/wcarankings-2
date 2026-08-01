@@ -153,7 +153,7 @@ async function getInitialRankings(
   const pageStarts = firstMatch
     ? [targetPageStart - PAGE_SIZE, targetPageStart, targetPageStart + PAGE_SIZE]
         .filter((start) => start > 0)
-    : [1];
+    : [1, 1 + PAGE_SIZE];
   const pages = await Promise.all(
     pageStarts.map((startRank) =>
       fetchRankings(
@@ -206,10 +206,10 @@ async function getInitialCompetitionRankings(
   regionId: string,
   gender: readonly GenderFilter[],
 ) {
-  const loaded = await loadCompetitionRankings(new URLSearchParams({
+  const loadPage = (start: number) => loadCompetitionRankings(new URLSearchParams({
     eventId,
     result: rankingType,
-    start: "0",
+    start: String(start),
     limit: String(PAGE_SIZE),
     paged: "1",
     ...(regionId ? { region: regionId } : {}),
@@ -221,16 +221,19 @@ async function getInitialCompetitionRankings(
           ? { ranking: "competitor-count" }
         : {}),
   }));
-  const data = loaded.data as RankingsResponse;
+  const pages = await Promise.all([loadPage(0), loadPage(PAGE_SIZE)]);
+  const pageData = pages.map((page) => page.data as RankingsResponse);
+  const firstPage = pageData[0];
+  const lastPage = pageData.at(-1) ?? firstPage;
   return {
-    entries: data.entries,
-    hasMore: data.hasMore ?? false,
-    nextPageStart: data.nextPageStart ?? null,
-    previousPageStart: data.previousPageStart ?? null,
-    startPosition: data.startPosition ?? 0,
-    lastRank: data.lastRank ?? null,
-    total: data.total ?? 0,
-    exportDate: data.exportDate ?? null,
+    entries: pageData.flatMap((page) => page.entries),
+    hasMore: lastPage.hasMore ?? false,
+    nextPageStart: lastPage.nextPageStart ?? null,
+    previousPageStart: firstPage.previousPageStart ?? null,
+    startPosition: firstPage.startPosition ?? 0,
+    lastRank: lastPage.lastRank ?? null,
+    total: lastPage.total ?? 0,
+    exportDate: lastPage.exportDate ?? null,
     startRank: 1,
     searchMatches: [],
     initialMatchPersonId: "",
@@ -252,7 +255,7 @@ async function getInitialResultRankings(
   const searchMatches = searched ? searched.data.entries as RankingEntry[] : [];
   const firstMatch = searchMatches[0];
   const targetPageStart = pageFirstSubRank(firstMatch?.subRank ?? 1);
-  const pageStarts = firstMatch ? [targetPageStart - PAGE_SIZE, targetPageStart, targetPageStart + PAGE_SIZE].filter((start) => start > 0) : [1];
+  const pageStarts = firstMatch ? [targetPageStart - PAGE_SIZE, targetPageStart, targetPageStart + PAGE_SIZE].filter((start) => start > 0) : [1, 1 + PAGE_SIZE];
   const pages = await Promise.all(pageStarts.map((startRank) => loadResultRankings(new URLSearchParams({ ...common, start: String(startRank - 1), limit: String(PAGE_SIZE) }))));
   const pageData = pages.map((page) => page.data as RankingsResponse);
   const firstPage = pageData[0];

@@ -344,9 +344,9 @@ export function RankingRow({
                 {formattedResult}
               </span>
             </span>
-            {entry.competitionName && (
-              <span className="competitionName" title={entry.competitionName}>
-                {entry.competitionName}
+            {(entry.resultSubtitle ?? entry.competitionName) && (
+              <span className="competitionName" title={entry.resultSubtitle ?? entry.competitionName}>
+                {entry.resultSubtitle ?? entry.competitionName}
               </span>
             )}
           </span>

@@ -6,7 +6,7 @@ const templateRoot = new URL("../", import.meta.url);
 const previewRoot = new URL("../app/_sites-preview/", import.meta.url);
 
 test("builds the original WCA Rankings UI on the self-hosted API", async () => {
-  const [component, layout, rankingsRoute, wca, schema] = await Promise.all([
+  const [component, layout, rankingsRoute, wca, schema, rankingsPage] = await Promise.all([
     Promise.all([
       "../components/RankingsExplorer/RankingsExplorer.tsx",
       "../components/AppHeader/AppHeader.tsx",
@@ -36,6 +36,7 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
       "../sql/ranking-projections/ranking_entries_average_source.sql",
       "../sql/ranking-projections/ranking_entries_indexes.sql",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8"))).then((files) => files.join("\n")),
+    readFile(new URL("../app/RankingsPage.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /title:\s*"WCA Rankings"/);
   assert.doesNotMatch(layout, /og\.png|summary_large_image/);
@@ -145,8 +146,8 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
   assert.doesNotMatch(component, /className="loader"/);
   assert.match(component, /className=.*row/);
   assert.match(component, /className="competitionName"/);
-  assert.match(component, /\{entry\.competitionName\}/);
-  assert.match(component, /title={entry\.competitionName}/);
+  assert.match(component, /\{entry\.resultSubtitle \?\? entry\.competitionName\}/);
+  assert.match(component, /title={entry\.resultSubtitle \?\? entry\.competitionName}/);
   assert.match(component, /rankingNumberFormatter/);
   assert.match(component, /formatRankingNumber\(rank\)/);
   assert.match(component, /formatWcaResult\(eventId, entry\.best, rankingType\)/);
@@ -155,6 +156,8 @@ test("builds the original WCA Rankings UI on the self-hosted API", async () => {
   assert.match(component, /const directVimCommand/);
   assert.match(wca, /rankingType === "average" \? \(value \/ 100\)\.toFixed\(2\)/);
   assert.match(component, /const nextStart = pageStartForSubRank\(normalizedRank\) \+ 1/);
+  assert.match(rankingsPage, /: \[1, 1 \+ PAGE_SIZE\]/);
+  assert.match(rankingsPage, /Promise\.all\(\[loadPage\(0\), loadPage\(PAGE_SIZE\)\]\)/);
   assert.doesNotMatch(component, /header-controls|collapsed-filter-summary|table-quick-jump/);
   assert.doesNotMatch(rankingsRoute, /SELECT (MIN|MAX|COUNT\(\*\))/);
   const normalRankingsRoute = rankingsRoute.split("async function queryGenderPage")[0];

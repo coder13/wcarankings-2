@@ -13,6 +13,7 @@ export type RankingEntry = {
   countryIso2: string;
   best: number;
   formattedValue?: string;
+  resultSubtitle?: string;
   competitionId: string;
   competitionName: string;
   recordBadges: RecordBadgeCode[];
