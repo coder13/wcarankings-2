@@ -133,9 +133,19 @@ test("candidate staging is monitored and the activation lock stays short", () =>
 
 test("server smoke tests retry the emitted local stylesheet after core readiness", () => {
   const coreIndex = serverDeploy.indexOf('retry_endpoint "/api/rankings?');
+  const rootIndex = serverDeploy.indexOf('retry_endpoint "/" 5 2 "SSR root" "$html_file"');
+  const cssExtractionIndex = serverDeploy.indexOf('css=$(printf "%s" "$html"');
   const stylesheetIndex = serverDeploy.indexOf('retry_endpoint "$css"');
 
-  assert.ok(coreIndex >= 0 && stylesheetIndex > coreIndex);
+  assert.ok(
+    coreIndex >= 0 &&
+      rootIndex > coreIndex &&
+      cssExtractionIndex > rootIndex &&
+      stylesheetIndex > cssExtractionIndex,
+  );
+  assert.match(serverDeploy, /output_file=\$\{5:-\}/);
+  assert.match(serverDeploy, /mv "\$response_file" "\$output_file"/);
+  assert.doesNotMatch(serverDeploy, /html=\$\(curl --fail/);
   assert.match(serverDeploy, /\/assets\/\*\.css\) ;;/);
   assert.match(serverDeploy, /assets\/\*\.css\) css="\/\$css" ;;/);
   assert.match(serverDeploy, /retry_endpoint "\$css" 5 2 "Stylesheet \$css"/);

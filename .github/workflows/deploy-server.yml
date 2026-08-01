@@ -356,6 +356,7 @@ jobs:
               attempts=$2
               delay=$3
               label=$4
+              output_file=${5:-}
               attempt=1
               while [ "$attempt" -le "$attempts" ]; do
                 response_file=$(mktemp)
@@ -363,7 +364,11 @@ jobs:
                   --output "$response_file" --write-out "%{http_code}" \
                   "http://127.0.0.1:3000${endpoint}" || true)
                 if [ "$status" -ge 200 ] 2>/dev/null && [ "$status" -lt 300 ] 2>/dev/null; then
-                  rm -f "$response_file"
+                  if [ -n "$output_file" ]; then
+                    mv "$response_file" "$output_file"
+                  else
+                    rm -f "$response_file"
+                  fi
                   echo "$label passed on attempt $attempt."
                   return 0
                 fi
@@ -385,7 +390,12 @@ jobs:
             # release requires.
             retry_endpoint "/api/rankings?eventId=333&result=single&start=0&limit=1" 10 3 "Core ranking"
 
-            html=$(curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/)
+            html_file=$(mktemp)
+            trap 'rm -f "$html_file"' EXIT
+            retry_endpoint "/" 5 2 "SSR root" "$html_file"
+            html=$(cat "$html_file")
+            rm -f "$html_file"
+            trap - EXIT
             css=$(printf "%s" "$html" | sed -n 's/.*href="\([^"]*\.css\)".*/\1/p' | head -n 1)
             if [ -z "$css" ]; then
               echo "SSR response did not include a stylesheet link." >&2
