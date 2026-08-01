@@ -131,6 +131,16 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(pullRequest, /type = 'BASELINE'/);
 });
 
+test("server smoke tests retry the emitted local stylesheet after core readiness", () => {
+  const coreIndex = serverDeploy.indexOf('retry_endpoint "/api/rankings?');
+  const stylesheetIndex = serverDeploy.indexOf('retry_endpoint "$css"');
+
+  assert.ok(coreIndex >= 0 && stylesheetIndex > coreIndex);
+  assert.match(serverDeploy, /\/assets\/\*\.css\) ;;/);
+  assert.match(serverDeploy, /assets\/\*\.css\) css="\/\$css" ;;/);
+  assert.match(serverDeploy, /retry_endpoint "\$css" 5 2 "Stylesheet \$css"/);
+});
+
 test("production staging remains sequential and activation is atomic", () => {
   assert.match(projectionDeploy, /for group in \$\(printf '%s' "\$PROJECTION_GROUPS"/);
   assert.match(projectionDeploy, /publish-projection-transfer\.mjs[\s\S]*--prepare-only/);

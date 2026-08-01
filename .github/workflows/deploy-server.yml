@@ -391,8 +391,15 @@ jobs:
               echo "SSR response did not include a stylesheet link." >&2
               exit 1
             fi
-            curl --fail --silent --show-error --max-time 15 \
-              "http://127.0.0.1:3000$css" >/dev/null
+            case "$css" in
+              /assets/*.css) ;;
+              assets/*.css) css="/$css" ;;
+              *)
+                echo "SSR response included an unexpected stylesheet URL: $css" >&2
+                exit 1
+                ;;
+            esac
+            retry_endpoint "$css" 5 2 "Stylesheet $css"
           REMOTE
 
           public_host="${SERVER_HOST#https://}"
