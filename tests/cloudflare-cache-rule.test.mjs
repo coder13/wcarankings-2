@@ -11,11 +11,11 @@ test("keeps Cloudflare eligibility limited to public GET API resources", async (
 
   assert.equal(rule.ref, "wcarankings_public_api_cache");
   assert.equal(rule.action, "set_cache_settings");
-  assert.match(rule.expression, /http\.request\.method eq \\"GET\\"/);
-  assert.match(rule.expression, /\\"\/api\/rankings\\"/);
-  assert.match(rule.expression, /\\"\/api\/regions\\"/);
-  assert.match(rule.expression, /\\"\/api\/people\/search\\"/);
-  assert.match(rule.expression, /\\"\/api\/lists\\"/);
+  assert.match(rule.expression, /http\.request\.method eq "GET"/);
+  assert.match(rule.expression, /"\/api\/rankings"/);
+  assert.match(rule.expression, /"\/api\/regions"/);
+  assert.match(rule.expression, /"\/api\/people\/search"/);
+  assert.match(rule.expression, /"\/api\/lists"/);
   assert.doesNotMatch(rule.expression, /auth|admin|health/i);
   assert.equal(rule.action_parameters.cache, true);
   assert.equal(rule.action_parameters.edge_ttl.mode, "respect_origin");
