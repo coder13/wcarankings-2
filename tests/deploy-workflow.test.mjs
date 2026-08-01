@@ -333,9 +333,11 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.doesNotMatch(serverDeploy, /docker images --format "\{\{\.Repository\}\}:\{\{\.Tag\}\} \{\{\.ID\}\}"/);
   const repairDataToolsTagIndex = serverDeploy.indexOf('docker tag "wcarankings-data-tools:${SOURCE_SHA}" wcarankings-data-tools:latest');
   const protectedServiceTagsIndex = serverDeploy.indexOf("wcarankings-app:latest|wcarankings-app:previous|wcarankings-flyway:latest|wcarankings-data-tools:latest) continue");
+  const genericServiceTagsIndex = serverDeploy.indexOf("wcarankings-app:*|wcarankings-flyway:*|wcarankings-data-tools:*)", protectedServiceTagsIndex);
   const serverImagePruneIndex = serverDeploy.indexOf("docker image prune -f");
   assert.ok(repairDataToolsTagIndex >= 0 && repairDataToolsTagIndex < serverImagePruneIndex);
   assert.ok(protectedServiceTagsIndex > repairDataToolsTagIndex && protectedServiceTagsIndex < serverImagePruneIndex);
+  assert.ok(genericServiceTagsIndex > protectedServiceTagsIndex && genericServiceTagsIndex < serverImagePruneIndex);
   assert.match(serverDeploy, /running_app_image=.*docker inspect.*\.Image/);
   assert.match(serverDeploy, /running_app_image.*=.*CANDIDATE_APP_IMAGE_ID/);
   assert.match(serverDeploy, /docker tag "\$running_app_image" wcarankings-app:previous/);
