@@ -11,6 +11,9 @@ import {
   promoteProjectionTables,
   refreshMysqlSchema,
 } from "./mysql-schema.mjs";
+import { refreshSystemLists } from "./refresh-system-lists.mjs";
+import { enqueueAllListRankingRebuilds } from "./list-ranking-jobs.mjs";
+import { refreshBoardList, refreshDelegatesList } from "./refresh-board-list.mjs";
 
 const EXPORT_API = "https://www.worldcubeassociation.org/api/v0/export/public";
 const force = process.argv.includes("--force");
@@ -379,8 +382,17 @@ async function main() {
       projection_swap_status: "swapping",
     });
     await promoteRankings();
-    const completedAt = now();
     await writeExportMetadata(latest);
+    const systemListConnection = await mysql.createConnection(databaseOptions());
+    try {
+      await refreshSystemLists(systemListConnection);
+      await refreshBoardList(systemListConnection);
+      await refreshDelegatesList(systemListConnection);
+      await enqueueAllListRankingRebuilds(systemListConnection);
+    } finally {
+      await systemListConnection.end();
+    }
+    const completedAt = now();
     await updateImportRun(runId, {
       status: "succeeded",
       projection_swap_status: "published",

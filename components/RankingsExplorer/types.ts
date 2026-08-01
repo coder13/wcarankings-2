@@ -32,6 +32,8 @@ export type RankingPage = {
   lastRank: number | null;
   total: number;
   exportDate?: string | null;
+  cacheMembershipVersion?: number;
+  cacheDataVersion?: string | null;
   offlineStale?: boolean;
   availableYears?: number[];
 };
@@ -44,6 +46,8 @@ export type InitialRankingData = Pick<
   | "previousPageStart"
   | "total"
   | "exportDate"
+  | "cacheMembershipVersion"
+  | "cacheDataVersion"
   | "availableYears"
 > & {
   startRank: number;
