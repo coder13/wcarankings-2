@@ -54,6 +54,43 @@ function imageTransferRequiredFunction() {
     .join("\n");
 }
 
+function pruneServerImagesFunction() {
+  const start = serverDeploy.indexOf("            prune_server_images() {");
+  const end = serverDeploy.indexOf("            prune_server_images\n", start);
+  assert.ok(start >= 0 && end > start);
+  return serverDeploy.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {12}/, ""))
+    .join("\n");
+}
+
+function exercisePruneServerImages() {
+  return spawnSync("sh", ["-eu", "-c", `${pruneServerImagesFunction()}
+docker() {
+  if [ "$1" = ps ]; then return 0; fi
+  if [ "$1" = images ]; then
+    printf '%s\\n' \\
+      'wcarankings-app:latest sha256:short-live' \\
+      'wcarankings-app:previous sha256:short-previous' \\
+      'wcarankings-flyway:latest sha256:short-flyway' \\
+      'wcarankings-data-tools:latest sha256:short-tools' \\
+      'wcarankings-app:protected-source sha256:short-protected' \\
+      'wcarankings-app:stale-source sha256:short-stale'
+    return 0
+  fi
+  if [ "$1" = image ] && [ "$2" = inspect ]; then
+    case "$3" in
+      wcarankings-app:stale-source) printf 'sha256:full-stale\\n' ;;
+      *) printf 'sha256:full-protected\\n' ;;
+    esac
+    return 0
+  fi
+  if [ "$1" = image ] && [ "$2" = rm ]; then printf 'removed %s\\n' "$3"; return 0; fi
+  return 1
+}
+prune_server_images
+`], { encoding: "utf8" });
+}
+
 function exerciseImageTransferRequired(changed, remoteImageId, candidateImageId) {
   return spawnSync("sh", ["-eu", "-c", `${imageTransferRequiredFunction()}
 if image_transfer_required "$1" "$2" "$3"; then printf 'required\\n'; else printf 'reused\\n'; fi
@@ -330,6 +367,8 @@ test("candidate staging is monitored and the activation lock stays short", () =>
     /wcarankings-app:latest\|wcarankings-app:previous\|wcarankings-flyway:latest\|wcarankings-data-tools:latest\) continue/,
   );
   assert.match(serverDeploy, /docker images --no-trunc --format/);
+  assert.match(serverDeploy, /canonical_id=.*docker image inspect "\$image_ref" --format "\{\{\.Id\}\}"/);
+  assert.match(serverDeploy, /" \$protected_images ".*" \$canonical_id "/);
   assert.doesNotMatch(serverDeploy, /docker images --format "\{\{\.Repository\}\}:\{\{\.Tag\}\} \{\{\.ID\}\}"/);
   const repairDataToolsTagIndex = serverDeploy.indexOf('docker tag "wcarankings-data-tools:${SOURCE_SHA}" wcarankings-data-tools:latest');
   const protectedServiceTagsIndex = serverDeploy.indexOf("wcarankings-app:latest|wcarankings-app:previous|wcarankings-flyway:latest|wcarankings-data-tools:latest) continue");
@@ -418,6 +457,13 @@ test("server image transfer selection repairs missing unchanged tags", () => {
   assert.equal(exerciseImageTransferRequired("false", "", imageId).stdout, "required\n");
   assert.equal(exerciseImageTransferRequired("false", otherImageId, imageId).stdout, "required\n");
   assert.equal(exerciseImageTransferRequired("false", imageId.slice(0, 19), imageId).stdout, "required\n");
+});
+
+test("server cleanup protects canonical IDs and critical tags when listed IDs are short", () => {
+  const result = exercisePruneServerImages();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, "");
+  assert.equal(result.stdout, "removed wcarankings-app:stale-source\n");
 });
 
 test("relative MariaDB cooldown accepts a stable high production baseline", async () => {

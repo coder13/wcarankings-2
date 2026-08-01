@@ -444,20 +444,28 @@ jobs:
             if [ "$APP_IMAGE_TRANSFER_REQUIRED" = true ]; then docker tag "wcarankings-app:${SOURCE_SHA}" wcarankings-app:latest; fi
             if [ "$FLYWAY_IMAGE_TRANSFER_REQUIRED" = true ]; then docker tag "wcarankings-flyway:${SOURCE_SHA}" wcarankings-flyway:latest; fi
             if [ "$DATA_TOOLS_IMAGE_TRANSFER_REQUIRED" = true ]; then docker tag "wcarankings-data-tools:${SOURCE_SHA}" wcarankings-data-tools:latest; fi
-            protected_images=$( {
-              docker ps -q | xargs -r docker inspect --format "{{.Image}}"
-              docker image inspect wcarankings-app:latest wcarankings-app:previous wcarankings-flyway:latest wcarankings-data-tools:latest --format "{{.Id}}" 2>/dev/null || true
-            } | sort -u )
-            docker images --no-trunc --format "{{.Repository}}:{{.Tag}} {{.ID}}" | while IFS=" " read -r image_ref image_id; do
-              case "$image_ref" in
-                wcarankings-app:latest|wcarankings-app:previous|wcarankings-flyway:latest|wcarankings-data-tools:latest) continue ;;
-                wcarankings-flyway:artifact-*|wcarankings-data-tools:artifact-*) continue ;;
-                wcarankings-app:*|wcarankings-flyway:*|wcarankings-data-tools:*) ;;
-                *) continue ;;
-              esac
-              case " $protected_images " in *" $image_id "*) continue ;; esac
-              docker image rm "$image_ref" || true
-            done
+            prune_server_images() {
+              protected_images=$( {
+                docker ps -q | xargs -r docker inspect --format "{{.Image}}"
+                docker image inspect wcarankings-app:latest wcarankings-app:previous wcarankings-flyway:latest wcarankings-data-tools:latest --format "{{.Id}}" 2>/dev/null || true
+              } | sort -u )
+              docker images --no-trunc --format "{{.Repository}}:{{.Tag}} {{.ID}}" | while IFS=" " read -r image_ref listed_image_id; do
+                case "$image_ref" in
+                  wcarankings-app:latest|wcarankings-app:previous|wcarankings-flyway:latest|wcarankings-data-tools:latest) continue ;;
+                  wcarankings-flyway:artifact-*|wcarankings-data-tools:artifact-*) continue ;;
+                  wcarankings-app:*|wcarankings-flyway:*|wcarankings-data-tools:*) ;;
+                  *) continue ;;
+                esac
+                canonical_id=$(docker image inspect "$image_ref" --format "{{.Id}}" 2>/dev/null || true)
+                if [ -z "$canonical_id" ]; then
+                  echo "Skipping cleanup for ${image_ref}; its canonical image ID could not be resolved." >&2
+                  continue
+                fi
+                case " $protected_images " in *" $canonical_id "*) continue ;; esac
+                docker image rm "$image_ref" || true
+              done
+            }
+            prune_server_images
             docker image prune -f
             cd /srv/wcarankings
             if [ "$FLYWAY_IMAGE_CHANGED" = true ] || [ "$DATA_TOOLS_IMAGE_CHANGED" = true ]; then
