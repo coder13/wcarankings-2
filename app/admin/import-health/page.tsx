@@ -1,5 +1,5 @@
-import { ImportHealth } from "@/components/ImportHealth/ImportHealth";
+import { redirect } from "next/navigation";
 
 export default function ImportHealthPage() {
-  return <ImportHealth />;
+  redirect("/admin/health");
 }

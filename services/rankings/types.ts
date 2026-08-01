@@ -176,6 +176,10 @@ export type RankingsPageKey = {
 export type CachePool<T extends object> = {
   cache: LRUCache<string, T>;
   pinnedKeys: Set<string>;
+  hits: number;
+  misses: number;
+  coalesced: number;
+  evictions: number;
 };
 
 export type PersonRankingsQueryInput = {
