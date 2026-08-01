@@ -117,11 +117,13 @@ function AccordionFrame({
   closing,
   initial,
   ready,
+  onCloseComplete,
   children,
 }: {
   closing: boolean;
   initial: boolean;
   ready: boolean;
+  onCloseComplete?: () => void;
   children: ReactNode;
 }) {
   return (
@@ -135,6 +137,9 @@ function AccordionFrame({
       transition={{
         height: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
         marginBottom: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
+      }}
+      onAnimationComplete={() => {
+        if (closing) onCloseComplete?.();
       }}
     >
       <div className="rowAccordionInner">
@@ -165,6 +170,8 @@ export function RankingRow({
   eventDetails,
   onPrefetchDetails,
   onCancelPrefetchDetails,
+  onHeightChange,
+  onCloseComplete,
   detailsError = "",
   onToggle,
 }: {
@@ -189,10 +196,13 @@ export function RankingRow({
   detailsError?: string;
   onPrefetchDetails?: (entry: RankingEntry) => void;
   onCancelPrefetchDetails?: (entry: RankingEntry) => void;
+  onHeightChange?: (rowIndex: number, height: number) => void;
+  onCloseComplete?: () => void;
   onToggle?: () => void;
 }) {
   const longPressTimerRef = useRef<number | null>(null);
   const longPressHandledRef = useRef(false);
+  const rowRef = useRef<HTMLLIElement>(null);
   const clearLongPress = () => {
     if (longPressTimerRef.current === null) return;
     window.clearTimeout(longPressTimerRef.current);
@@ -203,6 +213,15 @@ export function RankingRow({
       window.clearTimeout(longPressTimerRef.current);
     }
   }, []);
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row || rowIndex === undefined || !onHeightChange) return;
+    const reportHeight = () => onHeightChange(rowIndex, row.getBoundingClientRect().height);
+    reportHeight();
+    const observer = new ResizeObserver(reportHeight);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [onHeightChange, rowIndex]);
   const style = {
     "--t-animation-delay": `${animationIndex * 10}ms`,
     minHeight: "65.45px",
@@ -241,6 +260,7 @@ export function RankingRow({
 
   return (
     <li
+      ref={rowRef}
       className="listItem"
       data-person-id={entry.personId}
       data-row-index={rowIndex}
@@ -357,6 +377,7 @@ export function RankingRow({
               closing={closing}
               initial={skipAccordionAnimation}
               ready={!detailsPending}
+              onCloseComplete={onCloseComplete}
             >
               <div className="rowAccordionContent">
                 {detailsError && !eventDetails && <div className="rowAccordionState">{detailsError}</div>}

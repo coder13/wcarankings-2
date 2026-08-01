@@ -43,11 +43,6 @@
   background-color: var(--search-match);
 }
 
-.virtualRow[data-expanded="true"] .listItem,
-.virtualRow[data-expanded="true"] .row {
-  height: 100%;
-}
-
 .virtualRow:hover {
   filter: brightness(0.97);
 }
@@ -358,6 +353,9 @@
 .rowAccordionContent {
   position: relative;
   z-index: 0;
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
   grid-area: 1 / 1;
   opacity: 1;
   transition: opacity 240ms ease;
@@ -439,6 +437,12 @@
 .rowAccordionSkeletonLine--footer {
   width: 10rem;
   height: 1.2rem;
+}
+
+@media (max-width: 759px) {
+  .rowAccordionSkeletonLine--competition {
+    height: 2.7rem;
+  }
 }
 
 @keyframes rowAccordionSkeletonSweep {
