@@ -70,6 +70,16 @@ export type PersonRankingRow = {
   round_type_id: string;
 };
 
+export type PersonCompetitionRankingRow = {
+  person_id: string;
+  person_name: string;
+  country_name: string;
+  country_iso2: string;
+  competition_count: number;
+  rank: number;
+  position: number;
+};
+
 export type ResultRankingRow = {
   result_id: number;
   result_value: number;

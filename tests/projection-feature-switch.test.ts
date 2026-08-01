@@ -10,11 +10,13 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
     "city_event_stats", "entity_ranking_counts", "person_sum_of_ranks_scores",
     "person_year_ranking_cohorts", "person_year_rankings_single",
     "person_year_rankings_average", "person_year_ranking_counts",
+    "person_competition_counts", "person_competition_rankings", "person_competition_ranking_counts",
   ], { generationId: "generation-123", exportId: "2026-07-30T00:00:30Z" });
   assert.deepEqual(featureSwitch, {
     generationId: "generation-123", exportId: "2026-07-30T00:00:30Z",
     core: true, resultRankings: true, competitionRankings: true,
     cityEventStats: true, sumOfRanks: true, yearlyPersonRankings: true,
+    personCompetitionRankings: true,
   });
 });
 
@@ -25,6 +27,7 @@ test("keeps compatibility rankings available without semantic projections", () =
   assert.equal(featureSwitch.core, true);
   assert.equal(featureSwitch.resultRankings, false);
   assert.equal(featureSwitch.competitionRankings, false);
+  assert.equal(featureSwitch.personCompetitionRankings, false);
 });
 
 test("competition capability does not depend on city counts", () => {

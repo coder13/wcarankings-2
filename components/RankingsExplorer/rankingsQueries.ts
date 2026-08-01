@@ -77,7 +77,9 @@ function addRankingFilterParams(
     params.set("year", String(filters.year));
   }
   if (
-    (filters.resource === "people" || filters.resource === "results") &&
+    (filters.resource === "people" ||
+      filters.resource === "person-competition-count" ||
+      filters.resource === "results") &&
     filters.gender.length
   ) {
     params.set("gender", filters.gender.join(","));
@@ -107,6 +109,9 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
 
   let endpoint = "/api/rankings";
   if (filters.resource === "results") endpoint = "/api/rankings/results";
+  else if (filters.resource === "person-competition-count") {
+    endpoint = "/api/rankings/people/competitions";
+  }
   else if (filters.resource !== "people") {
     endpoint = "/api/rankings/competitions";
   }
@@ -123,9 +128,14 @@ async function requestRankingPage(
     const body = (await response.json()) as { error?: string };
     throw new Error(body.error ?? "Rankings are unavailable.");
   }
-  const data = (await response.json()) as RankingPage;
+  const data = (await response.json()) as RankingPage & {
+    entries: Array<RankingEntry & { position?: number }>;
+  };
   return {
-    entries: data.entries,
+    entries: data.entries.map(({ position, ...entry }) => ({
+      ...entry,
+      subRank: entry.subRank ?? position ?? 0,
+    })),
     hasMore: data.hasMore,
     nextPageStart: data.nextPageStart,
     previousPageStart: data.previousPageStart,

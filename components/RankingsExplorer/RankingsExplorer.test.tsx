@@ -46,6 +46,7 @@ function renderExplorerMarkup(
   const filters: RankingsFilterState = {
     subject: "people",
     competitionRanking: "best-result",
+    personCompetitionRanking: false,
     year: null,
     eventId: "333",
     rankingType: "single",

@@ -13,6 +13,7 @@ import type { RankingSource, RegionSelection } from "./types";
 type DataSourceFilters = {
   subject: ExplorerSubject;
   competitionRanking: CompetitionRanking;
+  personCompetitionRanking: boolean;
   year: number | null;
   latitudeHemisphere: "north" | "south";
   eventId: string;
@@ -24,10 +25,13 @@ type DataSourceFilters = {
 function rankingResource(
   subject: ExplorerSubject,
   competitionRanking: CompetitionRanking,
+  personCompetitionRanking: boolean,
   latitudeHemisphere: "north" | "south",
 ): RankingResource {
   if (subject === "results") return "results";
-  if (subject !== "competitions") return "people";
+  if (subject !== "competitions") {
+    return personCompetitionRanking ? "person-competition-count" : "people";
+  }
   if (competitionRanking === "latitude") return `latitude-${latitudeHemisphere}`;
   if (competitionRanking === "competitor-count") return "competitor-count";
   return competitionRanking === "podiums" ? "podiums" : "competitions";
@@ -43,6 +47,7 @@ export function useRankingDataSource({
   const {
     subject,
     competitionRanking,
+    personCompetitionRanking,
     year,
     latitudeHemisphere,
     eventId,
@@ -53,6 +58,7 @@ export function useRankingDataSource({
   const resource = rankingResource(
     subject,
     competitionRanking,
+    personCompetitionRanking,
     latitudeHemisphere,
   );
   const queryFilters = useMemo(

@@ -88,6 +88,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts"\]/);
   assert.match(groups, /name: "city-rankings"[\s\S]*dependencies: \["result-facts", "competition-rankings"\]/);
   assert.match(groups, /name: "sum-of-ranks"[\s\S]*projectionNames: \["sum-of-ranks"\]/);
+  assert.match(groups, /name: "person-competition-rankings"[\s\S]*person_competition_ranking_counts/);
   assert.match(schema, /enabledByDefault: true/);
   assert.match(importer, /promoteProjectionTables/);
 
@@ -173,6 +174,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(personCompetitionRankings, /CREATE TABLE person_competition_rankings AS/);
   assert.match(personCompetitionRankings, /PARTITION BY scope, region_id, gender/);
   assert.match(personCompetitionRankings, /idx_person_competition_rankings_page/);
+  assert.match(personCompetitionRankings, /CREATE TABLE person_competition_ranking_counts AS/);
   assert.match(cities, /fastest_average_result_id/);
   assert.match(cities, /fastest_average_rank/);
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);

@@ -21,6 +21,11 @@ const COMPETITION_RANKINGS_TABLES = [
   "competition_event_stats",
   "competition_stats",
 ] as const;
+const PERSON_COMPETITION_RANKINGS_TABLES = [
+  "person_competition_counts",
+  "person_competition_rankings",
+  "person_competition_ranking_counts",
+] as const;
 const CITY_EVENT_STATS_TABLES = ["city_event_stats", "entity_ranking_counts"] as const;
 const SUM_OF_RANKS_TABLES = ["person_sum_of_ranks_scores"] as const;
 const YEARLY_TABLES = [
@@ -48,6 +53,7 @@ export function featureSwitchFromTables(
     core: allPresent(present, CORE_TABLES),
     resultRankings: allPresent(present, RESULT_RANKINGS_TABLES),
     competitionRankings: allPresent(present, COMPETITION_RANKINGS_TABLES),
+    personCompetitionRankings: allPresent(present, PERSON_COMPETITION_RANKINGS_TABLES),
     cityEventStats: allPresent(present, CITY_EVENT_STATS_TABLES),
     sumOfRanks: allPresent(present, SUM_OF_RANKS_TABLES),
     yearlyPersonRankings: allPresent(present, YEARLY_TABLES),
@@ -71,6 +77,7 @@ async function loadProjectionFeatureSwitch() {
       core: capabilities.core === true || capabilities.core === 1,
       resultRankings: capabilities.resultRankings === true || capabilities.resultRankings === 1,
       competitionRankings: capabilities.competitionRankings === true || capabilities.competitionRankings === 1,
+      personCompetitionRankings: capabilities.personCompetitionRankings === true || capabilities.personCompetitionRankings === 1,
       cityEventStats: capabilities.cityEventStats === true || capabilities.cityEventStats === 1,
       sumOfRanks: capabilities.sumOfRanks === true || capabilities.sumOfRanks === 1,
       yearlyPersonRankings: capabilities.yearlyPersonRankings === true || capabilities.yearlyPersonRankings === 1,

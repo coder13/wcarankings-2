@@ -24,6 +24,7 @@ const COMPETITION_RANKINGS = new Set<string>(
 export type RankingsUrlState = {
   subject: ExplorerSubject;
   competitionRanking: CompetitionRanking;
+  personCompetitionRanking: boolean;
   year: number | null;
   eventId: string;
   rankingType: "single" | "average";
@@ -41,6 +42,7 @@ export type RankingsFilterState = Pick<
   RankingsUrlState,
   | "subject"
   | "competitionRanking"
+  | "personCompetitionRanking"
   | "year"
   | "eventId"
   | "rankingType"
@@ -64,6 +66,7 @@ export function rankingsFilterStateFromUrl(
   const {
     subject,
     competitionRanking,
+    personCompetitionRanking,
     year,
     eventId,
     rankingType,
@@ -76,6 +79,7 @@ export function rankingsFilterStateFromUrl(
   return {
     subject,
     competitionRanking,
+    personCompetitionRanking,
     year,
     eventId,
     rankingType,
@@ -98,6 +102,10 @@ function competitionRankingFromPathname(pathname: string) {
   return value && COMPETITION_RANKINGS.has(value)
     ? (value as CompetitionRanking)
     : "best-result";
+}
+
+function personCompetitionRankingFromPathname(pathname: string) {
+  return pathname === "/persons/competitions";
 }
 
 function validEventForSubject(subject: ExplorerSubject, eventId: string) {
@@ -137,6 +145,7 @@ function normalizeState(
 ): RankingsUrlState {
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
+  const personCompetitionRanking = personCompetitionRankingFromPathname(pathname);
   const eventId = validEventForSubject(subject, state.eventId);
   const podiumEventId =
     subject === "competitions" &&
@@ -151,7 +160,8 @@ function normalizeState(
     ...state,
     subject,
     competitionRanking,
-    year: subject === "people" ? state.year : null,
+    personCompetitionRanking,
+    year: subject === "people" && !personCompetitionRanking ? state.year : null,
     eventId: podiumEventId,
     rankingType: rankingTypeForSubject(
       subject,
@@ -186,12 +196,14 @@ export function parseRankingsUrl(
 ): RankingsUrlState {
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
+  const personCompetitionRanking = personCompetitionRankingFromPathname(pathname);
   const rawRankingType = params.get("result");
   const search = (params.get("search") ?? "").trim().slice(0, MAX_SEARCH_LENGTH);
 
   return normalizeState(pathname, {
     subject,
     competitionRanking,
+    personCompetitionRanking,
     year: yearFromUrl(pathname, params),
     eventId: validEventForSubject(subject, params.get("eventId") ?? "333"),
     rankingType: isRankingType(rawRankingType) ? rawRankingType : "single",
@@ -218,6 +230,7 @@ export function serializeRankingsUrl(
   const state = normalizeState(pathname, rawState);
   const params = new URLSearchParams();
   const hidesEvent =
+    state.personCompetitionRanking ||
     state.subject === "competitions" &&
     (state.competitionRanking === "latitude" ||
       state.competitionRanking === "competitor-count");

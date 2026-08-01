@@ -113,6 +113,29 @@ export function personRankingCountsQuery() {
      WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?`;
 }
 
+export function personCompetitionRankingRowsQuery() {
+  return sqlFragment`WITH page AS (
+      SELECT ranking.person_id, ranking.competition_count, ranking.rank, ranking.position
+      FROM person_competition_rankings ranking
+      WHERE ranking.scope = ? AND ranking.region_id = ? AND ranking.gender = ?
+        AND ranking.position >= ?
+      ORDER BY ranking.position, ranking.person_id
+      LIMIT ?
+    )
+    SELECT page.*, COALESCE(person.name, page.person_id) AS person_name,
+      COALESCE(country.name, person.country_id, '') AS country_name,
+      COALESCE(country.iso2, '') AS country_iso2
+    FROM page
+    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
+    LEFT JOIN countries country ON country.id = person.country_id
+    ORDER BY page.position, page.person_id`;
+}
+
+export function personCompetitionRankingCountQuery() {
+  return sqlFragment`SELECT count FROM person_competition_ranking_counts
+    WHERE scope = ? AND region_id = ? AND gender = ?`;
+}
+
 export function resultRankingsQuery(input: ResultRankingsQueryInput) {
   const partition = input.scope === "world" ? "" : `, ranking.${input.scope}_id`;
   const source = input.gender.length
