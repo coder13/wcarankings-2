@@ -30,7 +30,8 @@ test("synchronizer creates or updates only the managed Cloudflare cache rule", a
   );
 
   assert.match(source, /http_request_cache_settings/);
-  assert.match(source, /wcarankings_public_api_cache/);
+  assert.match(source, /candidate\.ref === rule\.ref/);
+  assert.match(source, /cloudflare-cache-rule\.json/);
   assert.match(source, /rulesets\/phases\/\$\{phase\}\/entrypoint/);
   assert.match(source, /method: "PATCH"/);
   assert.match(source, /method: "POST"/);
