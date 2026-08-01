@@ -142,6 +142,7 @@ jobs:
 
       - name: Copy deployment configuration
         run: |
+          set -o pipefail
           scp -q -o BatchMode=yes docker-compose.yml \
             "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-compose-${SOURCE_SHA}.yml"
           scp -q -o BatchMode=yes ops/Caddyfile \
@@ -153,10 +154,43 @@ jobs:
             'cat /srv/wcarankings/server-release-state.json 2>/dev/null || printf "{}\n"')
           current_compose=$(jq -r '.composeChecksum // ""' <<<"$current_state")
           current_caddy=$(jq -r '.caddyChecksum // ""' <<<"$current_state")
+          current_caddy_file=$(jq -r '.caddyFileChecksum // ""' <<<"$current_state")
           current_app=$(jq -r '.appImage // ""' <<<"$current_state")
           current_flyway=$(jq -r '.flywayImage // ""' <<<"$current_state")
           current_data_tools=$(jq -r '.dataToolsImage // ""' <<<"$current_state")
           current_source_sha=$(jq -r '.sourceSha // "unknown"' <<<"$current_state")
+          candidate_caddy_file=$(sha256sum ops/Caddyfile | cut -d' ' -f1)
+          resolve_approved_caddy_file_checksum() {
+            raw_checksum=$1
+            composite_checksum=$2
+            source_sha=$3
+            if [ -n "$raw_checksum" ]; then
+              if [[ ! "$raw_checksum" =~ ^[0-9a-f]{64}$ ]]; then
+                echo "Approved state contains an invalid raw Caddyfile checksum." >&2
+                return 1
+              fi
+              printf '%s\n' "$raw_checksum"
+              return 0
+            fi
+            if [ -z "$composite_checksum" ]; then
+              return 0
+            fi
+            if [[ ! "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Approved state lacks a source commit for Caddy file recovery." >&2
+              return 1
+            fi
+            if ! git cat-file -e "${source_sha}^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$source_sha" >&2
+            fi
+            git show "${source_sha}:ops/Caddyfile" | sha256sum | cut -d' ' -f1
+          }
+          current_caddy_file=$(resolve_approved_caddy_file_checksum \
+            "$current_caddy_file" "$current_caddy" "$current_source_sha")
+          if [ -z "$(jq -r '.caddyFileChecksum // ""' <<<"$current_state")" ] \
+            && [ -n "$current_caddy" ]; then
+            echo "Derived the approved raw Caddyfile checksum from ${current_source_sha}."
+          fi
+          [[ "$candidate_caddy_file" =~ ^[0-9a-f]{64}$ ]]
           [ "$current_app" = "$APP_IMAGE" ] && app_changed=false || app_changed=true
           [ "$current_flyway" = "$FLYWAY_IMAGE" ] && flyway_changed=false || flyway_changed=true
           [ "$current_data_tools" = "$DATA_TOOLS_IMAGE" ] && data_tools_changed=false || data_tools_changed=true
@@ -168,6 +202,8 @@ jobs:
           echo "PREVIOUS_SOURCE_SHA=$current_source_sha" >> "$GITHUB_ENV"
           echo "PREVIOUS_COMPOSE_CHECKSUM=$current_compose" >> "$GITHUB_ENV"
           echo "PREVIOUS_CADDY_CHECKSUM=$current_caddy" >> "$GITHUB_ENV"
+          echo "CADDY_FILE_CHECKSUM=$candidate_caddy_file" >> "$GITHUB_ENV"
+          echo "PREVIOUS_CADDY_FILE_CHECKSUM=$current_caddy_file" >> "$GITHUB_ENV"
           if [ "$app_changed" = true ] || [ "$compose_changed" = true ]; then
             echo "APP_SERVICE_CHANGED=true" >> "$GITHUB_ENV"
           else
@@ -184,7 +220,7 @@ jobs:
             "SOURCE_SHA='$SOURCE_SHA' COMPOSE_CONFIG_CHANGED='$compose_changed' \
              PROXY_CONFIG_CHANGED='$proxy_changed' \
              PREVIOUS_COMPOSE_CHECKSUM='$current_compose' \
-             PREVIOUS_CADDY_CHECKSUM='$current_caddy' sh -s" <<'REMOTE'
+             PREVIOUS_CADDY_FILE_CHECKSUM='$current_caddy_file' sh -s" <<'REMOTE'
             set -eu
             exec 9>/srv/wcarankings/server-release.lock
             flock -w 60 9
@@ -218,7 +254,7 @@ jobs:
             recover_approved_config \
               /srv/wcarankings/ops/Caddyfile \
               /srv/wcarankings/ops/Caddyfile.previous \
-              "$PREVIOUS_CADDY_CHECKSUM" "Caddy configuration"
+              "$PREVIOUS_CADDY_FILE_CHECKSUM" "Caddy configuration"
             if [ -f /srv/wcarankings/server-release-state.json ]; then
               cp /srv/wcarankings/server-release-state.json \
                 /srv/wcarankings/server-release-state.json.previous
@@ -654,15 +690,17 @@ jobs:
             --arg configChecksum "$CONFIG_CHECKSUM" \
             --arg composeChecksum "$COMPOSE_CHECKSUM" \
             --arg caddyChecksum "$CADDY_CHECKSUM" \
+            --arg caddyFileChecksum "$CADDY_FILE_CHECKSUM" \
             '{
-              version: 1,
+              version: 2,
               sourceSha: $sourceSha,
               appImage: $appImage,
               flywayImage: $flywayImage,
               dataToolsImage: $dataToolsImage,
               configChecksum: $configChecksum,
               composeChecksum: $composeChecksum,
-              caddyChecksum: $caddyChecksum
+              caddyChecksum: $caddyChecksum,
+              caddyFileChecksum: $caddyFileChecksum
             }')
           printf '%s\n' "$approved" \
             | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
