@@ -45,6 +45,15 @@ function serverCooldownFunctions() {
     .join("\n");
 }
 
+function projectionCooldownFunctions() {
+  const start = projectionDeploy.indexOf("            read_database_cpu() {");
+  const end = projectionDeploy.indexOf("            (\n              exec 8>/srv/wcarankings/production-mutation.lock", start);
+  assert.ok(start >= 0 && end > start);
+  return projectionDeploy.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {12}/, ""))
+    .join("\n");
+}
+
 function imageTransferRequiredFunction() {
   const start = serverDeploy.indexOf("          image_transfer_required() {");
   const end = serverDeploy.indexOf("          remote_image_id() {", start);
@@ -240,7 +249,7 @@ recover_approved_config "$1" "$2" "$3" "Caddy configuration"
   return { result, finalContents };
 }
 
-async function exerciseServerCooldown(cpuSamples) {
+async function exerciseDatabaseCooldown(cpuSamples, functions = serverCooldownFunctions()) {
   const directory = await mkdtemp(join(tmpdir(), "wcarankings-cooldown-"));
   const sequenceFile = join(directory, "sequence");
   const indexFile = join(directory, "index");
@@ -269,8 +278,9 @@ fi
 exit 1
 `);
   await chmod(docker, 0o755);
-  const script = `${serverCooldownFunctions()}
+  const script = `${functions}
 sleep() { :; }
+dc() { docker compose "$@"; }
 measure_database_cpu_baseline
 wait_for_database_cooldown
 printf 'result baseline=%s delta=%s ceiling=%s\\n' "$DATABASE_CPU_BASELINE" "$DATABASE_CPU_DELTA" "$DATABASE_CPU_CEILING"
@@ -389,7 +399,11 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(serverDeploy, /wait_for_database_cooldown/);
   for (const workflow of [serverDeploy, projectionDeploy]) {
     assert.match(workflow, /measure_database_cpu_baseline/);
-    assert.match(workflow, /DATABASE_CPU_BASELINE \* 0\.15/);
+    assert.match(workflow, /timeout 5 docker stats --no-stream/);
+    assert.match(workflow, /Timed out reading MariaDB CPU usage/);
+    assert.match(workflow, /candidate_baseline \* 0\.15/);
+    assert.match(workflow, /baseline attempt \$\{attempt\}\/12/);
+    assert.match(workflow, /three stable consecutive samples in 12 attempts/);
     assert.match(workflow, /delta < 10/);
     assert.match(workflow, /delta > 25/);
     assert.match(workflow, /cool_samples.*-ge 3/);
@@ -556,35 +570,54 @@ test("projection deploy compares normalized export identities and fails closed",
 });
 
 test("relative MariaDB cooldown accepts a stable high production baseline", async () => {
-  const result = await exerciseServerCooldown([98, 100, 96, 96, 100, 99]);
+  const result = await exerciseDatabaseCooldown([98, 100, 96, 96, 100, 99]);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /baseline=98\.00 delta=14\.70 ceiling=112\.70/);
   assert.match(result.stdout, /cooldown sample 3\/3/);
 });
 
 test("relative MariaDB cooldown resets after a transient spike", async () => {
-  const result = await exerciseServerCooldown([10, 12, 11, 60, 20, 21, 20]);
+  const result = await exerciseDatabaseCooldown([10, 12, 11, 60, 20, 21, 20]);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /above its pre-migration band: 60%/);
   assert.match(result.stdout, /cooldown sample 3\/3/);
 });
 
 test("relative MariaDB cooldown times out under sustained above-band load", async () => {
-  const result = await exerciseServerCooldown([98, 100, 96, ...Array(60).fill(130)]);
+  const result = await exerciseDatabaseCooldown([98, 100, 96, ...Array(60).fill(130)]);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /did not return to its pre-migration CPU band/);
   assert.match(result.stderr, /diagnostic/);
 });
 
-test("relative MariaDB cooldown fails closed on invalid or unstable baselines", async () => {
-  const invalid = await exerciseServerCooldown(["unknown"]);
+test("relative MariaDB baseline sampling skips a transient unstable window", async () => {
+  for (const functions of [serverCooldownFunctions(), projectionCooldownFunctions()]) {
+    const result = await exerciseDatabaseCooldown(
+      [0.01, 0.01, 10.76, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01],
+      functions,
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /baseline attempt 6\/12: 0\.01% CPU/);
+    assert.match(result.stdout, /baseline window: 0\.01%, 0\.01%, 0\.01% \(spread 0\.00, band 10\.00\)/);
+    assert.match(result.stdout, /baseline=0\.01 delta=10\.00 ceiling=10\.01/);
+  }
+});
+
+test("relative MariaDB cooldown fails closed on invalid or continuously unstable baselines", async () => {
+  const invalid = await exerciseDatabaseCooldown(["unknown"]);
   assert.notEqual(invalid.status, 0);
   assert.match(invalid.stderr, /Could not read MariaDB CPU usage/);
 
-  const unstable = await exerciseServerCooldown([0, 100, 0]);
-  assert.notEqual(unstable.status, 0);
-  assert.match(unstable.stderr, /pre-migration CPU was unstable/);
-  assert.doesNotMatch(unstable.stdout, /cooldown sample/);
+  for (const functions of [serverCooldownFunctions(), projectionCooldownFunctions()]) {
+    const unstable = await exerciseDatabaseCooldown(
+      Array.from({ length: 12 }, (_, index) => index % 2 === 0 ? 0 : 100),
+      functions,
+    );
+    assert.notEqual(unstable.status, 0);
+    assert.match(unstable.stderr, /did not produce three stable consecutive samples in 12 attempts/);
+    assert.match(unstable.stderr, /final window was 100%, 0%, 100%/);
+    assert.doesNotMatch(unstable.stdout, /cooldown sample/);
+  }
 });
 
 test("config-only cancellation keeps the current app tag despite a stale previous tag", () => {

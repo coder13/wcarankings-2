@@ -381,7 +381,11 @@ jobs:
             set -eu
             read_database_cpu() {
               db_container=$(docker compose ps -q db)
-              cpu=$(docker stats --no-stream --format '{{.CPUPerc}}' "$db_container" | tr -d '%')
+              if ! cpu=$(timeout 5 docker stats --no-stream --format '{{.CPUPerc}}' "$db_container"); then
+                echo "Timed out reading MariaDB CPU usage." >&2
+                return 1
+              fi
+              cpu=$(printf '%s' "$cpu" | tr -d '%')
               if ! printf '%s\n' "$cpu" | grep -Eq '^[0-9]+([.][0-9]+)?$'; then
                 echo "Could not read MariaDB CPU usage: ${cpu:-unknown}." >&2
                 return 1
@@ -389,28 +393,45 @@ jobs:
               printf '%s\n' "$cpu"
             }
             measure_database_cpu_baseline() {
-              baseline_total=0
-              baseline_min=
-              baseline_max=
-              sample=1
-              while [ "$sample" -le 3 ]; do
+              baseline_samples=0
+              attempt=1
+              while [ "$attempt" -le 12 ]; do
                 cpu=$(read_database_cpu)
-                echo "MariaDB pre-migration baseline sample ${sample}/3: ${cpu}% CPU."
-                baseline_total=$(awk "BEGIN { print $baseline_total + $cpu }")
-                if [ -z "$baseline_min" ] || awk "BEGIN { exit !($cpu < $baseline_min) }"; then baseline_min=$cpu; fi
-                if [ -z "$baseline_max" ] || awk "BEGIN { exit !($cpu > $baseline_max) }"; then baseline_max=$cpu; fi
-                if [ "$sample" -lt 3 ]; then sleep 5; fi
-                sample=$((sample + 1))
+                echo "MariaDB pre-migration baseline attempt ${attempt}/12: ${cpu}% CPU."
+                if [ "$baseline_samples" -eq 0 ]; then
+                  baseline_first=$cpu
+                  baseline_samples=1
+                elif [ "$baseline_samples" -eq 1 ]; then
+                  baseline_second=$cpu
+                  baseline_samples=2
+                elif [ "$baseline_samples" -eq 2 ]; then
+                  baseline_third=$cpu
+                  baseline_samples=3
+                else
+                  baseline_first=$baseline_second
+                  baseline_second=$baseline_third
+                  baseline_third=$cpu
+                fi
+                if [ "$baseline_samples" -eq 3 ]; then
+                  candidate_baseline=$(awk "BEGIN { printf \"%.2f\", ($baseline_first + $baseline_second + $baseline_third) / 3 }")
+                  candidate_delta=$(awk "BEGIN { delta = $candidate_baseline * 0.15; if (delta < 10) delta = 10; if (delta > 25) delta = 25; printf \"%.2f\", delta }")
+                  candidate_min=$(awk "BEGIN { min = $baseline_first; if ($baseline_second < min) min = $baseline_second; if ($baseline_third < min) min = $baseline_third; printf \"%.2f\", min }")
+                  candidate_max=$(awk "BEGIN { max = $baseline_first; if ($baseline_second > max) max = $baseline_second; if ($baseline_third > max) max = $baseline_third; printf \"%.2f\", max }")
+                  candidate_spread=$(awk "BEGIN { printf \"%.2f\", $candidate_max - $candidate_min }")
+                  echo "MariaDB pre-migration baseline window: ${baseline_first}%, ${baseline_second}%, ${baseline_third}% (spread ${candidate_spread}, band ${candidate_delta})."
+                  if awk "BEGIN { exit !($candidate_spread <= $candidate_delta) }"; then
+                    DATABASE_CPU_BASELINE=$candidate_baseline
+                    DATABASE_CPU_DELTA=$candidate_delta
+                    DATABASE_CPU_CEILING=$(awk "BEGIN { printf \"%.2f\", $DATABASE_CPU_BASELINE + $DATABASE_CPU_DELTA }")
+                    echo "MariaDB pre-migration baseline is ${DATABASE_CPU_BASELINE}% CPU; cooldown ceiling is ${DATABASE_CPU_CEILING}%."
+                    return 0
+                  fi
+                fi
+                if [ "$attempt" -lt 12 ]; then sleep 5; fi
+                attempt=$((attempt + 1))
               done
-              DATABASE_CPU_BASELINE=$(awk "BEGIN { printf \"%.2f\", $baseline_total / 3 }")
-              DATABASE_CPU_DELTA=$(awk "BEGIN { delta = $DATABASE_CPU_BASELINE * 0.15; if (delta < 10) delta = 10; if (delta > 25) delta = 25; printf \"%.2f\", delta }")
-              baseline_spread=$(awk "BEGIN { printf \"%.2f\", $baseline_max - $baseline_min }")
-              if ! awk "BEGIN { exit !($baseline_spread <= $DATABASE_CPU_DELTA) }"; then
-                echo "MariaDB pre-migration CPU was unstable: ${baseline_min}-${baseline_max}% exceeds the ${DATABASE_CPU_DELTA}-point stability band." >&2
-                return 1
-              fi
-              DATABASE_CPU_CEILING=$(awk "BEGIN { printf \"%.2f\", $DATABASE_CPU_BASELINE + $DATABASE_CPU_DELTA }")
-              echo "MariaDB pre-migration baseline is ${DATABASE_CPU_BASELINE}% CPU; cooldown ceiling is ${DATABASE_CPU_CEILING}%."
+              echo "MariaDB pre-migration CPU did not produce three stable consecutive samples in 12 attempts; final window was ${baseline_first}%, ${baseline_second}%, ${baseline_third}%." >&2
+              return 1
             }
             wait_for_database_cooldown() {
               cool_samples=0
