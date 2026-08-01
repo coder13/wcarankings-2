@@ -87,7 +87,10 @@ updates projection data independently.
 
 Pull-request checks fingerprint the application, Flyway, data-tools, and
 configuration independently. They restore already validated component images and
-build only changed components. Before publishing a changed image, the job
+build any component whose exact source-tree tag is not already validated. This
+also lets a fresh pull request validate the combined tree after independently
+validated pull requests are merged in sequence. Before publishing a component
+image, the job
 runs the Flyway image against temporary MariaDB, loads a small WCA-like fixture,
 refreshes ranking projections using the application image, starts that exact
 image, and runs a Chromium smoke test against it. The test asserts a seeded
