@@ -190,6 +190,7 @@ jobs:
             flock -w 60 9
             exec 8>/srv/wcarankings/production-mutation.lock
             flock -w 360 8
+            config_marker="/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging"
             recover_approved_config() {
               target=$1
               backup=$2
@@ -234,6 +235,18 @@ jobs:
             else
               rm -f /srv/wcarankings/ops/Caddyfile.previous
             fi
+            write_config_marker() {
+              marker_tmp="${config_marker}.tmp.$$"
+              printf '%s\n' "$1" > "$marker_tmp"
+              mv "$marker_tmp" "$config_marker"
+            }
+            if [ "$COMPOSE_CONFIG_CHANGED" = true ] || [ "$PROXY_CONFIG_CHANGED" = true ]; then
+              # Record mutation intent before the first move so cancellation can
+              # never leave an unmarked partial configuration stage.
+              write_config_marker prepared
+            else
+              rm -f "$config_marker"
+            fi
             if [ "$COMPOSE_CONFIG_CHANGED" = true ]; then
               mv "/tmp/wcarankings-compose-${SOURCE_SHA}.yml" \
                 /srv/wcarankings/docker-compose.yml
@@ -245,6 +258,9 @@ jobs:
                 /srv/wcarankings/ops/Caddyfile
             else
               rm -f "/tmp/wcarankings-Caddyfile-${SOURCE_SHA}"
+            fi
+            if [ -f "$config_marker" ]; then
+              write_config_marker staged
             fi
           REMOTE
 
@@ -534,7 +550,7 @@ jobs:
         if: always() && (failure() || cancelled()) && env.SERVICES_SWITCHED != 'true'
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' sh -s" <<'REMOTE'
+            "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' SOURCE_SHA='$SOURCE_SHA' sh -s" <<'REMOTE'
             set -eu
             exec 9>/srv/wcarankings/server-release.lock
             flock -w 60 9
@@ -550,12 +566,26 @@ jobs:
               fi
             }
             restore_previous_app_tag
-            if [ -f /srv/wcarankings/docker-compose.yml.previous ]; then
-              cp /srv/wcarankings/docker-compose.yml.previous /srv/wcarankings/docker-compose.yml
-            fi
-            if [ -f /srv/wcarankings/ops/Caddyfile.previous ]; then
-              cp /srv/wcarankings/ops/Caddyfile.previous /srv/wcarankings/ops/Caddyfile
-            fi
+            restore_staged_config() {
+              marker=$1
+              compose_target=$2
+              compose_backup=$3
+              caddy_target=$4
+              caddy_backup=$5
+              if [ ! -f "$marker" ]; then
+                echo "This run did not stage deployment configuration; retaining active files."
+                return 0
+              fi
+              if [ -f "$compose_backup" ]; then cp "$compose_backup" "$compose_target"; else rm -f "$compose_target"; fi
+              if [ -f "$caddy_backup" ]; then cp "$caddy_backup" "$caddy_target"; else rm -f "$caddy_target"; fi
+              rm -f "$marker"
+            }
+            restore_staged_config \
+              "/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging" \
+              /srv/wcarankings/docker-compose.yml \
+              /srv/wcarankings/docker-compose.yml.previous \
+              /srv/wcarankings/ops/Caddyfile \
+              /srv/wcarankings/ops/Caddyfile.previous
           REMOTE
 
       - name: Roll back failed server switch
@@ -564,6 +594,7 @@ jobs:
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' \
              PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' \
+             SOURCE_SHA='$SOURCE_SHA' \
              PREVIOUS_SOURCE_SHA='$PREVIOUS_SOURCE_SHA' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
@@ -589,6 +620,7 @@ jobs:
             else
               rm -f server-release-state.json
             fi
+            rm -f "/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging"
             DEPLOYED_MAIN_SHA="$PREVIOUS_SOURCE_SHA" \
               docker compose up -d --no-build --remove-orphans --force-recreate app
             if [ "$PROXY_CONFIG_CHANGED" = true ]; then
@@ -634,9 +666,18 @@ jobs:
             }')
           printf '%s\n' "$approved" \
             | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-                'cat > /srv/wcarankings/server-release-state.json.tmp \
-                  && mv /srv/wcarankings/server-release-state.json.tmp \
-                    /srv/wcarankings/server-release-state.json'
+                "cat > /tmp/wcarankings-server-release-${SOURCE_SHA}.json"
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            "SOURCE_SHA='$SOURCE_SHA' sh -s" <<'REMOTE'
+            set -eu
+            exec 9>/srv/wcarankings/server-release.lock
+            flock -w 60 9
+            exec 8>/srv/wcarankings/production-mutation.lock
+            flock -w 360 8
+            rm -f "/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging"
+            mv "/tmp/wcarankings-server-release-${SOURCE_SHA}.json" \
+              /srv/wcarankings/server-release-state.json
+          REMOTE
 
       - name: Roll back a late server release failure
         if: always() && (failure() || cancelled()) && env.SERVICES_SWITCHED == 'true' && env.ROLLBACK_COMPLETED != 'true'
@@ -644,6 +685,7 @@ jobs:
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             "APP_IMAGE_CHANGED='$APP_IMAGE_CHANGED' \
              PROXY_CONFIG_CHANGED='$PROXY_CONFIG_CHANGED' \
+             SOURCE_SHA='$SOURCE_SHA' \
              PREVIOUS_SOURCE_SHA='$PREVIOUS_SOURCE_SHA' sh -s" <<'REMOTE'
             set -eu
             cd /srv/wcarankings
@@ -661,6 +703,7 @@ jobs:
             else
               rm -f server-release-state.json
             fi
+            rm -f "/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging"
             DEPLOYED_MAIN_SHA="$PREVIOUS_SOURCE_SHA" \
               docker compose up -d --no-build --remove-orphans --force-recreate app
             if [ "$PROXY_CONFIG_CHANGED" = true ]; then

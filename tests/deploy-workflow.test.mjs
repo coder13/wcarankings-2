@@ -61,6 +61,44 @@ restore_previous_app_tag
 `], { encoding: "utf8" });
 }
 
+function preSwitchConfigRecoveryFunction() {
+  const start = serverDeploy.indexOf("            restore_staged_config() {");
+  const end = serverDeploy.indexOf("            restore_staged_config \\\n", start);
+  assert.ok(start >= 0 && end > start);
+  return serverDeploy.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {12}/, ""))
+    .join("\n");
+}
+
+async function exercisePreSwitchConfigRecovery(hasMarker) {
+  const directory = await mkdtemp(join(tmpdir(), "wcarankings-config-recovery-"));
+  const marker = join(directory, "config-staging");
+  const composeTarget = join(directory, "compose");
+  const composeBackup = join(directory, "compose.previous");
+  const caddyTarget = join(directory, "Caddyfile");
+  const caddyBackup = join(directory, "Caddyfile.previous");
+  await Promise.all([
+    writeFile(composeTarget, "active-compose-C\n"),
+    writeFile(composeBackup, "approved-compose-B\n"),
+    writeFile(caddyTarget, "active-caddy-C\n"),
+    writeFile(caddyBackup, "approved-caddy-B\n"),
+    ...(hasMarker ? [writeFile(marker, "staged\n")] : []),
+  ]);
+  const result = spawnSync("sh", ["-eu", "-c", `${preSwitchConfigRecoveryFunction()}
+restore_staged_config "$1" "$2" "$3" "$4" "$5"
+`, "sh", marker, composeTarget, composeBackup, caddyTarget, caddyBackup], { encoding: "utf8" });
+  const state = {
+    result,
+    composeTarget: await readFile(composeTarget, "utf8"),
+    composeBackup: await readFile(composeBackup, "utf8"),
+    caddyTarget: await readFile(caddyTarget, "utf8"),
+    caddyBackup: await readFile(caddyBackup, "utf8"),
+    markerExists: await readFile(marker, "utf8").then(() => true, () => false),
+  };
+  await rm(directory, { recursive: true, force: true });
+  return state;
+}
+
 async function exerciseServerCooldown(cpuSamples) {
   const directory = await mkdtemp(join(tmpdir(), "wcarankings-cooldown-"));
   const sequenceFile = join(directory, "sequence");
@@ -252,6 +290,20 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   const caddyChange = serverDeploy.indexOf('if [ "$PROXY_CONFIG_CHANGED" = true ]');
   assert.ok(composeBackup >= 0 && composeBackup < composeChange);
   assert.ok(caddyBackup >= 0 && caddyBackup < caddyChange);
+  const configMarkerPrepared = serverDeploy.indexOf("write_config_marker prepared");
+  const configMarkerLock = serverDeploy.lastIndexOf("production-mutation.lock", configMarkerPrepared);
+  const firstConfigMove = serverDeploy.indexOf('mv "/tmp/wcarankings-compose-${SOURCE_SHA}.yml"');
+  const configMarkerStaged = serverDeploy.indexOf("write_config_marker staged");
+  assert.ok(configMarkerLock >= 0 && configMarkerLock < configMarkerPrepared);
+  assert.ok(configMarkerPrepared < firstConfigMove && firstConfigMove < configMarkerStaged);
+  assert.match(serverDeploy, /if \[ ! -f "\$marker" \][\s\S]*retaining active files/);
+  assert.match(serverDeploy, /server-release-\$\{SOURCE_SHA\}\.config-staging/);
+  const recordApprovedIndex = serverDeploy.indexOf("- name: Record approved server release");
+  const recordMarkerRemoval = serverDeploy.indexOf('rm -f "/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging"', recordApprovedIndex);
+  const recordStateMove = serverDeploy.indexOf("/srv/wcarankings/server-release-state.json", recordMarkerRemoval);
+  const recordMutationLock = serverDeploy.lastIndexOf("production-mutation.lock", recordMarkerRemoval);
+  assert.ok(recordMutationLock > recordApprovedIndex && recordMutationLock < recordMarkerRemoval);
+  assert.ok(recordMarkerRemoval < recordStateMove);
   assert.match(flywayHistoryRepair, /script NOT IN/);
   assert.match(flywayHistoryRepair, /script IN/);
   assert.match(flywayHistoryRepair, /type = 'BASELINE' AND version IN/);
@@ -304,6 +356,25 @@ test("config-only cancellation keeps the current app tag despite a stale previou
   const imageRelease = exercisePreSwitchTagRecovery("true");
   assert.equal(imageRelease.status, 0, imageRelease.stderr);
   assert.match(imageRelease.stdout, /docker tag wcarankings-app:previous wcarankings-app:latest/);
+});
+
+test("pre-switch cleanup preserves unmarked config and restores only this run's staged config", async () => {
+  const beforeStage = await exercisePreSwitchConfigRecovery(false);
+  assert.equal(beforeStage.result.status, 0, beforeStage.result.stderr);
+  assert.match(beforeStage.result.stdout, /did not stage deployment configuration/);
+  assert.equal(beforeStage.composeTarget, "active-compose-C\n");
+  assert.equal(beforeStage.composeBackup, "approved-compose-B\n");
+  assert.equal(beforeStage.caddyTarget, "active-caddy-C\n");
+  assert.equal(beforeStage.caddyBackup, "approved-caddy-B\n");
+  assert.equal(beforeStage.markerExists, false);
+
+  const afterStage = await exercisePreSwitchConfigRecovery(true);
+  assert.equal(afterStage.result.status, 0, afterStage.result.stderr);
+  assert.equal(afterStage.composeTarget, "approved-compose-B\n");
+  assert.equal(afterStage.composeBackup, "approved-compose-B\n");
+  assert.equal(afterStage.caddyTarget, "approved-caddy-B\n");
+  assert.equal(afterStage.caddyBackup, "approved-caddy-B\n");
+  assert.equal(afterStage.markerExists, false);
 });
 
 test("server smoke tests retry the emitted local stylesheet after core readiness", () => {
