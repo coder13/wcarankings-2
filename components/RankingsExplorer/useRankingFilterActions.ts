@@ -74,6 +74,7 @@ export function useRankingFilterActions({
     subject: ExplorerSubject;
     competitionRanking: CompetitionRanking;
     cityRanking: CityRanking;
+    personCompetitionRanking: boolean;
     year: number | null;
     eventId: string;
     rankingType: "single" | "average";
@@ -91,6 +92,7 @@ export function useRankingFilterActions({
     subject,
     competitionRanking,
     cityRanking,
+    personCompetitionRanking,
     year,
     eventId,
     rankingType,
@@ -229,15 +231,17 @@ export function useRankingFilterActions({
     }
     if (nextSubject === subject) return;
     resetToTop(true);
-    const nextPath = nextSubject === "people" && year
-      ? `/persons/year/${year}`
-      : subjectPath(nextSubject);
+    let nextPath = subjectPath(nextSubject);
+    if (nextSubject === "people") {
+      if (personCompetitionRanking) nextPath = "/persons/competitions";
+      else if (year) nextPath = `/persons/year/${year}`;
+    }
     patchFilters(
       { subject: nextSubject },
       { history: "push", pathname: nextPath },
       { search: "", wcaId: "", focusMe: false },
     );
-  }, [patchFilters, resetToTop, router, subject, year]);
+  }, [patchFilters, personCompetitionRanking, resetToTop, router, subject, year]);
 
   const leaveList = useCallback((nextSubject: NavigationSubject) => {
     router.push(nextSubject === "lists" ? "/lists" : subjectPath(nextSubject));
@@ -247,7 +251,7 @@ export function useRankingFilterActions({
     if (nextYear === year) return;
     resetToTop(true);
     patchFilters(
-      { year: nextYear },
+      { year: nextYear, personCompetitionRanking: false },
       {
         history: "push",
         pathname: nextYear ? `/persons/year/${nextYear}` : "/",
@@ -255,6 +259,16 @@ export function useRankingFilterActions({
       { search: "", wcaId: "", focusMe: false },
     );
   }, [patchFilters, resetToTop, year]);
+
+  const changePersonCompetitionRanking = useCallback((enabled: boolean) => {
+    if (enabled === personCompetitionRanking) return;
+    resetToTop(true);
+    patchFilters(
+      { personCompetitionRanking: enabled, year: null },
+      { history: "push", pathname: enabled ? "/persons/competitions" : "/" },
+      { search: "", wcaId: "", focusMe: false },
+    );
+  }, [patchFilters, personCompetitionRanking, resetToTop]);
 
   const changeCompetitionRanking = useCallback((next: CompetitionRanking) => {
     if (next === competitionRanking) return;
@@ -291,6 +305,7 @@ export function useRankingFilterActions({
     changeSubject,
     leaveList,
     changeYear,
+    changePersonCompetitionRanking,
     changeCompetitionRanking,
     changeCityRanking,
     changeHemisphere,
@@ -304,6 +319,7 @@ export function useRankingFilterActions({
     changeRegion,
     changeSubject,
     changeYear,
+    changePersonCompetitionRanking,
     leaveList,
   ]);
 }

@@ -19,6 +19,7 @@ export type CityRanking = (typeof CITY_RANKING_OPTIONS)[number]["value"];
 
 export type RankingResource =
   | "people"
+  | "person-competition-count"
   | "results"
   | "competitions"
   | "podiums"

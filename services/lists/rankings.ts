@@ -1,4 +1,5 @@
 import { query } from "@/db";
+import { raiseListRankingRebuildPriority } from "@/lib/list-ranking-cache";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import {
   getRecordBadges,
@@ -39,12 +40,29 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
       .flatMap((value) => value.split(","))
       .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
   );
-  return { eventId, type, start, limit, search, locate, region, gender };
+  const requestedMembershipVersion = Number(searchParams.get("membershipVersion"));
+  const requestedDataVersion = (searchParams.get("rankingsDataVersion") ?? "").slice(0, 64);
+  return {
+    eventId,
+    type,
+    start,
+    limit,
+    search,
+    locate,
+    region,
+    gender,
+    membershipVersion:
+      Number.isSafeInteger(requestedMembershipVersion) && requestedMembershipVersion > 0
+        ? requestedMembershipVersion
+        : null,
+    rankingsDataVersion: requestedDataVersion || null,
+  };
 }
 
 async function loadScopedRankings(
   scopedSource: ScopedRankingSource,
   searchParams: URLSearchParams,
+  minimumPageLimit = 0,
 ) {
   const input = parseListRankingInput(searchParams);
   const source = rankingTable(input.type);
@@ -75,14 +93,15 @@ async function loadScopedRankings(
     conditions.push("(person_name LIKE ? OR person_id LIKE ?)");
     values.push(`%${input.search}%`, `%${input.search}%`);
   }
-  values.push(input.locate ? 1 : input.limit + 1);
+  const effectiveLimit = Math.max(input.limit, minimumPageLimit);
+  values.push(input.locate ? 1 : effectiveLimit + 1);
 
   const result = await query<ListRankingRow>(
     listRankingsQuery({ source: scopedSource.from(source), scopedConditions, conditions }),
     [input.eventId, ...scopedValues, ...values],
   );
 
-  const selectedRows = result.rows.slice(0, input.locate ? 1 : input.limit);
+  const selectedRows = result.rows.slice(0, input.locate ? 1 : effectiveLimit);
   const total = Number(result.rows[0]?.total ?? 0);
   const metadata = await getCurrentRankingsMetadata();
   return {
@@ -105,14 +124,126 @@ async function loadScopedRankings(
         continentId: row.continent_id,
       }),
     })),
-    hasMore: !input.locate && result.rows.length > input.limit,
-    nextStart: !input.locate && result.rows.length > input.limit ? input.start + input.limit : null,
+    hasMore: !input.locate && result.rows.length > effectiveLimit,
+    nextStart:
+      !input.locate && result.rows.length > effectiveLimit
+        ? input.start + effectiveLimit
+        : null,
     total,
     exportDate: metadata.exportDate,
   };
 }
 
+async function loadCachedListRankings(
+  list: ListSummary,
+  input: ReturnType<typeof parseListRankingInput>,
+) {
+  const metadata = await getCurrentRankingsMetadata();
+  const dataVersion = await query<{ value: string }>(
+    "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
+  );
+  const currentDataVersion = dataVersion.rows[0]?.value;
+  const rankingsDataVersion = input.rankingsDataVersion ?? currentDataVersion;
+  const membershipVersion = input.membershipVersion ?? list.membershipVersion;
+  if (!rankingsDataVersion) return null;
+  const source = rankingTable(input.type);
+  const cache = await query<ListRankingRow>(
+    `SELECT entry.list_rank AS rank, entry.list_position AS sub_rank,
+        scope.total_count AS total, entry.person_id, ranking.person_name,
+        ranking.country_id, ranking.country_name, ranking.country_iso2,
+        ranking.continent_id, entry.score AS best, ranking.competition_id,
+        ranking.competition_name, ranking.is_world_record,
+        ranking.is_continent_record, ranking.is_country_record
+      FROM list_ranking_cache_versions version
+      JOIN list_ranking_cache_scopes scope
+        ON scope.cache_version_id = version.id
+       AND scope.event_id = ? AND scope.result_type = ?
+      JOIN list_ranking_cache_entries entry
+        ON entry.cache_version_id = version.id
+       AND entry.event_id = scope.event_id AND entry.result_type = scope.result_type
+      JOIN ${source} ranking
+        ON ranking.event_id = entry.event_id AND ranking.person_id = entry.person_id
+      WHERE version.list_id = ? AND version.membership_version = ?
+        AND version.rankings_data_version = ? AND version.status = 'ready'
+        AND entry.list_position > ?
+      ORDER BY entry.list_position LIMIT ?`,
+    [
+      input.eventId,
+      input.type,
+      list.id,
+      membershipVersion,
+      rankingsDataVersion,
+      input.start,
+      input.limit + 1,
+    ],
+    { rankingStatementTimeout: true },
+  );
+  if (!cache.rows.length) {
+    const exists = await query<{ id: number }>(
+      `SELECT id FROM list_ranking_cache_versions
+       WHERE list_id = ? AND membership_version = ?
+         AND rankings_data_version = ? AND status = 'ready' LIMIT 1`,
+      [list.id, membershipVersion, rankingsDataVersion],
+    );
+    if (!exists.rows.length) return null;
+  }
+  const rows = cache.rows.slice(0, input.limit);
+  const total = Number(cache.rows[0]?.total ?? 0);
+  return {
+    entries: rows.map((row) => ({
+      rank: Number(row.rank),
+      subRank: Number(row.sub_rank),
+      personId: row.person_id,
+      personName: row.person_name,
+      countryId: row.country_id,
+      countryName: row.country_name,
+      countryIso2: row.country_iso2,
+      continentId: row.continent_id,
+      best: Number(row.best),
+      competitionId: row.competition_id,
+      competitionName: row.competition_name,
+      recordBadges: getRecordBadges({
+        isWorldRecord: Number(row.is_world_record) === 1,
+        isContinentRecord: Number(row.is_continent_record) === 1,
+        isCountryRecord: Number(row.is_country_record) === 1,
+        continentId: row.continent_id,
+      }),
+    })),
+    hasMore: cache.rows.length > input.limit,
+    nextStart: cache.rows.length > input.limit ? input.start + input.limit : null,
+    total,
+    exportDate: metadata.exportDate,
+    cacheMembershipVersion: membershipVersion,
+    cacheDataVersion: rankingsDataVersion,
+  };
+}
+
 export async function loadListRankings(list: ListSummary, searchParams: URLSearchParams) {
+  const input = parseListRankingInput(searchParams);
+  const isDefaultScope =
+    input.region.scope === "world" &&
+    input.gender.length === 0 &&
+    !input.search &&
+    !input.locate;
+  if (isDefaultScope) {
+    const cached = await loadCachedListRankings(list, input);
+    if (cached) {
+      return {
+        list: {
+          publicId: list.publicId,
+          systemAlias: list.systemAlias,
+          name: list.name,
+          kind: list.kind,
+          memberCount: list.memberCount,
+          membershipVersion: list.membershipVersion,
+        },
+        ...cached,
+      };
+    }
+    if (!input.membershipVersion && !input.rankingsDataVersion) {
+      void raiseListRankingRebuildPriority(list).catch(() => undefined);
+    }
+  }
   const rankings = await loadScopedRankings(
     {
       from: (source) => `list_members AS member
@@ -123,7 +254,13 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
       values: [list.id],
     },
     searchParams,
+    isDefaultScope ? 100 : 0,
   );
+  const fallbackDataVersion = isDefaultScope
+    ? (await query<{ value: string }>(
+      "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
+    )).rows[0]?.value ?? null
+    : null;
   return {
     list: {
       publicId: list.publicId,
@@ -134,6 +271,8 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
       membershipVersion: list.membershipVersion,
     },
     ...rankings,
+    cacheMembershipVersion: isDefaultScope ? list.membershipVersion : undefined,
+    cacheDataVersion: fallbackDataVersion,
   };
 }
 

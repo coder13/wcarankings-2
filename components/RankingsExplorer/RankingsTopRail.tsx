@@ -81,18 +81,22 @@ export function RankingsTopRail() {
   const currentEvent =
     ALL_EVENT_RANKING_OPTIONS.find((option) => option.id === filters.eventId) ??
     WCA_EVENTS.find((event) => event.id === filters.eventId)!;
-  const hidesResultType = filters.subject === "competitions" && [
-    "podiums",
-    "latitude",
-    "competitor-count",
-  ].includes(filters.competitionRanking);
+  const hidesResultType =
+    filters.personCompetitionRanking ||
+    (filters.subject === "competitions" && [
+      "podiums",
+      "latitude",
+      "competitor-count",
+    ].includes(filters.competitionRanking));
   const cityUsesResultType =
     filters.subject === "cities" &&
     ["fastest-single", "fastest-average"].includes(filters.cityRanking);
-  const hidesEventPicker = filters.subject === "competitions" && [
-    "latitude",
-    "competitor-count",
-  ].includes(filters.competitionRanking);
+  const hidesEventPicker =
+    filters.personCompetitionRanking ||
+    (filters.subject === "competitions" && [
+      "latitude",
+      "competitor-count",
+    ].includes(filters.competitionRanking));
   return (
     <div
       className="stickyRankingsRail"
@@ -150,7 +154,7 @@ export function RankingsTopRail() {
             showResultType:
               filters.eventId !== "SOR" &&
               filters.eventId !== "sor-kinch" &&
-              (!hidesResultType && (filters.subject !== "cities" || cityUsesResultType)),
+              !hidesResultType && (filters.subject !== "cities" || cityUsesResultType),
             showEventPicker: !hidesEventPicker,
             showGender:
               filters.subject === "people" || filters.subject === "results",

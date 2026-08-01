@@ -131,8 +131,8 @@ test("a new export selects every group while reusing exact artifacts", async () 
     repositoryRoot,
   });
   assert.equal(plan.exportChanged, true);
-  assert.equal(plan.releaseGroups.length, 7);
-  assert.equal(plan.cachedGroups.length, 7);
+  assert.deepEqual([...plan.releaseGroups].sort(), Object.keys(desired.groups).sort());
+  assert.deepEqual([...plan.cachedGroups].sort(), Object.keys(desired.groups).sort());
   assert.deepEqual(plan.buildGroups, []);
 });
 

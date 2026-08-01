@@ -32,7 +32,32 @@ export type RankingQueryFilters = {
   source?: RankingSource;
   gender: readonly GenderFilter[];
   year: number | null;
+  membershipVersion?: number;
+  rankingsDataVersion?: string | null;
 };
+
+const savedListVersionWindows = new Map<
+  string,
+  { membershipVersion: number; rankingsDataVersion: string }
+>();
+
+function savedListVersionKey(filters: RankingQueryFilters) {
+  return filters.source?.kind === "saved"
+    ? `${filters.source.listId}:${filters.eventId}:${filters.rankingType}`
+    : null;
+}
+
+export function seedSavedListVersionWindow(
+  filters: RankingQueryFilters,
+  initialData?: InitialRankingData,
+) {
+  const key = savedListVersionKey(filters);
+  if (!key || !initialData?.cacheMembershipVersion || !initialData.cacheDataVersion) return;
+  savedListVersionWindows.set(key, {
+    membershipVersion: initialData.cacheMembershipVersion,
+    rankingsDataVersion: initialData.cacheDataVersion,
+  });
+}
 
 export function rankingPageStart(subRank: number) {
   return Math.floor((Math.max(1, subRank) - 1) / PAGE_SIZE) * PAGE_SIZE;
@@ -55,6 +80,8 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     filters.regionSelection.regionId,
     filters.gender.join(","),
     filters.resource === "people" ? filters.year ?? "all" : "all",
+    filters.membershipVersion ?? "current",
+    filters.rankingsDataVersion ?? "current",
   ] as const;
 }
 
@@ -73,10 +100,25 @@ function addRankingFilterParams(
   filters: RankingQueryFilters,
 ) {
   addSourceParams(params, filters.source);
+  const versionKey = savedListVersionKey(filters);
+  const versionWindow = versionKey ? savedListVersionWindows.get(versionKey) : null;
+  if (
+    versionWindow &&
+    filters.regionSelection.scope === "world" &&
+    filters.gender.length === 0
+  ) {
+    params.set("membershipVersion", String(versionWindow.membershipVersion));
+    params.set("rankingsDataVersion", versionWindow.rankingsDataVersion);
+  }
   if (filters.resource === "people" && filters.year) {
     params.set("year", String(filters.year));
   }
-  if ((filters.resource === "people" || filters.resource === "results") && filters.gender.length) {
+  if (
+    (filters.resource === "people" ||
+      filters.resource === "person-competition-count" ||
+      filters.resource === "results") &&
+    filters.gender.length
+  ) {
     params.set("gender", filters.gender.join(","));
   }
   if (filters.regionSelection.scope !== "world") {
@@ -112,6 +154,9 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
 
   let endpoint = "/api/rankings";
   if (filters.resource === "results") endpoint = "/api/rankings/results";
+  else if (filters.resource === "person-competition-count") {
+    endpoint = "/api/rankings/people/competitions";
+  }
   else if (filters.resource.startsWith("city-")) endpoint = "/api/rankings/cities";
   else if (filters.resource !== "people") {
     endpoint = "/api/rankings/competitions";
@@ -129,9 +174,21 @@ async function requestRankingPage(
     const body = (await response.json()) as { error?: string };
     throw new Error(body.error ?? "Rankings are unavailable.");
   }
-  const data = (await response.json()) as RankingPage;
+  const data = (await response.json()) as RankingPage & {
+    entries: Array<RankingEntry & { position?: number }>;
+  };
+  const versionKey = savedListVersionKey(filters);
+  if (versionKey && data.cacheMembershipVersion && data.cacheDataVersion) {
+    savedListVersionWindows.set(versionKey, {
+      membershipVersion: data.cacheMembershipVersion,
+      rankingsDataVersion: data.cacheDataVersion,
+    });
+  }
   return {
-    entries: data.entries,
+    entries: data.entries.map(({ position, ...entry }) => ({
+      ...entry,
+      subRank: entry.subRank ?? position ?? 0,
+    })),
     hasMore: data.hasMore,
     nextPageStart: data.nextPageStart,
     previousPageStart: data.previousPageStart,

@@ -22,7 +22,7 @@ export function useRankingDataRuntime({
   source?: RankingSource;
   ownerListId?: string;
 }) {
-  const dataSource = useRankingDataSource({ filters, source });
+  const dataSource = useRankingDataSource({ filters, source, initialData });
   const window = useRankingWindow({
     initialData,
     rankingType: filters.rankingType,
