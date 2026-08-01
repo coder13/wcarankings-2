@@ -63,6 +63,57 @@ function projectionExportNormalizerFunction() {
     .join("\n");
 }
 
+function projectionResetCandidateFunction() {
+  const start = projectionDeploy.indexOf("            reset_candidate() {");
+  const end = projectionDeploy.indexOf("\n            }\n\n            case \"$phase\"", start);
+  assert.ok(start >= 0 && end > start);
+  return projectionDeploy.slice(start, end + "\n            }".length).split("\n")
+    .map((line) => line.replace(/^ {12}/, ""))
+    .join("\n");
+}
+
+function projectionComposeWrappers() {
+  const start = projectionDeploy.indexOf("            dc() {");
+  const end = projectionDeploy.indexOf("            candidate=", start);
+  assert.ok(start >= 0 && end > start);
+  return projectionDeploy.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {12}/, ""))
+    .join("\n");
+}
+
+async function exerciseProjectionResetCandidateAgainstStdinReader() {
+  const directory = await mkdtemp(join(tmpdir(), "wcarankings-projection-stdin-"));
+  const phaseFile = join(directory, "phase");
+  const result = spawnSync("sh", ["-eu", "-s"], {
+    input: `docker() { cat; }
+compose_base=base
+compose_override=override
+${projectionComposeWrappers()}
+candidate=wcarankings_candidate_test
+previous=wcarankings_candidate_test_previous
+phase_file=${phaseFile}
+${projectionResetCandidateFunction()}
+reset_candidate
+printf 'sentinel-after-candidate\\n'
+`,
+    encoding: "utf8",
+  });
+  await rm(directory, { recursive: true, force: true });
+  return result;
+}
+
+function exerciseProjectionStreamHelper() {
+  return spawnSync("sh", ["-eu", "-s"], {
+    input: `docker() { cat; }
+compose_base=base
+compose_override=override
+${projectionComposeWrappers()}
+printf 'intentional-stream-payload\\n' | dc_with_stdin run --rm data-tools
+`,
+    encoding: "utf8",
+  });
+}
+
 function exerciseProjectionExportComparison(buildExport, productionExport) {
   return spawnSync("sh", ["-eu", "-c", `${projectionExportNormalizerFunction()}
 build=$(normalize_export_identity "$1")
@@ -428,6 +479,23 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(pullRequest, /V8__system_list_definitions\.sql/);
   assert.match(pullRequest, /V8__result_attempts_lookup\.sql/);
   assert.match(pullRequest, /type = 'BASELINE'/);
+});
+
+test("projection deployment protects its remote heredoc from non-input compose children", async () => {
+  const result = await exerciseProjectionResetCandidateAgainstStdinReader();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "sentinel-after-candidate\n");
+  const streamResult = exerciseProjectionStreamHelper();
+  assert.equal(streamResult.status, 0, streamResult.stderr);
+  assert.equal(streamResult.stdout, "intentional-stream-payload\n");
+
+  assert.match(projectionDeploy, /dc\(\) \{\n\s+docker compose .* "\$@" <\/dev\/null/);
+  assert.match(projectionDeploy, /dc_with_stdin\(\) \{\n\s+docker compose .* "\$@"\n/);
+  assert.equal((projectionDeploy.match(/dc_with_stdin (?:run|exec)/g) || []).length, 4);
+  assert.match(projectionDeploy, /dc_with_stdin run --rm -T data-tools[\s\S]*?verify-active[\s\S]*?< "\$release_file"/);
+  assert.match(projectionDeploy, /dc_with_stdin run --rm -T --entrypoint sh[\s\S]*?< "\/tmp\/wcarankings-\$\{ARTIFACT_ID\}-raw\.sql\.zip"/);
+  assert.match(projectionDeploy, /\| dc_with_stdin exec -T/);
+  assert.match(projectionDeploy, /--manifest=-\s*\\\n\s*< "\$release_file"/);
 });
 
 test("server image transfer selection repairs missing unchanged tags", () => {

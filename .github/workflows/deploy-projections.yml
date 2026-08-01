@@ -284,6 +284,9 @@ jobs:
             printf 'services:\n  data-tools:\n    image: wcarankings-data-tools:artifact-%s\n  flyway:\n    image: wcarankings-flyway:artifact-%s\n' \
               "$ARTIFACT_ID" "$ARTIFACT_ID" > "$compose_override"
             dc() {
+              docker compose -f "$compose_base" -f "$compose_override" "$@" </dev/null
+            }
+            dc_with_stdin() {
               docker compose -f "$compose_base" -f "$compose_override" "$@"
             }
             candidate="wcarankings_candidate_${ARTIFACT_ID}"
@@ -310,7 +313,7 @@ jobs:
             fi
             if [ "$phase" = activated ]; then
               set +e
-              dc run --rm -T data-tools \
+              dc_with_stdin run --rm -T data-tools \
                 /app/scripts/activate-ranking-generation.mjs verify-active \
                   --artifact-run-id="$ARTIFACT_RUN_ID" \
                   --artifact-id="$ARTIFACT_ID" \
@@ -537,7 +540,7 @@ jobs:
 
             if [ "$phase" = initialized ]; then
               if [ "$HAS_RAW" = true ]; then
-                dc run --rm -T --entrypoint sh data-tools -c \
+                dc_with_stdin run --rm -T --entrypoint sh data-tools -c \
                   "cat > /var/cache/wcarankings/wca-export-${ARTIFACT_ID}.sql.zip" \
                   < "/tmp/wcarankings-${ARTIFACT_ID}-raw.sql.zip"
                 dc run --rm \
@@ -573,7 +576,7 @@ jobs:
                 if [ "$group" = yearly-person-rankings ]; then prefix=yearly; fi
                 gzip -t "/tmp/wcarankings-${ARTIFACT_ID}-${prefix}.sql.gz"
                 gzip -dc "/tmp/wcarankings-${ARTIFACT_ID}-${prefix}.sql.gz" \
-                  | dc exec -T \
+                  | dc_with_stdin exec -T \
                       -e CANDIDATE_SCHEMA="$candidate" \
                       db sh -c '
                         mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$CANDIDATE_SCHEMA"
@@ -624,7 +627,7 @@ jobs:
             fi
 
             if [ "$phase" = projections_prepared ]; then
-              dc run --rm -T \
+              dc_with_stdin run --rm -T \
                 -e FAILURE_INJECTION_POINT="$FAILURE_INJECTION_POINT" \
                 data-tools /app/scripts/activate-ranking-generation.mjs activate \
                   --candidate-schema="$candidate" \
