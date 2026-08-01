@@ -450,6 +450,7 @@ jobs:
             } | sort -u )
             docker images --no-trunc --format "{{.Repository}}:{{.Tag}} {{.ID}}" | while IFS=" " read -r image_ref image_id; do
               case "$image_ref" in
+                wcarankings-app:latest|wcarankings-app:previous|wcarankings-flyway:latest|wcarankings-data-tools:latest) continue ;;
                 wcarankings-flyway:artifact-*|wcarankings-data-tools:artifact-*) continue ;;
                 wcarankings-app:*|wcarankings-flyway:*|wcarankings-data-tools:*) ;;
                 *) continue ;;
