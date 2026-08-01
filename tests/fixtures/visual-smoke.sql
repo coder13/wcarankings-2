@@ -10,6 +10,7 @@ CREATE TABLE persons (
   sub_id INT NOT NULL,
   name VARCHAR(100) NOT NULL,
   country_id VARCHAR(50) NOT NULL,
+  gender CHAR(1) NOT NULL,
   PRIMARY KEY (wca_id, sub_id)
 );
 
@@ -77,8 +78,8 @@ CREATE TABLE results (
 INSERT INTO countries (id, name, iso2, continent_id)
 VALUES ('USA', 'United States', 'US', '_North America');
 
-INSERT INTO persons (wca_id, sub_id, name, country_id)
-VALUES ('2026TEST01', 1, 'Visual Test Cuber', 'USA');
+INSERT INTO persons (wca_id, sub_id, name, country_id, gender)
+VALUES ('2026TEST01', 1, 'Visual Test Cuber', 'USA', 'm');
 
 INSERT INTO formats (id, expected_solve_count) VALUES ('a', 5);
 INSERT INTO round_types (id, rank, final) VALUES ('f', 1, 1);

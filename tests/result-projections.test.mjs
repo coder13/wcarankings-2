@@ -58,6 +58,7 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(fixture, /year SMALLINT/);
   assert.match(fixture, /month TINYINT/);
   assert.match(fixture, /day TINYINT/);
+  assert.match(fixture, /gender CHAR\(1\) NOT NULL/);
   assert.match(fixture, /regional_single_record/);
 });
 
