@@ -94,6 +94,22 @@ export function RankingRow({
   const id = entry.personId;
   const countryName = entry.countryName || "Country unavailable";
   const recordBadge = entry.recordBadges[0];
+  const recordStreakWeeks = entry.recordStreakWeeks && entry.recordStreakWeeks > 0
+    ? entry.recordStreakWeeks
+    : null;
+  const recordBadgeLabel = recordBadge
+    ? `${RECORD_BADGE_LABELS[recordBadge]}${recordStreakWeeks ? `, unbeaten for ${recordStreakWeeks} competition weeks` : ""}`
+    : null;
+  const rankDeltaLabel = entry.rankDeltaState === "new"
+    ? "new ranking"
+    : entry.rankDelta && entry.rankDelta > 0
+      ? `up ${Math.abs(entry.rankDelta)} places`
+      : entry.rankDelta && entry.rankDelta < 0
+        ? `down ${Math.abs(entry.rankDelta)} places`
+        : null;
+  const rankDeltaIcon = entry.rankDeltaState === "new"
+    ? "New"
+    : entry.rankDelta && entry.rankDelta > 0 ? "↑" : entry.rankDelta && entry.rankDelta < 0 ? "↓" : null;
   const formattedResult = entry.formattedValue ??
     formatWcaResult(eventId, entry.best, rankingType);
   const inferredProfileHref = /^\d{4}[A-Z]{4}\d{2}$/.test(id) ? `/person/${id}` : "";
@@ -125,7 +141,7 @@ export function RankingRow({
       data-row-index={rowIndex}
       style={style}
       tabIndex={0}
-      aria-label={`Rank ${formatRankingNumber(rank)}: ${name}, ${formattedResult}`}
+      aria-label={`Rank ${formatRankingNumber(rank)}: ${name}, ${formattedResult}${rankDeltaLabel ? `, ${rankDeltaLabel}` : ""}`}
       onKeyDown={(keyboardEvent) => {
         if (keyboardEvent.altKey || keyboardEvent.ctrlKey || keyboardEvent.metaKey)
           return;
@@ -191,6 +207,11 @@ export function RankingRow({
           {selectionMode && <button className="memberSelectionToggle" type="button" aria-label={`Select ${name}`} aria-pressed={selected} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onToggleSelected?.(entry.personId); }}>{selected ? "✓" : ""}</button>}
           <span className={`rank${rankIsDuplicate ? " rank--duplicate" : ""}`}>
             {formatRankingNumber(rank)}
+            {rankDeltaIcon && rankDeltaLabel && (
+              <span className={`rankDelta rankDelta--${entry.rankDeltaState === "new" ? "new" : entry.rankDelta! > 0 ? "up" : "down"}`} aria-label={rankDeltaLabel} title={rankDeltaLabel}>
+                <span aria-hidden="true">{rankDeltaIcon}</span>{entry.rankDeltaState === "new" ? null : Math.abs(entry.rankDelta ?? 0)}
+              </span>
+            )}
           </span>
           {(entry.profileHref || inferredProfileHref) && !onToggle ? (
             <Link className="identity identity--link" href={entry.profileHref || inferredProfileHref}>
@@ -210,10 +231,10 @@ export function RankingRow({
                   <span
                     className={`recordBadge recordBadge--${recordBadge}`}
                     role="img"
-                    aria-label={RECORD_BADGE_LABELS[recordBadge]}
-                    title={RECORD_BADGE_LABELS[recordBadge]}
+                    aria-label={recordBadgeLabel ?? undefined}
+                    title={recordBadgeLabel ?? undefined}
                   >
-                    {recordBadge}
+                    {recordBadge}{recordStreakWeeks ? ` · ${recordStreakWeeks}w` : ""}
                   </span>
                 )}
               </span>

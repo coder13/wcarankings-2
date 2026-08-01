@@ -17,6 +17,9 @@ export type RankingEntry = {
   competitionId: string;
   competitionName: string;
   recordBadges: RecordBadgeCode[];
+  rankDelta?: number | null;
+  rankDeltaState?: "changed" | "new" | null;
+  recordStreakWeeks?: number | null;
 };
 
 export function rankingEntryKey(entry: Pick<RankingEntry, "entryKey" | "personId">) {

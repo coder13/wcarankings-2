@@ -17,6 +17,13 @@ export type RankingRow = {
   is_world_record: number;
   is_continent_record: number;
   is_country_record: number;
+  world_rank_delta: number | null;
+  world_rank_delta_state: "changed" | "new" | null;
+  continent_rank_delta: number | null;
+  continent_rank_delta_state: "changed" | "new" | null;
+  country_rank_delta: number | null;
+  country_rank_delta_state: "changed" | "new" | null;
+  record_streak_weeks: number | null;
 };
 
 export type KinchOrder = "regional" | "continent";

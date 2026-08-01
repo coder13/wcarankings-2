@@ -21,7 +21,7 @@ export function rankingShape(scope: RegionScope) {
 }
 
 export function rankingColumns(rank: string, subRank: string) {
-  return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record`;
+  return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record, world_rank_delta, world_rank_delta_state, continent_rank_delta, continent_rank_delta_state, country_rank_delta, country_rank_delta_state, record_streak_weeks`;
 }
 
 export function genderCondition(alias: string, genders: readonly GenderFilter[]) {

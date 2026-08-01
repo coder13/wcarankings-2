@@ -46,7 +46,13 @@ import type { RankingsMetadata } from "@/services/rankings/types";
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const MAX_SEARCH_RESULTS = 500;
 
-function toRankingEntry(row: RankingRow): RankingEntry {
+function toRankingEntry(row: RankingRow, scope: QueryInput["scope"]): RankingEntry {
+  const rankDelta = scope === "continent"
+    ? row.continent_rank_delta
+    : scope === "country" ? row.country_rank_delta : row.world_rank_delta;
+  const rankDeltaState = scope === "continent"
+    ? row.continent_rank_delta_state
+    : scope === "country" ? row.country_rank_delta_state : row.world_rank_delta_state;
   return {
     rank: Number(row.rank),
     subRank: Number(row.sub_rank),
@@ -65,6 +71,11 @@ function toRankingEntry(row: RankingRow): RankingEntry {
       isCountryRecord: Number(row.is_country_record) === 1,
       continentId: row.continent_id,
     }),
+    rankDelta: rankDelta === null || rankDelta === undefined ? null : Number(rankDelta),
+    rankDeltaState: rankDeltaState ?? null,
+    recordStreakWeeks: row.record_streak_weeks === null || row.record_streak_weeks === undefined
+      ? null
+      : Number(row.record_streak_weeks),
   };
 }
 
@@ -97,7 +108,7 @@ function normalPageResponse(rows: RankingRow[], input: QueryInput, metadata: Ran
           input.scope,
           input.regionId,
         );
-  const entries = rows.map(toRankingEntry);
+  const entries = rows.map((row) => toRankingEntry(row, input.scope));
   const startPosition = Math.min(Math.max(0, input.startRank - 1), total);
   const hasMore = input.startRank + entries.length <= total;
   return {
@@ -194,7 +205,7 @@ async function queryGenderPage(input: QueryInput) {
     genderRankingPageQuery({ source, baseConditions, conditions }),
     [...values, resultLimit],
   );
-  const entries = result.rows.slice(0, input.locate ? 1 : input.limit).map(toRankingEntry);
+  const entries = result.rows.slice(0, input.locate ? 1 : input.limit).map((row) => toRankingEntry(row, input.scope));
   if (input.locate)
     return {
       data: { located: entries[0] ?? null },
@@ -272,7 +283,7 @@ export async function queryMysql(input: QueryInput) {
       [...values, input.locate],
     );
     return {
-      data: { located: result.rows[0] ? toRankingEntry(result.rows[0]) : null },
+      data: { located: result.rows[0] ? toRankingEntry(result.rows[0], input.scope) : null },
       timings: result.timings,
       queryCount: 1,
       returnedRows: result.rows.length,
@@ -305,7 +316,7 @@ export async function queryMysql(input: QueryInput) {
       }),
       [...values, ...people.personIds, input.searchLimit],
     );
-    const entries = result.rows.map(toRankingEntry);
+    const entries = result.rows.map((row) => toRankingEntry(row, input.scope));
     return {
       data: {
         entries,
@@ -332,7 +343,7 @@ export async function queryMysql(input: QueryInput) {
     rankingCursorQuery({ selectColumns, from, predicate, qualifiedSubRank, personColumn, cursor }),
     pageValues,
   );
-  const entries = result.rows.slice(0, input.limit).map(toRankingEntry);
+  const entries = result.rows.slice(0, input.limit).map((row) => toRankingEntry(row, input.scope));
   return {
     data: {
       entries,
