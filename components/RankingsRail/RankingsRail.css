@@ -6,7 +6,7 @@
   align-items: center;
   border-radius: 20px;
   background: var(--rail-surface);
-  box-shadow: 0 4px 16px var(--shadow);
+  box-shadow: 0 5px 18px var(--shadow);
 }
 
 .RankingsRail { isolation: isolate; }

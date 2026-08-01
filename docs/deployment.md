@@ -1,5 +1,10 @@
 # Deployment
 
+> **Current production release workflow:** the historical import-and-transfer
+> description below predates the independent server and projection release
+> lanes. For the current workflow, operational safeguards, cache model, and
+> observed production results, see [Production release pipeline](production-release-pipeline.md).
+
 CubeRanks is deployed as a Docker Compose stack on a managed Linux host. The
 production stack contains five services:
 
