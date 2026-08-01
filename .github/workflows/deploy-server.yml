@@ -461,7 +461,9 @@ jobs:
                   echo "Skipping cleanup for ${image_ref}; its canonical image ID could not be resolved." >&2
                   continue
                 fi
-                case " $protected_images " in *" $canonical_id "*) continue ;; esac
+                if printf '%s\n' "$protected_images" | grep -Fqx -- "$canonical_id"; then
+                  continue
+                fi
                 docker image rm "$image_ref" || true
               done
             }

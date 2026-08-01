@@ -69,18 +69,25 @@ docker() {
   if [ "$1" = ps ]; then return 0; fi
   if [ "$1" = images ]; then
     printf '%s\\n' \\
-      'wcarankings-app:latest sha256:short-live' \\
-      'wcarankings-app:previous sha256:short-previous' \\
-      'wcarankings-flyway:latest sha256:short-flyway' \\
-      'wcarankings-data-tools:latest sha256:short-tools' \\
-      'wcarankings-app:protected-source sha256:short-protected' \\
+      'wcarankings-app:latest sha256:short-unprotected-live' \\
+      'wcarankings-app:previous sha256:short-unprotected-previous' \\
+      'wcarankings-flyway:latest sha256:short-unprotected-flyway' \\
+      'wcarankings-data-tools:latest sha256:short-unprotected-tools' \\
+      'wcarankings-app:protected-first sha256:short-protected-first' \\
+      'wcarankings-data-tools:protected-last sha256:short-protected-last' \\
       'wcarankings-app:stale-source sha256:short-stale'
     return 0
   fi
   if [ "$1" = image ] && [ "$2" = inspect ]; then
+    if [ "\${4:-}" = wcarankings-app:previous ]; then
+      printf 'sha256:full-protected-first\\nsha256:full-protected-last\\n'
+      return 0
+    fi
     case "$3" in
+      wcarankings-app:protected-first) printf 'sha256:full-protected-first\\n' ;;
+      wcarankings-data-tools:protected-last) printf 'sha256:full-protected-last\\n' ;;
       wcarankings-app:stale-source) printf 'sha256:full-stale\\n' ;;
-      *) printf 'sha256:full-protected\\n' ;;
+      *) printf 'sha256:full-unprotected\\n' ;;
     esac
     return 0
   fi
@@ -368,7 +375,7 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   );
   assert.match(serverDeploy, /docker images --no-trunc --format/);
   assert.match(serverDeploy, /canonical_id=.*docker image inspect "\$image_ref" --format "\{\{\.Id\}\}"/);
-  assert.match(serverDeploy, /" \$protected_images ".*" \$canonical_id "/);
+  assert.match(serverDeploy, /printf '%s\\n' "\$protected_images" \| grep -Fqx -- "\$canonical_id"/);
   assert.doesNotMatch(serverDeploy, /docker images --format "\{\{\.Repository\}\}:\{\{\.Tag\}\} \{\{\.ID\}\}"/);
   const repairDataToolsTagIndex = serverDeploy.indexOf('docker tag "wcarankings-data-tools:${SOURCE_SHA}" wcarankings-data-tools:latest');
   const protectedServiceTagsIndex = serverDeploy.indexOf("wcarankings-app:latest|wcarankings-app:previous|wcarankings-flyway:latest|wcarankings-data-tools:latest) continue");
