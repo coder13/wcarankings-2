@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   activateGeneration,
   activationTables,
+  bootstrapGenerationState,
   rollbackGeneration,
 } from "../scripts/activate-ranking-generation.mjs";
 
@@ -141,6 +142,41 @@ if (!applicationUrl && !adminUrl) {
     const fullTables = activationTables(fullManifest);
     await initializeSchema(schemas.production, fullTables, "old");
     await initializeSchema(schemas.candidate, fullTables, "new", fullManifest.exportId);
+
+    const bootstrapConnection = await mysql.createConnection(connectionOptions(applicationUrl, schemas.production));
+    try {
+      const first = await bootstrapGenerationState({
+        connection: bootstrapConnection,
+        productionSchema: schemas.production,
+      });
+      const second = await bootstrapGenerationState({
+        connection: bootstrapConnection,
+        productionSchema: schemas.production,
+      });
+      assert.equal(first.bootstrapped, true);
+      assert.equal(second.bootstrapped, false);
+      assert.equal(first.state.exportId, new Date(oldExportId).toISOString());
+      assert.deepEqual(first.state.capabilities, {
+        core: true,
+        resultRankings: true,
+        competitionRankings: true,
+        cityEventStats: true,
+        sumOfRanks: true,
+        yearlyPersonRankings: true,
+      });
+      assert.deepEqual(first.state.artifactFingerprints, {});
+      assert.deepEqual(first.state.activationTables, []);
+      assert.deepEqual(first.state.previousTables, []);
+      const [bootstrapRows] = await bootstrapConnection.query(
+        "SELECT fingerprints_json FROM ranking_generation_state WHERE id = 1",
+      );
+      assert.deepEqual(JSON.parse(bootstrapRows[0].fingerprints_json), {
+        semantic: {}, artifacts: {}, digests: {},
+      });
+      await execute(bootstrapConnection, "DELETE FROM ranking_generation_state WHERE id = 1");
+    } finally {
+      await bootstrapConnection.end();
+    }
     await insertState(schemas.production, {
       generationId: "old-generation",
       exportId: oldExportId,

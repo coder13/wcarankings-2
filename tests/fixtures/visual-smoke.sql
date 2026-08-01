@@ -111,17 +111,3 @@ VALUES (
 INSERT INTO export_metadata (`key`, `value`) VALUES
   ('export_date', '2026-01-01'),
   ('fetched_at', '2026-01-01T00:00:00.000Z');
-
-INSERT INTO ranking_generation_state (
-  id, generation_id, export_id, artifact_format_version,
-  dataset_schema_version, fingerprints_json, capabilities_json,
-  source_sha, artifact_run_id, artifact_id, activation_tables_json,
-  previous_tables_json, activated_at
-)
-VALUES (
-  1, 'visual-smoke-generation', '2026-01-01', 3,
-  1, '{"semantic":{},"artifacts":{},"digests":{}}',
-  '{"core":true,"resultRankings":true,"competitionRankings":true,"cityEventStats":true,"sumOfRanks":true,"yearlyPersonRankings":true}',
-  '0000000000000000000000000000000000000000', 0, 0, '[]',
-  '[]', '2026-01-01 00:00:00.000000'
-);

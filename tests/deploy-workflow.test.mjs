@@ -108,6 +108,15 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(serverDeploy, /wait_for_database_cooldown/);
   assert.match(projectionDeploy, /verify-active/);
   assert.match(serverDeploy, /flyway_schema_history_results/);
+  const bootstrapIndex = serverDeploy.indexOf("activate-ranking-generation.mjs bootstrap");
+  const mutationLockIndex = serverDeploy.lastIndexOf("production-mutation.lock", bootstrapIndex);
+  const lastFlywayIndex = serverDeploy.lastIndexOf("flyway migrate", bootstrapIndex);
+  const migrationConditionalEndIndex = serverDeploy.lastIndexOf("            fi", bootstrapIndex);
+  const serverSwitchIndex = serverDeploy.indexOf("- name: Switch production server", bootstrapIndex);
+  assert.ok(mutationLockIndex >= 0 && bootstrapIndex > mutationLockIndex);
+  assert.ok(lastFlywayIndex >= 0 && bootstrapIndex > lastFlywayIndex);
+  assert.ok(migrationConditionalEndIndex >= 0 && bootstrapIndex > migrationConditionalEndIndex);
+  assert.ok(serverSwitchIndex > bootstrapIndex);
   assert.match(projectionDeploy, /flyway_schema_history_results/);
   assert.match(serverDeploy, /wcarankings-data-tools:artifact-\*\) continue/);
   assert.match(serverDeploy, /FLYWAY_IMAGE_CHANGED.*\|\|.*DATA_TOOLS_IMAGE_CHANGED/);

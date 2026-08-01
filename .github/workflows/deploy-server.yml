@@ -306,6 +306,8 @@ jobs:
                 flyway migrate
               wait_for_database_cooldown
             fi
+            docker compose run --rm data-tools \
+              /app/scripts/activate-ranking-generation.mjs bootstrap
           REMOTE
           echo "CANDIDATE_STAGED=true" >> "$GITHUB_ENV"
 

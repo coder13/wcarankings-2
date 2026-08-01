@@ -4,6 +4,7 @@ import mysql from "mysql2/promise";
 import {
   DEPLOYMENT_PROJECTION_GROUPS,
   PROJECTION_CAPABILITIES,
+  PROJECTION_ARTIFACT_FORMAT_VERSION,
 } from "./projection-groups.mjs";
 import { normalizeExportDate } from "./projection-transfer-date.mjs";
 
@@ -62,6 +63,22 @@ function groupTables(groups) {
     throw new Error("The release contains an unknown projection group");
   }
   return [...new Set(definitions.flatMap(({ tables }) => tables))];
+}
+
+export function capabilitiesFromTables(tables) {
+  const present = new Set(tables);
+  const groups = new Map(
+    DEPLOYMENT_PROJECTION_GROUPS.map((group) => [
+      group.name,
+      group.tables.every((table) => present.has(table)),
+    ]),
+  );
+  return Object.fromEntries(
+    Object.entries(PROJECTION_CAPABILITIES).map(([capability, requiredGroups]) => [
+      capability,
+      requiredGroups.every((group) => groups.get(group) === true),
+    ]),
+  );
 }
 
 export function activationTables(manifest) {
@@ -194,6 +211,82 @@ async function acquireLock(connection) {
 
 async function releaseLock(connection) {
   await connection.query("SELECT RELEASE_LOCK(?)", [LOCK_NAME]);
+}
+
+export async function bootstrapGenerationState({ connection, productionSchema }) {
+  identifier(productionSchema, "production schema");
+  await acquireLock(connection);
+  try {
+    const current = await activeState(connection, productionSchema);
+    if (current) return { bootstrapped: false, state: current };
+
+    const tables = await tableNames(connection, productionSchema);
+    for (const required of ["ranking_generation_state", "export_metadata"]) {
+      if (!tables.has(required)) {
+        throw new Error(`Cannot bootstrap projection state without ${required}`);
+      }
+    }
+    const [exportRows] = await connection.query(
+      `SELECT \`key\`, value
+         FROM ${qualified(productionSchema, "export_metadata")}
+        WHERE \`key\` IN ('export_date', 'fetched_at')`,
+    );
+    const exportMetadata = new Map(exportRows.map((row) => [row.key, row.value]));
+    if (exportRows.length !== 2 || exportMetadata.size !== 2) {
+      throw new Error("Projection bootstrap requires one export_date and one fetched_at value");
+    }
+    const exportId = normalizeExportDate(exportMetadata.get("export_date"));
+    if (!exportId) {
+      throw new Error("Projection bootstrap export identity is invalid");
+    }
+    const fetchedAt = normalizeExportDate(exportMetadata.get("fetched_at"));
+    if (!fetchedAt) {
+      throw new Error("Projection bootstrap fetched_at metadata is invalid");
+    }
+
+    const capabilities = capabilitiesFromTables(tables);
+    if (!capabilities.core) {
+      throw new Error("Projection bootstrap requires every core ranking table");
+    }
+    const state = {
+      generationId: `bootstrap:${exportId}`,
+      exportId,
+      artifactFormatVersion: PROJECTION_ARTIFACT_FORMAT_VERSION,
+      datasetSchemaVersion: 1,
+      semanticFingerprints: {},
+      artifactFingerprints: {},
+      artifactDigests: {},
+      capabilities,
+      sourceSha: "0".repeat(40),
+      artifactRunId: 0,
+      artifactId: 0,
+      activationTables: [],
+      previousTables: [],
+    };
+    await connection.query(
+      `INSERT INTO ${qualified(productionSchema, "ranking_generation_state")}
+        (id, generation_id, export_id, artifact_format_version, dataset_schema_version,
+         fingerprints_json, capabilities_json, source_sha, artifact_run_id, artifact_id,
+         activation_tables_json, previous_tables_json, activated_at)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))`,
+      [
+        state.generationId,
+        state.exportId,
+        state.artifactFormatVersion,
+        state.datasetSchemaVersion,
+        JSON.stringify({ semantic: {}, artifacts: {}, digests: {} }),
+        JSON.stringify(state.capabilities),
+        state.sourceSha,
+        state.artifactRunId,
+        state.artifactId,
+        JSON.stringify(state.activationTables),
+        JSON.stringify(state.previousTables),
+      ],
+    );
+    return { bootstrapped: true, state };
+  } finally {
+    await releaseLock(connection);
+  }
 }
 
 function inject(point, requested = process.env.FAILURE_INJECTION_POINT) {
@@ -401,7 +494,14 @@ async function main() {
       process.stdout.write(`${JSON.stringify(await activeState(connection, productionSchema) || {})}\n`);
       return;
     }
-    throw new Error("Use activate-ranking-generation.mjs activate, verify-active, rollback, or state");
+    if (command === "bootstrap") {
+      process.stdout.write(`${JSON.stringify(await bootstrapGenerationState({
+        connection,
+        productionSchema,
+      }))}\n`);
+      return;
+    }
+    throw new Error("Use activate-ranking-generation.mjs activate, verify-active, rollback, state, or bootstrap");
   } finally {
     await connection.end();
   }

@@ -294,6 +294,9 @@ jobs:
             "$MYSQL_DATABASE" < tests/fixtures/visual-smoke.sql
           docker compose run --rm data-tools /app/scripts/backfill-result-entries.mjs
           docker compose run --rm data-tools /app/scripts/refresh-rankings.mjs
+          docker compose run --rm data-tools /app/scripts/activate-ranking-generation.mjs bootstrap
+          docker compose run --rm data-tools /app/scripts/activate-ranking-generation.mjs bootstrap \
+            | grep -q '"bootstrapped":false'
 
       - name: Exercise candidate-schema activation against disposable MariaDB
         env:

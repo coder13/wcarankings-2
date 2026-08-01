@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   activateGeneration,
   activationTables,
+  bootstrapGenerationState,
+  capabilitiesFromTables,
   matchesActiveGeneration,
   mergedGenerationState,
   rollbackGeneration,
@@ -52,13 +54,21 @@ function stateRow({
   };
 }
 
-function fakeConnection({ activeRow = stateRow(), schemas = {} } = {}) {
+function fakeConnection({
+  activeRow = stateRow(),
+  schemas = {},
+  exportRows = [
+    { key: "export_date", value: manifest.exportId },
+    { key: "fetched_at", value: "2026-07-30T00:01:00Z" },
+  ],
+  lockAcquired = true,
+} = {}) {
   const statements = [];
   return {
     statements,
     async query(sql, parameters = []) {
       statements.push({ sql, parameters });
-      if (sql.includes("GET_LOCK")) return [[{ acquired: 1 }]];
+      if (sql.includes("GET_LOCK")) return [[{ acquired: lockAcquired ? 1 : 0 }]];
       if (sql.includes("RELEASE_LOCK")) return [[{ released: 1 }]];
       if (sql.includes("information_schema.tables")) {
         return [[...(schemas[parameters[0]] || [])].map((name) => ({ name }))];
@@ -67,12 +77,106 @@ function fakeConnection({ activeRow = stateRow(), schemas = {} } = {}) {
         return [[activeRow].filter(Boolean)];
       }
       if (sql.includes("FROM `wcarankings`.`export_metadata`")) {
-        return [[{ value: manifest.exportId }]];
+        return [exportRows];
       }
       return [{ affectedRows: 1 }];
     },
   };
 }
+
+test("bootstrap preserves an existing active generation without writing", async () => {
+  const activeRow = stateRow();
+  const connection = fakeConnection({
+    activeRow,
+    schemas: { wcarankings: ["ranking_generation_state"] },
+  });
+  const result = await bootstrapGenerationState({ connection, productionSchema: "wcarankings" });
+
+  assert.equal(result.bootstrapped, false);
+  assert.equal(result.state.generationId, activeRow.generation_id);
+  assert.equal(connection.statements.some(({ sql }) => sql.includes("INSERT INTO")), false);
+});
+
+test("bootstrap fails closed without complete, valid export metadata", async () => {
+  const tables = [
+    "ranking_generation_state", "export_metadata",
+    "ranking_entries_single", "ranking_entries_average", "ranking_counts",
+    "result_entries_single", "result_counts",
+  ];
+  for (const exportRows of [
+    [],
+    [{ key: "export_date", value: manifest.exportId }],
+    [
+      { key: "export_date", value: "not-a-date" },
+      { key: "fetched_at", value: "2026-07-30T00:01:00Z" },
+    ],
+    [
+      { key: "export_date", value: manifest.exportId },
+      { key: "fetched_at", value: "not-a-date" },
+    ],
+  ]) {
+    const connection = fakeConnection({
+      activeRow: null,
+      schemas: { wcarankings: tables },
+      exportRows,
+    });
+    await assert.rejects(
+      bootstrapGenerationState({ connection, productionSchema: "wcarankings" }),
+      /export_date|export identity|fetched_at/,
+    );
+    assert.equal(connection.statements.some(({ sql }) => sql.includes("INSERT INTO")), false);
+  }
+});
+
+test("bootstrap records only table-proven partial capabilities and no fabricated fingerprints", async () => {
+  const tables = [
+    "ranking_generation_state", "export_metadata",
+    "ranking_entries_single", "ranking_entries_average", "ranking_counts",
+    "result_entries_single", "result_counts",
+    "competition_podium_members", "competition_event_stats", "competition_stats",
+    "city_event_stats",
+  ];
+  const connection = fakeConnection({
+    activeRow: null,
+    schemas: { wcarankings: tables },
+  });
+  const result = await bootstrapGenerationState({ connection, productionSchema: "wcarankings" });
+
+  assert.equal(result.bootstrapped, true);
+  assert.deepEqual(result.state.capabilities, {
+    core: true,
+    resultRankings: false,
+    competitionRankings: true,
+    cityEventStats: false,
+    sumOfRanks: false,
+    yearlyPersonRankings: false,
+  });
+  assert.deepEqual(result.state.artifactFingerprints, {});
+  assert.deepEqual(result.state.artifactDigests, {});
+  assert.deepEqual(result.state.activationTables, []);
+  assert.deepEqual(result.state.previousTables, []);
+  const insert = connection.statements.find(({ sql }) => sql.includes("INSERT INTO"));
+  assert.deepEqual(JSON.parse(insert.parameters[4]), { semantic: {}, artifacts: {}, digests: {} });
+  assert.deepEqual(JSON.parse(insert.parameters[5]), result.state.capabilities);
+});
+
+test("bootstrap fails without the ranking-generation advisory lock", async () => {
+  const connection = fakeConnection({ lockAcquired: false });
+  await assert.rejects(
+    bootstrapGenerationState({ connection, productionSchema: "wcarankings" }),
+    /activation lock is already held/,
+  );
+  assert.equal(connection.statements.some(({ sql }) => sql.includes("INSERT INTO")), false);
+});
+
+test("capability table mapping keeps city and competition ownership independent", () => {
+  const capabilities = capabilitiesFromTables([
+    "competition_podium_members", "competition_event_stats", "competition_stats",
+    "city_event_stats", "entity_ranking_counts",
+  ]);
+  assert.equal(capabilities.competitionRankings, true);
+  assert.equal(capabilities.cityEventStats, true);
+});
 
 test("partial activation preserves unchanged artifacts and capabilities", () => {
   const next = mergedGenerationState({
