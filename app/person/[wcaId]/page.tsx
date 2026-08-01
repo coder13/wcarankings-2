@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -53,7 +54,9 @@ function bestResults(profile: NonNullable<Awaited<ReturnType<typeof loadPersonPr
 }
 
 function metricScore(profile: NonNullable<Awaited<ReturnType<typeof loadPersonProfile>>>, type: RankingType, scope: RegionScope) {
-  const regionId = scope === "world" ? "" : scope === "continent" ? profile.person.continentId : profile.person.countryId;
+  let regionId = profile.person.countryId;
+  if (scope === "world") regionId = "";
+  else if (scope === "continent") regionId = profile.person.continentId;
   return profile.metricScores.find((score) =>
     score.resultType === type &&
     score.scope === scope &&
@@ -142,7 +145,7 @@ export default async function PersonProfilePage({ params }: PageProps) {
         <div className="profileIdentity">
           <span className="profileAvatar" aria-hidden="true">
             {profile.person.avatarUrl ? (
-              <img src={profile.person.avatarUrl} alt="" decoding="async" referrerPolicy="no-referrer" />
+              <Image src={profile.person.avatarUrl} alt="" width={64} height={64} unoptimized referrerPolicy="no-referrer" />
             ) : initials(profile.person.name)}
           </span>
           <div>

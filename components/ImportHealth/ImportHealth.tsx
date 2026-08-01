@@ -76,11 +76,9 @@ export function ImportHealth({ loadHealth = loadImportHealth }: { loadHealth?: (
       query.state.data?.status === "import_running" ? 5_000 : 30_000,
   });
   const data = healthQuery.data ?? null;
-  const error = healthQuery.error instanceof Error
-    ? healthQuery.error.message
-    : healthQuery.isError
-      ? "Unable to load import health."
-      : null;
+  let error: string | null = null;
+  if (healthQuery.error instanceof Error) error = healthQuery.error.message;
+  else if (healthQuery.isError) error = "Unable to load import health.";
 
   if (error && !data) return <main className={styles.page}><p className={styles.alert}>{error}</p></main>;
   if (!data) return <main className={styles.page}><p>Loading import health…</p></main>;

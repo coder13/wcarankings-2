@@ -135,11 +135,9 @@ export function useRankingWindow({
     () => ({ patch, replacePage, reload }),
     [patch, reload, replacePage],
   );
-  const queryError = query.error instanceof Error
-    ? query.error.message
-    : query.isError
-      ? "Rankings are unavailable."
-      : "";
+  let queryError = "";
+  if (query.error instanceof Error) queryError = query.error.message;
+  else if (query.isError) queryError = "Rankings are unavailable.";
   const state = useMemo<RankingWindowState>(() => ({
     ...ui,
     entries,

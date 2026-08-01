@@ -34,6 +34,8 @@ export function ListAddPeopleRail({
   const search = usePersonSearchStream(value, searchOpen);
   const { entries } = search;
   const activeIndex = Math.min(active, Math.max(0, entries.length - 1));
+  // TanStack Virtual intentionally exposes callbacks; this component does not memoize them.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => suggestionsRef.current,

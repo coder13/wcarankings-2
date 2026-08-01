@@ -51,12 +51,15 @@ export default async function ListPage({
   const eventValue = typeof query.eventId === "string" ? query.eventId : "333";
   const resultValue = typeof query.result === "string" ? query.result : "single";
   const eventId = isEventId(eventValue) ? eventValue : "333";
-  const rankingType = eventId === "333mbf" || !isRankingType(resultValue)
-    ? "single"
-    : resultValue;
+  const rankingType = eventId !== "333mbf" && isRankingType(resultValue)
+    ? resultValue
+    : "single";
+  let genderValues: string[];
+  if (Array.isArray(query.gender)) genderValues = query.gender;
+  else if (query.gender === undefined) genderValues = [];
+  else genderValues = [query.gender];
   const gender = normalizeGenderFilters(
-    (Array.isArray(query.gender) ? query.gender : query.gender ? [query.gender] : [])
-      .flatMap((value) => value.split(","))
+    genderValues.flatMap((value) => value.split(","))
       .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
   );
   const { list, regions, user, isOwner, membershipState, membershipRequests } = await getListPageData(listId);

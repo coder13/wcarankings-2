@@ -48,11 +48,8 @@ export function planRankNavigation({
     : -1;
   const rankedIndex = entries.findIndex((entry) => entry.subRank >= targetRank);
   const requestedIndex = focusedIndex >= 0 ? focusedIndex : rankedIndex;
-  const targetIndex = requestedIndex >= 0
-    ? requestedIndex
-    : direction === -1
-      ? 0
-      : Math.max(0, entries.length - 1);
+  let targetIndex = requestedIndex;
+  if (targetIndex < 0) targetIndex = direction === -1 ? 0 : Math.max(0, entries.length - 1);
 
   return {
     targetRank,

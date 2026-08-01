@@ -67,7 +67,11 @@ function makeMockRankings(): RankingEntry[] {
         competitionId: `storybook-${index % 7}`,
         countryName: ["United States", "Canada", "Japan", "Germany"][index % 4],
         countryIso2: ["US", "CA", "JP", "DE"][index % 4],
-        recordBadges: (index === 0 ? ["WR", "NR"] : index % 31 === 0 ? ["NR"] : []) as RecordBadgeCode[],
+        recordBadges: (() => {
+          if (index === 0) return ["WR", "NR"] as RecordBadgeCode[];
+          if (index % 31 === 0) return ["NR"] as RecordBadgeCode[];
+          return [];
+        })(),
       };
     });
 }
