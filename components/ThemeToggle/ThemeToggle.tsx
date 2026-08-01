@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  isTheme,
+  getThemePreference,
   resolveTheme,
   THEME_STORAGE_KEY,
   type Theme,
+  type ThemePreference,
 } from "./theme";
 
 const THEME_COLORS: Record<Theme, string> = {
@@ -16,10 +17,9 @@ const THEME_COLORS: Record<Theme, string> = {
 function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.colorScheme = theme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute(
-    "content",
-    THEME_COLORS[theme],
-  );
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute("content", THEME_COLORS[theme]);
+  });
 }
 
 function ThemeIcon({ theme }: { theme: Theme | null }) {
@@ -39,52 +39,122 @@ function ThemeIcon({ theme }: { theme: Theme | null }) {
   );
 }
 
+function SystemIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="14" rx="2" />
+      <path d="M8 22h8M12 18v4" />
+    </svg>
+  );
+}
+
+const THEME_OPTIONS: readonly ThemePreference[] = ["light", "system", "dark"];
+
+function optionLabel(preference: ThemePreference) {
+  return preference[0].toUpperCase() + preference.slice(1);
+}
+
 export function ThemeToggle() {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [preference, setPreference] = useState<ThemePreference | null>(null);
   const [theme, setTheme] = useState<Theme | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const loadTheme = () => {
-      const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-      const nextTheme = resolveTheme(savedTheme, media.matches);
+    const loadTheme = (savedValue = window.localStorage.getItem(THEME_STORAGE_KEY)) => {
+      const nextPreference = getThemePreference(savedValue);
+      const nextTheme = resolveTheme(nextPreference, media.matches);
       applyTheme(nextTheme);
+      setPreference(nextPreference);
       setTheme(nextTheme);
-      return savedTheme;
     };
-    const savedTheme = loadTheme();
-    if (isTheme(savedTheme)) return;
+    loadTheme();
 
     const handleChange = () => {
-      applyTheme(media.matches ? "dark" : "light");
-      setTheme(media.matches ? "dark" : "light");
+      if (getThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY)) === "system") {
+        loadTheme("system");
+      }
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === THEME_STORAGE_KEY) loadTheme(event.newValue);
     };
     media.addEventListener("change", handleChange);
-    return () => media.removeEventListener("change", handleChange);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      media.removeEventListener("change", handleChange);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
-  const nextTheme = theme === "dark" ? "light" : "dark";
-  const label = theme
-    ? `Switch to ${nextTheme} mode`
-    : "Toggle color theme";
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        rootRef.current?.querySelector<HTMLButtonElement>(".themeToggle")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
+
+  const label = preference
+    ? `Color theme: ${optionLabel(preference)}`
+    : "Choose color theme";
+
+  const selectPreference = (nextPreference: ThemePreference) => {
+    const nextTheme = resolveTheme(
+      nextPreference,
+      window.matchMedia("(prefers-color-scheme: dark)").matches,
+    );
+    window.localStorage.setItem(THEME_STORAGE_KEY, nextPreference);
+    applyTheme(nextTheme);
+    setPreference(nextPreference);
+    setTheme(nextTheme);
+    setOpen(false);
+  };
 
   return (
-    <button
-      className="themeToggle"
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={() => {
-        const currentTheme = theme ?? resolveTheme(
-          window.localStorage.getItem(THEME_STORAGE_KEY),
-          window.matchMedia("(prefers-color-scheme: dark)").matches,
-        );
-        const selectedTheme = currentTheme === "dark" ? "light" : "dark";
-        window.localStorage.setItem(THEME_STORAGE_KEY, selectedTheme);
-        applyTheme(selectedTheme);
-        setTheme(selectedTheme);
-      }}
-    >
-      <ThemeIcon theme={theme} />
-    </button>
+    <div className="themeMenu" ref={rootRef}>
+      <button
+        className="themeToggle"
+        type="button"
+        aria-label={label}
+        title={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {preference === "system" ? <SystemIcon /> : <ThemeIcon theme={theme} />}
+      </button>
+
+      {open && (
+        <div className="themePopover" role="menu" aria-label="Color theme">
+          {THEME_OPTIONS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="menuitemradio"
+              aria-checked={preference === option}
+              onClick={() => selectPreference(option)}
+            >
+              <span className="themeOptionIcon">
+                {option === "system" ? <SystemIcon /> : <ThemeIcon theme={option} />}
+              </span>
+              <span>{optionLabel(option)}</span>
+              <span className="themeOptionCheck" aria-hidden="true">✓</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
