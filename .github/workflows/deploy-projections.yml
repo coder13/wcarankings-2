@@ -128,7 +128,7 @@ jobs:
           [[ "$PRODUCTION_WCA_EXPORT_VALUE" =~ ^[0-9TZUTC:+.\ -]+$ ]]
           for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do
             case "$group" in
-              compatibility|result-facts|result-rankings|competition-rankings|city-rankings|sum-of-ranks|yearly-person-rankings) ;;
+              compatibility|result-facts|result-rankings|competition-rankings|person-competition-rankings|city-rankings|sum-of-ranks|yearly-person-rankings) ;;
               *) echo "Unknown projection group: $group" >&2; exit 1 ;;
             esac
           done
@@ -662,7 +662,7 @@ jobs:
                 data-tools /app/scripts/publish-projection-transfer.mjs \
                   --groups="$PROJECTION_GROUPS" &
               wait_for_candidate_work "$!"
-              if [ "$PROJECTION_GROUPS" = "compatibility,result-facts,result-rankings,competition-rankings,city-rankings,sum-of-ranks,yearly-person-rankings" ]; then
+              if [ "$PROJECTION_GROUPS" = "compatibility,result-facts,result-rankings,competition-rankings,person-competition-rankings,city-rankings,sum-of-ranks,yearly-person-rankings" ]; then
                 dc run --rm --label "$candidate_work_label" \
                   -e DATABASE_NAME_OVERRIDE="$candidate" \
                   data-tools /app/scripts/check-ranking-projections.mjs &
@@ -737,6 +737,9 @@ jobs:
             esac
             case ",$PROJECTION_GROUPS," in
               *,competition-rankings,*) retry_endpoint "/api/rankings/competitions?ranking=competitor-count&start=0&limit=10" ;;
+            esac
+            case ",$PROJECTION_GROUPS," in
+              *,person-competition-rankings,*) retry_endpoint "/api/rankings/people/competitions?start=0&limit=1" ;;
             esac
 
             dc exec -T \

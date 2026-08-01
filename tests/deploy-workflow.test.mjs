@@ -330,6 +330,15 @@ test("incremental planning classifies active, cached, build, and hydrate groups"
   assert.match(projectionRelease, /ref: main/);
 });
 
+test("projection deployment accepts and smoke-tests every capability group", async () => {
+  const { DEPLOYMENT_PROJECTION_GROUPS } = await import(new URL("../scripts/projection-groups.mjs", import.meta.url));
+
+  for (const { name } of DEPLOYMENT_PROJECTION_GROUPS) {
+    assert.match(projectionDeploy, new RegExp(`\\b${name}\\b`));
+  }
+  assert.match(projectionDeploy, /person-competition-rankings,\*\) retry_endpoint "\/api\/rankings\/people\/competitions\?start=0&limit=1"/);
+});
+
 test("group artifacts use GHCR and cached dependencies hydrate before a two-worker build", () => {
   assert.match(builder, /oras pull "\$\{repository\}@\$\{digest\}"/);
   assert.match(builder, /oras push "\$ref"/);
