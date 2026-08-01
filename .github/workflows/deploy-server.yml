@@ -604,12 +604,20 @@ jobs:
             restore_previous_app_tag
             restore_staged_config() {
               marker=$1
-              compose_target=$2
-              compose_backup=$3
-              caddy_target=$4
-              caddy_backup=$5
+              release_state=$2
+              source_sha=$3
+              compose_target=$4
+              compose_backup=$5
+              caddy_target=$6
+              caddy_backup=$7
               if [ ! -f "$marker" ]; then
                 echo "This run did not stage deployment configuration; retaining active files."
+                return 0
+              fi
+              if [ -f "$release_state" ] \
+                && grep -Eq "\"sourceSha\"[[:space:]]*:[[:space:]]*\"${source_sha}\"" "$release_state"; then
+                echo "This run is already approved; removing its stale configuration marker."
+                rm -f "$marker"
                 return 0
               fi
               if [ -f "$compose_backup" ]; then cp "$compose_backup" "$compose_target"; else rm -f "$compose_target"; fi
@@ -618,6 +626,8 @@ jobs:
             }
             restore_staged_config \
               "/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging" \
+              /srv/wcarankings/server-release-state.json \
+              "$SOURCE_SHA" \
               /srv/wcarankings/docker-compose.yml \
               /srv/wcarankings/docker-compose.yml.previous \
               /srv/wcarankings/ops/Caddyfile \
@@ -704,7 +714,7 @@ jobs:
             }')
           printf '%s\n' "$approved" \
             | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-                "cat > /tmp/wcarankings-server-release-${SOURCE_SHA}.json"
+                "umask 077; cat > /srv/wcarankings/server-release-state-${SOURCE_SHA}.json.tmp"
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             "SOURCE_SHA='$SOURCE_SHA' sh -s" <<'REMOTE'
             set -eu
@@ -712,9 +722,9 @@ jobs:
             flock -w 60 9
             exec 8>/srv/wcarankings/production-mutation.lock
             flock -w 360 8
-            rm -f "/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging"
-            mv "/tmp/wcarankings-server-release-${SOURCE_SHA}.json" \
+            mv "/srv/wcarankings/server-release-state-${SOURCE_SHA}.json.tmp" \
               /srv/wcarankings/server-release-state.json
+            rm -f "/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging"
           REMOTE
 
       - name: Roll back a late server release failure

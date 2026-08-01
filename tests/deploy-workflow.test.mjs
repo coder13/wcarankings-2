@@ -71,23 +71,26 @@ function preSwitchConfigRecoveryFunction() {
     .join("\n");
 }
 
-async function exercisePreSwitchConfigRecovery(hasMarker) {
+async function exercisePreSwitchConfigRecovery(hasMarker, approvedSourceSha = "") {
   const directory = await mkdtemp(join(tmpdir(), "wcarankings-config-recovery-"));
   const marker = join(directory, "config-staging");
   const composeTarget = join(directory, "compose");
   const composeBackup = join(directory, "compose.previous");
   const caddyTarget = join(directory, "Caddyfile");
   const caddyBackup = join(directory, "Caddyfile.previous");
+  const releaseState = join(directory, "server-release-state.json");
+  const sourceSha = "c".repeat(40);
   await Promise.all([
     writeFile(composeTarget, "active-compose-C\n"),
     writeFile(composeBackup, "approved-compose-B\n"),
     writeFile(caddyTarget, "active-caddy-C\n"),
     writeFile(caddyBackup, "approved-caddy-B\n"),
     ...(hasMarker ? [writeFile(marker, "staged\n")] : []),
+    ...(approvedSourceSha ? [writeFile(releaseState, JSON.stringify({ sourceSha: approvedSourceSha }))] : []),
   ]);
   const result = spawnSync("sh", ["-eu", "-c", `${preSwitchConfigRecoveryFunction()}
-restore_staged_config "$1" "$2" "$3" "$4" "$5"
-`, "sh", marker, composeTarget, composeBackup, caddyTarget, caddyBackup], { encoding: "utf8" });
+restore_staged_config "$1" "$2" "$3" "$4" "$5" "$6" "$7"
+`, "sh", marker, releaseState, sourceSha, composeTarget, composeBackup, caddyTarget, caddyBackup], { encoding: "utf8" });
   const state = {
     result,
     composeTarget: await readFile(composeTarget, "utf8"),
@@ -95,6 +98,7 @@ restore_staged_config "$1" "$2" "$3" "$4" "$5"
     caddyTarget: await readFile(caddyTarget, "utf8"),
     caddyBackup: await readFile(caddyBackup, "utf8"),
     markerExists: await readFile(marker, "utf8").then(() => true, () => false),
+    sourceSha,
   };
   await rm(directory, { recursive: true, force: true });
   return state;
@@ -348,11 +352,13 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(serverDeploy, /caddyFileChecksum: \$caddyFileChecksum/);
   assert.match(serverDeploy, /version: 2/);
   const recordApprovedIndex = serverDeploy.indexOf("- name: Record approved server release");
+  const recordStateTemp = serverDeploy.indexOf("/srv/wcarankings/server-release-state-${SOURCE_SHA}.json.tmp", recordApprovedIndex);
+  const recordStateMove = serverDeploy.indexOf('mv "/srv/wcarankings/server-release-state-${SOURCE_SHA}.json.tmp"', recordApprovedIndex);
   const recordMarkerRemoval = serverDeploy.indexOf('rm -f "/srv/wcarankings/server-release-${SOURCE_SHA}.config-staging"', recordApprovedIndex);
-  const recordStateMove = serverDeploy.indexOf("/srv/wcarankings/server-release-state.json", recordMarkerRemoval);
-  const recordMutationLock = serverDeploy.lastIndexOf("production-mutation.lock", recordMarkerRemoval);
-  assert.ok(recordMutationLock > recordApprovedIndex && recordMutationLock < recordMarkerRemoval);
-  assert.ok(recordMarkerRemoval < recordStateMove);
+  const recordMutationLock = serverDeploy.lastIndexOf("production-mutation.lock", recordStateMove);
+  assert.ok(recordStateTemp > recordApprovedIndex && recordStateTemp < recordMutationLock);
+  assert.ok(recordMutationLock < recordStateMove && recordStateMove < recordMarkerRemoval);
+  assert.doesNotMatch(serverDeploy.slice(recordApprovedIndex), /cat > \/tmp\/wcarankings-server-release/);
   assert.match(flywayHistoryRepair, /script NOT IN/);
   assert.match(flywayHistoryRepair, /script IN/);
   assert.match(flywayHistoryRepair, /type = 'BASELINE' AND version IN/);
@@ -424,6 +430,15 @@ test("pre-switch cleanup preserves unmarked config and restores only this run's 
   assert.equal(afterStage.caddyTarget, "approved-caddy-B\n");
   assert.equal(afterStage.caddyBackup, "approved-caddy-B\n");
   assert.equal(afterStage.markerExists, false);
+
+  const alreadyApproved = await exercisePreSwitchConfigRecovery(true, "c".repeat(40));
+  assert.equal(alreadyApproved.result.status, 0, alreadyApproved.result.stderr);
+  assert.match(alreadyApproved.result.stdout, /already approved/);
+  assert.equal(alreadyApproved.composeTarget, "active-compose-C\n");
+  assert.equal(alreadyApproved.composeBackup, "approved-compose-B\n");
+  assert.equal(alreadyApproved.caddyTarget, "active-caddy-C\n");
+  assert.equal(alreadyApproved.caddyBackup, "approved-caddy-B\n");
+  assert.equal(alreadyApproved.markerExists, false);
 });
 
 test("Caddy recovery resolves raw checksums from new and legacy release state", async () => {
