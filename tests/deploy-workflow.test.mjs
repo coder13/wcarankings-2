@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   SERVER_COMPONENT_PATHS,
@@ -31,6 +34,65 @@ const [
   workflow("pull-request.yml"),
   readFile(new URL("../scripts/prepare-flyway-history.mjs", import.meta.url), "utf8"),
 ]);
+
+function serverCooldownFunctions() {
+  const start = serverDeploy.indexOf("            read_database_cpu() {");
+  const end = serverDeploy.indexOf("            exec 9>/srv/wcarankings/server-release.lock", start);
+  assert.ok(start >= 0 && end > start);
+  return serverDeploy.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {12}/, ""))
+    .join("\n");
+}
+
+async function exerciseServerCooldown(cpuSamples) {
+  const directory = await mkdtemp(join(tmpdir(), "wcarankings-cooldown-"));
+  const sequenceFile = join(directory, "sequence");
+  const indexFile = join(directory, "index");
+  const docker = join(directory, "docker");
+  await writeFile(sequenceFile, `${cpuSamples.join("\n")}\n`);
+  await writeFile(indexFile, "1\n");
+  await writeFile(docker, `#!/bin/sh
+if [ "$1" = "compose" ]; then
+  if [ "$2" = "ps" ]; then printf 'db\\n'; fi
+  exit 0
+fi
+if [ "$1" = "stats" ]; then
+  case " $* " in
+    *" --format "*)
+      index=$(cat "$CPU_INDEX_FILE")
+      value=$(sed -n "\${index}p" "$CPU_SEQUENCE_FILE")
+      if [ -z "$value" ]; then value=$(tail -n 1 "$CPU_SEQUENCE_FILE"); fi
+      next=$((index + 1))
+      printf '%s\\n' "$next" > "$CPU_INDEX_FILE"
+      printf '%s%%%%\\n' "$value"
+      ;;
+    *) printf 'diagnostic\\n' ;;
+  esac
+  exit 0
+fi
+exit 1
+`);
+  await chmod(docker, 0o755);
+  const script = `${serverCooldownFunctions()}
+sleep() { :; }
+measure_database_cpu_baseline
+wait_for_database_cooldown
+printf 'result baseline=%s delta=%s ceiling=%s\\n' "$DATABASE_CPU_BASELINE" "$DATABASE_CPU_DELTA" "$DATABASE_CPU_CEILING"
+`;
+  try {
+    return spawnSync("sh", ["-eu", "-c", script], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${directory}:${process.env.PATH}`,
+        CPU_SEQUENCE_FILE: sequenceFile,
+        CPU_INDEX_FILE: indexFile,
+      },
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
 
 test("server and projection releases have independent triggers and queues", () => {
   assert.match(serverRelease, /push:[\s\S]*branches: \[main\]/);
@@ -106,21 +168,47 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(serverDeploy, /production-mutation\.lock/);
   assert.match(projectionDeploy, /wait_for_database_cooldown/);
   assert.match(serverDeploy, /wait_for_database_cooldown/);
+  for (const workflow of [serverDeploy, projectionDeploy]) {
+    assert.match(workflow, /measure_database_cpu_baseline/);
+    assert.match(workflow, /DATABASE_CPU_BASELINE \* 0\.15/);
+    assert.match(workflow, /delta < 10/);
+    assert.match(workflow, /delta > 25/);
+    assert.match(workflow, /cool_samples.*-ge 3/);
+    assert.match(workflow, /while \[ "\$attempt" -le 60 \]/);
+    assert.match(workflow, /Threads_running/);
+    assert.doesNotMatch(workflow, /cpu < 50|cool below 50%/);
+  }
   assert.match(projectionDeploy, /verify-active/);
   assert.match(serverDeploy, /flyway_schema_history_results/);
   const bootstrapIndex = serverDeploy.indexOf("activate-ranking-generation.mjs bootstrap");
   const mutationLockIndex = serverDeploy.lastIndexOf("production-mutation.lock", bootstrapIndex);
   const lastFlywayIndex = serverDeploy.lastIndexOf("flyway migrate", bootstrapIndex);
+  const serverBaselineIndex = serverDeploy.lastIndexOf("measure_database_cpu_baseline", lastFlywayIndex);
+  const serverCooldownIndex = serverDeploy.indexOf("wait_for_database_cooldown", lastFlywayIndex);
   const migrationConditionalEndIndex = serverDeploy.lastIndexOf("            fi", bootstrapIndex);
   const serverSwitchIndex = serverDeploy.indexOf("- name: Switch production server", bootstrapIndex);
   assert.ok(mutationLockIndex >= 0 && bootstrapIndex > mutationLockIndex);
   assert.ok(lastFlywayIndex >= 0 && bootstrapIndex > lastFlywayIndex);
+  assert.ok(serverBaselineIndex > mutationLockIndex && serverBaselineIndex < lastFlywayIndex);
+  assert.ok(serverCooldownIndex > lastFlywayIndex && bootstrapIndex > serverCooldownIndex);
   assert.ok(migrationConditionalEndIndex >= 0 && bootstrapIndex > migrationConditionalEndIndex);
   assert.ok(serverSwitchIndex > bootstrapIndex);
   assert.match(projectionDeploy, /flyway_schema_history_results/);
   assert.match(serverDeploy, /wcarankings-data-tools:artifact-\*\) continue/);
+  assert.match(serverDeploy, /running_app_image=.*docker inspect.*\.Image/);
+  assert.match(serverDeploy, /running_app_image.*=.*candidate_app_image/);
+  assert.match(serverDeploy, /docker tag "\$running_app_image" wcarankings-app:previous/);
+  assert.doesNotMatch(serverDeploy, /docker tag wcarankings-app:latest wcarankings-app:previous/);
+  assert.match(serverDeploy, /always\(\).*cancelled\(\).*SERVICES_SWITCHED != 'true'/);
+  assert.match(serverDeploy, /recover_approved_config/);
+  assert.match(serverDeploy, /PREVIOUS_COMPOSE_CHECKSUM/);
   assert.match(serverDeploy, /FLYWAY_IMAGE_CHANGED.*\|\|.*DATA_TOOLS_IMAGE_CHANGED/);
   assert.match(projectionDeploy, /compose_base=.*\.projection-compose-/);
+  const projectionImportIndex = projectionDeploy.indexOf("publish-projection-transfer.mjs");
+  const projectionBaselineIndex = projectionDeploy.lastIndexOf("measure_database_cpu_baseline", projectionImportIndex);
+  const projectionCooldownIndex = projectionDeploy.lastIndexOf("wait_for_database_cooldown");
+  assert.ok(projectionBaselineIndex >= 0 && projectionBaselineIndex < projectionImportIndex);
+  assert.ok(projectionCooldownIndex > projectionImportIndex && lockIndex > projectionCooldownIndex);
   assert.match(projectionDeploy, /no longer matches this release; marking it superseded/);
   assert.doesNotMatch(projectionDeploy, /stale; rebuilding its candidate/);
   const composeBackup = serverDeploy.indexOf("cp /srv/wcarankings/docker-compose.yml");
@@ -138,6 +226,38 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(pullRequest, /V8__system_list_definitions\.sql/);
   assert.match(pullRequest, /V8__result_attempts_lookup\.sql/);
   assert.match(pullRequest, /type = 'BASELINE'/);
+});
+
+test("relative MariaDB cooldown accepts a stable high production baseline", async () => {
+  const result = await exerciseServerCooldown([98, 100, 96, 96, 100, 99]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /baseline=98\.00 delta=14\.70 ceiling=112\.70/);
+  assert.match(result.stdout, /cooldown sample 3\/3/);
+});
+
+test("relative MariaDB cooldown resets after a transient spike", async () => {
+  const result = await exerciseServerCooldown([10, 12, 11, 60, 20, 21, 20]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /above its pre-migration band: 60%/);
+  assert.match(result.stdout, /cooldown sample 3\/3/);
+});
+
+test("relative MariaDB cooldown times out under sustained above-band load", async () => {
+  const result = await exerciseServerCooldown([98, 100, 96, ...Array(60).fill(130)]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /did not return to its pre-migration CPU band/);
+  assert.match(result.stderr, /diagnostic/);
+});
+
+test("relative MariaDB cooldown fails closed on invalid or unstable baselines", async () => {
+  const invalid = await exerciseServerCooldown(["unknown"]);
+  assert.notEqual(invalid.status, 0);
+  assert.match(invalid.stderr, /Could not read MariaDB CPU usage/);
+
+  const unstable = await exerciseServerCooldown([0, 100, 0]);
+  assert.notEqual(unstable.status, 0);
+  assert.match(unstable.stderr, /pre-migration CPU was unstable/);
+  assert.doesNotMatch(unstable.stdout, /cooldown sample/);
 });
 
 test("server smoke tests retry the emitted local stylesheet after core readiness", () => {

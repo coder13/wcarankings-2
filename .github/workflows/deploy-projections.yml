@@ -417,27 +417,65 @@ jobs:
                 exit 1
               fi
             done
-            wait_for_database_cooldown() {
+            read_database_cpu() {
               db_container=$(dc ps -q db)
+              cpu=$(docker stats --no-stream --format '{{.CPUPerc}}' "$db_container" | tr -d '%')
+              if ! printf '%s\n' "$cpu" | grep -Eq '^[0-9]+([.][0-9]+)?$'; then
+                echo "Could not read MariaDB CPU usage: ${cpu:-unknown}." >&2
+                return 1
+              fi
+              printf '%s\n' "$cpu"
+            }
+            measure_database_cpu_baseline() {
+              baseline_total=0
+              baseline_min=
+              baseline_max=
+              sample=1
+              while [ "$sample" -le 3 ]; do
+                cpu=$(read_database_cpu)
+                echo "MariaDB pre-staging baseline sample ${sample}/3: ${cpu}% CPU."
+                baseline_total=$(awk "BEGIN { print $baseline_total + $cpu }")
+                if [ -z "$baseline_min" ] || awk "BEGIN { exit !($cpu < $baseline_min) }"; then baseline_min=$cpu; fi
+                if [ -z "$baseline_max" ] || awk "BEGIN { exit !($cpu > $baseline_max) }"; then baseline_max=$cpu; fi
+                if [ "$sample" -lt 3 ]; then sleep 5; fi
+                sample=$((sample + 1))
+              done
+              DATABASE_CPU_BASELINE=$(awk "BEGIN { printf \"%.2f\", $baseline_total / 3 }")
+              DATABASE_CPU_DELTA=$(awk "BEGIN { delta = $DATABASE_CPU_BASELINE * 0.15; if (delta < 10) delta = 10; if (delta > 25) delta = 25; printf \"%.2f\", delta }")
+              baseline_spread=$(awk "BEGIN { printf \"%.2f\", $baseline_max - $baseline_min }")
+              if ! awk "BEGIN { exit !($baseline_spread <= $DATABASE_CPU_DELTA) }"; then
+                echo "MariaDB pre-staging CPU was unstable: ${baseline_min}-${baseline_max}% exceeds the ${DATABASE_CPU_DELTA}-point stability band." >&2
+                return 1
+              fi
+              DATABASE_CPU_CEILING=$(awk "BEGIN { printf \"%.2f\", $DATABASE_CPU_BASELINE + $DATABASE_CPU_DELTA }")
+              echo "MariaDB pre-staging baseline is ${DATABASE_CPU_BASELINE}% CPU; cooldown ceiling is ${DATABASE_CPU_CEILING}%."
+            }
+            wait_for_database_cooldown() {
               cool_samples=0
               attempt=1
               while [ "$attempt" -le 60 ]; do
-                cpu=$(docker stats --no-stream --format '{{.CPUPerc}}' "$db_container" | tr -d '%')
-                if printf '%s\n' "$cpu" | grep -Eq '^[0-9]+([.][0-9]+)?$' \
-                  && awk "BEGIN { exit !($cpu < 50) }"; then
+                cpu=$(read_database_cpu)
+                if awk "BEGIN { exit !($cpu <= $DATABASE_CPU_CEILING) }"; then
                   cool_samples=$((cool_samples + 1))
-                  echo "MariaDB cooldown sample ${cool_samples}/3: ${cpu}% CPU."
+                  echo "MariaDB cooldown sample ${cool_samples}/3: ${cpu}% CPU (baseline ${DATABASE_CPU_BASELINE}%, ceiling ${DATABASE_CPU_CEILING}%)."
                   if [ "$cool_samples" -ge 3 ]; then return 0; fi
                 else
                   cool_samples=0
-                  echo "MariaDB is still settling after projection preparation: ${cpu:-unknown}% CPU."
+                  echo "MariaDB is still above its pre-staging band: ${cpu}% CPU (ceiling ${DATABASE_CPU_CEILING}%)."
                 fi
                 attempt=$((attempt + 1))
                 sleep 5
               done
-              echo "MariaDB did not cool below 50% CPU for three consecutive samples." >&2
+              echo "MariaDB did not return to its pre-staging CPU band for three consecutive samples." >&2
+              db_container=$(dc ps -q db)
+              docker stats --no-stream "$db_container" >&2 || true
+              dc exec -T db sh -c '
+                mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" \
+                  --execute="SHOW GLOBAL STATUS WHERE Variable_name IN ('\''Threads_connected'\'', '\''Threads_running'\'', '\''Innodb_buffer_pool_pages_dirty'\'');"
+              ' >&2 || true
               return 1
             }
+            measure_database_cpu_baseline
             deploy_pid=$$
             (
               failures=0
