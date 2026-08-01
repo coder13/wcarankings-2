@@ -127,15 +127,14 @@ function AccordionFrame({
   return (
     <motion.div
       className={`rowAccordion${ready ? " rowAccordion--ready" : ""}`}
-      initial={initial ? false : closing ? false : { height: 0, marginBottom: 0, opacity: 0 }}
+      initial={initial ? false : closing ? false : { height: 0, marginBottom: 0 }}
       animate={closing
-        ? { height: 0, marginBottom: 0, opacity: 0 }
-        : { height: "auto", marginBottom: "0.4rem", opacity: 1 }}
-      exit={{ height: 0, marginBottom: 0, opacity: 0 }}
+        ? { height: 0, marginBottom: 0 }
+        : { height: "auto", marginBottom: "0.4rem" }}
+      exit={{ height: 0, marginBottom: 0 }}
       transition={{
         height: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
         marginBottom: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
-        opacity: { duration: ACCORDION_TRANSITION_SECONDS * 0.5, ease: "easeOut" },
       }}
     >
       <div className="rowAccordionInner">
