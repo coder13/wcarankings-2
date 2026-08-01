@@ -38,6 +38,7 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "react-ga4": "^3.0.1",
+    "sql-template-tag": "^5.2.1",
     "unzipper": "^0.12.5"
   },
   "devDependencies": {

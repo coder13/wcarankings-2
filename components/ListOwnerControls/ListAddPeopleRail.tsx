@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { RankingsRail } from "@/components/RankingsRail/RankingsRail";
-import { parseListMemberIds } from "@/lib/list-member-ids";
+import { parseListMemberIds } from "@/lib/helpers/lists/list-member-ids";
 import { flagEmoji } from "@/lib/wca";
 import { personInitials, type ListPerson } from "./shared";
 import { usePersonSearchStream } from "./usePersonSearchStream";

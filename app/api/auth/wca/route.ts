@@ -3,7 +3,7 @@ import {
   getSameOriginDestination,
   getWcaAuthConfig,
   makeCookie,
-} from "@/lib/wca-auth";
+} from "@/services/auth/wca";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,13 @@ export async function GET(request: Request) {
     Location: authorizeUrl.toString(),
     "Cache-Control": "no-store",
   });
-  headers.append("Set-Cookie", makeCookie("wca_oauth_state", state, request, { maxAge: 600, sameSite: "Lax" }));
-  headers.append("Set-Cookie", makeCookie("wca_oauth_return_to", returnTo, request, { maxAge: 600, sameSite: "Lax" }));
+  headers.append(
+    "Set-Cookie",
+    makeCookie("wca_oauth_state", state, request, { maxAge: 600, sameSite: "Lax" }),
+  );
+  headers.append(
+    "Set-Cookie",
+    makeCookie("wca_oauth_return_to", returnTo, request, { maxAge: 600, sameSite: "Lax" }),
+  );
   return new Response(null, { status: 302, headers });
 }

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { listPath } from "@/lib/list-path";
+import { listPath } from "@/lib/helpers/lists/list-path";
 
 type CreatedList = { publicId: string; slug: string };
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { notifyAnalyticsNavigation } from "@/lib/google-analytics";
+import { notifyAnalyticsNavigation } from "@/lib/helpers/analytics/google-analytics";
 import {
   parseRankingsUrl,
   serializeRankingsUrl,

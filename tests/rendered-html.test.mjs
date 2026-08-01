@@ -58,15 +58,17 @@ test("composes the rankings UI around URL state and TanStack Query", async () =>
 });
 
 test("does not replace SQL failures with synthetic ranking data", async () => {
-  const [page, rankings, route, readme] = await Promise.all([
+  const [page, rankings, route, controller, readme] = await Promise.all([
     read("app/page.tsx"),
-    read("lib/rankings.ts"),
+    read("services/rankings/service.ts"),
     read("app/api/rankings/route.ts"),
+    read("controllers/rankings-controller.ts"),
     read("README.md"),
   ]);
 
   assert.doesNotMatch(page + rankings, /demo-data|makeDemoRankings/);
-  assert.match(route, /inputError \? 400 : 503/);
+  assert.match(route, /handleRankingsRequest/);
+  assert.match(controller, /inputError \? 400 : 503/);
   assert.doesNotMatch(readme, /preview rows/);
   await assert.rejects(access(new URL("lib/demo-data.ts", root)));
 });

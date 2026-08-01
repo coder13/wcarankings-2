@@ -1,5 +1,5 @@
-import { getAuthUser } from "@/lib/auth";
-import { getWcaAuthConfig } from "@/lib/wca-auth";
+import { getAuthUser } from "@/services/auth/auth";
+import { getWcaAuthConfig } from "@/services/auth/wca";
 
 export const dynamic = "force-dynamic";
 

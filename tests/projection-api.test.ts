@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   ApiInputError,
   optionalInteger,
+  optionalText,
   parseEvent,
   parseGender,
   parseLimit,
@@ -11,7 +12,7 @@ import {
   parseScope,
   parseStart,
   parseYear,
-} from "../lib/projection-api";
+} from "../lib/api/projection";
 import { genderFiltersLabel, normalizeGenderFilters } from "../lib/wca";
 
 test("parses bounded semantic ranking parameters", () => {
@@ -65,6 +66,18 @@ test("keeps cursor integers explicit", () => {
   assert.equal(optionalInteger(new URLSearchParams(), "afterValue"), null);
   assert.throws(
     () => optionalInteger(new URLSearchParams({ afterValue: "12.5" }), "afterValue"),
+    ApiInputError,
+  );
+});
+
+test("reads ranking parameter aliases through the same validators", () => {
+  const params = new URLSearchParams({ event: "333", type: "single", note: "ready" });
+  assert.equal(parseEvent(params), "333");
+  assert.equal(parseResultType(params), "single");
+  assert.equal(optionalText(params, "note"), "ready");
+  assert.equal(optionalText(new URLSearchParams(), "note"), null);
+  assert.throws(
+    () => optionalText(new URLSearchParams({ note: "12345" }), "note", 4),
     ApiInputError,
   );
 });

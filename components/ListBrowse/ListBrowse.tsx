@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
 import { ListBrowseControlsRail, ListBrowsePagerRail } from "@/components/RankingsRail/RankingsRail";
-import type { PublicListSummary } from "@/lib/lists";
+import type { PublicListSummary } from "@/services/lists/types";
 import { ListRow } from "./ListRow";
 import { ListCreateTrigger } from "@/components/ListOwnerControls/ListOwnerControls";
 import "./ListBrowse.css";

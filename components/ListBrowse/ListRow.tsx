@@ -1,6 +1,6 @@
 import Link from "next/link";
-import type { ListSummary, PublicListSummary } from "@/lib/lists";
-import { listPath } from "@/lib/list-path";
+import type { ListSummary, PublicListSummary } from "@/services/lists/types";
+import { listPath } from "@/lib/helpers/lists/list-path";
 import "./ListBrowse.css";
 
 function listSubtitle(list: ListSummary | PublicListSummary) {

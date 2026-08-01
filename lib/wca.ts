@@ -138,7 +138,11 @@ export function isValidRegexPattern(value: string) {
   }
 }
 
-export function formatWcaResult(eventId: string, value: number, rankingType: RankingType = "single") {
+export function formatWcaResult(
+  eventId: string,
+  value: number,
+  rankingType: RankingType = "single",
+) {
   if (eventId === "sor-kinch") {
     return new Intl.NumberFormat(undefined, {
       minimumFractionDigits: 2,

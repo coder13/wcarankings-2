@@ -1,5 +1,5 @@
 import { normalizeProfileWcaId } from "@/lib/person-profile";
-import { fetchWcaThumbs } from "@/lib/person-search";
+import { fetchPersonThumbnailsFromWca } from "@/services/thumbnails/wca-person-thumbnails";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export async function GET(
     return Response.json({ error: "Person was not found." }, { status: 404 });
   }
   if (!request.headers.get("accept")?.includes("text/event-stream")) {
-    const thumbs = await fetchWcaThumbs(normalized, [normalized], 1, 1).catch(() => new Map<string, string | null>());
+    const thumbs = await fetchPersonThumbnailsFromWca(normalized, [normalized], 1, 1).catch(() => new Map<string, string | null>());
     return Response.json({ personId: normalized, avatarUrl: thumbs.get(normalized) ?? null });
   }
   const encoder = new TextEncoder();
@@ -22,7 +22,7 @@ export async function GET(
       const send = (event: string, data: unknown) => {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
-      const thumbs = await fetchWcaThumbs(normalized, [normalized], 1, 1).catch(() => new Map<string, string | null>());
+      const thumbs = await fetchPersonThumbnailsFromWca(normalized, [normalized], 1, 1).catch(() => new Map<string, string | null>());
       send("thumb", { personId: normalized, avatarUrl: thumbs.get(normalized) ?? null });
       controller.close();
     },

@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { listPath } from "@/lib/list-path";
+import { listPath } from "@/lib/helpers/lists/list-path";
 import { useRouter } from "next/navigation";
 import { ListCreateDialog } from "./ListCreateDialog";
 

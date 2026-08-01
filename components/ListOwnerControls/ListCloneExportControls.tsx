@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { listPath } from "@/lib/list-path";
+import { listPath } from "@/lib/helpers/lists/list-path";
 
 export function ListCloneExportControls({ listId }: { listId: string }) {
   const router = useRouter();

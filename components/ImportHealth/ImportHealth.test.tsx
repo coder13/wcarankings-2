@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getImportHealthStatus, formatDuration } from "@/lib/import-health";
+import { getImportHealthStatus, formatDuration } from "@/lib/helpers/text/import-health";
 
 test("distinguishes empty, running, successful, and failed imports", () => {
   assert.equal(getImportHealthStatus({ currentExport: null, latestRun: null }), "empty");

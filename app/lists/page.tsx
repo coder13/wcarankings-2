@@ -1,5 +1,5 @@
 import { ListBrowse } from "@/components/ListBrowse/ListBrowse";
-import { listPublicLists } from "@/lib/lists";
+import { listPublicLists } from "@/services/lists/lists";
 
 export const dynamic = "force-dynamic";
 

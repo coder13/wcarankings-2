@@ -1,22 +1,9 @@
-import { requireAuthUser } from "@/lib/auth";
-import { apiError, assertSameOrigin } from "@/lib/api";
-import { removeSelfFromList } from "@/lib/lists";
+import {
+  removeCurrentUserFromList,
+  type ListRouteContext,
+  withListErrors,
+} from "@/services/lists/controller";
 
-type RouteContext = {
-  params: Promise<{ listId: string }>;
-};
-
-export async function DELETE(request: Request, context: RouteContext) {
-  try {
-    assertSameOrigin(request);
-    const user = await requireAuthUser(request);
-    const { listId } = await context.params;
-    await removeSelfFromList(user, listId);
-    return new Response(null, {
-      status: 204,
-      headers: { "Cache-Control": "private, no-store" },
-    });
-  } catch (error) {
-    return apiError(error);
-  }
+export function DELETE(request: Request, context: ListRouteContext) {
+  return withListErrors(() => removeCurrentUserFromList(request, context));
 }

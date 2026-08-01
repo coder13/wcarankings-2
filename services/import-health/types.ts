@@ -1,0 +1,25 @@
+export type ImportRunRow = {
+  id: number;
+  export_date: string | null;
+  export_format_version: string | null;
+  status: string;
+  started_at: string;
+  fetch_started_at: string | null;
+  fetched_at: string | null;
+  projection_build_started_at: string | null;
+  projection_built_at: string | null;
+  projection_build_duration_ms: number | null;
+  completed_at: string | null;
+  duration_ms: number | null;
+  failure_message: string | null;
+  projection_swap_status: string;
+  source_person_count: number | null;
+  source_result_count: number | null;
+  published_ranking_count: number | null;
+  published_result_count: number | null;
+  event_count: number | null;
+  region_count: number | null;
+  aggregate_count: number | null;
+  result_aggregate_count: number | null;
+};
+export type ProjectionTableRow = { name: string };

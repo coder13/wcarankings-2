@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AuthUser } from "@/lib/auth";
-import {
-  assertCanViewList,
-  type ListSummary,
-} from "@/lib/lists";
+import type { AuthUser } from "@/services/auth/types";
+import { assertCanViewList } from "@/services/lists/lists";
+import type { ListSummary } from "@/services/lists/types";
 
 const owner: AuthUser = {
   id: 1,

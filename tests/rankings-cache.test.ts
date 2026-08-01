@@ -4,7 +4,7 @@ import {
   RANKINGS_CACHE_CAPACITY_333,
   RANKINGS_CACHE_CAPACITY_DEFAULT,
   RankingsPageCache,
-} from "@/lib/rankings-cache";
+} from "@/services/rankings/cache";
 
 const page = (eventId: string, startRank: number, scope: "world" | "country" = "world") => ({
   eventId,

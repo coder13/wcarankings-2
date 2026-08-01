@@ -3,14 +3,14 @@ import test from "node:test";
 import {
   AUTH_SESSION_MAX_AGE_SECONDS,
   generateSessionToken,
-} from "@/lib/auth";
+} from "@/services/auth/auth";
 import {
   getRequestOrigin,
   getSameOriginDestination,
   getWcaAuthConfig,
   makeCookie,
   toWcaProfile,
-} from "@/lib/wca-auth";
+} from "@/services/auth/wca";
 import { getLogoutDestination } from "@/app/api/auth/wca/logout/route";
 import { GET as startWcaAuth } from "@/app/api/auth/wca/route";
 

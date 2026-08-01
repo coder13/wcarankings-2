@@ -199,45 +199,50 @@ test("does not introduce entries or sub-rank vocabulary in new schemas", async (
 });
 
 test("exposes bounded resource APIs without projection name scans", async () => {
-  const [shared, people, results, rankings, entities, search] = await Promise.all([
-    readFile(new URL("lib/projection-api.ts", root), "utf8"),
-    readFile(new URL("lib/semantic-person-rankings.ts", root), "utf8"),
-    readFile(new URL("lib/semantic-result-rankings.ts", root), "utf8"),
-    readFile(new URL("lib/rankings.ts", root), "utf8"),
-    readFile(new URL("lib/semantic-entity-rankings.ts", root), "utf8"),
-    readFile(new URL("lib/person-search.ts", root), "utf8"),
+  const [shared, people, results, rankings, entities, search, rankingQueries] = await Promise.all([
+    readFile(new URL("lib/api/projection.ts", root), "utf8"),
+    readFile(new URL("services/rankings/person.ts", root), "utf8"),
+    readFile(new URL("services/rankings/result.ts", root), "utf8"),
+    readFile(new URL("services/rankings/service.ts", root), "utf8"),
+    readFile(new URL("services/rankings/entity.ts", root), "utf8"),
+    readFile(new URL("services/people/database.ts", root), "utf8"),
+    readFile(new URL("services/rankings/queries.ts", root), "utf8"),
   ]);
+
+  const rankingSources = `${rankings}\n${rankingQueries}`;
+  const entitySources = `${entities}\n${rankingQueries}`;
+  const personSources = `${people}\n${rankingQueries}`;
 
   assert.match(shared, /MAX_PAGE_SIZE = 100/);
   assert.match(shared, /ApiInputError/);
-  assert.match(people, /WITH page AS/);
-  assert.match(people, /FROM person_event_rankings ranking/);
-  assert.match(results, /FROM \$\{table\} ranking/);
+  assert.match(rankingQueries, /WITH page AS/);
+  assert.match(rankingQueries, /FROM person_event_rankings ranking/);
+  assert.match(rankingQueries, /FROM \$\{table\} ranking/);
   assert.match(results, /positionColumn/);
   assert.match(results, /ranking\.\$\{positionColumn\} > \?/);
   assert.match(results, /entryKey: `result:/);
-  assert.match(rankings, /FROM person_sum_of_ranks_scores score/);
-  assert.match(rankings, /input\.eventId === "SOR"/);
-  assert.match(rankings, /input\.eventId === "sor-kinch"/);
-  assert.match(rankings, /score\.\$\{positionColumn\} AS sub_rank/);
-  assert.match(rankings, /\/ 17\.0/);
-  assert.match(rankings, /kinch_continent_score/);
-  assert.match(rankings, /kinchScoreColumn/);
-  assert.doesNotMatch(rankings, /kinch_score \/ 16\.0/);
-  assert.match(rankings, /queryFilteredPersonMetric/);
-  assert.match(rankings, /DENSE_RANK\(\) OVER/);
-  assert.doesNotMatch(rankings, /FROM person_sum_of_ranks_scores\n\s+LEFT JOIN persons/);
-  assert.match(entities, /FROM competition_event_stats stats/);
-  assert.match(entities, /stats\.\$\{positionColumn\} > \?/);
-  assert.match(entities, /INNER JOIN results result ON result\.id = page\.result_id/);
-  assert.match(entities, /FROM city_event_stats stats/);
-  assert.match(search, /FROM persons person/);
+  assert.match(rankingSources, /FROM person_sum_of_ranks_scores score/);
+  assert.match(rankingSources, /input\.eventId === "SOR"/);
+  assert.match(rankingSources, /input\.eventId === "sor-kinch"/);
+  assert.match(rankingSources, /score\.\$\{input\.positionColumn\} AS sub_rank/);
+  assert.match(rankingSources, /\/ 17\.0/);
+  assert.match(rankingSources, /kinch_continent_score/);
+  assert.match(rankingSources, /kinchScoreColumn/);
+  assert.doesNotMatch(rankingSources, /kinch_score \/ 16\.0/);
+  assert.match(rankingSources, /queryFilteredPersonMetric/);
+  assert.match(rankingSources, /DENSE_RANK\(\) OVER/);
+  assert.doesNotMatch(rankingSources, /FROM person_sum_of_ranks_scores\n\s+LEFT JOIN persons/);
+  assert.match(entitySources, /FROM competition_event_stats stats/);
+  assert.match(entitySources, /stats\.\$\{positionColumn\} > \?/);
+  assert.match(entitySources, /INNER JOIN results result ON result\.id = page\.result_id/);
+  assert.match(entitySources, /FROM city_event_stats stats/);
+  assert.match(search, /fetchPersonSearchRowsFromDatabase/);
 
-  for (const source of [people, results, rankings]) {
+  for (const source of [personSources, `${results}\n${rankingQueries}`, rankingSources]) {
     assert.doesNotMatch(source, /FROM results\b/);
     assert.doesNotMatch(source, /person_name LIKE/);
   }
-  assert.doesNotMatch(entities, /person_name LIKE/);
+  assert.doesNotMatch(entitySources, /person_name LIKE/);
   assert.match(entities, /Number\(last\.position\) \+ 1/);
 });
 
@@ -274,16 +279,16 @@ test("backfills only the active competition-event projection", async () => {
 });
 
 test("person search resolves IDs before querying projections", async () => {
-  const [search, rankings, results, compatibilityResults] = await Promise.all([
-    readFile(new URL("lib/person-search.ts", root), "utf8"),
-    readFile(new URL("lib/rankings.ts", root), "utf8"),
+  const [searchQueries, rankings, results, compatibilityResults] = await Promise.all([
+    readFile(new URL("services/people/queries.ts", root), "utf8"),
+    readFile(new URL("services/rankings/service.ts", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_rankings_single.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_entries_single_indexes.sql", root), "utf8"),
   ]);
 
-  assert.match(search, /FROM persons/);
-  assert.match(search, /wca_id = \?/);
-  assert.match(search, /name LIKE \?/);
+  assert.match(searchQueries, /FROM persons/);
+  assert.match(searchQueries, /wca_id = \?/);
+  assert.match(searchQueries, /name LIKE \?/);
   assert.match(rankings, /searchPersonIds/);
   assert.match(rankings, /person_id IN/);
   assert.doesNotMatch(rankings, /person_name \$\{operator\}/);

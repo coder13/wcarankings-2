@@ -92,9 +92,7 @@ export async function query<T extends Record<string, unknown>>(
   }
 }
 
-export async function withTransaction<T>(
-  callback: (connection: PoolConnection) => Promise<T>,
-) {
+export async function withTransaction<T>(callback: (connection: PoolConnection) => Promise<T>) {
   const releaseQueue = await getQueue().acquire();
   let connection: PoolConnection | undefined;
   try {

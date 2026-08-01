@@ -1,8 +1,8 @@
-import { handleProjectionApi } from "@/lib/projection-api";
-import { loadResultRankings } from "@/lib/semantic-result-rankings";
+import { handleProjectionRequest } from "@/controllers/projection-controller";
+import { loadResultRankings } from "@/services/rankings/result";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  return handleProjectionApi(request, "result-rankings", loadResultRankings);
+  return handleProjectionRequest(request, "result-rankings", loadResultRankings);
 }

@@ -1,12 +1,12 @@
 import { query } from "@/db";
-import { getCurrentRankingsMetadata } from "@/lib/rankings-metadata";
+import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import {
   WCA_EVENTS,
   formatWcaResult,
   type RankingType,
   type RegionScope,
 } from "@/lib/wca";
-import { fetchWcaThumbs } from "@/lib/person-search";
+import { fetchPersonThumbnailsFromWca } from "@/services/thumbnails/wca-person-thumbnails";
 
 export type PersonProfileResult = {
   resultType: RankingType;
@@ -255,7 +255,7 @@ export async function loadPersonProfile(wcaId: string): Promise<PersonProfile | 
     [normalized],
   );
 
-  const thumbPromise = fetchWcaThumbs(normalized, [normalized], 1, 1).catch(() => new Map<string, string | null>());
+  const thumbPromise = fetchPersonThumbnailsFromWca(normalized, [normalized], 1, 1).catch(() => new Map<string, string | null>());
   const [metadata, identity, personEventResults, rankingEntriesResults, metricValues, metricScores, thumbs] =
     await Promise.all([metadataPromise, identityPromise, personEventResultsPromise, rankingEntriesResultsPromise, metricValuesPromise, metricScoresPromise, thumbPromise]);
   const person = identity.rows[0];

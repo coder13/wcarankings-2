@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { stripMarkdownLinks } from "@/lib/display-text";
+import { stripMarkdownLinks } from "@/lib/helpers/text/display-text";
 
 test("renders Markdown venue links as plain text", () => {
   assert.equal(

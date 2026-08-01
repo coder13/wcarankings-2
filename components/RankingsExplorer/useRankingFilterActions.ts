@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { trackGoogleAnalyticsEvent } from "@/lib/google-analytics";
+import { trackGoogleAnalyticsEvent } from "@/lib/helpers/analytics/google-analytics";
 import {
   normalizeGenderFilters,
   type GenderFilter,

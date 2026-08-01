@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   hasMultipleListCountries,
   normalizeListRegionSelection,
-} from "@/lib/list-regions";
+} from "@/services/lists/regions";
 
 const northAmerica = {
   continents: [{ id: "_North America", name: "_North America" }],

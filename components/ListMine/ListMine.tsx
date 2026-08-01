@@ -3,7 +3,7 @@
 import { ListCreateTrigger } from "@/components/ListOwnerControls/ListOwnerControls";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
 import { ListRow } from "@/components/ListBrowse/ListRow";
-import type { ListSummary } from "@/lib/lists";
+import type { ListSummary } from "@/services/lists/types";
 import "@/components/ListBrowse/ListBrowse.css";
 import { useRouter } from "next/navigation";
 import { subjectPath } from "@/components/RankingsExplorer/helpers/navigation";

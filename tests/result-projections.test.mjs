@@ -65,7 +65,7 @@ test("normal rankings retain separate historical country and continent bests", a
   const [single, average, listRankings, fixture, resultAttemptsMigration, personLookupMigration] = await Promise.all([
     readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/ranking_entries_average_source.sql", root), "utf8"),
-    readFile(new URL("lib/list-rankings.ts", root), "utf8"),
+    readFile(new URL("services/lists/rankings.ts", root), "utf8"),
     readFile(new URL("tests/fixtures/regional-ranking-history.sql", root), "utf8"),
     readFile(new URL("migrations/mysql/results/V8__result_attempts_lookup.sql", root), "utf8"),
     readFile(new URL("migrations/mysql/app/V13__person_ranking_lookup.sql", root), "utf8"),

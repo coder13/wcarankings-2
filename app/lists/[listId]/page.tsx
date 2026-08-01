@@ -1,19 +1,19 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { getAuthUser } from "@/lib/auth";
-import { loadListRankings } from "@/lib/list-rankings";
+import { getAuthUser } from "@/services/auth/auth";
+import { loadListRankings } from "@/services/lists/rankings";
 import {
   getListRegions,
   hasMultipleListCountries,
   normalizeListRegionSelection,
-} from "@/lib/list-regions";
+} from "@/services/lists/regions";
 import {
   assertCanViewList,
   getListMembershipState,
   listMembershipRequests,
   ListNotFoundError,
   resolveList,
-} from "@/lib/lists";
+} from "@/services/lists/lists";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
 import { isEventId, isRankingType, normalizeGenderFilters, parseRegionQuery, type GenderFilter } from "@/lib/wca";
 

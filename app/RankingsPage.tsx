@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
 import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
-import { getCurrentRankingsMetadata } from "@/lib/rankings-metadata";
-import { getRegions } from "@/lib/regions";
+import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
+import { getRegions } from "@/services/regions/service";
 
 export const dynamic = "force-dynamic";
 
