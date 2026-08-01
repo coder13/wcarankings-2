@@ -230,6 +230,18 @@ test("incremental planning classifies active, cached, build, and hydrate groups"
 test("group artifacts use GHCR and cached dependencies hydrate before a two-worker build", () => {
   assert.match(builder, /oras pull "\$\{repository\}@\$\{digest\}"/);
   assert.match(builder, /oras push "\$ref"/);
+  const publishStart = builder.indexOf("      - name: Publish newly built group artifacts to GHCR");
+  const publishEnd = builder.indexOf("      - name: Compose exact production release bundle", publishStart);
+  assert.ok(publishStart >= 0 && publishEnd > publishStart);
+  const publish = builder.slice(publishStart, publishEnd);
+  assert.match(publish, /pushd "\$directory" >\/dev\/null/);
+  assert.match(publish, /"projection-release\.json:application\/vnd\.cuberanks\.projection\.manifest\.v3\+json"/);
+  assert.match(publish, /"\$archive:application\/vnd\.cuberanks\.projection\.sql\+gzip"/);
+  assert.match(publish, /"\$metadata:application\/vnd\.cuberanks\.projection\.transfer\+json"/);
+  assert.match(publish, /popd >\/dev\/null/);
+  const orasPush = publish.match(/oras push "\$ref"[\s\S]*?popd >\/dev\/null/);
+  assert.ok(orasPush, "the artifact publish must run from the artifact directory");
+  assert.doesNotMatch(orasPush[0], /"\$directory\//);
   assert.doesNotMatch(builder, /projection-release-group-/);
   assert.match(builder, /publish-projection-transfer\.mjs --hydrate/);
   assert.match(builder, /--satisfied-groups="\$HYDRATE_GROUPS"/);

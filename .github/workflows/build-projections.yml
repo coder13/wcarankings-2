@@ -211,10 +211,14 @@ jobs:
             ref="ghcr.io/${owner}/wcarankings-projection-${group}:${tag}"
             archive=$(jq -r --arg group "$group" '.groups[$group].archive.file' "$directory/projection-release.json")
             metadata=$(jq -r --arg group "$group" '.groups[$group].metadata.file' "$directory/projection-release.json")
+            # ORAS rejects absolute file paths. Publish from the artifact directory so
+            # every file reference remains relative even as ORAS tightens validation.
+            pushd "$directory" >/dev/null
             oras push "$ref" --artifact-type application/vnd.cuberanks.projection.group.v3 \
-              "$directory/projection-release.json:application/vnd.cuberanks.projection.manifest.v3+json" \
-              "$directory/$archive:application/vnd.cuberanks.projection.sql+gzip" \
-              "$directory/$metadata:application/vnd.cuberanks.projection.transfer+json"
+              "projection-release.json:application/vnd.cuberanks.projection.manifest.v3+json" \
+              "$archive:application/vnd.cuberanks.projection.sql+gzip" \
+              "$metadata:application/vnd.cuberanks.projection.transfer+json"
+            popd >/dev/null
             digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
             jq --arg group "$group" --arg digest "$digest" '.[$group] = $digest' \
               /tmp/artifact-digests.json > /tmp/artifact-digests.next
