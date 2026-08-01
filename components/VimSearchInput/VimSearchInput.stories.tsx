@@ -21,19 +21,21 @@ function InteractiveVimSearchInput() {
   const [helpOpen, setHelpOpen] = useState(false);
   return (
     <VimSearchInput
-      inputRef={inputRef}
-      value={value}
-      vimMode={false}
-      vimSearchActive
-      findLoading={false}
-      findPending={false}
-      findQuery="Cailyn"
-      activeFindMatch={match}
-      findMatches={[match]}
-      vimHelpOpen={helpOpen}
-      onChange={setValue}
-      onCycle={() => undefined}
-      onToggleHelp={() => setHelpOpen((open) => !open)}
+      state={{ inputRef, mode: false, command: value, helpOpen }}
+      search={{
+        active: true,
+        query: "Cailyn",
+        loading: false,
+        pending: false,
+        activeMatch: match,
+        matches: [match],
+      }}
+      actions={{
+        changeCommand: setValue,
+        closeSearch: () => undefined,
+        cycleSearch: () => undefined,
+        toggleHelp: () => setHelpOpen((open) => !open),
+      }}
     />
   );
 }
@@ -43,19 +45,26 @@ const meta = {
   component: VimSearchInput,
   parameters: { layout: "fullscreen" },
   args: {
-    inputRef: { current: null },
-    value: "/Cailyn",
-    vimMode: false,
-    vimSearchActive: true,
-    findLoading: false,
-    findPending: false,
-    findQuery: "Cailyn",
-    activeFindMatch: match,
-    findMatches: [match],
-    vimHelpOpen: false,
-    onChange: () => undefined,
-    onCycle: () => undefined,
-    onToggleHelp: () => undefined,
+    state: {
+      inputRef: { current: null },
+      mode: false,
+      command: "/Cailyn",
+      helpOpen: false,
+    },
+    search: {
+      active: true,
+      query: "Cailyn",
+      loading: false,
+      pending: false,
+      activeMatch: match,
+      matches: [match],
+    },
+    actions: {
+      changeCommand: () => undefined,
+      closeSearch: () => undefined,
+      cycleSearch: () => undefined,
+      toggleHelp: () => undefined,
+    },
   },
   render: () => <InteractiveVimSearchInput />,
 } satisfies Meta<typeof VimSearchInput>;

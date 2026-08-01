@@ -4,35 +4,54 @@
   inset-inline: 0;
   display: flex;
   justify-content: center;
+  visibility: hidden;
   opacity: 0;
   pointer-events: none;
   will-change: opacity, transform;
-  transition: opacity 100ms var(--cubic-exit),
-    transform 150ms var(--cubic-exit);
+  transition: opacity 100ms var(--cubic-exit) 100ms,
+    transform 150ms var(--cubic-exit) 100ms,
+    visibility 0s linear 250ms;
 }
 
 .JumpControlsVisibility:has(.Jump[data-direction="up"]) {
   top: 1em;
-  opacity: var(--jump-controls-progress);
-  transform: translate3d(
-    0,
-    calc((var(--jump-controls-progress) - 1) * 96px),
-    0
-  );
-  transition: none;
+  transform: translate3d(0, -6px, 0);
 }
 
 .JumpControlsVisibility:has(.Jump[data-direction="down"]) {
-  bottom: 4em;
-  opacity: var(--jump-controls-progress);
-  transform: translate3d(
-    0,
-    calc((1 - var(--jump-controls-progress)) * 96px),
-    0
-  );
-  transition: none;
+  bottom: 1em;
+  transform: translate3d(0, 6px, 0);
 }
 
-.JumpControlsVisibility[data-interactive="true"]:has(.Jump[data-direction]) {
+.JumpControlsVisibility[data-visible="true"]:has(.Jump[data-direction]) {
+  visibility: visible;
+  opacity: 1;
   pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  transition: opacity 150ms var(--cubic-enter) 100ms,
+    transform 150ms var(--cubic-enter) 100ms,
+    visibility 0s linear 100ms;
+}
+
+.JumpControlsFallback {
+  position: fixed;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, 6px, 0);
+  will-change: opacity, transform;
+  transition: opacity 100ms var(--cubic-exit),
+    transform 150ms var(--cubic-exit), visibility 0s linear 150ms;
+}
+
+.JumpControlsFallback[data-visible="true"] {
+  visibility: visible;
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition: opacity 150ms var(--cubic-enter) 100ms,
+    transform 150ms var(--cubic-enter) 100ms, visibility 0s linear 100ms;
 }

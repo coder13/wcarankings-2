@@ -5,6 +5,16 @@ import { Dropdown } from "../Dropdown/Dropdown";
 import SelectChevronIcon from "../Icon/select-chevron.svg?react";
 import { genderFiltersLabel, genderLabel, normalizeGenderFilters, type GenderFilter } from "@/lib/wca";
 
+const GENDER_OPTIONS: Array<{
+  value: GenderFilter | null;
+  label: string;
+}> = [
+  { value: null, label: genderLabel(null) },
+  { value: "m", label: genderLabel("m") },
+  { value: "f", label: genderLabel("f") },
+  { value: "o", label: genderLabel("o") },
+];
+
 export function GenderPicker({
   value,
   onChange,
@@ -16,14 +26,6 @@ export function GenderPicker({
 }) {
   const [open, setOpen] = useState(false);
   const listboxId = useId();
-  const options: Array<{ value: GenderFilter | null; label: string }> = [
-    { value: null, label: genderLabel(null) },
-    { value: "m" as const, label: genderLabel("m") },
-    { value: "f" as const, label: genderLabel("f") },
-    { value: "o" as const, label: genderLabel("o") },
-  ];
-  const selectedLabel = genderFiltersLabel(value);
-
   return (
     <Dropdown className={`genderPicker ${className}`.trim()} open={open} onOpenChange={setOpen}>
       <button
@@ -35,12 +37,12 @@ export function GenderPicker({
         aria-controls={listboxId}
         onClick={() => setOpen((current) => !current)}
       >
-        {selectedLabel}
+        {genderFiltersLabel(value)}
       </button>
       <SelectChevronIcon />
       <div className="genderPickerMenu regionPickerMenu Dropdown-menu" id={listboxId} data-open={open} role="listbox" aria-label="Gender" aria-multiselectable="true" aria-hidden={!open}>
         <div className="regionOptions">
-          {options.map((option) => (
+          {GENDER_OPTIONS.map((option) => (
             <button
               className={`regionOption${(option.value === null ? value.length === 0 : value.includes(option.value)) ? " isSelected" : ""}`}
               key={option.label}
@@ -52,10 +54,11 @@ export function GenderPicker({
                   onChange([]);
                   return;
                 }
-                const next = value.includes(option.value)
-                  ? value.filter((current) => current !== option.value)
-                  : [...value, option.value];
-                onChange(normalizeGenderFilters(next));
+                onChange(normalizeGenderFilters(
+                  value.includes(option.value)
+                    ? value.filter((current) => current !== option.value)
+                    : [...value, option.value],
+                ));
               }}
             >
               {option.label}

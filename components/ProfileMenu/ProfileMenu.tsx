@@ -2,18 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-
-type Profile = {
-  wcaId: string;
-  name: string;
-  countryIso2: string;
-  avatarUrl: string | null;
-};
-
-type ProfileResponse = {
-  profile: Profile | null;
-  configured: boolean;
-};
+import { useWcaProfile } from "../Auth/useWcaProfile";
 
 function PersonIcon() {
   return (
@@ -27,24 +16,10 @@ function PersonIcon() {
 export function ProfileMenu() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<ProfileResponse | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/auth/wca/me", {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Could not load profile");
-        setState((await response.json()) as ProfileResponse);
-      })
-      .catch((error) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setState({ profile: null, configured: true });
-      });
-    return () => controller.abort();
-  }, []);
+  const profileQuery = useWcaProfile();
+  const state = profileQuery.data ?? (profileQuery.isError
+    ? { profile: null, configured: true }
+    : null);
 
   useEffect(() => {
     if (!open) return;
@@ -86,7 +61,7 @@ export function ProfileMenu() {
           <span>{profile.wcaId}</span>
         </div>
         <Link role="menuitem" href="/lists/mine">My lists</Link>
-        <a role="menuitem" href="/settings">Settings</a>
+        <Link role="menuitem" href="/settings">Settings</Link>
         <form action="/api/auth/wca/logout" method="post">
           <button role="menuitem" type="submit">Sign out</button>
         </form>

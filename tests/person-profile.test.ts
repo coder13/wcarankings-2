@@ -22,14 +22,14 @@ test("person profile route batches profile data from ranking projections", async
 });
 
 test("person event details load average attempts from raw result attempts", async () => {
-  const [loader, row] = await Promise.all([
+  const [loader, detailsPanel] = await Promise.all([
     readFile(new URL("../lib/person-event-details.ts", import.meta.url), "utf8"),
-    readFile(new URL("../components/RankingRow/RankingRow.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/RankingRow/RankingDetailsPanel.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(loader, /FROM result_attempts/);
   assert.match(loader, /WHERE result_id = \?/);
   assert.match(loader, /averageCountedAttemptNumbers/);
   assert.doesNotMatch(loader, /value1/);
-  assert.match(row, /label === "Average"/);
+  assert.match(detailsPanel, /label === "Average"/);
 });

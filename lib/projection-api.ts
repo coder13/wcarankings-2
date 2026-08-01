@@ -8,7 +8,6 @@ import {
   parseRegionQuery,
   type RankingType,
   type RegionScope,
-  type GenderFilter,
 } from "@/lib/wca";
 
 export const DEFAULT_PAGE_SIZE = 50;

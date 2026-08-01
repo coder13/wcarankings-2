@@ -142,7 +142,7 @@ function StorybookFetchMock({ children }: { children: ReactNode }) {
     const originalFetch = window.fetch.bind(window);
     window.fetch = ((input, init) => {
       const requestUrl = new URL(getRequestUrl(input), window.location.href);
-      if (requestUrl.pathname === "/api/rankings") {
+      if (requestUrl.pathname.startsWith("/api/rankings")) {
         return makeMockResponse(requestUrl, init);
       }
       return originalFetch(input, init);
@@ -171,8 +171,6 @@ const initialData = {
   startPosition: 0,
   lastRank: entries.at(-1)?.rank ?? null,
   total: allEntries.length,
-  searchMatches: [],
-  initialMatchPersonId: "",
 };
 
 const meta = {
@@ -190,35 +188,25 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const sharedArgs = {
-  initialData,
-  showAllEventRankingOptions: true,
-  showSubjectSwitch: true,
-  mockSubjectRows: true,
-  initialRegions: {
-    continents: FALLBACK_CONTINENTS,
-    countries: FALLBACK_COUNTRIES,
+  initial: {
+    data: initialData,
+    regions: {
+      continents: FALLBACK_CONTINENTS,
+      countries: FALLBACK_COUNTRIES,
+    },
+  },
+  options: {
+    showAllEventRankingOptions: true,
+    showSubjectSwitch: true,
   },
 };
 
 export const Persons: Story = {
-  args: {
-    ...sharedArgs,
-    initialSubject: "people",
-    initialEventId: "333",
-    initialRankingType: "single",
-  },
+  args: sharedArgs,
 };
 
 export const PersonsInfiniteScroll: Story = {
-  args: {
-    ...sharedArgs,
-    // Keep the real virtualized table and the 10,000-entry paged fetch mock
-    // so scrolling exercises the same incremental loading path as production.
-    mockSubjectRows: false,
-    initialSubject: "people",
-    initialEventId: "333",
-    initialRankingType: "single",
-  },
+  args: sharedArgs,
   parameters: {
     docs: {
       description: {
@@ -229,45 +217,36 @@ export const PersonsInfiniteScroll: Story = {
 };
 
 export const Results: Story = {
-  args: {
-    ...sharedArgs,
-    initialSubject: "results",
-    initialEventId: "333",
-    initialRankingType: "single",
+  args: sharedArgs,
+  parameters: {
+    nextjs: { navigation: { pathname: "/results" } },
   },
 };
 
 export const CompetitionBestResults: Story = {
-  args: {
-    ...sharedArgs,
-    initialSubject: "competitions",
-    initialCompetitionRanking: "best-result",
-    initialEventId: "333",
-    initialRankingType: "single",
+  args: sharedArgs,
+  parameters: {
+    nextjs: { navigation: { pathname: "/competitions/best-result" } },
   },
 };
 
 export const CompetitionPodiums: Story = {
-  args: {
-    ...sharedArgs,
-    initialSubject: "competitions",
-    initialCompetitionRanking: "podiums",
-    initialEventId: "333",
-    initialRankingType: "single",
+  args: sharedArgs,
+  parameters: {
+    nextjs: { navigation: { pathname: "/competitions/podiums" } },
   },
 };
 
 export const CompetitionLatitude: Story = {
-  args: {
-    ...sharedArgs,
-    initialSubject: "competitions",
-    initialCompetitionRanking: "latitude",
-    initialLatitudeHemisphere: "north",
-    initialEventId: "333",
-    initialRankingType: "single",
+  args: sharedArgs,
+  parameters: {
+    nextjs: { navigation: { pathname: "/competitions/latitude" } },
   },
 };
 
 export const SearchOpen: Story = {
-  render: () => <RankingsExplorer {...sharedArgs} initialEventId="333" initialRankingType="single" initialSearch="Avery" />,
+  args: sharedArgs,
+  parameters: {
+    nextjs: { navigation: { pathname: "/", query: { search: "Avery" } } },
+  },
 };

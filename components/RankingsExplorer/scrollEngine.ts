@@ -89,15 +89,6 @@ export function getScrollAnimationDuration(peopleDistance: number) {
   );
 }
 
-export function isDuplicateRank(
-  previousRank: number | null | undefined,
-  rank: number
-) {
-  return (
-    previousRank !== null && previousRank !== undefined && previousRank === rank
-  );
-}
-
 export type ScrollAnimationState = {
   frame: number | null;
   active: boolean;
@@ -257,11 +248,10 @@ export function getCurrentViewportPosition(
   list: HTMLDivElement | null,
   entries: Array<unknown>,
   startPosition: number,
-  fallbackPosition: number,
   visibleIndex?: number,
   rowHeight = DEFAULT_ROW_HEIGHT
 ) {
-  if (!list || entries.length === 0) return fallbackPosition;
+  if (!list || entries.length === 0) return startPosition;
   const listTop = list.getBoundingClientRect().top;
   const index =
     visibleIndex ??
@@ -270,7 +260,7 @@ export function getCurrentViewportPosition(
 }
 
 export function getCurrentViewportSubRank(
-  list: HTMLDivElement | null,
+  list: HTMLElement | null,
   entries: Array<{ subRank: number }>,
   fallbackSubRank: number,
   rowHeight = DEFAULT_ROW_HEIGHT

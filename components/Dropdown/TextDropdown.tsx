@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import SelectChevronIcon from "../Icon/select-chevron.svg?react";
 import { Dropdown } from "./Dropdown";
 
@@ -15,16 +15,18 @@ export function TextDropdown<T extends string>({
   onChange,
   ariaLabel,
   className = "",
+  triggerPrefix,
+  hideSelectedOption = false,
 }: {
   options: readonly TextDropdownOption<T>[];
   value: T;
   onChange: (value: T) => void;
   ariaLabel: string;
   className?: string;
+  triggerPrefix?: ReactNode;
+  hideSelectedOption?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = options.find((option) => option.value === value)!;
-
   return (
     <Dropdown className={`TextDropdown${className ? ` ${className}` : ""}`} open={open} onOpenChange={setOpen}>
       <button
@@ -38,11 +40,14 @@ export function TextDropdown<T extends string>({
           if (event.key === "Escape") setOpen(false);
         }}
       >
-        <span>{selected.label}</span>
+        <span>
+          {triggerPrefix}
+          {options.find((option) => option.value === value)!.label}
+        </span>
         <SelectChevronIcon />
       </button>
       <div className="TextDropdown-options Dropdown-menu" data-open={open} role="listbox" aria-label={ariaLabel}>
-        {options.map((option) => (
+        {options.filter((option) => !hideSelectedOption || option.value !== value).map((option) => (
           <button
             key={option.value}
             type="button"

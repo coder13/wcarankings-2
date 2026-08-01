@@ -1,10 +1,10 @@
 "use client";
 
-import { TextDropdown } from "../Dropdown/TextDropdown";
 import { useProjectionFeatureSwitch } from "@/components/ProjectionFeatureSwitchProvider";
+import { TextDropdown } from "../Dropdown/TextDropdown";
 
 export const EXPLORER_SUBJECTS = [
-  { id: "people", label: "Persons" },
+  { id: "people", label: "Rankings" },
   { id: "results", label: "Results" },
   { id: "competitions", label: "Competitions" },
 ] as const;
@@ -23,7 +23,7 @@ export function ExplorerSubjectSwitch({
 }: {
   subject: NavigationSubject;
   onChange: (subject: NavigationSubject) => void;
-  variant?: "segmented" | "select" | "text";
+  variant?: "segmented" | "select" | "text" | "title";
 }) {
   const featureSwitch = useProjectionFeatureSwitch();
   const subjects = NAVIGATION_SUBJECTS.filter((option) => {
@@ -33,10 +33,29 @@ export function ExplorerSubjectSwitch({
     if (option.id === "competitions") return featureSwitch.competitionRankings;
     return true;
   });
+  const dropdownOptions = subjects.map((option) => ({
+    value: option.id,
+    label: option.label,
+  }));
+
+  if (variant === "title") {
+    return (
+      <TextDropdown
+        options={dropdownOptions}
+        value={subject}
+        onChange={(value) => onChange(value as NavigationSubject)}
+        ariaLabel="Browse WCA data"
+        className="headerSubjectDropdown"
+        triggerPrefix="WCA "
+        hideSelectedOption={subject !== "lists"}
+      />
+    );
+  }
+
   if (variant === "text") {
     return (
       <TextDropdown
-        options={subjects.map((option) => ({ value: option.id, label: option.label }))}
+        options={dropdownOptions}
         value={subject}
         onChange={(value) => onChange(value as NavigationSubject)}
         ariaLabel="Browse"
@@ -46,12 +65,14 @@ export function ExplorerSubjectSwitch({
 
   if (variant === "select") {
     return (
-      <label className={`ExplorerSubjectSelect${variant === "text" ? " ExplorerSubjectSelect--text" : ""}`}>
+      <label className="ExplorerSubjectSelect">
         <span className="visuallyHidden">Browse</span>
         <select
           value={subject}
           aria-label="Browse"
-          onChange={(event) => onChange(event.target.value as NavigationSubject)}
+          onChange={(event) =>
+            onChange(event.target.value as NavigationSubject)
+          }
         >
           {subjects.map((option) => (
             <option key={option.id} value={option.id}>{option.label}</option>

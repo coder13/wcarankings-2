@@ -15,10 +15,10 @@ function InteractiveTextDropdown() {
 
 const meta = {
   title: "Core UI/Atoms/TextDropdown",
-  component: TextDropdown,
+  component: InteractiveTextDropdown,
   parameters: { layout: "centered" },
   render: () => <InteractiveTextDropdown />,
-} satisfies Meta<typeof TextDropdown>;
+} satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

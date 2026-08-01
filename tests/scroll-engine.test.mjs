@@ -10,7 +10,6 @@ import {
   getSearchJumpMode,
   getPrefetchRowCount,
   shouldPrefetchExtraPage,
-  isDuplicateRank,
   DISTANT_SCROLL_DURATION_MS,
   MAX_LOCAL_SCROLL_DURATION_MS,
   MIN_LOCAL_SCROLL_DURATION_MS,
@@ -46,13 +45,6 @@ test("uses a diminishing duration curve between its configured bounds", () => {
     getScrollAnimationDuration(100_000),
     DISTANT_SCROLL_DURATION_MS
   );
-});
-
-test("marks only an adjacent repeated rank as a duplicate", () => {
-  assert.equal(isDuplicateRank(42, 42), true);
-  assert.equal(isDuplicateRank(41, 42), false);
-  assert.equal(isDuplicateRank(undefined, 42), false);
-  assert.equal(isDuplicateRank(null, 42), false);
 });
 
 test("targets the known ranking total when jumping to the end", () => {

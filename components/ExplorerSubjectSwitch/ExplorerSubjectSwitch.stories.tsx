@@ -11,7 +11,11 @@ const description: Record<ExplorerSubject, string> = {
   competitions: "Competition bests for the selected event and result type.",
 };
 
-function InteractiveSwitch({ variant }: { variant: "segmented" | "select" }) {
+function InteractiveSwitch({
+  variant = "segmented",
+}: {
+  variant?: "segmented" | "select";
+}) {
   const [subject, setSubject] = useState<ExplorerSubject>("people");
   return (
     <div style={{ display: "grid", gap: "1rem", minWidth: "min(100%, 30rem)" }}>
@@ -25,9 +29,9 @@ function InteractiveSwitch({ variant }: { variant: "segmented" | "select" }) {
 
 const meta = {
   title: "Core UI/Atoms/ExplorerSubjectSwitch",
-  component: ExplorerSubjectSwitch,
+  component: InteractiveSwitch,
   parameters: { layout: "centered" },
-} satisfies Meta<typeof ExplorerSubjectSwitch>;
+} satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

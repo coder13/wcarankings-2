@@ -49,9 +49,6 @@ export type InitialRankingData = Pick<
   startRank: number;
   startPosition: number;
   lastRank: number | null;
-  searchMatches: RankingEntry[];
-  initialMatchPersonId: string;
-  regexSearch?: boolean;
 };
 
 export type RegionOption = {
@@ -64,12 +61,68 @@ export type RegionOption = {
 
 export type RegionSelection = Pick<RegionOption, "scope" | "regionId">;
 
+export type RankingSource =
+  | { kind: "saved"; listId: string; listName: string }
+  | { kind: "dynamic"; personIds: string[]; listName: string };
+
+export type RankingsRegions = {
+  continents: Array<{ id: string; name: string }>;
+  countries: Array<{ id: string; name: string; iso2?: string }>;
+};
+
+export type RankingsExplorerOptions = {
+  showAllEventRankingOptions: boolean;
+  showSubjectSwitch: boolean;
+  showMyRank: boolean;
+  regionSelectionDisabled: boolean;
+};
+
+export type RankingsListConfig = {
+  owner?: {
+    listId: string;
+    visibility: "public" | "private";
+    joinPolicy: "open" | "closed";
+  };
+  membership?: {
+    listId: string;
+    joinPolicy: "open" | "closed";
+    state: "member" | "pending" | "not_member";
+  };
+  membershipRequests?: {
+    listId: string;
+    requests: Array<{ id: number; personId: string; name: string }>;
+  };
+  actions?: { listId: string; isOwner: boolean };
+  dynamic?: { personIds: string[] };
+  notice?: string;
+};
+
+export type RankingsExplorerConfig = {
+  source?: RankingSource;
+  list?: RankingsListConfig;
+  regions: RankingsRegions;
+  options: RankingsExplorerOptions;
+  release?: {
+    commitSha: string;
+    lastResultIngestAt: string | null;
+  };
+};
+
 const rankingNumberFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 0,
 });
 
 export function formatRankingNumber(value: number) {
   return rankingNumberFormatter.format(value);
+}
+
+export function rankingScope(
+  scope: "world" | "continent" | "national",
+  regionLabel: string,
+  rank: number,
+) {
+  const label = `#${formatRankingNumber(rank)}`;
+  return { scope, label, ariaLabel: `${regionLabel} ${label}` };
 }
 
 export function formatExportDate(value: string) {

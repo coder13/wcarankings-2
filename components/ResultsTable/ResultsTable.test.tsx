@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithProviders } from "@/tests/render-providers";
 import type { RankingEntry } from "../RankingsExplorer/types";
 import { ResultsTable } from "./ResultsTable";
 
@@ -32,22 +32,18 @@ const entries: RankingEntry[] = [
 ];
 
 test("renders rows and highlights tied results", () => {
-  const markup = renderToStaticMarkup(
+  const markup = renderWithProviders(
     <ResultsTable
-      entries={entries}
-      renderedRows={entries.map((_, index) => ({ index, key: index, start: index * 65.45 }))}
-      renderedListHeight={123.2}
-      listOffset={0}
-      eventId="333"
-      rankingType="single"
-      loading={false}
-      showLoading={false}
-      preserveListDuringLoad={false}
-      hasMore
-      loadingMore={false}
-      highlightedPersonId="2024TIED02"
-      measureElement={() => undefined}
-      onRowNavigate={() => undefined}
+      data={{ entries, eventId: "333", rankingType: "single", hasMore: true }}
+      virtualization={{
+        renderedRows: entries.map((_, index) => ({ index, key: index, start: index * 65.45 })),
+        renderedListHeight: 123.2,
+        listOffset: 0,
+        measureElement: () => undefined,
+      }}
+      status={{ loading: false, preserveListDuringLoad: false, loadingMore: false }}
+      search={{ highlightedPersonId: "2024TIED02" }}
+      interaction={{ onRowNavigate: () => undefined }}
     />,
   );
   assert.match(markup, /Fast Solver/);
@@ -56,22 +52,18 @@ test("renders rows and highlights tied results", () => {
 });
 
 test("keeps already rendered rankings visible while refreshing", () => {
-  const markup = renderToStaticMarkup(
+  const markup = renderWithProviders(
     <ResultsTable
-      entries={entries}
-      renderedRows={entries.map((_, index) => ({ index, key: index, start: index * 65.45 }))}
-      renderedListHeight={123.2}
-      listOffset={0}
-      eventId="333"
-      rankingType="single"
-      loading
-      showLoading
-      preserveListDuringLoad={false}
-      hasMore
-      loadingMore={false}
-      highlightedPersonId=""
-      measureElement={() => undefined}
-      onRowNavigate={() => undefined}
+      data={{ entries, eventId: "333", rankingType: "single", hasMore: true }}
+      virtualization={{
+        renderedRows: entries.map((_, index) => ({ index, key: index, start: index * 65.45 })),
+        renderedListHeight: 123.2,
+        listOffset: 0,
+        measureElement: () => undefined,
+      }}
+      status={{ loading: true, preserveListDuringLoad: false, loadingMore: false }}
+      search={{ highlightedPersonId: "" }}
+      interaction={{ onRowNavigate: () => undefined }}
     />,
   );
 

@@ -22,10 +22,12 @@ test("renders a result row without exposing internal ordering", () => {
   const markup = renderToStaticMarkup(
     <RankingRow
       entry={entry}
-      eventId="333"
-      rankingType="single"
-      animationIndex={0}
-      rankIsDuplicate
+      display={{
+        eventId: "333",
+        rankingType: "single",
+        animationIndex: 0,
+        rankIsDuplicate: true,
+      }}
     />
   );
   assert.match(markup, /Cailyn Sinclair/);
@@ -46,10 +48,12 @@ test("can hide an identity ID for competition ranking rows", () => {
   const markup = renderToStaticMarkup(
     <RankingRow
       entry={{ ...entry, personId: entry.competitionId, personName: entry.competitionName }}
-      eventId="333"
-      rankingType="single"
-      animationIndex={0}
-      hideIdentityId
+      display={{
+        eventId: "333",
+        rankingType: "single",
+        animationIndex: 0,
+        hideIdentityId: true,
+      }}
     />,
   );
 
@@ -61,12 +65,12 @@ test("makes the full row a member selection target", () => {
   const markup = renderToStaticMarkup(
     <RankingRow
       entry={entry}
-      eventId="333"
-      rankingType="single"
-      animationIndex={0}
-      selectionMode
-      selected
-      onToggleSelected={() => undefined}
+      display={{ eventId: "333", rankingType: "single", animationIndex: 0 }}
+      interaction={{
+        selectionMode: true,
+        selected: true,
+        onToggleSelected: () => undefined,
+      }}
     />,
   );
 
@@ -78,10 +82,8 @@ test("enables the member context menu on a ranking row", () => {
   const markup = renderToStaticMarkup(
     <RankingRow
       entry={entry}
-      eventId="333"
-      rankingType="single"
-      animationIndex={0}
-      onMemberContextMenu={() => undefined}
+      display={{ eventId: "333", rankingType: "single", animationIndex: 0 }}
+      interaction={{ onMemberContextMenu: () => undefined }}
     />,
   );
 
@@ -92,10 +94,12 @@ test("can show a venue beneath the row identity", () => {
   const markup = renderToStaticMarkup(
     <RankingRow
       entry={{ ...entry, identitySubtitle: "Polar Hotel", competitionName: "Longyearbyen" }}
-      eventId="333"
-      rankingType="single"
-      animationIndex={0}
-      hideIdentityId
+      display={{
+        eventId: "333",
+        rankingType: "single",
+        animationIndex: 0,
+        hideIdentityId: true,
+      }}
     />,
   );
 
@@ -114,10 +118,12 @@ test("shows podium names on the left and individual results on the right", () =>
         competitionName: "",
         resultSubtitle: "3.74, 3.85, 5.02",
       }}
-      eventId="333"
-      rankingType="average"
-      animationIndex={0}
-      hideIdentityId
+      display={{
+        eventId: "333",
+        rankingType: "average",
+        animationIndex: 0,
+        hideIdentityId: true,
+      }}
     />,
   );
 

@@ -46,20 +46,25 @@ const meta = {
   component: ResultsTable,
   parameters: { layout: "fullscreen" },
   args: {
-    entries,
-    renderedRows: entries.map((_, index) => ({ index, key: index, start: index * 65.45 })),
-    renderedListHeight: entries.length * 65.45,
-    listOffset: 0,
-    eventId: "333",
-    rankingType: "single",
-    loading: false,
-    showLoading: false,
-    preserveListDuringLoad: false,
-    hasMore: true,
-    loadingMore: false,
-    highlightedPersonId: "",
-    measureElement: () => undefined,
-    onRowNavigate: () => undefined,
+    data: {
+      entries,
+      eventId: "333",
+      rankingType: "single",
+      hasMore: true,
+    },
+    virtualization: {
+      renderedRows: entries.map((_, index) => ({ index, key: index, start: index * 65.45 })),
+      renderedListHeight: entries.length * 65.45,
+      listOffset: 0,
+      measureElement: () => undefined,
+    },
+    status: {
+      loading: false,
+      preserveListDuringLoad: false,
+      loadingMore: false,
+    },
+    search: { highlightedPersonId: "" },
+    interaction: { onRowNavigate: () => undefined },
   },
 } satisfies Meta<typeof ResultsTable>;
 
@@ -67,5 +72,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-export const Loading: Story = { args: { loading: true } };
-export const Highlighted: Story = { args: { highlightedPersonId: "2024TIED02" } };
+export const Loading: Story = {
+  args: { status: { ...meta.args.status, loading: true } },
+};
+export const Highlighted: Story = {
+  args: { search: { highlightedPersonId: "2024TIED02" } },
+};

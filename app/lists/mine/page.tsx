@@ -7,8 +7,9 @@ import { listOwnedLists } from "@/lib/lists";
 export const dynamic = "force-dynamic";
 
 export default async function MyListsPage() {
-  const request = new Request("http://localhost", { headers: await headers() });
-  const user = await getAuthUser(request);
+  const user = await getAuthUser(
+    new Request("http://localhost", { headers: await headers() }),
+  );
   if (!user) redirect("/api/auth/wca");
   return <ListMine lists={await listOwnedLists(user)} />;
 }
