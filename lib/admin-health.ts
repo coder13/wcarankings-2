@@ -22,6 +22,11 @@ export const capabilityTables = {
     "competition_event_stats",
     "competition_stats",
   ],
+  personCompetitionRankings: [
+    "person_competition_counts",
+    "person_competition_rankings",
+    "person_competition_ranking_counts",
+  ],
   cityEventStats: ["city_event_stats", "entity_ranking_counts"],
   sumOfRanks: ["person_sum_of_ranks_scores"],
   yearlyPersonRankings: [

@@ -12,6 +12,11 @@ test("maps capability state to the tables each feature actually owns", () => {
     "city_event_stats",
     "entity_ranking_counts",
   ]);
+  assert.deepEqual(capabilityTables.personCompetitionRankings, [
+    "person_competition_counts",
+    "person_competition_rankings",
+    "person_competition_ranking_counts",
+  ]);
 });
 
 test("classifies active projection capabilities", () => {

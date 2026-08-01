@@ -69,13 +69,14 @@ export function RankingsResults({
             : undefined,
           enablePersonDetails:
             filters.subject === "people" &&
+            !filters.personCompetitionRanking &&
             WCA_EVENTS.some((event) => event.id === filters.eventId),
           initialExpandedPersonId:
-            filters.subject === "people"
+            filters.subject === "people" && !filters.personCompetitionRanking
               ? ranking.focusedExpandedPersonId
               : "",
           onFocusedPersonChange:
-            filters.subject === "people"
+            filters.subject === "people" && !filters.personCompetitionRanking
               ? interactions.navigation.updateFocusedPerson
               : undefined,
         }}

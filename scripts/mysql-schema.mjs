@@ -178,7 +178,11 @@ const projectionDefinitions = [
     name: "person-competition-rankings",
     dependencies: ["raw-wca"],
     files: ["person_competition_rankings.sql"],
-    tables: ["person_competition_counts", "person_competition_rankings"],
+    tables: [
+      "person_competition_counts",
+      "person_competition_rankings",
+      "person_competition_ranking_counts",
+    ],
     enabledByDefault: true,
   },
   { name: "city-event-stats", dependencies: ["result-facts"], files: ["city_event_stats.sql"], tables: ["city_event_stats"] },

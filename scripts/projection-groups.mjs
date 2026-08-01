@@ -57,6 +57,18 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
     sqlFiles: ["competition_podium_members.sql", "competition_event_stats.sql", "competition_stats.sql"],
   },
   {
+    name: "person-competition-rankings",
+    schemaVersion: 1,
+    dependencies: [],
+    projectionNames: ["person-competition-rankings"],
+    tables: [
+      "person_competition_counts",
+      "person_competition_rankings",
+      "person_competition_ranking_counts",
+    ],
+    sqlFiles: ["person_competition_rankings.sql"],
+  },
+  {
     name: "city-rankings",
     schemaVersion: 1,
     dependencies: ["result-facts", "competition-rankings"],
@@ -96,6 +108,7 @@ export const PROJECTION_CAPABILITIES = {
   core: ["compatibility"],
   resultRankings: ["result-rankings"],
   competitionRankings: ["competition-rankings"],
+  personCompetitionRankings: ["person-competition-rankings"],
   cityEventStats: ["city-rankings"],
   sumOfRanks: ["sum-of-ranks"],
   yearlyPersonRankings: ["yearly-person-rankings"],

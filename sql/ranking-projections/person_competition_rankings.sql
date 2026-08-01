@@ -73,3 +73,11 @@ ALTER TABLE person_competition_rankings
   ADD INDEX idx_person_competition_rankings_page (
     scope, region_id, gender, position, person_id
   );
+
+CREATE TABLE person_competition_ranking_counts AS
+SELECT scope, region_id, gender, COUNT(*) AS count
+FROM person_competition_rankings
+GROUP BY scope, region_id, gender;
+
+ALTER TABLE person_competition_ranking_counts
+  ADD PRIMARY KEY (scope, region_id, gender);
