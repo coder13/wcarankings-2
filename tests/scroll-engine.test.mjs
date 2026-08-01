@@ -8,8 +8,10 @@ import {
   getSearchAnimationDuration,
   getSearchBridgePageStarts,
   getSearchJumpMode,
+  getNeighborPageStarts,
   getPrefetchRowCount,
   shouldPrefetchExtraPage,
+  shouldPrefetchNeighborPages,
   DISTANT_SCROLL_DURATION_MS,
   MAX_LOCAL_SCROLL_DURATION_MS,
   MIN_LOCAL_SCROLL_DURATION_MS,
@@ -84,6 +86,27 @@ test("only looks ahead an extra page during a fast scroll on suitable connection
   assert.equal(
     shouldPrefetchExtraPage({ downwardPixelsPerMs: 2, effectiveType: "2g" }),
     false
+  );
+});
+
+test("prefetches both immediate page neighbors unless the connection is constrained", () => {
+  assert.deepEqual(
+    getNeighborPageStarts({ previousPageStart: null, nextPageStart: 51 }),
+    [51],
+  );
+  assert.deepEqual(
+    getNeighborPageStarts({ previousPageStart: 151, nextPageStart: 251 }),
+    [151, 251],
+  );
+  assert.equal(shouldPrefetchNeighborPages({ saveData: true }), false);
+  assert.equal(shouldPrefetchNeighborPages({ effectiveType: "slow-2g" }), false);
+  assert.deepEqual(
+    getNeighborPageStarts({
+      previousPageStart: 151,
+      nextPageStart: 251,
+      effectiveType: "2g",
+    }),
+    [],
   );
 });
 

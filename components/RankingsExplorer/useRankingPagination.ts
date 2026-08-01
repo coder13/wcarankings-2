@@ -7,6 +7,7 @@ import {
 } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import {
+  getNeighborPageStarts,
   getPrefetchRowCount,
   shouldPrefetchExtraPage,
 } from "./scrollEngine";
@@ -106,6 +107,20 @@ export function useRankingPagination({
   const loadingMoreRef = useRef(false);
   const loadingPreviousRef = useRef(false);
   const rowFocusFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const connection = (navigator as Navigator & {
+      connection?: NetworkInformationLike;
+    }).connection;
+    for (const pageStart of getNeighborPageStarts({
+      previousPageStart,
+      nextPageStart,
+      saveData: connection?.saveData,
+      effectiveType: connection?.effectiveType,
+    })) {
+      void getPage(pageStart).catch(() => undefined);
+    }
+  }, [getPage, nextPageStart, previousPageStart]);
 
   const loadMore = useCallback(async () => {
     if (

@@ -30,6 +30,31 @@ export function shouldPrefetchExtraPage({
   );
 }
 
+export function shouldPrefetchNeighborPages({
+  saveData = false,
+  effectiveType = "",
+}: {
+  saveData?: boolean;
+  effectiveType?: string;
+}) {
+  return !saveData && effectiveType !== "slow-2g" && effectiveType !== "2g";
+}
+
+export function getNeighborPageStarts({
+  previousPageStart,
+  nextPageStart,
+  saveData,
+  effectiveType,
+}: {
+  previousPageStart: number | null;
+  nextPageStart: number | null;
+  saveData?: boolean;
+  effectiveType?: string;
+}) {
+  if (!shouldPrefetchNeighborPages({ saveData, effectiveType })) return [];
+  return [previousPageStart, nextPageStart].filter((start): start is number => start !== null);
+}
+
 export type SearchJumpMode = "local" | "multi-page";
 
 export function getSearchJumpMode(
