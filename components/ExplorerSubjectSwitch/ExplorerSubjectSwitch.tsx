@@ -7,6 +7,7 @@ export const EXPLORER_SUBJECTS = [
   { id: "people", label: "Rankings" },
   { id: "results", label: "Results" },
   { id: "competitions", label: "Competitions" },
+  { id: "cities", label: "Cities" },
 ] as const;
 export const NAVIGATION_SUBJECTS = [
   ...EXPLORER_SUBJECTS,
@@ -31,6 +32,7 @@ export function ExplorerSubjectSwitch({
     if (!featureSwitch.core) return false;
     if (option.id === "results") return featureSwitch.resultRankings;
     if (option.id === "competitions") return featureSwitch.competitionRankings;
+    if (option.id === "cities") return featureSwitch.cityEventStats;
     return true;
   });
   const dropdownOptions = subjects.map((option) => ({

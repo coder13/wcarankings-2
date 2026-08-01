@@ -76,10 +76,7 @@ function addRankingFilterParams(
   if (filters.resource === "people" && filters.year) {
     params.set("year", String(filters.year));
   }
-  if (
-    (filters.resource === "people" || filters.resource === "results") &&
-    filters.gender.length
-  ) {
+  if ((filters.resource === "people" || filters.resource === "results") && filters.gender.length) {
     params.set("gender", filters.gender.join(","));
   }
   if (filters.regionSelection.scope !== "world") {
@@ -104,9 +101,18 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
     params.set("ranking", "latitude");
     params.set("hemisphere", filters.resource.slice("latitude-".length));
   }
+  if (filters.resource.startsWith("city-")) {
+    const cityRanking = filters.resource.slice("city-".length);
+    if (cityRanking === "competitors" || cityRanking === "competitions" || cityRanking === "solves") {
+      params.set("stat", cityRanking);
+    } else {
+      params.set("result", cityRanking === "fastest-average" ? "average" : "single");
+    }
+  }
 
   let endpoint = "/api/rankings";
   if (filters.resource === "results") endpoint = "/api/rankings/results";
+  else if (filters.resource.startsWith("city-")) endpoint = "/api/rankings/cities";
   else if (filters.resource !== "people") {
     endpoint = "/api/rankings/competitions";
   }

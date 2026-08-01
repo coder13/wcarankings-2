@@ -35,6 +35,7 @@ function pathnameForFilters(filters: RankingsFilterState) {
   if (filters.subject === "competitions") {
     return `/competitions/${filters.competitionRanking}`;
   }
+  if (filters.subject === "cities") return `/cities/${filters.cityRanking}`;
   if (filters.year) return `/persons/year/${filters.year}`;
   return "/";
 }
@@ -46,6 +47,7 @@ function renderExplorerMarkup(
   const filters: RankingsFilterState = {
     subject: "people",
     competitionRanking: "best-result",
+    cityRanking: "fastest-single",
     year: null,
     eventId: "333",
     rankingType: "single",
@@ -120,6 +122,7 @@ test("gives each non-default subject and competition ranking a page", () => {
   assert.equal(subjectPath("people"), "/");
   assert.equal(subjectPath("results"), "/results");
   assert.equal(subjectPath("competitions"), "/competitions/best-result");
+  assert.equal(subjectPath("cities"), "/cities/fastest-single");
   assert.equal(competitionRankingPath("best-result"), "/competitions/best-result");
   assert.equal(competitionRankingPath("podiums"), "/competitions/podiums");
   assert.equal(competitionRankingPath("competitor-count"), "/competitions/competitor-count");
@@ -129,7 +132,7 @@ test("gives each non-default subject and competition ranking a page", () => {
 test("exposes active person, result, and competition ranking subjects", () => {
   assert.deepEqual(
     EXPLORER_SUBJECTS.map(({ id }) => id),
-    ["people", "results", "competitions"],
+    ["people", "results", "competitions", "cities"],
   );
 });
 

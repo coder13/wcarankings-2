@@ -101,6 +101,7 @@ test("keeps the rankings visual shell and PWA wiring", async () => {
   assert.match(page, /getProjectionFeatureSwitch/);
   assert.match(page, /requiresResultRankings && !featureSwitch\.resultRankings/);
   assert.match(page, /requiresCompetitionRankings && !featureSwitch\.competitionRankings/);
+  assert.match(page, /requiresCityRankings && !featureSwitch\.cityEventStats/);
   assert.match(layout, /title:\s*"WCA Rankings"/);
   assert.match(layout, /PwaRegistration/);
   assert.match(layout, /ProjectionFeatureSwitchProvider/);

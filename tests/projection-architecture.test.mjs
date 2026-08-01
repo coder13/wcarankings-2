@@ -169,7 +169,14 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(competitions, /idx_competition_stats_south/);
   assert.match(cities, /fastest_average_result_id/);
   assert.match(cities, /fastest_average_rank/);
+  assert.match(cities, /person\.gender IN \('m', 'f'\)/);
+  assert.match(cities, /SELECT base\.\*, 'all' AS gender FROM base/);
+  assert.match(cities, /COUNT\(DISTINCT scoped\.person_id\) AS competitor_count/);
+  assert.match(cities, /COUNT\(DISTINCT scoped\.competition_id\) AS competition_count/);
+  assert.match(cities, /official_solve_count/);
+  assert.match(cities, /ADD PRIMARY KEY \(city_name, country_id, event_id, gender\)/);
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);
+  assert.match(counts, /gender = 'all' AND fastest_single IS NOT NULL/);
   assert.match(counts, /FROM competition_event_stats WHERE podium_score IS NOT NULL/);
   assert.doesNotMatch(counts, /podium_(?:single|average)_score/);
   assert.match(schema, /entity-ranking-counts/);
@@ -236,6 +243,9 @@ test("exposes bounded resource APIs without projection name scans", async () => 
   assert.match(entitySources, /stats\.\$\{positionColumn\} > \?/);
   assert.match(entitySources, /INNER JOIN results result ON result\.id = page\.result_id/);
   assert.match(entitySources, /FROM city_event_stats stats/);
+  assert.match(entitySources, /City rankings support one gender at a time/);
+  assert.match(entitySources, /stats\.gender = \?/);
+  assert.match(entitySources, /official_solve_count/);
   assert.match(search, /fetchPersonSearchRowsFromDatabase/);
 
   for (const source of [personSources, `${results}\n${rankingQueries}`, rankingSources]) {
@@ -252,11 +262,11 @@ test("only exposes APIs backed by active projections", async () => {
     "app/api/rankings/route.ts",
     "app/api/rankings/results/route.ts",
     "app/api/rankings/competitions/route.ts",
+    "app/api/rankings/cities/route.ts",
   ];
   const inactiveRoutes = [
     "app/api/rankings/people/route.ts",
     "app/api/rankings/podiums/route.ts",
-    "app/api/rankings/cities/route.ts",
     "app/api/rankings/metrics/route.ts",
   ];
   for (const route of activeRoutes) {

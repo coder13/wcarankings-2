@@ -10,6 +10,8 @@ import {
 import type { ExplorerSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import {
   COMPETITION_RANKING_OPTIONS,
+  CITY_RANKING_OPTIONS,
+  type CityRanking,
   type CompetitionRanking,
 } from "./helpers/rankingModes";
 import type { RegionSelection } from "./types";
@@ -20,10 +22,14 @@ const MAX_SEARCH_LENGTH = 80;
 const COMPETITION_RANKINGS = new Set<string>(
   COMPETITION_RANKING_OPTIONS.map(({ value }) => value),
 );
+const CITY_RANKINGS = new Set<string>(
+  CITY_RANKING_OPTIONS.map(({ value }) => value),
+);
 
 export type RankingsUrlState = {
   subject: ExplorerSubject;
   competitionRanking: CompetitionRanking;
+  cityRanking: CityRanking;
   year: number | null;
   eventId: string;
   rankingType: "single" | "average";
@@ -41,6 +47,7 @@ export type RankingsFilterState = Pick<
   RankingsUrlState,
   | "subject"
   | "competitionRanking"
+  | "cityRanking"
   | "year"
   | "eventId"
   | "rankingType"
@@ -64,6 +71,7 @@ export function rankingsFilterStateFromUrl(
   const {
     subject,
     competitionRanking,
+    cityRanking,
     year,
     eventId,
     rankingType,
@@ -76,6 +84,7 @@ export function rankingsFilterStateFromUrl(
   return {
     subject,
     competitionRanking,
+    cityRanking,
     year,
     eventId,
     rankingType,
@@ -90,6 +99,7 @@ export function rankingsFilterStateFromUrl(
 function subjectFromPathname(pathname: string): ExplorerSubject {
   if (pathname.startsWith("/results")) return "results";
   if (pathname.startsWith("/competitions")) return "competitions";
+  if (pathname.startsWith("/cities")) return "cities";
   return "people";
 }
 
@@ -100,6 +110,13 @@ function competitionRankingFromPathname(pathname: string) {
     : "best-result";
 }
 
+function cityRankingFromPathname(pathname: string) {
+  const value = pathname.match(/^\/cities\/([^/?#]+)/)?.[1];
+  return value && CITY_RANKINGS.has(value)
+    ? (value as CityRanking)
+    : "fastest-single";
+}
+
 function validEventForSubject(subject: ExplorerSubject, eventId: string) {
   if (subject === "people") return isRankingEventId(eventId) ? eventId : "333";
   return isEventId(eventId) ? eventId : "333";
@@ -108,10 +125,15 @@ function validEventForSubject(subject: ExplorerSubject, eventId: string) {
 function rankingTypeForSubject(
   subject: ExplorerSubject,
   competitionRanking: CompetitionRanking,
+  cityRanking: CityRanking,
   eventId: string,
   requested: "single" | "average",
 ) {
   if (eventId === "333mbf" || eventId === "sor-kinch") return "single";
+  if (subject === "cities") {
+    if (cityRanking === "fastest-single") return "single";
+    if (cityRanking === "fastest-average") return "average";
+  }
   if (subject !== "competitions" || competitionRanking !== "podiums") {
     return requested;
   }
@@ -137,6 +159,7 @@ function normalizeState(
 ): RankingsUrlState {
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
+  const cityRanking = cityRankingFromPathname(pathname);
   const eventId = validEventForSubject(subject, state.eventId);
   const podiumEventId =
     subject === "competitions" &&
@@ -151,11 +174,13 @@ function normalizeState(
     ...state,
     subject,
     competitionRanking,
+    cityRanking,
     year: subject === "people" ? state.year : null,
     eventId: podiumEventId,
     rankingType: rankingTypeForSubject(
       subject,
       competitionRanking,
+      cityRanking,
       podiumEventId,
       state.rankingType,
     ),
@@ -186,12 +211,14 @@ export function parseRankingsUrl(
 ): RankingsUrlState {
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
+  const cityRanking = cityRankingFromPathname(pathname);
   const rawRankingType = params.get("result");
   const search = (params.get("search") ?? "").trim().slice(0, MAX_SEARCH_LENGTH);
 
   return normalizeState(pathname, {
     subject,
     competitionRanking,
+    cityRanking,
     year: yearFromUrl(pathname, params),
     eventId: validEventForSubject(subject, params.get("eventId") ?? "333"),
     rankingType: isRankingType(rawRankingType) ? rawRankingType : "single",

@@ -7,4 +7,22 @@ export const COMPETITION_RANKING_OPTIONS = [
 
 export type CompetitionRanking = (typeof COMPETITION_RANKING_OPTIONS)[number]["value"];
 
-export type RankingResource = "people" | "results" | "competitions" | "podiums" | "competitor-count" | "latitude-north" | "latitude-south";
+export const CITY_RANKING_OPTIONS = [
+  { value: "fastest-single", label: "Fastest single" },
+  { value: "fastest-average", label: "Fastest average" },
+  { value: "competitors", label: "Competitors" },
+  { value: "competitions", label: "Competitions" },
+  { value: "solves", label: "Official solves" },
+] as const;
+
+export type CityRanking = (typeof CITY_RANKING_OPTIONS)[number]["value"];
+
+export type RankingResource =
+  | "people"
+  | "results"
+  | "competitions"
+  | "podiums"
+  | "competitor-count"
+  | "latitude-north"
+  | "latitude-south"
+  | `city-${CityRanking}`;

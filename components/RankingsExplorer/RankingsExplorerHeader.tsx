@@ -2,7 +2,10 @@
 
 import { AppHeader } from "../AppHeader/AppHeader";
 import { TextDropdown } from "../Dropdown/TextDropdown";
-import { COMPETITION_RANKING_OPTIONS } from "./helpers/rankingModes";
+import {
+  CITY_RANKING_OPTIONS,
+  COMPETITION_RANKING_OPTIONS,
+} from "./helpers/rankingModes";
 import { useRankingsExplorer } from "./RankingsExplorerContext";
 
 export function RankingsExplorerHeader() {
@@ -12,7 +15,7 @@ export function RankingsExplorerHeader() {
     data,
     interactions: { filterActions: actions },
   } = useRankingsExplorer();
-  const { subject, year, competitionRanking } = filters;
+  const { subject, year, competitionRanking, cityRanking } = filters;
   const { availableYears } = data.window.state;
   let headerSubject;
   if (source) headerSubject = "lists" as const;
@@ -45,6 +48,16 @@ export function RankingsExplorerHeader() {
         value={competitionRanking}
         onChange={actions.changeCompetitionRanking}
         ariaLabel="Competition ranking"
+        className="competitionRankingDropdown"
+      />
+    );
+  } else if (!source && showSubjectSwitch && subject === "cities") {
+    contextualControl = (
+      <TextDropdown
+        options={CITY_RANKING_OPTIONS}
+        value={cityRanking}
+        onChange={(value) => actions.changeCityRanking(value as typeof cityRanking)}
+        ariaLabel="City ranking"
         className="competitionRankingDropdown"
       />
     );

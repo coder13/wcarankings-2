@@ -15,7 +15,7 @@ import {
 import { RANKING_ROW_HEIGHT } from "./rankingLayout";
 import { rankingPageStart } from "./rankingsQueries";
 import { subjectPath } from "./helpers/navigation";
-import type { CompetitionRanking } from "./helpers/rankingModes";
+import type { CityRanking, CompetitionRanking } from "./helpers/rankingModes";
 import type {
   ExplorerSubject,
   NavigationSubject,
@@ -40,6 +40,10 @@ type FilterViewport = Pick<
 
 export function competitionRankingPath(ranking: CompetitionRanking) {
   return `/competitions/${ranking}`;
+}
+
+export function cityRankingPath(ranking: CityRanking) {
+  return `/cities/${ranking}`;
 }
 
 function podiumRankingType(eventId: string): "single" | "average" {
@@ -69,6 +73,7 @@ export function useRankingFilterActions({
   state: {
     subject: ExplorerSubject;
     competitionRanking: CompetitionRanking;
+    cityRanking: CityRanking;
     year: number | null;
     eventId: string;
     rankingType: "single" | "average";
@@ -85,6 +90,7 @@ export function useRankingFilterActions({
   const {
     subject,
     competitionRanking,
+    cityRanking,
     year,
     eventId,
     rankingType,
@@ -259,6 +265,19 @@ export function useRankingFilterActions({
     );
   }, [competitionRanking, patchFilters, resetToTop]);
 
+  const changeCityRanking = useCallback((next: CityRanking) => {
+    if (next === cityRanking) return;
+    resetToTop(true);
+    patchFilters(
+      {
+        cityRanking: next,
+        rankingType:
+          next === "fastest-average" ? "average" : "single",
+      },
+      { history: "push", pathname: cityRankingPath(next) },
+    );
+  }, [cityRanking, patchFilters, resetToTop]);
+
   const changeHemisphere = useCallback((hemisphere: "north" | "south") => {
     patchFilters({ latitudeHemisphere: hemisphere });
     patchWindow({ startRank: 1 });
@@ -273,9 +292,11 @@ export function useRankingFilterActions({
     leaveList,
     changeYear,
     changeCompetitionRanking,
+    changeCityRanking,
     changeHemisphere,
   }), [
     changeCompetitionRanking,
+    changeCityRanking,
     changeEvent,
     changeGender,
     changeHemisphere,

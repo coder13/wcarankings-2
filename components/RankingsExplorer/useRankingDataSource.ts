@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { GenderFilter } from "@/lib/wca";
 import type { ExplorerSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
-import type { CompetitionRanking, RankingResource } from "./helpers/rankingModes";
+import type { CityRanking, CompetitionRanking, RankingResource } from "./helpers/rankingModes";
 import {
   rankingWindowQueryKey,
   useRankingsQueryApi,
@@ -13,6 +13,7 @@ import type { RankingSource, RegionSelection } from "./types";
 type DataSourceFilters = {
   subject: ExplorerSubject;
   competitionRanking: CompetitionRanking;
+  cityRanking: CityRanking;
   year: number | null;
   latitudeHemisphere: "north" | "south";
   eventId: string;
@@ -24,9 +25,11 @@ type DataSourceFilters = {
 function rankingResource(
   subject: ExplorerSubject,
   competitionRanking: CompetitionRanking,
+  cityRanking: CityRanking,
   latitudeHemisphere: "north" | "south",
 ): RankingResource {
   if (subject === "results") return "results";
+  if (subject === "cities") return `city-${cityRanking}`;
   if (subject !== "competitions") return "people";
   if (competitionRanking === "latitude") return `latitude-${latitudeHemisphere}`;
   if (competitionRanking === "competitor-count") return "competitor-count";
@@ -43,6 +46,7 @@ export function useRankingDataSource({
   const {
     subject,
     competitionRanking,
+    cityRanking,
     year,
     latitudeHemisphere,
     eventId,
@@ -53,6 +57,7 @@ export function useRankingDataSource({
   const resource = rankingResource(
     subject,
     competitionRanking,
+    cityRanking,
     latitudeHemisphere,
   );
   const queryFilters = useMemo(

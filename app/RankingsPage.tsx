@@ -27,11 +27,13 @@ export async function RankingsPage({
   requiresYearlyRankings = false,
   requiresResultRankings = false,
   requiresCompetitionRankings = false,
+  requiresCityRankings = false,
 }: {
   searchParams?: Promise<RankingsSearchParams>;
   requiresYearlyRankings?: boolean;
   requiresResultRankings?: boolean;
   requiresCompetitionRankings?: boolean;
+  requiresCityRankings?: boolean;
 } = {}) {
   const featureSwitch = await getProjectionFeatureSwitch();
   const requestedEvent = searchParam(
@@ -43,6 +45,7 @@ export async function RankingsPage({
     (requiresYearlyRankings && !featureSwitch.yearlyPersonRankings) ||
     (requiresResultRankings && !featureSwitch.resultRankings) ||
     (requiresCompetitionRankings && !featureSwitch.competitionRankings) ||
+    (requiresCityRankings && !featureSwitch.cityEventStats) ||
     (["SOR", "sor-kinch"].includes(requestedEvent) &&
       !featureSwitch.sumOfRanks)
   ) {

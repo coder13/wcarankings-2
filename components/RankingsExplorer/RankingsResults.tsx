@@ -38,7 +38,8 @@ export function RankingsResults({
           entries: ranking.entries,
           eventId: filters.eventId,
           rankingType: ranking.entriesRankingType,
-          hideIdentityIds: filters.subject === "competitions",
+          hideIdentityIds:
+            filters.subject === "competitions" || filters.subject === "cities",
           hasMore: ranking.hasMore,
         }}
         virtualization={{

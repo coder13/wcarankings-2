@@ -86,6 +86,9 @@ export function RankingsTopRail() {
     "latitude",
     "competitor-count",
   ].includes(filters.competitionRanking);
+  const cityUsesResultType =
+    filters.subject === "cities" &&
+    ["fastest-single", "fastest-average"].includes(filters.cityRanking);
   const hidesEventPicker = filters.subject === "competitions" && [
     "latitude",
     "competitor-count",
@@ -147,7 +150,7 @@ export function RankingsTopRail() {
             showResultType:
               filters.eventId !== "SOR" &&
               filters.eventId !== "sor-kinch" &&
-              !hidesResultType,
+              (!hidesResultType && (filters.subject !== "cities" || cityUsesResultType)),
             showEventPicker: !hidesEventPicker,
             showGender:
               filters.subject === "people" || filters.subject === "results",
