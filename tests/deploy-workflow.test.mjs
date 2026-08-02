@@ -54,11 +54,11 @@ function serverCooldownFunctions() {
 }
 
 function projectionCooldownFunctions() {
-  const start = projectionDeploy.indexOf("            read_database_cpu() {");
-  const end = projectionDeploy.indexOf("            (\n              exec 8>/srv/wcarankings/production-mutation.lock", start);
+  const start = projectionDeploymentScript.indexOf("  read_database_cpu() {");
+  const end = projectionDeploymentScript.indexOf("  (\n    exec 8>/srv/wcarankings/production-mutation.lock", start);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start, end).split("\n")
-    .map((line) => line.replace(/^ {12}/, ""))
+  return projectionDeploymentScript.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {2}/, ""))
     .join("\n");
 }
 
@@ -72,39 +72,37 @@ function imageTransferRequiredFunction() {
 }
 
 function projectionExportNormalizerFunction() {
-  const start = projectionDeploy.indexOf("          normalize_export_identity() {");
-  const end = projectionDeploy.indexOf("          normalized_build_export=", start);
+  const start = projectionDeploymentScript.indexOf("normalize_export_identity() {");
+  const end = projectionDeploymentScript.indexOf("normalized_build_export=", start);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start, end).split("\n")
-    .map((line) => line.replace(/^ {10}/, ""))
-    .join("\n");
+  return projectionDeploymentScript.slice(start, end);
 }
 
 function projectionResetCandidateFunction() {
-  const start = projectionDeploy.indexOf("            reset_candidate() {");
-  const end = projectionDeploy.indexOf("\n            }\n\n            case \"$phase\"", start);
+  const start = projectionDeploymentScript.indexOf("  reset_candidate() {");
+  const end = projectionDeploymentScript.indexOf("\n  }\n\n  case \"$phase\"", start);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start, end + "\n            }".length).split("\n")
-    .map((line) => line.replace(/^ {12}/, ""))
+  return projectionDeploymentScript.slice(start, end + "\n  }".length).split("\n")
+    .map((line) => line.replace(/^ {2}/, ""))
     .join("\n");
 }
 
 function projectionComposeWrappers() {
-  const start = projectionDeploy.indexOf("            dc() {");
-  const end = projectionDeploy.indexOf("            candidate=", start);
+  const start = projectionDeploymentScript.indexOf("  dc() {");
+  const end = projectionDeploymentScript.indexOf("  candidate=", start);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start, end).split("\n")
-    .map((line) => line.replace(/^ {12}/, ""))
+  return projectionDeploymentScript.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {2}/, ""))
     .join("\n");
 }
 
 function projectionActivationRemoteScript() {
-  const marker = "             FAILURE_INJECTION_POINT='$FAILURE_INJECTION_POINT' sh -s\" <<'REMOTE'\n";
-  const start = projectionDeploy.indexOf(marker);
-  const end = projectionDeploy.indexOf("\n          REMOTE", start + marker.length);
+  const marker = "   FAILURE_INJECTION_POINT='$FAILURE_INJECTION_POINT' sh -s\" <<'REMOTE'\n";
+  const start = projectionDeploymentScript.indexOf(marker);
+  const end = projectionDeploymentScript.indexOf("\nREMOTE", start + marker.length);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start + marker.length, end).split("\n")
-    .map((line) => line.replace(/^ {12}/, ""))
+  return projectionDeploymentScript.slice(start + marker.length, end).split("\n")
+    .map((line) => line.replace(/^ {2}/, ""))
     .join("\n");
 }
 

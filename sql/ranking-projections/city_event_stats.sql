@@ -63,7 +63,7 @@ SELECT aggregates.city_name, aggregates.country_id, aggregates.event_id, aggrega
     DENSE_RANK() OVER (PARTITION BY event_id, gender ORDER BY fastest_average)
   END AS fastest_average_rank
 FROM aggregates
-INNER JOIN winners USING (city_name, country_id, event_id, gender);
+LEFT JOIN winners USING (city_name, country_id, event_id, gender);
 
 ALTER TABLE city_event_stats
   ADD PRIMARY KEY (city_name, country_id, event_id, gender),

@@ -114,7 +114,7 @@ async function executeTableStatements(connection, sql, phases = [], { tableProgr
 const projectionDefinitions = [
   {
     name: "sum-of-ranks",
-    dependencies: [],
+    dependencies: ["result-facts"],
     files: ["person_sum_of_ranks_scores.sql"],
     tables: ["person_sum_of_ranks_scores"],
     enabledByDefault: true,
@@ -176,7 +176,7 @@ const projectionDefinitions = [
   },
   {
     name: "person-competition-rankings",
-    dependencies: ["raw-wca"],
+    dependencies: ["result-facts"],
     files: ["person_competition_rankings.sql"],
     tables: [
       "person_competition_counts",
@@ -216,8 +216,8 @@ export const RETIRED_PROJECTION_TABLES = [
 ];
 
 export const COMPATIBILITY_PROJECTION_TASKS = [
-  { name: "compatibility-ranking-entries-single-source", dependencies: ["raw-wca"], estimatedDurationMs: 0 },
-  { name: "compatibility-ranking-entries-average-source", dependencies: ["raw-wca"], estimatedDurationMs: 0 },
+  { name: "compatibility-ranking-entries-single-source", dependencies: ["projection:result-facts"], estimatedDurationMs: 0 },
+  { name: "compatibility-ranking-entries-average-source", dependencies: ["projection:result-facts"], estimatedDurationMs: 0 },
   { name: "compatibility-result-entries-single-source", dependencies: ["raw-wca"], estimatedDurationMs: 0 },
   { name: "compatibility-ranking-entries-single", dependencies: ["compatibility-ranking-entries-single-source"], table: "ranking_entries_single", estimatedDurationMs: 120_000 },
   { name: "compatibility-ranking-entries-average", dependencies: ["compatibility-ranking-entries-average-source"], table: "ranking_entries_average", estimatedDurationMs: 120_000 },

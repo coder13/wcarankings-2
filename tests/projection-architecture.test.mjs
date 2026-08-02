@@ -87,6 +87,8 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(groups, /name: "compatibility"/);
   assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts"\]/);
   assert.match(groups, /name: "city-rankings"[\s\S]*dependencies: \["result-facts", "competition-rankings"\]/);
+  assert.match(groups, /name: "sum-of-ranks"[\s\S]*dependencies: \["result-facts"\]/);
+  assert.match(groups, /name: "person-competition-rankings"[\s\S]*dependencies: \["result-facts"\]/);
   assert.match(groups, /name: "sum-of-ranks"[\s\S]*projectionNames: \["sum-of-ranks"\]/);
   assert.match(groups, /name: "person-competition-rankings"[\s\S]*person_competition_ranking_counts/);
   assert.match(schema, /enabledByDefault: true/);
@@ -185,6 +187,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(cities, /attempt_counts AS/);
   assert.match(cities, /comp\.country_id/);
   assert.match(cities, /official_solve_count/);
+  assert.match(cities, /LEFT JOIN winners USING \(city_name, country_id, event_id, gender\)/);
   assert.match(cities, /ADD PRIMARY KEY \(city_name, country_id, event_id, gender\)/);
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);
   assert.match(counts, /gender = 'all' AND fastest_single IS NOT NULL/);

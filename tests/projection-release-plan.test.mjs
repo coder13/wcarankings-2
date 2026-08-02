@@ -144,8 +144,13 @@ test("a corrupt exact artifact is quarantined and rebuilt", async () => {
         valid: false,
         artifactFingerprint: desired.groups.compatibility.artifactFingerprint,
       },
+      "result-facts": {
+        valid: true,
+        artifactFingerprint: desired.groups["result-facts"].artifactFingerprint,
+      },
     },
     repositoryRoot,
   });
   assert.deepEqual(plan.buildGroups, ["compatibility"]);
+  assert.deepEqual(plan.hydrateGroups, ["result-facts"]);
 });

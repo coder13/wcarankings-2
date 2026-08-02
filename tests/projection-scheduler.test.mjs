@@ -5,6 +5,7 @@ import {
   DEFAULT_PROJECTION_NAMES,
   COMPATIBILITY_PROJECTION_TASKS,
   COMPATIBILITY_TABLE_TASK_COUNT,
+  PROJECTION_REGISTRY,
   createTableProgress,
   projectionBuildPlan,
   projectionConcurrency,
@@ -184,15 +185,31 @@ test("a full schema refresh keeps the default semantic projections when selectio
   assert.deepEqual(projectionNamesForRefresh([]), []);
 });
 
+test("result-fact consumers never start from raw WCA tables alone", () => {
+  for (const name of ["sum-of-ranks", "person-competition-rankings"]) {
+    const projection = PROJECTION_REGISTRY.find((candidate) => candidate.name === name);
+    assert.ok(projection, `${name} is registered`);
+    assert.deepEqual(projection.dependencies, ["result-facts"]);
+  }
+  for (const name of [
+    "compatibility-ranking-entries-single-source",
+    "compatibility-ranking-entries-average-source",
+  ]) {
+    const task = COMPATIBILITY_PROJECTION_TASKS.find((candidate) => candidate.name === name);
+    assert.ok(task, `${name} is registered`);
+    assert.deepEqual(task.dependencies, ["projection:result-facts"]);
+  }
+});
+
 test("compatibility build omits disabled weekly helper tables", () => {
   assert.equal(COMPATIBILITY_PROJECTION_TASKS.some(({ name, table }) =>
     /weekly-rank-deltas|record-streaks/.test(name) || /weekly_rank_deltas|record_streaks/.test(table ?? "")), false);
   const source = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
     name === "compatibility-ranking-entries-single-source");
-  assert.deepEqual(source.dependencies, ["raw-wca"]);
+  assert.deepEqual(source.dependencies, ["projection:result-facts"]);
   const averageSource = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
     name === "compatibility-ranking-entries-average-source");
-  assert.deepEqual(averageSource.dependencies, ["raw-wca"]);
+  assert.deepEqual(averageSource.dependencies, ["projection:result-facts"]);
   assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 5);
   const progress = createTableProgress(COMPATIBILITY_TABLE_TASK_COUNT);
   let lastProgress;
@@ -202,7 +219,7 @@ test("compatibility build omits disabled weekly helper tables", () => {
   assert.equal(lastProgress, "[5/5]");
 });
 
-test("compatibility source views are ready directly after raw WCA data", async () => {
+test("compatibility source views wait for result facts", async () => {
   const names = new Set(["compatibility-ranking-entries-single-source"]);
   const events = [];
   const tasks = COMPATIBILITY_PROJECTION_TASKS
@@ -219,7 +236,7 @@ test("compatibility source views are ready directly after raw WCA data", async (
   await runDependencyAwareTasks(tasks, {
     createConnection: async () => fakeConnection(events.length + 1, []),
     concurrency: 2,
-    satisfiedDependencies: ["raw-wca"],
+    satisfiedDependencies: ["projection:result-facts"],
   });
 
   assert.deepEqual(events, [

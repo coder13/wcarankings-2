@@ -153,5 +153,19 @@ export function downstreamGroupClosure(names) {
       }
     }
   }
-  return DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) => selected.has(name));
+  const ordered = [];
+  const visited = new Set();
+  function visit(name) {
+    if (visited.has(name)) return;
+    const group = projectionGroup(name);
+    for (const dependency of group.dependencies) {
+      if (selected.has(dependency)) visit(dependency);
+    }
+    visited.add(name);
+    ordered.push(group);
+  }
+  for (const { name } of DEPLOYMENT_PROJECTION_GROUPS) {
+    if (selected.has(name)) visit(name);
+  }
+  return ordered;
 }
