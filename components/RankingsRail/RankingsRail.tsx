@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { forwardRef, useCallback, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { MotionConfig, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { TextDropdown, type TextDropdownOption } from "../Dropdown/TextDropdown";
@@ -293,13 +293,11 @@ export function RankingsPagerRail({
         : t("rankingsRail.pager.jumpDown", { distance: formatRankingNumber(5000) }),
   };
   const [pendingDirection, setPendingDirection] = useState<-1 | 1 | null>(null);
-  useEffect(() => {
-    if (!busy) setPendingDirection(null);
-  }, [busy]);
-  const labels = busy && pendingDirection
+  const activePendingDirection = busy ? pendingDirection : null;
+  const labels = activePendingDirection
     ? {
       ...currentLabels,
-      [pendingDirection === -1 ? "up" : "down"]: pendingDirection === -1
+      [activePendingDirection === -1 ? "up" : "down"]: activePendingDirection === -1
         ? t("rankingsRail.pager.jumpToTop")
         : t("rankingsRail.pager.jumpToEnd"),
     }
