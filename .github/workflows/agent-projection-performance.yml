@@ -25,8 +25,12 @@ jobs:
         continue-on-error: true
         run: node scripts/apply-projection-performance-patches.mjs
       - name: Update architecture tests
+        continue-on-error: true
         run: node scripts/apply-projection-performance-test-patches.mjs
+      - name: Preserve projection semantics
+        run: node scripts/apply-projection-correctness-patches.mjs
       - name: Apply direct GHCR deployment patch
+        continue-on-error: true
         run: node scripts/apply-direct-ghcr-deploy-patch.mjs
       - run: pnpm install --frozen-lockfile
       - run: node --check scripts/*.mjs
