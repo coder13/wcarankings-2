@@ -26,6 +26,8 @@ jobs:
         run: node scripts/apply-projection-performance-patches.mjs
       - name: Update architecture tests
         run: node scripts/apply-projection-performance-test-patches.mjs
+      - name: Apply direct GHCR deployment patch
+        run: node scripts/apply-direct-ghcr-deploy-patch.mjs
       - run: pnpm install --frozen-lockfile
       - run: node --check scripts/*.mjs
       - run: node --test tests/projection-release-artifact.test.mjs tests/projection-architecture.test.mjs tests/projection-transfer.test.mjs tests/deploy-workflow.test.mjs
@@ -35,5 +37,5 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Implement projection pipeline performance improvements [skip ci]'
+          git commit -m 'Stage projection releases directly from GHCR [skip ci]'
           git push origin HEAD:agent/projection-pipeline-performance
