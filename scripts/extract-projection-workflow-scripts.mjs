@@ -125,7 +125,15 @@ let tests = await readFile(testsPath, "utf8");
 if (!tests.includes("run-projection-deployment.sh")) {
   const close = tests.indexOf("];", tests.indexOf("Promise.all"));
   if (close < 0) throw new Error("Could not locate workflow fixture list");
-  tests = `${tests.slice(0, close + 2)}\nconst projectionDeploymentScript = await readFile(\n  new URL(\"../scripts/run-projection-deployment.sh\", import.meta.url),\n  \"utf8\",\n);\nconst projectionDeploySource = `${"${projectionDeploy}"}\\n${"${projectionDeploymentScript}"}`;${tests.slice(close + 2)}`;
+  const fixture = [
+    "",
+    "const projectionDeploymentScript = await readFile(",
+    "  new URL(\"../scripts/run-projection-deployment.sh\", import.meta.url),",
+    "  \"utf8\",",
+    ");",
+    "const projectionDeploySource = projectionDeploy + \"\\n\" + projectionDeploymentScript;",
+  ].join("\n");
+  tests = tests.slice(0, close + 2) + fixture + tests.slice(close + 2);
   tests = tests.replaceAll("assert.match(projectionDeploy,", "assert.match(projectionDeploySource,");
   tests = tests.replaceAll("assert.doesNotMatch(projectionDeploy,", "assert.doesNotMatch(projectionDeploySource,");
   tests = tests.replaceAll("projectionDeploy.includes(", "projectionDeploySource.includes(");
