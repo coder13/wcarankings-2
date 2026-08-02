@@ -7,6 +7,13 @@ export type ListAddSubmission =
   | { type: "select-person"; person: ListPerson }
   | { type: "none" };
 
+export function highlightedPersonForBuffer(
+  entries: ListPerson[],
+  activeIndex: number,
+) {
+  return entries[activeIndex] ?? null;
+}
+
 export function resolveListAddSubmission(
   value: string,
   entries: ListPerson[],
@@ -22,6 +29,6 @@ export function resolveListAddSubmission(
     return { type: "commit-person-ids", personIds };
   }
 
-  const person = entries[activeIndex];
+  const person = highlightedPersonForBuffer(entries, activeIndex);
   return person ? { type: "select-person", person } : { type: "none" };
 }

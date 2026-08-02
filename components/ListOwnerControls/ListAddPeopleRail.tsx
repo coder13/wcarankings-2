@@ -5,7 +5,10 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { RankingsRail } from "@/components/RankingsRail/RankingsRail";
 import { flagEmoji } from "@/lib/wca";
-import { resolveListAddSubmission } from "./list-add-submission";
+import {
+  highlightedPersonForBuffer,
+  resolveListAddSubmission,
+} from "./list-add-submission";
 import { personInitials, type ListPerson } from "./shared";
 import { usePersonSearchStream } from "./usePersonSearchStream";
 
@@ -193,9 +196,10 @@ export function ListAddPeopleRail({
               setSearchOpen(true);
             }}
             onKeyDown={(event) => {
-              if (event.key === "Tab" && entries[activeIndex]) {
+              const highlightedPerson = highlightedPersonForBuffer(entries, activeIndex);
+              if (event.key === "Tab" && highlightedPerson) {
                 event.preventDefault();
-                select([entries[activeIndex]]);
+                select([highlightedPerson]);
                 return;
               }
               if (event.key === "Backspace" && !value && selected.length) {
