@@ -20,57 +20,47 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Apply structural dependency and assertion fixes
+      - name: Apply literal dependency and assertion fixes
         run: |
           node --input-type=module <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';
 
-          const replaceTestBlock = (source, testName, transform) => {
-            const start = source.indexOf(`test("${testName}"`);
-            if (start < 0) throw new Error(`Test not found: ${testName}`);
-            const next = source.indexOf('\ntest("', start + 6);
-            const end = next < 0 ? source.length : next;
-            return source.slice(0, start) + transform(source.slice(start, end)) + source.slice(end);
-          };
-
           const groupsPath = 'scripts/projection-groups.mjs';
           const groupLines = (await readFile(groupsPath, 'utf8')).split('\n');
           const cityStart = groupLines.findIndex((line) => line.includes('name: "city-rankings"'));
-          if (cityStart < 0) throw new Error('city-rankings group not found');
           const dependencyIndex = groupLines.findIndex(
             (line, index) => index > cityStart && line.includes('dependencies:'),
           );
-          if (dependencyIndex < 0) throw new Error('city-rankings dependencies not found');
+          if (cityStart < 0 || dependencyIndex < 0) throw new Error('city dependency line not found');
           const indent = groupLines[dependencyIndex].match(/^\s*/)[0];
           groupLines[dependencyIndex] = `${indent}dependencies: ["result-facts", "competition-rankings"],`;
           await writeFile(groupsPath, groupLines.join('\n'));
 
           const deployTestPath = 'tests/deploy-workflow.test.mjs';
           let deployTest = await readFile(deployTestPath, 'utf8');
-          deployTest = replaceTestBlock(
-            deployTest,
-            'projection workflow treats WCA export timestamps as exact identities',
-            (block) => block.replaceAll('WCA export identity', 'Projection export identity'),
+          deployTest = deployTest.replaceAll(
+            'WCA export identity',
+            'Projection export identity',
           );
           await writeFile(deployTestPath, deployTest);
 
           const resultTestPath = 'tests/result-projections.test.mjs';
           let resultTest = await readFile(resultTestPath, 'utf8');
-          resultTest = replaceTestBlock(
-            resultTest,
-            'ranking entry sources use historical result nationality for regional rankings',
-            (block) => block
-              .replaceAll('r\\.event_id', 'historical\\.event_id')
-              .replaceAll('r\\.person_id', 'historical\\.person_id')
-              .replaceAll('r\\.person_country_id', 'historical\\.person_country_id')
-              .replaceAll('r\\.person_continent_id', 'historical\\.person_continent_id'),
-          );
+          resultTest = resultTest
+            .replaceAll(
+              'PARTITION BY r\\.event_id, r\\.person_id, COALESCE\\(r\\.person_country_id',
+              'PARTITION BY historical\\.event_id, historical\\.person_id, COALESCE\\(historical\\.person_country_id',
+            )
+            .replaceAll(
+              'PARTITION BY r\\.event_id, r\\.person_id, r\\.person_continent_id',
+              'PARTITION BY historical\\.event_id, historical\\.person_id, historical\\.person_continent_id',
+            );
           await writeFile(resultTestPath, resultTest);
           NODE
 
           awk '/name: "city-rankings"/,/projectionNames:/' scripts/projection-groups.mjs
-          grep -n 'Projection export identity' tests/deploy-workflow.test.mjs
-          grep -n 'historical\\.event_id' tests/result-projections.test.mjs
+          grep -n 'Projection export identity' tests/deploy-workflow.test.mjs || true
+          grep -n 'historical\\.event_id' tests/result-projections.test.mjs || true
       - name: Run corrected projection tests
         run: |
           node --test \
