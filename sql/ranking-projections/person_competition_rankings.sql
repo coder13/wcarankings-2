@@ -1,22 +1,22 @@
 -- phase: count each person's distinct competitions
 CREATE TABLE person_competition_counts AS
-SELECT person_id, COUNT(DISTINCT competition_id) AS competition_count
-FROM result_facts
-GROUP BY person_id;
+SELECT facts.person_id, COUNT(DISTINCT facts.competition_id) AS competition_count
+FROM result_facts facts
+INNER JOIN persons person
+  ON person.wca_id = facts.person_id
+ AND person.sub_id = 1
+GROUP BY facts.person_id;
 
 ALTER TABLE person_competition_counts ADD PRIMARY KEY (person_id);
 
--- phase: rank competition counts by region and gender
 CREATE TABLE person_competition_rankings AS
 WITH people AS (
-  SELECT counts.person_id, counts.competition_count,
-    facts.person_country_id AS country_id,
-    facts.person_continent_id AS continent_id,
-    facts.person_gender
+  SELECT counts.person_id, counts.competition_count, person.country_id,
+    COALESCE(country.continent_id, '') AS continent_id,
+    CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END AS person_gender
   FROM person_competition_counts counts
-  INNER JOIN result_facts facts ON facts.person_id = counts.person_id
-  GROUP BY counts.person_id, counts.competition_count,
-    facts.person_country_id, facts.person_continent_id, facts.person_gender
+  INNER JOIN persons person ON person.wca_id = counts.person_id AND person.sub_id = 1
+  LEFT JOIN countries country ON country.id = person.country_id
 ), cohorts AS (
   SELECT person_id, competition_count, 'world' AS scope, '' AS region_id, 'all' AS gender FROM people
   UNION ALL SELECT person_id, competition_count, 'world', '', person_gender FROM people

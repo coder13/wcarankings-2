@@ -406,7 +406,10 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.ok(monitorTrapIndex >= 0 && heartbeatIndex > monitorTrapIndex);
   assert.match(projectionDeploy, /stop_background_jobs\(\)[\s\S]*?kill "\$heartbeat_pid"[\s\S]*?wait "\$heartbeat_pid"[\s\S]*?kill "\$monitor_pid"[\s\S]*?wait "\$monitor_pid"/);
   assert.match(projectionDeploy, /rollback_on_failure\(\)[\s\S]*?trap - EXIT TERM INT HUP[\s\S]*?stop_background_jobs/);
-  assert.match(projectionDeploy, /chunk-projection-dump\.mjs \\\n\s+--import --rows-per-insert=1000/);
+  assert.match(projectionDeploy, /import-projection-transfer\.mjs/);
+  assert.match(projectionDeploy, /--concurrency=2/);
+  assert.match(projectionDeploy, /WCA_PROJECTION_INDEX_CONCURRENCY=2/);
+  assert.doesNotMatch(projectionDeploy, /chunk-projection-dump\.mjs/);
   assert.match(projectionDeploy, /candidate_work_label="wcarankings\.projection-artifact=\$\{ARTIFACT_ID\}"/);
   assert.match(projectionDeploy, /candidate_work_pid=\$1[\s\S]*?wait "\$candidate_work_pid"/);
   assert.match(projectionDeploy, /docker ps -q --filter "label=\$\{candidate_work_label\}"/);
@@ -552,13 +555,19 @@ test("projection deployment protects its remote heredoc from non-input compose c
 
   assert.match(projectionDeploy, /dc\(\) \{\n\s+docker compose .* "\$@" <\/dev\/null/);
   assert.match(projectionDeploy, /dc_with_stdin\(\) \{\n\s+docker compose .* "\$@"\n/);
-  assert.equal((projectionDeploy.match(/dc_with_stdin (?:run|exec)/g) || []).length, 4);
+  assert.equal((projectionDeploy.match(/dc_with_stdin (?:run|exec)/g) || []).length, 3);
   assert.match(projectionDeploy, /dc_with_stdin run --rm -T data-tools[\s\S]*?verify-active[\s\S]*?< "\$release_file"/);
   assert.match(
     projectionDeploy,
     /dc_with_stdin run --rm -T --label "\$candidate_work_label" \\\n\s+--entrypoint sh[\s\S]*?< "\/tmp\/wcarankings-\$\{ARTIFACT_ID\}-raw\.sql\.zip"/,
   );
-  assert.match(projectionDeploy, /gzip -dc[\s\S]*?\| dc_with_stdin run --rm -T[\s\S]*?chunk-projection-dump\.mjs/);
+  assert.match(projectionDeploy, /tar -xzf "\$archive" -C "\$transfer_directory"/);
+  assert.ok(projectionDeploy.includes('-v "$transfer_directory:/projection-transfer:ro"'));
+  assert.match(projectionDeploy, /import-projection-transfer\.mjs[\s\S]*?--metadata=\/projection-transfer\.json/);
+  assert.match(projectionDeploy, /Stage exact generation directly from GHCR/);
+  assert.match(projectionDeploy, /oras pull "\$ref"/);
+  assert.match(projectionDeploy, /docker --config "\$auth_directory" pull "\$DATA_TOOLS_IMAGE"/);
+  assert.doesNotMatch(projectionDeploy, /docker save/);
   assert.match(projectionDeploy, /--manifest=-\s*\\\n\s*< "\$release_file"/);
 });
 

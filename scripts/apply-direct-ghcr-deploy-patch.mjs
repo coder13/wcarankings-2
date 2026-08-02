@@ -1,3 +1,4 @@
+const prefix = "${prefix}"; const required_db_kib = "${required_db_kib}"; const available_db_kib = "${available_db_kib}"; const required_tmp_kib = "${required_tmp_kib}"; const available_tmp_kib = "${available_tmp_kib}"; const SERVER_IP = "${SERVER_IP}"; const SERVER_USER = "${SERVER_USER}"; const ARTIFACT_ID = "${ARTIFACT_ID}";
 import { readFile, writeFile } from "node:fs/promises";
 
 const path = ".github/workflows/deploy-projections.yml";
