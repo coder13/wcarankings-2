@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { rankingEntryEnhancementsFromColumns } from "@/services/rankings/capabilities";
+import { RANKING_ENTRY_ENHANCEMENTS_ENABLED } from "@/lib/ranking-entry-enhancements";
+import { getRankingEntryEnhancements } from "@/services/rankings/capabilities";
 import { rankingColumns } from "@/services/rankings/helpers";
 import { genderRankingPageQuery, rankingPageQuery } from "@/services/rankings/queries";
 
@@ -15,11 +16,6 @@ const enhancedColumns = [
   "record_streak_weeks",
 ];
 
-function columnsFor(tables: readonly string[]) {
-  return tables.flatMap((table_name) =>
-    enhancedColumns.map((column_name) => ({ table_name, column_name })));
-}
-
 function assertNoEnhancementColumnRead(sql: string) {
   for (const column of enhancedColumns) {
     assert.match(sql, new RegExp(`NULL AS ${column}`));
@@ -31,8 +27,9 @@ function assertNoEnhancementColumnRead(sql: string) {
   }
 }
 
-test("new server queries a prior ranking generation without reading missing enhancement columns", () => {
-  const enhancements = rankingEntryEnhancementsFromColumns([]);
+test("launch feature flag keeps ranking enhancements off", async () => {
+  assert.equal(RANKING_ENTRY_ENHANCEMENTS_ENABLED, false);
+  const enhancements = await getRankingEntryEnhancements();
   assert.deepEqual(enhancements, { rankDeltas: false });
 
   const columns = rankingColumns("world_rank", "world_sub_rank", enhancements);
@@ -45,50 +42,24 @@ test("new server queries a prior ranking generation without reading missing enha
   assertNoEnhancementColumnRead(sql);
 });
 
-test("a partial or mixed ranking schema fails closed to the all-null fallback", () => {
-  const mixed = columnsFor(["ranking_entries_single"])
-    .concat(columnsFor(["ranking_entries_average"]).filter(
-      ({ column_name }) => column_name !== "record_streak_weeks",
-    ));
-
-  const enhancements = rankingEntryEnhancementsFromColumns(mixed);
-  assert.deepEqual(enhancements, { rankDeltas: false });
+test("ranking queries use null aliases even if a caller omits capability state", () => {
   assertNoEnhancementColumnRead(rankingPageQuery(
     "ranking_entries_average",
-    rankingColumns("world_rank", "world_sub_rank", enhancements),
+    rankingColumns("world_rank", "world_sub_rank"),
     ["event_id = ?"],
     "world_sub_rank",
   ));
 });
 
-test("enables rank deltas only after both active ranking tables expose every field", () => {
-  const complete = columnsFor(["ranking_entries_single", "ranking_entries_average"]);
-
-  assert.deepEqual(rankingEntryEnhancementsFromColumns(complete), { rankDeltas: true });
-});
-
-test("gender-filtered rankings use the same pre-activation fallback and post-activation fields", () => {
-  const legacyColumns = rankingColumns("filtered_rank", "filtered_position", { rankDeltas: false });
+test("gender-filtered rankings use the launch fallback", () => {
   const legacy = genderRankingPageQuery({
     source: "ranking_entries_single",
     baseConditions: ["ranking.event_id = ?"],
     conditions: ["filtered_position >= ?"],
-    selectColumns: legacyColumns,
+    selectColumns: rankingColumns("filtered_rank", "filtered_position"),
   });
   assert.match(legacy, /NULL AS world_rank_delta/);
   assert.match(legacy, /NULL AS record_streak_weeks/);
   assert.match(legacy, /total_count/);
 
-  const active = genderRankingPageQuery({
-    source: "ranking_entries_single",
-    baseConditions: ["ranking.event_id = ?"],
-    conditions: ["filtered_position >= ?"],
-    selectColumns: rankingColumns("filtered_rank", "filtered_position", { rankDeltas: true }),
-  });
-  assert.match(active, /world_rank_delta/);
-  assert.match(active, /record_streak_weeks/);
-  assert.doesNotMatch(active, /NULL AS world_rank_delta/);
-  for (const column of enhancedColumns) {
-    assert.equal([...active.matchAll(new RegExp(`\\b${column}\\b`, "g"))].length, 1);
-  }
 });

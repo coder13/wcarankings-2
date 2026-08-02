@@ -286,51 +286,17 @@ test("only exposes APIs backed by active projections", async () => {
   }
 });
 
-test("weekly rank deltas are materialized in the compatibility ranking projection", async () => {
-  const [schema, groups, single, average, source] = await Promise.all([
-    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
+test("compatibility projections omit disabled weekly ranking enhancements", async () => {
+  const [groups, single, average] = await Promise.all([
     readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/weekly_rank_deltas_single.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/weekly_rank_deltas_average.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/ranking_entries_average_source.sql", root), "utf8"),
   ]);
-  assert.match(schema, /weekly_rank_deltas_single/);
-  assert.match(groups, /weekly_rank_deltas_average\.sql/);
-  for (const sql of [single, average]) {
-    assert.match(sql, /CREATE TABLE weekly_rank_deltas_/);
-    assert.match(sql, /DAYOFWEEK/);
-    assert.match(sql, /latest_week/);
-    assert.match(sql, /weekly_position/);
-    assert.match(sql, /RANK\(\) OVER/);
-    assert.doesNotMatch(sql, /result_value > current_bests\.result_value/);
-    assert.doesNotMatch(sql, /WHERE current_bests\.week_start = latest_week\.week_start/);
-    assert.match(sql, /ADD PRIMARY KEY \(event_id, person_id\)/);
+  for (const source of [groups, single, average]) {
+    assert.doesNotMatch(source, /weekly_rank_deltas_/);
+    assert.doesNotMatch(source, /record_streaks_/);
+    assert.doesNotMatch(source, /record_streak_weeks/);
   }
-  assert.match(source, /weekly_rank_deltas_single/);
-  assert.match(source, /world_rank_delta_state/);
-});
-
-test("record streaks are materialized from current values and Thursday weeks", async () => {
-  const [schema, groups, single, average, source] = await Promise.all([
-    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
-    readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/record_streaks_single.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/record_streaks_average.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
-  ]);
-  assert.match(schema, /record_streaks_single/);
-  assert.match(groups, /record_streaks_average\.sql/);
-  for (const sql of [single, average]) {
-    assert.match(sql, /CREATE TABLE record_streaks_/);
-    assert.match(sql, /DAYOFWEEK/);
-    assert.match(sql, /current_values/);
-    assert.match(sql, /MIN\(scoped_results\.week_start\)/);
-    assert.match(sql, /DATEDIFF/);
-    assert.match(sql, /streak_weeks/);
-    assert.match(sql, /ADD PRIMARY KEY \(event_id, person_id\)/);
-  }
-  assert.match(source, /record_streaks_single/);
-  assert.match(source, /record_streak_weeks/);
 });
 
 test("backfills only the active competition-event projection", async () => {

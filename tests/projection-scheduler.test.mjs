@@ -184,42 +184,26 @@ test("a full schema refresh keeps the default semantic projections when selectio
   assert.deepEqual(projectionNamesForRefresh([]), []);
 });
 
-test("compatibility helper tables are indexed, scheduled, and counted as build work", () => {
-  const helpers = COMPATIBILITY_PROJECTION_TASKS.filter(({ name }) =>
-    name.startsWith("compatibility-weekly-rank-deltas") || name.startsWith("compatibility-record-streaks"));
-  assert.equal(helpers.length, 4);
-  for (const task of helpers) {
-    assert.equal(task.dependencies[0], "raw-wca");
-    assert.ok(task.table);
-    assert.ok(task.estimatedDurationMs > 0);
-  }
+test("compatibility build omits disabled weekly helper tables", () => {
+  assert.equal(COMPATIBILITY_PROJECTION_TASKS.some(({ name, table }) =>
+    /weekly-rank-deltas|record-streaks/.test(name) || /weekly_rank_deltas|record_streaks/.test(table ?? "")), false);
   const source = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
     name === "compatibility-ranking-entries-single-source");
-  assert.deepEqual(source.dependencies, [
-    "compatibility-weekly-rank-deltas-single",
-    "compatibility-record-streaks-single",
-  ]);
+  assert.deepEqual(source.dependencies, ["raw-wca"]);
   const averageSource = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
     name === "compatibility-ranking-entries-average-source");
-  assert.deepEqual(averageSource.dependencies, [
-    "compatibility-weekly-rank-deltas-average",
-    "compatibility-record-streaks-average",
-  ]);
-  assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 9);
+  assert.deepEqual(averageSource.dependencies, ["raw-wca"]);
+  assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 5);
   const progress = createTableProgress(COMPATIBILITY_TABLE_TASK_COUNT);
   let lastProgress;
   for (const task of COMPATIBILITY_PROJECTION_TASKS) {
     if (task.table) lastProgress = progress.start(task.table);
   }
-  assert.equal(lastProgress, "[9/9]");
+  assert.equal(lastProgress, "[5/5]");
 });
 
-test("compatibility source views wait for their two helper tables", async () => {
-  const names = new Set([
-    "compatibility-weekly-rank-deltas-single",
-    "compatibility-record-streaks-single",
-    "compatibility-ranking-entries-single-source",
-  ]);
+test("compatibility source views are ready directly after raw WCA data", async () => {
+  const names = new Set(["compatibility-ranking-entries-single-source"]);
   const events = [];
   const tasks = COMPATIBILITY_PROJECTION_TASKS
     .filter(({ name }) => names.has(name))
@@ -238,7 +222,8 @@ test("compatibility source views wait for their two helper tables", async () => 
     satisfiedDependencies: ["raw-wca"],
   });
 
-  const sourceStart = events.indexOf("start:compatibility-ranking-entries-single-source");
-  assert.ok(sourceStart > events.indexOf("finish:compatibility-weekly-rank-deltas-single"));
-  assert.ok(sourceStart > events.indexOf("finish:compatibility-record-streaks-single"));
+  assert.deepEqual(events, [
+    "start:compatibility-ranking-entries-single-source",
+    "finish:compatibility-ranking-entries-single-source",
+  ]);
 });

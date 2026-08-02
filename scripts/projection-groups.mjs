@@ -10,16 +10,12 @@ export const PROJECTION_ARTIFACT_FORMAT_VERSION = 3;
 export const DEPLOYMENT_PROJECTION_GROUPS = [
   {
     name: "compatibility",
-    schemaVersion: 2,
+    schemaVersion: 3,
     dependencies: [],
     projectionNames: [],
     tables: [
       "ranking_entries_single",
       "ranking_entries_average",
-      "weekly_rank_deltas_single",
-      "weekly_rank_deltas_average",
-      "record_streaks_single",
-      "record_streaks_average",
       "ranking_counts",
       "result_entries_single",
       "result_counts",
@@ -27,10 +23,6 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
     sqlFiles: [
       "wca_best_single.sql",
       "wca_best_average.sql",
-      "weekly_rank_deltas_single.sql",
-      "weekly_rank_deltas_average.sql",
-      "record_streaks_single.sql",
-      "record_streaks_average.sql",
       "ranking_entries_single_source.sql",
       "ranking_entries_average_source.sql",
       "result_entries_single_source.sql",

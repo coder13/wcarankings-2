@@ -27,7 +27,7 @@ export type RankingEntryEnhancements = {
 export function rankingColumns(
   rank: string,
   subRank: string,
-  { rankDeltas }: RankingEntryEnhancements = { rankDeltas: true },
+  { rankDeltas }: RankingEntryEnhancements = { rankDeltas: false },
 ) {
   const enhancements = rankDeltas
     ? "world_rank_delta, world_rank_delta_state, continent_rank_delta, continent_rank_delta_state, country_rank_delta, country_rank_delta_state, record_streak_weeks"
