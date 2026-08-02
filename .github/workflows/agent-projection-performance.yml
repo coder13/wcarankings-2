@@ -42,23 +42,12 @@ jobs:
             node scripts/apply-direct-ghcr-deploy-patch.mjs
           fi
           node scripts/apply-direct-ghcr-deploy-test-patches.mjs
+      - name: Extract deployment and transfer scripts
+        run: node scripts/extract-projection-workflow-scripts.mjs
       - run: pnpm install --frozen-lockfile
       - run: node --check scripts/*.mjs
+      - run: bash -n scripts/run-projection-deployment.sh scripts/test-bulk-projection-transfer.sh
       - run: node --test tests/projection-release-artifact.test.mjs tests/projection-architecture.test.mjs tests/projection-transfer.test.mjs tests/deploy-workflow.test.mjs
-      - name: Package validated files
-        run: |
-          git diff --name-only -z \
-            | tar --null --files-from=- --create --gzip \
-                --file=/tmp/projection-performance-validated.tar.gz
-          git diff --name-only > /tmp/projection-performance-files.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: projection-performance-validated
-          path: |
-            /tmp/projection-performance-validated.tar.gz
-            /tmp/projection-performance-files.txt
-          if-no-files-found: error
-          retention-days: 1
       - name: Commit validated non-workflow changes
         run: |
           git config user.name github-actions[bot]
@@ -66,5 +55,5 @@ jobs:
           git add -A
           git reset -- .github/workflows
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Complete projection pipeline source improvements [skip ci]'
+          git commit -m 'Extract projection deployment scripts [skip ci]'
           git push origin HEAD:agent/projection-pipeline-performance
