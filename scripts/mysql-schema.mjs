@@ -164,6 +164,13 @@ const projectionDefinitions = [
     tables: ["result_ranking_counts", "result_gender_ranking_counts"],
     enabledByDefault: true,
   },
+  {
+    name: "current-year-result-rankings",
+    dependencies: ["result-facts"],
+    files: ["result_current_year_gender_rankings_single.sql", "result_current_year_gender_rankings_average.sql"],
+    tables: ["result_current_year_gender_rankings_single", "result_current_year_gender_rankings_average"],
+    enabledByDefault: false,
+  },
   { name: "person-ranking-counts", dependencies: ["person-event-rankings"], files: ["projection_counts.sql"], tables: ["person_ranking_counts"] },
   { name: "person-metric-values", dependencies: ["person-event-rankings"], files: ["person_metric_values.sql"], tables: ["person_metric_values"] },
   { name: "person-metric-scores", dependencies: ["person-metric-values"], files: ["person_metric_scores.sql"], tables: ["person_metric_scores", "person_metric_counts"] },
