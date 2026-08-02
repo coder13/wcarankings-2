@@ -19,24 +19,39 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Record test sources before install
+      - run: pnpm install --frozen-lockfile
+      - name: Show exact assertion sources
         run: |
           git rev-parse HEAD
-          wc -l tests/deploy-workflow.test.mjs tests/projection-release-plan.test.mjs tests/result-projections.test.mjs
-          sha256sum tests/deploy-workflow.test.mjs tests/projection-release-plan.test.mjs tests/result-projections.test.mjs > /tmp/tests-before.sha
-      - run: pnpm install --frozen-lockfile
-      - name: Compare test sources after install
+          grep -n -B2 -A10 "projection workflow treats WCA export timestamps as exact identities" tests/deploy-workflow.test.mjs
+          grep -n -B2 -A14 "explicit group selection expands required dependencies" tests/projection-release-plan.test.mjs
+          grep -n -B2 -A12 "ranking entry sources use historical result nationality" tests/result-projections.test.mjs
+          grep -n "PARTITION BY.*person_country_id" sql/ranking-projections/ranking_entries_*_source.sql
+      - name: Show exact assertion values
         run: |
-          wc -l tests/deploy-workflow.test.mjs tests/projection-release-plan.test.mjs tests/result-projections.test.mjs
-          sha256sum -c /tmp/tests-before.sha || true
-          git status --short
-          git diff -- tests/deploy-workflow.test.mjs tests/projection-release-plan.test.mjs tests/result-projections.test.mjs | head -n 300
-          grep -R -n "projection workflow treats WCA export timestamps as exact identities" tests || true
-          grep -R -n "explicit group selection expands required dependencies" tests || true
-          grep -R -n "ranking entry sources use historical result nationality" tests || true
-      - name: Run projection tests against branch head
-        run: |
-          node --test \
+          cat > /tmp/failure-reporter.mjs <<'REPORTER'
+          export default async function* failureReporter(source) {
+            for await (const event of source) {
+              if (event.type !== 'test:fail') continue;
+              const error = event.data.details?.error || {};
+              yield `${JSON.stringify({
+                name: event.data.name,
+                operator: error.operator,
+                expected: error.expected,
+                actual: error.actual,
+                stack: String(error.stack || '').split('\n').filter((line) => line.includes('/tests/')).slice(0, 2),
+              }, null, 2)}\n`;
+            }
+          }
+          REPORTER
+          set +e
+          failed=0
+          for test_file in \
             tests/deploy-workflow.test.mjs \
             tests/projection-release-plan.test.mjs \
-            tests/result-projections.test.mjs
+            tests/result-projections.test.mjs; do
+            node --test --test-reporter=/tmp/failure-reporter.mjs "$test_file"
+            status=$?
+            if [ "$status" -ne 0 ]; then failed=1; fi
+          done
+          exit "$failed"
