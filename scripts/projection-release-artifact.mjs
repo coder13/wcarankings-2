@@ -65,8 +65,8 @@ export async function createProjectionReleaseManifest({
     }
     const prefix = prefixForGroup(group);
     const metadataFile = `${prefix}-projection-transfer.json`;
-    const archiveFile = `${prefix}-projection-transfer.sql.gz`;
     const transfer = JSON.parse(await readFile(join(directory, metadataFile), "utf8"));
+    const archiveFile = transfer.archiveFile || `${prefix}-projection-transfer.sql.gz`;
     if (transfer.group !== group) {
       throw new Error(`Transfer metadata group ${transfer.group || "(missing)"} does not match ${group}`);
     }

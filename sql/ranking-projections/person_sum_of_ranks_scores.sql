@@ -16,11 +16,10 @@ SELECT
   result.event_id,
   result.person_id,
   result.person_country_id,
-  COALESCE(country.continent_id, ''),
+  result.person_continent_id,
   MIN(CASE WHEN result.best > 0 THEN result.best END),
   MIN(CASE WHEN result.average > 0 THEN result.average END)
-FROM results result
-LEFT JOIN countries country ON country.id = result.person_country_id
+FROM result_facts result
 WHERE result.person_country_id <> ''
   AND result.event_id IN (
     '333', '222', '444', '555', '666', '777', '333bf', '333fm',

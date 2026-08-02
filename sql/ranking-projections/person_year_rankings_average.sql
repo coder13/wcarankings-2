@@ -1,11 +1,11 @@
 CREATE TABLE person_year_rankings_average AS
 WITH country_candidates AS (
   SELECT
-    YEAR(competition_start_date) AS ranking_year, event_id, person_id,
+    competition_year AS ranking_year, event_id, person_id,
     person_country_id AS country_id, person_continent_id AS continent_id,
     result_id, competition_start_date, competition_id, average AS result_value,
     ROW_NUMBER() OVER (
-      PARTITION BY YEAR(competition_start_date), event_id, person_id, person_country_id
+      PARTITION BY competition_year, event_id, person_id, person_country_id
       ORDER BY average, competition_start_date, competition_id, result_id
     ) AS candidate_position
   FROM result_facts

@@ -19,6 +19,7 @@ const [
   projectionRelease,
   planner,
   builder,
+  groupBuilder,
   serverBuild,
   serverDeploy,
   projectionDeploy,
@@ -29,6 +30,7 @@ const [
   workflow("projection-release.yml"),
   workflow("plan-projections.yml"),
   workflow("build-projections.yml"),
+  workflow("build-projection-group.yml"),
   workflow("build-server.yml"),
   workflow("deploy-server.yml"),
   workflow("deploy-projections.yml"),
@@ -325,9 +327,11 @@ test("incremental planning classifies active, cached, build, and hydrate groups"
   assert.match(planner, /available_artifacts/);
   assert.match(planner, /build_groups/);
   assert.match(planner, /hydrate_groups/);
-  assert.match(planner, /Quarantining corrupt projection artifact/);
-  assert.match(projectionRelease, /supersession:/);
-  assert.match(projectionRelease, /ref: main/);
+  assert.match(planner, /Ignoring projection artifact with invalid OCI metadata/);
+  assert.match(planner, /oras manifest fetch/);
+  assert.doesNotMatch(planner, /oras pull/);
+  assert.match(projectionRelease, /check-projection-supersession\.yml/);
+  assert.match(projectionRelease, /needs\.supersession\.outputs\.safe == 'true'/);
 });
 
 test("projection deployment accepts and smoke-tests every capability group", async () => {
@@ -339,26 +343,20 @@ test("projection deployment accepts and smoke-tests every capability group", asy
   assert.match(projectionDeploy, /person-competition-rankings,\*\) retry_endpoint "\/api\/rankings\/people\/competitions\?start=0&limit=1"/);
 });
 
-test("group artifacts use GHCR and cached dependencies hydrate before a two-worker build", () => {
-  assert.match(builder, /oras pull "\$\{repository\}@\$\{digest\}"/);
-  assert.match(builder, /oras push "\$ref"/);
-  const publishStart = builder.indexOf("      - name: Publish newly built group artifacts to GHCR");
-  const publishEnd = builder.indexOf("      - name: Compose exact production release bundle", publishStart);
-  assert.ok(publishStart >= 0 && publishEnd > publishStart);
-  const publish = builder.slice(publishStart, publishEnd);
-  assert.match(publish, /pushd "\$directory" >\/dev\/null/);
-  assert.match(publish, /"projection-release\.json:application\/vnd\.cuberanks\.projection\.manifest\.v3\+json"/);
-  assert.match(publish, /"\$archive:application\/vnd\.cuberanks\.projection\.sql\+gzip"/);
-  assert.match(publish, /"\$metadata:application\/vnd\.cuberanks\.projection\.transfer\+json"/);
-  assert.match(publish, /popd >\/dev\/null/);
-  const orasPush = publish.match(/oras push "\$ref"[\s\S]*?popd >\/dev\/null/);
-  assert.ok(orasPush, "the artifact publish must run from the artifact directory");
-  assert.doesNotMatch(orasPush[0], /"\$directory\//);
+test("group artifacts use GHCR and cached dependencies hydrate before isolated builds", () => {
+  assert.match(builder, /projection-build-matrix\.mjs --wave=1/);
+  assert.match(builder, /projection-build-matrix\.mjs --wave=2/);
+  assert.match(builder, /strategy:[\s\S]*matrix:/);
+  assert.match(groupBuilder, /oras pull "\$\{repository\}@\$\{digest\}"/);
+  assert.match(groupBuilder, /oras push "\$ref"/);
+  assert.match(groupBuilder, /application\/vnd\.cuberanks\.projection\.tables\.v1\+gzip/);
+  assert.match(groupBuilder, /import-projection-transfer\.mjs/);
+  assert.match(groupBuilder, /publish-projection-transfer\.mjs --hydrate/);
+  assert.match(groupBuilder, /--satisfied-groups="\$HYDRATE_GROUPS"/);
+  assert.match(groupBuilder, /WCA_PROJECTION_BUILD_CONCURRENCY=2/);
+  assert.match(groupBuilder, /repair-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/);
+  assert.match(builder, /path: \/tmp\/projection-release\/projection-release\.json/);
   assert.doesNotMatch(builder, /projection-release-group-/);
-  assert.match(builder, /publish-projection-transfer\.mjs --hydrate/);
-  assert.match(builder, /--satisfied-groups="\$HYDRATE_GROUPS"/);
-  assert.match(builder, /WCA_PROJECTION_BUILD_CONCURRENCY=2/);
-  assert.match(builder, /repair-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/);
 });
 
 test("component images are independently identified and production requires PR validation", () => {
@@ -383,7 +381,7 @@ test("component images are independently identified and production requires PR v
 });
 
 test("Node dependency consumers use the pinned pnpm lockfile", () => {
-  for (const nodeWorkflow of [pullRequest, planner, builder]) {
+  for (const nodeWorkflow of [pullRequest, groupBuilder]) {
     assert.match(nodeWorkflow, /pnpm\/action-setup@v4/);
     assert.match(nodeWorkflow, /cache: pnpm/);
     assert.match(nodeWorkflow, /pnpm install --frozen-lockfile/);
