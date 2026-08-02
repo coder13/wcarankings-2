@@ -56,4 +56,8 @@ content = content.replace(
   "    needs: [matrix, wave-one, wave-two]\n",
   "    needs: [matrix, raw-export, wave-one, wave-two]\n",
 );
+content = content.replace(
+  "      && needs.matrix.result == 'success'\n",
+  "      && needs.matrix.result == 'success'\n      && needs.raw-export.result == 'success'\n",
+);
 await writeFile(path, content);
