@@ -45,7 +45,22 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node --check scripts/*.mjs
       - run: node --test tests/projection-release-artifact.test.mjs tests/projection-architecture.test.mjs tests/projection-transfer.test.mjs tests/deploy-workflow.test.mjs
+      - name: Package validated files
+        run: |
+          git diff --name-only -z \
+            | tar --null --files-from=- --create --gzip \
+                --file=/tmp/projection-performance-validated.tar.gz
+          git diff --name-only > /tmp/projection-performance-files.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: projection-performance-validated
+          path: |
+            /tmp/projection-performance-validated.tar.gz
+            /tmp/projection-performance-files.txt
+          if-no-files-found: error
+          retention-days: 1
       - name: Commit validated changes
+        continue-on-error: true
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
