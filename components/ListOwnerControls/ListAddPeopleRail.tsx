@@ -126,7 +126,7 @@ export function ListAddPeopleRail({
       return;
     }
     const person = entries[activeIndex];
-    if (person) void commit([...selected, person]);
+    if (person) select([person]);
   };
 
   const resetSearch = () => {
