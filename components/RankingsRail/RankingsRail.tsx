@@ -224,6 +224,8 @@ export function RankingsControlsRail<T extends EventPickerOption>({
         {showResultType && <div className="Jump-resultTypeControl">
           <button className="Jump-resultTypeToggle" type="button" disabled={event.id === "333mbf"} aria-label={t("rankingsRail.controls.switchToRankingType", { rankingType: nextType })} onClick={() => onRankingTypeChange(nextType)}>{t(`rankingsRail.controls.${rankingType}`)}</button>
         </div>}
+        {showGender && <GenderPicker className="Jump-genderPicker" value={gender} onChange={onGenderChange} />}
+        <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} disabled={regionDisabled} />
         {period && (
           <TextDropdown
             options={period.options}
@@ -233,8 +235,6 @@ export function RankingsControlsRail<T extends EventPickerOption>({
             className="personYearDropdown Jump-periodPicker"
           />
         )}
-        {showGender && <GenderPicker className="Jump-genderPicker" value={gender} onChange={onGenderChange} />}
-        <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} disabled={regionDisabled} />
         {listAddAction && <button className="Jump-listAddButton" type="button" onClick={listAddAction}>{t("rankingsRail.controls.addToList")}</button>}
       </div>
       {search && <RailSearch model={search} />}

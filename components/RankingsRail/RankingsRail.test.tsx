@@ -42,6 +42,7 @@ test("renders the person ranking period control in the settings rail", () => {
   assert.match(markup, /class="[^"]*personYearDropdown Jump-periodPicker"/);
   assert.match(markup, /aria-label="Person ranking period"/);
   assert.match(markup, />All time</);
+  assert.ok(markup.indexOf("Jump-regionPicker") < markup.indexOf("Jump-periodPicker"));
 });
 
 test("shows clickable previous and next person actions only while find navigation is active", () => {
@@ -61,6 +62,7 @@ test("shows clickable previous and next person actions only while find navigatio
 test("makes find navigation interactive only while search navigation is active", async () => {
   const css = await readFile(new URL("./RankingsRail.css", import.meta.url), "utf8");
   assert.match(css, /\.Jump-pagerButton--me \{ padding-inline: \.75em; text-align: center; \}/);
+  assert.match(css, /\.Jump-periodPicker \{[^}]*border-left: 1px solid var\(--border-subtle\);/);
   assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \.Jump-pagerActions \{ opacity: 0; pointer-events: none; \}/);
   assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \{ width: min\(26em, calc\(100vw - 2em\)\); \}/);
   assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \.Jump-searchNavigation \{ opacity: 1; pointer-events: auto; \}/);
