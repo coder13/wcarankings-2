@@ -39,7 +39,7 @@ export function RankingsResults({
           eventId: filters.eventId,
           rankingType: ranking.entriesRankingType,
           emptyState: list?.owner?.memberCount === 0
-            ? <div className="listMessage">Build your list by adding cubers.</div>
+            ? <div className="listMessage">Add cubers to this list to get started.</div>
             : undefined,
           hideIdentityIds:
             filters.subject === "competitions" || filters.subject === "cities",
