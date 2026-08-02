@@ -80,6 +80,10 @@ test("warms the destination-side page for each large pager jump", () => {
     [14_950, 15_000],
   );
   assert.deepEqual(getNavigationWindowPageStarts(0, -1, RESULTS_PAGE_SIZE), [0]);
+  assert.deepEqual(
+    getNavigationWindowPageStarts(5_000, 1, RESULTS_PAGE_SIZE, 2),
+    [5_000, 5_050, 5_100],
+  );
 });
 
 test("extends the page prefetch buffer for fast downward scrolling", () => {

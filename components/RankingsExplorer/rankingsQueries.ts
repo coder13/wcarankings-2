@@ -26,6 +26,7 @@ import { rankingEntryKey } from "./types";
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const PAGE_STALE_TIME_MS = 5 * 60 * 1000;
 const SEARCH_PREFETCH_RADIUS = 3;
+const NAVIGATION_ADJACENT_PAGE_COUNT = 2;
 
 export type RankingQueryFilters = {
   eventId: string;
@@ -295,11 +296,13 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       targetSubRank: number,
       direction: -1 | 1,
     ) => {
+      const targetPageStart = rankingPageStart(targetSubRank);
       const pages = (await Promise.all(
         getNavigationWindowPageStarts(
-          rankingPageStart(targetSubRank),
+          targetPageStart,
           direction,
           PAGE_SIZE,
+          NAVIGATION_ADJACENT_PAGE_COUNT,
         )
           .map((pageStart) => getPage(pageStart + 1)),
       ))
