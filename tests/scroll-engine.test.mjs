@@ -9,6 +9,7 @@ import {
   getSearchBridgePageStarts,
   getSearchJumpMode,
   getNeighborPageStarts,
+  getNavigationWindowPageStarts,
   getPrefetchRowCount,
   shouldPrefetchExtraPage,
   shouldPrefetchNeighborPages,
@@ -67,6 +68,18 @@ test("derives each pager jump from the settled ranking position", () => {
   assert.equal(getPagerJumpTarget(10_000, 1, 291_763), 15_000);
   assert.equal(getPagerJumpTarget(5_000, -1, 291_763), 1);
   assert.equal(getPagerJumpTarget(288_000, 1, 291_763), 291_763);
+});
+
+test("warms the destination-side page for each large pager jump", () => {
+  assert.deepEqual(
+    getNavigationWindowPageStarts(4_950, -1, RESULTS_PAGE_SIZE),
+    [4_900, 4_950],
+  );
+  assert.deepEqual(
+    getNavigationWindowPageStarts(14_950, 1, RESULTS_PAGE_SIZE),
+    [14_950, 15_000],
+  );
+  assert.deepEqual(getNavigationWindowPageStarts(0, -1, RESULTS_PAGE_SIZE), [0]);
 });
 
 test("extends the page prefetch buffer for fast downward scrolling", () => {

@@ -9,7 +9,10 @@ import {
 import { useMemo } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import type { GenderFilter } from "@/lib/wca";
-import { getSearchBridgePageStarts } from "./scrollEngine";
+import {
+  getNavigationWindowPageStarts,
+  getSearchBridgePageStarts,
+} from "./scrollEngine";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
   InitialRankingData,
@@ -288,12 +291,18 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       };
     };
 
-    const getNavigationWindow = async (targetSubRank: number) => {
-      const targetPageStart = rankingPageStart(targetSubRank);
-      const pages = (await Promise.all([
-        targetPageStart,
-        targetPageStart + PAGE_SIZE,
-      ].map((pageStart) => getPage(pageStart + 1))))
+    const getNavigationWindow = async (
+      targetSubRank: number,
+      direction: -1 | 1,
+    ) => {
+      const pages = (await Promise.all(
+        getNavigationWindowPageStarts(
+          rankingPageStart(targetSubRank),
+          direction,
+          PAGE_SIZE,
+        )
+          .map((pageStart) => getPage(pageStart + 1)),
+      ))
         .filter((page) => page.entries.length > 0);
       const firstPage = pages[0];
       if (!firstPage) return getPage(targetPageStart + 1);

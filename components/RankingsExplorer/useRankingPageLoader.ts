@@ -140,7 +140,10 @@ export function useRankingPageLoader({
     if (focusLast) pageRequest = getEndWindow(startRank);
     else if (focusMatch) pageRequest = getPersonWindow(focusMatch);
     else if (pendingNavigationAppendRef.current) {
-      pageRequest = getNavigationWindow(pendingRankRef.current);
+      pageRequest = getNavigationWindow(
+        pendingRankRef.current,
+        pendingScrollDirectionRef.current ?? 1,
+      );
     } else pageRequest = getPage(startRank);
 
     pageRequest
