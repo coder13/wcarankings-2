@@ -43,25 +43,26 @@ function secureRegistryTransfer(stage) {
   }
   let secured = stage.replace(insecureInvocation, secureInvocation);
   const remoteConfig = [
-    'auth_directory=$(mktemp -d)',
-    'stage_directory=$(mktemp -d)',
-    'cleanup_stage() {',
-    '  docker --config "$auth_directory" logout ghcr.io >/dev/null 2>&1 || true',
-    '  rm -rf "$auth_directory" "$stage_directory"',
-    '}',
-    'trap cleanup_stage EXIT TERM INT HUP',
-    'install -m 600 "/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json" \\',
-    '  "$auth_directory/config.json"',
-    'rm -f "/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json"',
+    '  auth_directory=$(mktemp -d)',
+    '  stage_directory=$(mktemp -d)',
+    '  cleanup_stage() {',
+    '    docker --config "$auth_directory" logout ghcr.io >/dev/null 2>&1 || true',
+    '    rm -rf "$auth_directory" "$stage_directory"',
+    '  }',
+    '  trap cleanup_stage EXIT TERM INT HUP',
+    '  install -m 600 "/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json" \\',
+    '    "$auth_directory/config.json"',
+    '  rm -f "/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json"',
   ].join("\n");
-  const remoteStart = secured.indexOf("auth_directory=$(mktemp -d)");
-  const pullStart = secured.indexOf(
-    'docker --config "$auth_directory" pull "$DATA_TOOLS_IMAGE"',
-    remoteStart,
-  );
-  if (remoteStart < 0 || pullStart < 0) {
+  const remoteMarker = "\n  auth_directory=$(mktemp -d)";
+  const pullMarker = '\n  docker --config "$auth_directory" pull "$DATA_TOOLS_IMAGE"';
+  const remoteStartMarker = secured.indexOf(remoteMarker);
+  const pullStartMarker = secured.indexOf(pullMarker, remoteStartMarker + remoteMarker.length);
+  if (remoteStartMarker < 0 || pullStartMarker < 0) {
     throw new Error("Could not locate remote GHCR login boundaries");
   }
+  const remoteStart = remoteStartMarker + 1;
+  const pullStart = pullStartMarker + 1;
   secured = `${secured.slice(0, remoteStart)}${remoteConfig}\n${secured.slice(pullStart)}`;
   secured += "\ncleanup_local_auth\ntrap - EXIT";
   return secured;
@@ -96,7 +97,7 @@ ${validate}
 # Verify the lightweight release coordinate and compatibility contract.
 ${verify}
 
-# Pull and stage exact digest-qualified release inputs directly on production.
+# Stage exact generation directly from GHCR.
 ${stage}
 
 # Prepare, verify, and atomically activate the candidate generation.
