@@ -5,13 +5,13 @@
  * input, while scheduler, progress, and deployment implementation are not.
  */
 export const MARIADB_COMPATIBILITY_VERSION = "11.8";
-export const PROJECTION_ARTIFACT_FORMAT_VERSION = 3;
+export const PROJECTION_ARTIFACT_FORMAT_VERSION = 4;
 
 export const DEPLOYMENT_PROJECTION_GROUPS = [
   {
     name: "compatibility",
-    schemaVersion: 3,
-    dependencies: [],
+    schemaVersion: 4,
+    dependencies: ["result-facts"],
     projectionNames: [],
     tables: [
       "ranking_entries_single",
@@ -34,7 +34,7 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
   },
   {
     name: "result-facts",
-    schemaVersion: 1,
+    schemaVersion: 2,
     dependencies: [],
     projectionNames: ["result-facts"],
     tables: ["result_facts"],
@@ -58,8 +58,8 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
   },
   {
     name: "person-competition-rankings",
-    schemaVersion: 1,
-    dependencies: [],
+    schemaVersion: 2,
+    dependencies: ["result-facts"],
     projectionNames: ["person-competition-rankings"],
     tables: [
       "person_competition_counts",
@@ -70,7 +70,7 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
   },
   {
     name: "city-rankings",
-    schemaVersion: 1,
+    schemaVersion: 2,
     dependencies: ["result-facts", "competition-rankings"],
     projectionNames: ["city-event-stats", "entity-ranking-counts"],
     tables: ["city_event_stats", "entity_ranking_counts"],
@@ -78,8 +78,8 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
   },
   {
     name: "sum-of-ranks",
-    schemaVersion: 1,
-    dependencies: [],
+    schemaVersion: 2,
+    dependencies: ["result-facts"],
     projectionNames: ["sum-of-ranks"],
     tables: ["person_sum_of_ranks_scores"],
     sqlFiles: ["person_sum_of_ranks_scores.sql"],
