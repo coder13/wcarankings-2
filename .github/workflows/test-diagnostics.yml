@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   isolate:
@@ -31,17 +31,13 @@ jobs:
           const dependencyIndex = groupLines.findIndex(
             (line, index) => index > cityStart && line.includes('dependencies:'),
           );
-          if (cityStart < 0 || dependencyIndex < 0) throw new Error('city dependency line not found');
           const indent = groupLines[dependencyIndex].match(/^\s*/)[0];
           groupLines[dependencyIndex] = `${indent}dependencies: ["result-facts", "competition-rankings"],`;
           await writeFile(groupsPath, groupLines.join('\n'));
 
           const deployTestPath = 'tests/deploy-workflow.test.mjs';
           let deployTest = await readFile(deployTestPath, 'utf8');
-          deployTest = deployTest.replaceAll(
-            'WCA export identity',
-            'Projection export identity',
-          );
+          deployTest = deployTest.replaceAll('WCA export identity', 'Projection export identity');
           await writeFile(deployTestPath, deployTest);
 
           const resultTestPath = 'tests/result-projections.test.mjs';
@@ -57,20 +53,38 @@ jobs:
             );
           await writeFile(resultTestPath, resultTest);
           NODE
-
-          awk '/name: "city-rankings"/,/projectionNames:/' scripts/projection-groups.mjs
-          grep -n 'Projection export identity' tests/deploy-workflow.test.mjs || true
-          grep -n 'historical\\.event_id' tests/result-projections.test.mjs || true
-      - name: Run corrected projection tests
+      - name: Report remaining failure metadata
         run: |
-          node --test \
+          cat > /tmp/failure-reporter.mjs <<'REPORTER'
+          export default async function* failureReporter(source) {
+            for await (const event of source) {
+              if (event.type !== 'test:fail') continue;
+              const error = event.data.details?.error || {};
+              const actual = typeof error.actual === 'string'
+                ? error.actual.slice(0, 500)
+                : error.actual;
+              const expected = typeof error.expected === 'string'
+                ? error.expected.slice(0, 500)
+                : error.expected;
+              yield `${JSON.stringify({
+                name: event.data.name,
+                operator: error.operator,
+                expected,
+                actual,
+                stack: String(error.stack || '').split('\n').filter((line) => line.includes('/tests/')).slice(0, 3),
+              }, null, 2)}\n`;
+            }
+          }
+          REPORTER
+          set +e
+          failed=0
+          for test_file in \
             tests/deploy-workflow.test.mjs \
             tests/projection-release-plan.test.mjs \
-            tests/result-projections.test.mjs
-      - name: Commit corrected source and tests
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add scripts/projection-groups.mjs tests/deploy-workflow.test.mjs tests/result-projections.test.mjs
-          git commit -m 'Fix projection dependency closure and expectations'
-          git push origin HEAD:agent/projection-pipeline-performance
+            tests/result-projections.test.mjs; do
+            echo "===== $test_file ====="
+            node --test --test-reporter=/tmp/failure-reporter.mjs "$test_file"
+            status=$?
+            if [ "$status" -ne 0 ]; then failed=1; fi
+          done
+          exit "$failed"
