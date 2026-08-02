@@ -1,0 +1,76 @@
+name: Prune Actions caches
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "23 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TARGET_BYTES: "7500000000"
+      STALE_DAYS: "14"
+    steps:
+      - name: Delete caches for the closed pull request
+        if: github.event_name == 'pull_request'
+        env:
+          PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          set -euo pipefail
+          gh cache list --repo "$GH_REPO" --ref "$PR_REF" --limit 1000 \
+            --json id --jq '.[].id' |
+            while read -r cache_id; do
+              [ -n "$cache_id" ] || continue
+              gh cache delete "$cache_id" --repo "$GH_REPO"
+            done
+
+      - name: Prune stale caches and retain 7.5 GB of recent caches
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          caches_file=$(mktemp)
+          refresh_caches() {
+            gh cache list --repo "$GH_REPO" --limit 1000 \
+              --sort last_accessed_at --order asc \
+              --json id,key,lastAccessedAt,sizeInBytes > "$caches_file"
+          }
+          delete_cache() {
+            local cache_id=$1
+            local cache_key=$2
+            echo "Deleting cache $cache_id ($cache_key)"
+            gh cache delete "$cache_id" --repo "$GH_REPO"
+          }
+
+          refresh_caches
+          stale_before=$(date -u -d "$STALE_DAYS days ago" +%s)
+          while IFS=$'\t' read -r cache_id cache_key last_accessed; do
+            [ -n "$cache_id" ] || continue
+            last_accessed_epoch=$(date -u -d "$last_accessed" +%s)
+            if [ "$last_accessed_epoch" -lt "$stale_before" ]; then
+              delete_cache "$cache_id" "$cache_key"
+            fi
+          done < <(jq -r '.[] | [.id, .key, .lastAccessedAt] | @tsv' "$caches_file")
+
+          refresh_caches
+          total_bytes=$(jq '[.[].sizeInBytes] | add // 0' "$caches_file")
+          while [ "$total_bytes" -gt "$TARGET_BYTES" ]; do
+            oldest=$(jq -r '.[0] | [.id, .key] | @tsv' "$caches_file")
+            [ -n "$oldest" ] || break
+            IFS=$'\t' read -r cache_id cache_key <<EOF
+$oldest
+EOF
+            delete_cache "$cache_id" "$cache_key"
+            refresh_caches
+            total_bytes=$(jq '[.[].sizeInBytes] | add // 0' "$caches_file")
+          done
+
+          echo "Cache storage after pruning: $total_bytes bytes"
