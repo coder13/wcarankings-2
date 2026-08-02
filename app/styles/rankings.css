@@ -27,6 +27,10 @@
   transition: background-color 420ms ease;
 }
 
+.virtualRowContent {
+  width: 100%;
+}
+
 .virtualRow[data-expanded="true"] {
   background-color: var(--surface-hover);
 }
@@ -37,11 +41,6 @@
 
 .virtualRow[data-expanded="true"][data-highlighted="true"] {
   background-color: var(--search-match);
-}
-
-.virtualRow[data-expanded="true"] .listItem,
-.virtualRow[data-expanded="true"] .row {
-  height: 100%;
 }
 
 .virtualRow:hover {
@@ -309,6 +308,20 @@
   pointer-events: none;
   box-shadow: 0 -4px 16px var(--shadow);
   backdrop-filter: blur(4px);
+  transition: opacity 160ms var(--cubic-exit), transform 180ms var(--cubic-exit), visibility 0s;
+}
+
+.siteFooter[data-at-top="false"] {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(calc(100% + 0.5rem));
+  transition: opacity 160ms var(--cubic-exit), transform 180ms var(--cubic-exit), visibility 0s linear 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .siteFooter {
+    transition: none;
+  }
 }
 
 .siteFooter--standalone {
@@ -321,6 +334,13 @@
 
 .siteFooter span:last-child {
   text-align: right;
+}
+
+@media (max-width: 600px) {
+  .siteFooter {
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+  }
 }
 
 .rowAccordion {
@@ -336,6 +356,7 @@
 
 .rowAccordionInner {
   position: relative;
+  display: grid;
   overflow: hidden;
   min-height: 0;
   padding-block: 1rem;
@@ -344,6 +365,10 @@
 .rowAccordionContent {
   position: relative;
   z-index: 0;
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
+  grid-area: 1 / 1;
   opacity: 1;
   transition: opacity 240ms ease;
 }
@@ -353,9 +378,9 @@
 }
 
 .rowAccordionLoading {
-  position: absolute;
+  position: relative;
   z-index: 1;
-  inset: 0;
+  grid-area: 1 / 1;
   transition: opacity 240ms ease;
 }
 
@@ -398,30 +423,38 @@
 
 .rowAccordionSkeletonLine--label {
   width: 3.6rem;
-  height: 0.72rem;
+  height: 1.02rem;
 }
 
 .rowAccordionSkeletonLine--value {
   width: 4.1rem;
-  height: 1.55rem;
-  margin-top: 0.05rem;
+  height: 1.74rem;
 }
 
 .rowAccordionSkeletonLine--competition {
   width: min(13rem, 82%);
+  height: 1.2rem;
 }
 
 .rowAccordionSkeletonLine--rank {
   width: 5.6rem;
+  height: 1.296rem;
 }
 
 .rowAccordionSkeletonLine--solves {
   width: min(18rem, 100%);
+  height: 1.2rem;
 }
 
 .rowAccordionSkeletonLine--footer {
   width: 10rem;
-  height: 0.85rem;
+  height: 1.2rem;
+}
+
+@media (max-width: 759px) {
+  .rowAccordionSkeletonLine--competition {
+    height: 2.7rem;
+  }
 }
 
 @keyframes rowAccordionSkeletonSweep {

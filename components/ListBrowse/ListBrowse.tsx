@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
 import { ListBrowseControlsRail, ListBrowsePagerRail } from "@/components/RankingsRail/RankingsRail";
 import type { PublicListSummary } from "@/services/lists/types";
+import { motionSafeScrollBehavior } from "@/lib/motion-preferences";
 import { ListRow } from "./ListRow";
 import { ListCreateTrigger } from "@/components/ListOwnerControls/ListOwnerControls";
 import "./ListBrowse.css";
@@ -43,7 +44,7 @@ export function ListBrowse({ lists }: { lists: PublicListSummary[] }) {
         ) : <p className="listBrowseEmpty">No public lists match “{query}”.</p>}
         {filtered.length > 50 && (
           <div className="listBrowsePager">
-            <ListBrowsePagerRail onJumpUp={() => window.scrollTo({ top: 0, behavior: "smooth" })} onJumpDown={() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" })} />
+            <ListBrowsePagerRail onJumpUp={() => window.scrollTo({ top: 0, behavior: motionSafeScrollBehavior() })} onJumpDown={() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: motionSafeScrollBehavior() })} />
           </div>
         )}
       </main>

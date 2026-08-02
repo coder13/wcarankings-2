@@ -21,6 +21,7 @@ test("disables pager actions while a jump is settling", () => {
 
 test("renders the ranking settings and search in one rail", () => {
   const markup = renderWithProviders(<RankingsControlsRail controls={{ event: WCA_EVENTS[0], onEventChange: () => undefined, rankingType: "single", onRankingTypeChange: () => undefined, gender: [], onGenderChange: () => undefined, regions, regionSelection: { scope: "world", regionId: "" }, onRegionChange: () => undefined, compactResultType: false }} search={{ findOpen: false, findQuery: "", findError: "", findLoading: false, findPending: false, findMatches: [], findIndex: 0, onSearchOpen: () => undefined, onSearchClose: () => undefined, onSearchQueryChange: () => undefined, onSearchCycle: () => undefined }} />);
+  assert.match(markup, /class="RankingsRailTransition"/);
   assert.match(markup, /class="Jump RankingsRail Jump--rankings"/);
   assert.match(markup, /cubing-icon event-333/);
   assert.match(markup, /aria-label="3x3x3 Cube"/);

@@ -16,53 +16,389 @@
 @import "./styles/profile.css";
 @import "./styles/vim.css";
 
-:root,:root[data-theme="light"],:root[data-theme="dark"],:root:not([data-theme]){--surface-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 5%,transparent);--search-match-hover:var(--search-match)}
-:root[data-theme="dark"]{--surface-hover:color-mix(in srgb,var(--text-strong) 8%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 8%,transparent)}
-@media (prefers-color-scheme:dark){:root:not([data-theme]){--surface-hover:color-mix(in srgb,var(--text-strong) 8%,transparent);--control-hover:color-mix(in srgb,var(--text-strong) 8%,transparent)}}
-.listPersonAvatar{font-size:.875rem}
-.listSettingsMenu{min-width:10.5rem}
-.listSettingsMenu>button{min-height:40px;padding:.4rem .55rem;border:0;border-radius:.4rem;background:transparent;color:var(--text-strong);cursor:pointer;font:inherit;text-align:left;white-space:nowrap}
-.listSettingsMenu>button:hover,.listSettingsMenu>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 6%,transparent);outline:2px solid var(--focus-ring);outline-offset:-2px}
-.rowHeader:has(.memberSelectionToggle){cursor:pointer;user-select:none}
-.row--contextMenu{user-select:none;-webkit-user-select:none}
-.memberSelectionToggle{width:36px;height:36px;font-size:1.125rem;line-height:1}
-.listMemberContextMenu{position:fixed;z-index:40;min-width:11rem;padding:.3rem;border:1px solid var(--border-subtle);border-radius:.6rem;background:var(--surface);box-shadow:0 8px 24px var(--shadow)}
-.listMemberContextMenu button{display:block;width:100%;min-height:40px;padding:.45rem .65rem;border:0;border-radius:.35rem;background:transparent;color:var(--text-strong);font:inherit;text-align:left;cursor:pointer}
-.listMemberContextMenu button:hover,.listMemberContextMenu button:focus-visible{background:var(--surface-hover)}
-.listMemberContextMenuBackdrop{display:none}
-.listMemberSelectionRail{bottom:calc(1rem + 3.5rem)}
-.listRemovalDialog{max-width:28rem}
-.listRemovalDialog h2{margin:0;font-size:1.2rem}
-.listRemovalDialog p{margin:.8rem 0 0}
-.listRemovalActions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.25rem}
-.listRemovalActions button{min-height:40px;padding:0 .9rem;border:1px solid var(--border-subtle);border-radius:.5rem;background:var(--surface);color:var(--text-strong);cursor:pointer;font:inherit;font-weight:600}
-.listRemovalActions button:last-child{border-color:var(--record-world);background:var(--record-world);color:#fff}
-.listRemovalActions button:disabled{cursor:wait;opacity:.6}
-.Jump--listAdd{--rail-control-height:52px}
-.Jump--listAdd .listAddComposer{height:var(--rail-control-height)}
-.Jump--listAdd .listAddComposer>.listAddSubmit{position:absolute;z-index:3;right:.5rem;width:auto;min-width:var(--rail-control-height);height:max(40px,calc(var(--rail-control-height) - .5rem));margin:.25rem 0;padding-inline:.7rem;border:0;border-radius:16px;background:transparent;color:var(--focus);font-size:.875rem;font-weight:600}
-.Jump--listAdd .listAddTokens{padding-right:calc(var(--rail-control-height) + 1rem)}
-.Jump--listAdd .listAddError{display:none}
-.Jump--listAdd .listAddCancel{width:40px;height:40px;min-height:40px;margin:6px 0 6px 6px;padding:0;border-radius:16px}
-.Jump--listAdd .listAddCancel:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent)}
-.Jump--listAdd .listAddComposer>.listAddSubmit:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:0}
-.Jump--listAdd .listAddComposer>.listAddSubmit:focus-visible{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
-.Jump--listAdd .listAddComposer>.listAddSubmit:disabled{cursor:wait;opacity:.65}
-.listMemberSelectionRail button:first-child{order:3;background:transparent;color:var(--text-strong)}
-.listMemberSelectionRail span{order:2}
-.listMemberSelectionRail button:nth-of-type(2){order:1;background:var(--record-world);color:#fff}
-@media (hover:hover){:where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(.97);outline:0}}
-@media (hover:hover){:root[data-theme="dark"] :where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(1.08)}}
-@media (prefers-color-scheme:dark){@media (hover:hover){:root:not([data-theme]) :where(button,a[href],input,select,textarea,[role="button"]):not(:disabled):hover:not(:focus-visible){filter:brightness(1.08)}}}
-.stickyRankingsRail{--list-owner-control-height:calc(52px - (12px * var(--rail-scroll-progress, 0)))}
-.stickyRankingsRail>.listOwnerControls{top:0}
-.stickyRankingsRail>.listOwnerControls>button{display:grid;width:var(--list-owner-control-height);height:var(--list-owner-control-height);min-height:var(--list-owner-control-height);padding:0;place-items:center;border-radius:50%;background:transparent;box-shadow:none}
-.stickyRankingsRail>.listOwnerControls>button:hover{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:0}
-.stickyRankingsRail>.listOwnerControls>button:focus-visible{background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong);outline:2px solid var(--focus-ring);outline-offset:1px}
-.TextDropdown-trigger:hover:not(:focus-visible){background:color-mix(in srgb,var(--text-strong) 5%,transparent);color:var(--text-strong)}
-.listSettingsMenu label{min-height:40px}
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"],
+:root:not([data-theme]) {
+  --surface-hover: color-mix(in srgb, var(--text-strong) 5%, transparent);
+  --control-hover: color-mix(in srgb, var(--text-strong) 5%, transparent);
+  --search-match-hover: var(--search-match);
+}
+:root[data-theme="dark"] {
+  --surface-hover: color-mix(in srgb, var(--text-strong) 8%, transparent);
+  --control-hover: color-mix(in srgb, var(--text-strong) 8%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --surface-hover: color-mix(in srgb, var(--text-strong) 8%, transparent);
+    --control-hover: color-mix(in srgb, var(--text-strong) 8%, transparent);
+  }
+}
+:root {
+  /* Shared viewport-edge blur controls. Levels use 0 (none) through 1 (full). */
+  --edge-blur-filter: blur(10px) saturate(0.9);
+  --edge-blur-top-filter: blur(16px) saturate(0.9);
+  --edge-blur-color: var(--surface);
+  --edge-blur-surface-strength: 55%;
+  --edge-blur-top-surface-strength: 88%;
+  --edge-blur-start-level: 1;
+  --edge-blur-end-level: 0;
+  --edge-blur-soft-level: 0.96;
+  --edge-blur-mid-level: 0.7;
+  --edge-blur-tail-level: 0.25;
+  --edge-blur-fade-start: 20%;
+  --edge-blur-soft-stop: 45%;
+  --edge-blur-mid-stop: 65%;
+  --edge-blur-tail-stop: 85%;
+  --edge-blur-fade-end: 100%;
+  --edge-blur-top-overlap: 0px;
+  --edge-blur-top-extension: 2em;
+  --edge-blur-top-fade-start: var(--edge-blur-fade-start);
+  --edge-blur-top-soft-stop: 55%;
+  --edge-blur-top-mid-stop: 72%;
+  --edge-blur-top-tail-stop: 88%;
+}
+@media (max-width: 600px) {
+  :root {
+    --phone-system-bar-color: #fffcff;
+    --edge-blur-color: var(--phone-system-bar-color);
+    --edge-blur-surface-strength: 100%;
+    --edge-blur-top-filter: blur(14px) saturate(0.9);
+    --edge-blur-top-surface-strength: 100%;
+    --edge-blur-start-level: 1;
+    --edge-blur-end-level: 0;
+    --edge-blur-fade-start: 0%;
+    --edge-blur-top-overlap: 40px;
+    --edge-blur-top-fade-start: 40px;
+    --edge-blur-top-soft-stop: 75%;
+    --edge-blur-top-mid-stop: 85%;
+    --edge-blur-top-tail-stop: 94%;
+  }
 
-@media (max-width:600px){.stickyRankingsRail{--list-owner-control-height:44px}.stickyRankingsRail>.listOwnerControls{right:.35rem}.Jump--listAdd{--rail-control-height:44px}.Jump--rankings.Jump--withListAdd{--result-type-width:5.25rem;--rail-select-width:min(8.5em,max(40px,calc(100vw - 1rem - 44px - 5.25rem - 4.75rem - 44px)));--rail-settings-width:calc(44px + var(--result-type-width) + var(--rail-select-width) + 4.75rem);min-width:calc(var(--rail-settings-width) + var(--rail-control-height))}.listMemberContextMenuBackdrop{position:fixed;z-index:39;inset:0;display:block;background:color-mix(in srgb,#000 42%,transparent);animation:listMemberContextBackdropIn 160ms ease-out}.listMemberContextMenu{z-index:40;right:0;bottom:0;left:0;min-width:0;padding:.75rem 1rem calc(.75rem + env(safe-area-inset-bottom));border:0;border-radius:1.2rem 1.2rem 0 0;box-shadow:0 -8px 24px var(--shadow);animation:listMemberContextSheetIn 220ms var(--cubic-enter, ease-out)}.listMemberContextMenu::before{display:block;width:2.5rem;height:.25rem;margin:0 auto .65rem;border-radius:999px;background:var(--border-strong);content:""}.listMemberContextMenu button{min-height:48px;padding:.65rem .75rem;font-size:1rem;font-weight:600}.listMemberContextMenu button:hover,.listMemberContextMenu button:focus-visible{background:var(--surface-hover)}@keyframes listMemberContextBackdropIn{from{opacity:0}to{opacity:1}}@keyframes listMemberContextSheetIn{from{transform:translateY(100%)}to{transform:translateY(0)}}}
+}
+.listPersonAvatar {
+  font-size: 0.875rem;
+}
+.listSettingsMenu {
+  min-width: 10.5rem;
+}
+.listSettingsMenu > button {
+  min-height: 40px;
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--text-strong);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+.listSettingsMenu > button:hover,
+.listSettingsMenu > button:focus-visible {
+  background: color-mix(in srgb, var(--text-strong) 6%, transparent);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.rowHeader:has(.memberSelectionToggle) {
+  cursor: pointer;
+  user-select: none;
+}
+.row--contextMenu {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.memberSelectionToggle {
+  width: 36px;
+  height: 36px;
+  font-size: 1.125rem;
+  line-height: 1;
+}
+.listMemberContextMenu {
+  position: fixed;
+  z-index: 40;
+  min-width: 11rem;
+  padding: 0.3rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+.listMemberContextMenu button {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.listMemberContextMenu button:hover,
+.listMemberContextMenu button:focus-visible {
+  background: var(--surface-hover);
+}
+.listMemberContextMenuBackdrop {
+  display: none;
+}
+.listMemberSelectionRail {
+  bottom: calc(1rem + 3.5rem);
+}
+.listRemovalDialog {
+  max-width: 28rem;
+}
+.listRemovalDialog h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+.listRemovalDialog p {
+  margin: 0.8rem 0 0;
+}
+.listRemovalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+.listRemovalActions button {
+  min-height: 40px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text-strong);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+.listRemovalActions button:last-child {
+  border-color: var(--record-world);
+  background: var(--record-world);
+  color: #fff;
+}
+.listRemovalActions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.Jump--listAdd {
+  --rail-control-height: 52px;
+}
+.Jump--listAdd .listAddComposer {
+  height: var(--rail-control-height);
+}
+.Jump--listAdd .listAddComposer > .listAddSubmit {
+  position: absolute;
+  z-index: 3;
+  right: 0.5rem;
+  width: auto;
+  min-width: var(--rail-control-height);
+  height: max(40px, calc(var(--rail-control-height) - 0.5rem));
+  margin: 0.25rem 0;
+  padding-inline: 0.7rem;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--focus);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.Jump--listAdd .listAddTokens {
+  padding-right: calc(var(--rail-control-height) + 1rem);
+}
+.Jump--listAdd .listAddError {
+  display: none;
+}
+.Jump--listAdd .listAddCancel {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  margin: 6px 0 6px 6px;
+  padding: 0;
+  border-radius: 16px;
+}
+.Jump--listAdd .listAddCancel:hover {
+  background: color-mix(in srgb, var(--text-strong) 5%, transparent);
+}
+.Jump--listAdd .listAddComposer > .listAddSubmit:hover {
+  background: color-mix(in srgb, var(--text-strong) 5%, transparent);
+  color: var(--text-strong);
+  outline: 0;
+}
+.Jump--listAdd .listAddComposer > .listAddSubmit:focus-visible {
+  background: color-mix(in srgb, var(--text-strong) 5%, transparent);
+  color: var(--text-strong);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.Jump--listAdd .listAddComposer > .listAddSubmit:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.listMemberSelectionRail button:first-child {
+  order: 3;
+  background: transparent;
+  color: var(--text-strong);
+}
+.listMemberSelectionRail span {
+  order: 2;
+}
+.listMemberSelectionRail button:nth-of-type(2) {
+  order: 1;
+  background: var(--record-world);
+  color: #fff;
+}
+@media (hover: hover) {
+  :where(button, a[href], input, select, textarea, [role="button"]):not(
+      :disabled
+    ):hover:not(:focus-visible) {
+    filter: brightness(0.97);
+    outline: 0;
+  }
+}
+@media (hover: hover) {
+  :root[data-theme="dark"]
+    :where(button, a[href], input, select, textarea, [role="button"]):not(
+      :disabled
+    ):hover:not(:focus-visible) {
+    filter: brightness(1.08);
+  }
+}
+@media (prefers-color-scheme: dark) {
+  @media (hover: hover) {
+    :root:not([data-theme])
+      :where(button, a[href], input, select, textarea, [role="button"]):not(
+        :disabled
+      ):hover:not(:focus-visible) {
+      filter: brightness(1.08);
+    }
+  }
+}
+.stickyRankingsRail {
+  --rail-lift-progress: clamp(0, calc(var(--rail-scroll-progress, 0) * 2), 1);
+  --rail-shrink-progress: clamp(
+    0,
+    calc((var(--rail-scroll-progress, 0) - 0.5) * 2),
+    1
+  );
+  --list-owner-control-height: calc(
+    52px - (12px * var(--rail-shrink-progress))
+  );
+}
+.stickyRankingsRail > .listOwnerControls {
+  top: 0;
+}
+.stickyRankingsRail > .listOwnerControls > button {
+  display: grid;
+  width: var(--list-owner-control-height);
+  height: var(--list-owner-control-height);
+  min-height: var(--list-owner-control-height);
+  padding: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+}
+.stickyRankingsRail > .listOwnerControls > button:hover {
+  background: color-mix(in srgb, var(--text-strong) 5%, transparent);
+  color: var(--text-strong);
+  outline: 0;
+}
+.stickyRankingsRail > .listOwnerControls > button:focus-visible {
+  background: color-mix(in srgb, var(--text-strong) 5%, transparent);
+  color: var(--text-strong);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.TextDropdown-trigger:hover:not(:focus-visible) {
+  background: color-mix(in srgb, var(--text-strong) 5%, transparent);
+  color: var(--text-strong);
+}
+.listSettingsMenu label {
+  min-height: 40px;
+}
+
+@media (max-width: 600px) {
+  .stickyRankingsRail {
+    --list-owner-control-height: calc(
+      48px - (4px * var(--rail-scroll-progress, 0))
+    );
+  }
+  .stickyRankingsRail > .listOwnerControls {
+    right: 0.35rem;
+  }
+  .Jump--listAdd {
+    --rail-control-height: 44px;
+  }
+  .Jump--rankings.Jump--withListAdd {
+    --result-type-width: 5.25rem;
+    --rail-select-width: min(
+      8.5em,
+      max(40px, calc(100vw - 1rem - 44px - 5.25rem - 4.75rem - 44px))
+    );
+    --rail-settings-width: calc(
+      44px + var(--result-type-width) + var(--rail-select-width) + 4.75rem
+    );
+    min-width: calc(var(--rail-settings-width) + var(--rail-control-height));
+  }
+  .listMemberContextMenuBackdrop {
+    position: fixed;
+    z-index: 39;
+    inset: 0;
+    display: block;
+    background: color-mix(in srgb, #000 42%, transparent);
+    animation: listMemberContextBackdropIn 160ms ease-out;
+  }
+  .listMemberContextMenu {
+    z-index: 40;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    min-width: 0;
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 1.2rem 1.2rem 0 0;
+    box-shadow: 0 -8px 24px var(--shadow);
+    animation: listMemberContextSheetIn 220ms var(--cubic-enter, ease-out);
+  }
+  .listMemberContextMenu::before {
+    display: block;
+    width: 2.5rem;
+    height: 0.25rem;
+    margin: 0 auto 0.65rem;
+    border-radius: 999px;
+    background: var(--border-strong);
+    content: "";
+  }
+  .listMemberContextMenu button {
+    min-height: 48px;
+    padding: 0.65rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .listMemberContextMenu button:hover,
+  .listMemberContextMenu button:focus-visible {
+    background: var(--surface-hover);
+  }
+  @keyframes listMemberContextBackdropIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes listMemberContextSheetIn {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+}
 
 ::-webkit-scrollbar {
   display: none;
@@ -262,7 +598,6 @@ select {
   white-space: nowrap;
 }
 
-
 .stickyRankingsRail {
   view-transition-name: rankings-controls;
 
@@ -289,26 +624,157 @@ main {
   }
 }
 
-.stickyRankingsRail > .Jump {
+.stickyRankingsRail > .RankingsRailTransition > .Jump {
   background: var(--surface);
-  box-shadow:
-    0 calc(1px * (1 - var(--rail-scroll-progress)))
-      calc(4px * (1 - var(--rail-scroll-progress))) var(--shadow-soft),
-    0 calc(4px * var(--rail-scroll-progress))
-      calc(16px * var(--rail-scroll-progress)) var(--shadow);
-  transform: translateY(calc(-0.25em * var(--rail-scroll-progress)));
+  box-shadow: none;
+  transform: translateY(calc(-6px * var(--rail-lift-progress)));
   transition: none;
+  will-change: transform;
+}
+
+.stickyRankingsRail > .RankingsRailTransition > .Jump::before,
+.stickyRankingsRail > .RankingsRailTransition > .Jump::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.stickyRankingsRail > .RankingsRailTransition > .Jump::before {
+  box-shadow: 0 1px 4px var(--shadow-soft);
+  opacity: calc(1 - var(--rail-lift-progress));
+}
+
+.stickyRankingsRail > .RankingsRailTransition > .Jump::after {
+  box-shadow: 0 7px 24px var(--shadow);
+  opacity: var(--rail-lift-progress);
+}
+
+@media (max-width: 600px) {
+  .stickyRankingsRail {
+    --list-owner-control-height: calc(
+      48px - (4px * var(--rail-shrink-progress))
+    );
+  }
+}
+
+@media (max-width: 759px) {
+  .stickyRankingsRail > .RankingsRailTransition > .Jump--rankings {
+    min-width: min(
+      max(
+        80vw,
+        calc(var(--rail-settings-width) + var(--rail-icon-slot-width))
+      ),
+      calc(100vw - 2rem)
+    );
+    max-width: calc(100vw - 2rem);
+  }
+}
+
+.stickyRankingsRail > .RankingsRailTransition,
+.JumpControlsVisibility:has(.Jump[data-direction="down"])
+  > .RankingsRailTransition {
+  position: relative;
+  isolation: isolate;
+}
+
+.stickyRankingsRail > .RankingsRailTransition::before,
+.JumpControlsVisibility:has(.Jump[data-direction="down"])
+  > .RankingsRailTransition::before {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  width: 100vw;
+  background: color-mix(
+    in srgb,
+    var(--edge-blur-color) var(--edge-blur-surface-strength),
+    transparent
+  );
+  backdrop-filter: var(--edge-blur-filter);
+  -webkit-backdrop-filter: var(--edge-blur-filter);
+  content: "";
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.stickyRankingsRail > .RankingsRailTransition::before {
+  top: calc(-1em - var(--edge-blur-top-overlap));
+  bottom: calc(0px - var(--edge-blur-top-extension));
+  background: color-mix(
+    in srgb,
+    var(--edge-blur-color) var(--edge-blur-top-surface-strength),
+    transparent
+  );
+  backdrop-filter: var(--edge-blur-top-filter);
+  -webkit-backdrop-filter: var(--edge-blur-top-filter);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-top-fade-start),
+    rgb(0 0 0 / var(--edge-blur-soft-level)) var(--edge-blur-top-soft-stop),
+    rgb(0 0 0 / var(--edge-blur-mid-level)) var(--edge-blur-top-mid-stop),
+    rgb(0 0 0 / var(--edge-blur-tail-level)) var(--edge-blur-top-tail-stop),
+    rgb(0 0 0 / var(--edge-blur-end-level)) var(--edge-blur-fade-end)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-top-fade-start),
+    rgb(0 0 0 / var(--edge-blur-soft-level)) var(--edge-blur-top-soft-stop),
+    rgb(0 0 0 / var(--edge-blur-mid-level)) var(--edge-blur-top-mid-stop),
+    rgb(0 0 0 / var(--edge-blur-tail-level)) var(--edge-blur-top-tail-stop),
+    rgb(0 0 0 / var(--edge-blur-end-level)) var(--edge-blur-fade-end)
+  );
+}
+
+.JumpControlsVisibility:has(.Jump[data-direction="down"])
+  > .RankingsRailTransition::before {
+  top: -1em;
+  bottom: calc(
+    -1em - var(--jump-controls-bottom-offset, 0px) - env(safe-area-inset-bottom)
+  );
+  -webkit-mask-image: linear-gradient(
+    to top,
+    rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-fade-start),
+    rgb(0 0 0 / var(--edge-blur-soft-level)) var(--edge-blur-soft-stop),
+    rgb(0 0 0 / var(--edge-blur-mid-level)) var(--edge-blur-mid-stop),
+    rgb(0 0 0 / var(--edge-blur-tail-level)) var(--edge-blur-tail-stop),
+    rgb(0 0 0 / var(--edge-blur-end-level)) var(--edge-blur-fade-end)
+  );
+  mask-image: linear-gradient(
+    to top,
+    rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-fade-start),
+    rgb(0 0 0 / var(--edge-blur-soft-level)) var(--edge-blur-soft-stop),
+    rgb(0 0 0 / var(--edge-blur-mid-level)) var(--edge-blur-mid-stop),
+    rgb(0 0 0 / var(--edge-blur-tail-level)) var(--edge-blur-tail-stop),
+    rgb(0 0 0 / var(--edge-blur-end-level)) var(--edge-blur-fade-end)
+  );
+}
+
+.stickyRankingsRail > .RankingsRailTransition > .Jump,
+.JumpControlsVisibility:has(.Jump[data-direction="down"])
+  > .RankingsRailTransition
+  > .Jump {
+  z-index: 1;
 }
 
 .stickyRankingsRail .findBar--rail {
   background: var(--surface);
 }
 
-.stickyRankingsRail > .Jump--rankings:has(
-  .findBar--rail:is([data-has-text="true"], [data-open="true"])
-) {
+.stickyRankingsRail
+  > .RankingsRailTransition
+  > .Jump--rankings:has(
+    .findBar--rail:is([data-has-text="true"], [data-open="true"])
+  ) {
   background: transparent;
   box-shadow: none;
+}
+
+.themeMenu {
+  position: relative;
+  flex: 0 0 auto;
 }
 
 .themeToggle {
@@ -329,7 +795,8 @@ main {
 }
 
 .themeToggle:hover,
-.themeToggle:focus-visible {
+.themeToggle:focus-visible,
+.themeToggle[aria-expanded="true"] {
   color: var(--focus);
   outline: none;
 }
@@ -342,6 +809,66 @@ main {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.7;
+}
+
+.themePopover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.5em);
+  right: 0;
+  display: grid;
+  width: 10.5em;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.65em;
+  background: var(--surface);
+  box-shadow: 0 0.75em 2.5em rgb(0 0 0 / 18%);
+}
+
+.themePopover button {
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  grid-template-columns: 1.5em 1fr 1em;
+  align-items: center;
+  gap: 0.65em;
+  padding: 0.7em 0.85em;
+  border: 0;
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.themePopover button:hover,
+.themePopover button:focus-visible {
+  background: var(--surface-hover);
+  color: var(--focus);
+  outline: none;
+}
+
+.themeOptionIcon {
+  display: inline-grid;
+  place-items: center;
+}
+
+.themeOptionIcon svg {
+  width: 1.15em;
+  height: 1.15em;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.themeOptionCheck {
+  visibility: hidden;
+}
+
+.themePopover button[aria-checked="true"] .themeOptionCheck {
+  visibility: visible;
 }
 
 .profileMenu {
@@ -449,7 +976,8 @@ main {
   margin: 0;
 }
 
-.themeToggle circle {
+.themeToggle circle,
+.themeOptionIcon circle {
   fill: currentColor;
 }
 
@@ -617,14 +1145,20 @@ main {
     min-height: 44px;
   }
 
-  .genderPicker { min-width: 0; flex: 0 1 5.5em; }
-  .genderPickerTrigger { min-height: 40px; padding-inline: .45em 1.5em; font-size: .75em; }
+  .genderPicker {
+    min-width: 0;
+    flex: 0 1 5.5em;
+  }
+  .genderPickerTrigger {
+    min-height: 40px;
+    padding-inline: 0.45em 1.5em;
+    font-size: 0.75em;
+  }
 
   .regionPickerTrigger {
     height: 44px;
     min-height: 44px;
   }
-
 }
 
 @media only screen and (max-width: 549px) {
@@ -663,9 +1197,9 @@ main {
     transform: translateY(-50%);
   }
 
-  .headerTopRow:has(
-      .findBar--header:is([data-has-text="true"], :focus-within)
-    ) .headerActions .findBar.findBar--header {
+  .headerTopRow:has(.findBar--header:is([data-has-text="true"], :focus-within))
+    .headerActions
+    .findBar.findBar--header {
     right: 0;
     width: 100%;
     max-width: none;
@@ -681,6 +1215,8 @@ main {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useCallback, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { MotionConfig, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { EventPicker, type EventPickerOption } from "../EventPicker/EventPicker";
 import { RegionPicker } from "../RegionPicker/RegionPicker";
 import ArrowDownIcon from "../Icon/arrow-down.svg?react";
@@ -13,12 +14,42 @@ import type { GenderFilter } from "@/lib/wca";
 import { GenderPicker } from "../GenderPicker/GenderPicker";
 import { useWcaProfile } from "../Auth/useWcaProfile";
 
-export const RankingsRail = forwardRef<HTMLDivElement, { children: ReactNode; className?: string; direction: "up" | "down"; searchNavigation?: boolean; compactResultType?: boolean }>(
-  ({ children, className = "", direction, searchNavigation, compactResultType }, ref) => (
-    <div ref={ref} className={`Jump RankingsRail ${className}`} data-direction={direction} data-search-navigation={searchNavigation || undefined} data-compact-result-type={compactResultType || undefined}>
-      {children}
-    </div>
-  )
+const railLayoutTransition = { type: "spring", stiffness: 520, damping: 42, mass: 0.55 } as const;
+
+export const RankingsRail = forwardRef<HTMLDivElement, { children: ReactNode; className?: string; direction: "up" | "down"; searchNavigation?: boolean; compactResultType?: boolean; animateLayout?: boolean }>(
+  ({ children, className = "", direction, searchNavigation, compactResultType, animateLayout = false }, ref) => {
+    const isPresent = useIsPresent();
+    const reduceMotion = useReducedMotion();
+    const shouldAnimateLayout = animateLayout || className.includes("Jump--listAdd");
+
+    return (
+      <MotionConfig reducedMotion="user">
+        <motion.div
+          layout={shouldAnimateLayout}
+          layoutId={shouldAnimateLayout ? `rankings-rail-${direction}` : undefined}
+          initial={false}
+          animate={{
+            opacity: isPresent ? 1 : 0,
+          }}
+          transition={{
+            layout: railLayoutTransition,
+            opacity: { duration: reduceMotion ? 0 : 0.14, ease: "easeOut" },
+          }}
+          className="RankingsRailTransition"
+        >
+          <div
+            ref={ref}
+            className={`Jump RankingsRail ${className}`}
+            data-direction={direction}
+            data-search-navigation={searchNavigation || undefined}
+            data-compact-result-type={compactResultType || undefined}
+          >
+            {children}
+          </div>
+        </motion.div>
+      </MotionConfig>
+    );
+  }
 );
 
 RankingsRail.displayName = "RankingsRail";
@@ -176,7 +207,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({
     );
   }
   return (
-    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType}>
+    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType} animateLayout>
       <div className="Jump-railSettings">
         {primaryControl}
         {showResultType && <div className="Jump-resultTypeControl">
