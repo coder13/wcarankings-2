@@ -187,7 +187,7 @@
 .Jump-pagerButtonContent { display: flex; width: 9.5em; height: 100%; flex: 0 0 9.5em; align-items: center; justify-content: center; gap: .5em; }
 .Jump-searchNavigationButton { flex: 1; }
 .Jump-pagerButton svg { flex: 0 0 auto; }
-.Jump-pagerButton--me { padding-inline: .375em; text-align: center; }
+.Jump-pagerButton--me { padding-inline: .75em; text-align: center; }
 .Jump-pagerButton + .Jump-pagerButton, .Jump-searchNavigationButton + .Jump-searchNavigationButton { border-left: 1px solid var(--border-subtle); }
 .Jump-pagerButton:hover, .Jump-pagerButton:focus-visible, .Jump-searchNavigationButton:hover, .Jump-searchNavigationButton:focus-visible { color: var(--focus); outline: none; }
 .Jump-searchNavigation { z-index: 1; grid-area: 1 / 1; overflow: hidden; opacity: 0; pointer-events: none; }

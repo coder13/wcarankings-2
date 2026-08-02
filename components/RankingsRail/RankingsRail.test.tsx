@@ -10,9 +10,15 @@ const regions = [{ key: "world", scope: "world" as const, regionId: "", label: "
 
 test("renders paired pager actions with useful labels", () => {
   const markup = renderWithProviders(<JumpControlsVisibility visible><RankingsPagerRail navigation={{ currentPosition: 100, total: 10_000, onJumpUp: () => undefined, onJumpDown: () => undefined }} search={{ active: false, onPrevious: () => undefined, onNext: () => undefined }} /></JumpControlsVisibility>);
-  assert.match(markup, />Top</);
-  assert.match(markup, />\+5000</);
+  assert.match(markup, />Jump to top</);
+  assert.match(markup, />Down 5,000</);
   assert.match(markup, /data-direction="down"/);
+});
+
+test("describes an end-bound pager jump", () => {
+  const markup = renderWithProviders(<RankingsPagerRail navigation={{ currentPosition: 10_000, total: 10_000, onJumpUp: () => undefined, onJumpDown: () => undefined }} search={{ active: false, onPrevious: () => undefined, onNext: () => undefined }} />);
+  assert.match(markup, />Up 5,000</);
+  assert.match(markup, />Jump to end</);
 });
 
 test("disables pager actions while a jump is settling", () => {
@@ -47,6 +53,7 @@ test("shows clickable previous and next person actions only while find navigatio
 
 test("makes find navigation interactive only while search navigation is active", async () => {
   const css = await readFile(new URL("./RankingsRail.css", import.meta.url), "utf8");
+  assert.match(css, /\.Jump-pagerButton--me \{ padding-inline: \.75em; text-align: center; \}/);
   assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \.Jump-pagerActions \{ opacity: 0; pointer-events: none; \}/);
   assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \.Jump-searchNavigation \{ opacity: 1; pointer-events: auto; \}/);
   assert.match(css, /\.Jump-searchNavigation \{[^}]*opacity: 0; pointer-events: none;/);
