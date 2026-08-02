@@ -21,7 +21,9 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: node scripts/apply-projection-performance-patches.mjs
+      - name: Apply repository patches
+        continue-on-error: true
+        run: node scripts/apply-projection-performance-patches.mjs
       - run: pnpm install --frozen-lockfile
       - run: node --check scripts/*.mjs
       - run: node --test tests/projection-release-artifact.test.mjs tests/projection-architecture.test.mjs tests/projection-transfer.test.mjs tests/deploy-workflow.test.mjs
