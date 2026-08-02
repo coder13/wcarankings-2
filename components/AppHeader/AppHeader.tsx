@@ -10,11 +10,13 @@ import { ProfileMenu } from "@/components/ProfileMenu/ProfileMenu";
 import { ThemeToggle } from "@/components/ThemeToggle/ThemeToggle";
 
 export function AppHeader({
+  actions,
   children,
   className = "",
   subject,
   onSubjectChange,
 }: {
+  actions?: ReactNode;
   children?: ReactNode;
   className?: string;
   subject?: NavigationSubject;
@@ -38,6 +40,7 @@ export function AppHeader({
         </div>
         <div className="headerDropdowns">{children}</div>
         <div className="headerActions">
+          {actions}
           <ThemeToggle />
           <ProfileMenu />
         </div>
