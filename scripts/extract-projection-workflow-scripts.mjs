@@ -122,21 +122,24 @@ await writeFile(
 
 const testsPath = "tests/deploy-workflow.test.mjs";
 let tests = await readFile(testsPath, "utf8");
-if (!tests.includes("run-projection-deployment.sh")) {
-  const close = tests.indexOf("];", tests.indexOf("Promise.all"));
-  if (close < 0) throw new Error("Could not locate workflow fixture list");
+tests = tests.replaceAll("projectionDeploySource", "projectionDeploy");
+if (!tests.includes("projectionDeployWorkflow")) {
+  const fixtureName = "  projectionDeploy,\n";
+  if (!tests.includes(fixtureName)) throw new Error("Could not locate projection workflow fixture");
+  tests = tests.replace(fixtureName, "  projectionDeployWorkflow,\n");
+  const insertionMarker = "]);\n\nfunction serverCooldownFunctions()";
+  if (!tests.includes(insertionMarker)) throw new Error("Could not locate fixture insertion point");
   const fixture = [
+    "]);",
     "",
     "const projectionDeploymentScript = await readFile(",
     "  new URL(\"../scripts/run-projection-deployment.sh\", import.meta.url),",
     "  \"utf8\",",
     ");",
-    "const projectionDeploySource = projectionDeploy + \"\\n\" + projectionDeploymentScript;",
+    "const projectionDeploy = projectionDeployWorkflow + \"\\n\" + projectionDeploymentScript;",
+    "",
+    "function serverCooldownFunctions()",
   ].join("\n");
-  tests = tests.slice(0, close + 2) + fixture + tests.slice(close + 2);
-  tests = tests.replaceAll("assert.match(projectionDeploy,", "assert.match(projectionDeploySource,");
-  tests = tests.replaceAll("assert.doesNotMatch(projectionDeploy,", "assert.doesNotMatch(projectionDeploySource,");
-  tests = tests.replaceAll("projectionDeploy.includes(", "projectionDeploySource.includes(");
-  tests = tests.replaceAll("projectionDeploy.match(", "projectionDeploySource.match(");
+  tests = tests.replace(insertionMarker, fixture);
 }
 await writeFile(testsPath, tests);
