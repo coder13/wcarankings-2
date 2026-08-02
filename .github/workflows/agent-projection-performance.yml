@@ -59,12 +59,12 @@ jobs:
             /tmp/projection-performance-files.txt
           if-no-files-found: error
           retention-days: 1
-      - name: Commit validated changes
-        continue-on-error: true
+      - name: Commit validated non-workflow changes
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
+          git reset -- .github/workflows
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Complete projection pipeline performance implementation [skip ci]'
+          git commit -m 'Complete projection pipeline source improvements [skip ci]'
           git push origin HEAD:agent/projection-pipeline-performance
