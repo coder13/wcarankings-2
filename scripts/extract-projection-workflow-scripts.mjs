@@ -42,19 +42,6 @@ function secureRegistryTransfer(stage) {
     throw new Error("Could not locate GHCR token-bearing SSH invocation");
   }
   let secured = stage.replace(insecureInvocation, secureInvocation);
-  const remoteLogin = [
-    'auth_directory=$(mktemp -d)',
-    'stage_directory=$(mktemp -d)',
-    'cleanup_stage() {',
-    '  docker --config "$auth_directory" logout ghcr.io >/dev/null 2>&1 || true',
-    '  rm -rf "$auth_directory" "$stage_directory"',
-    '}',
-    'trap cleanup_stage EXIT TERM INT HUP',
-    '',
-    'printf \'%s\' "$GHCR_TOKEN" \\',
-    '  | docker --config "$auth_directory" login ghcr.io \\',
-    '      --username "$GHCR_ACTOR" --password-stdin >/dev/null',
-  ].join("\n");
   const remoteConfig = [
     'auth_directory=$(mktemp -d)',
     'stage_directory=$(mktemp -d)',
@@ -67,10 +54,15 @@ function secureRegistryTransfer(stage) {
     '  "$auth_directory/config.json"',
     'rm -f "/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json"',
   ].join("\n");
-  if (!secured.includes(remoteLogin)) {
-    throw new Error("Could not locate remote GHCR login block");
+  const remoteStart = secured.indexOf("auth_directory=$(mktemp -d)");
+  const pullStart = secured.indexOf(
+    'docker --config "$auth_directory" pull "$DATA_TOOLS_IMAGE"',
+    remoteStart,
+  );
+  if (remoteStart < 0 || pullStart < 0) {
+    throw new Error("Could not locate remote GHCR login boundaries");
   }
-  secured = secured.replace(remoteLogin, remoteConfig);
+  secured = `${secured.slice(0, remoteStart)}${remoteConfig}\n${secured.slice(pullStart)}`;
   secured += "\ncleanup_local_auth\ntrap - EXIT";
   return secured;
 }
