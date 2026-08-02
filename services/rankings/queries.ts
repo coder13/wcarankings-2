@@ -184,9 +184,7 @@ export function genderRankingPageQuery(input: GenderRankingQueryInput) {
     FROM ${input.source} ranking
     JOIN persons gender_person ON gender_person.wca_id = ranking.person_id AND gender_person.sub_id = 1
     WHERE ${input.baseConditions.join(" AND ")}
-  ) SELECT filtered_rank AS rank, filtered_position AS sub_rank, total_count,
-    person_id, person_name, country_id, country_name, country_iso2, continent_id, best,
-    competition_id, competition_name, is_world_record, is_continent_record, is_country_record
+  ) SELECT ${input.selectColumns}, total_count
     FROM filtered ${input.conditions.length ? `WHERE ${input.conditions.join(" AND ")}` : ""}
     ORDER BY filtered_position LIMIT ?`;
 }

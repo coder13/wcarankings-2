@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { renderWithProviders } from "@/tests/render-providers";
 import { WCA_EVENTS } from "@/lib/wca";
@@ -30,9 +31,23 @@ test("renders the ranking settings and search in one rail", () => {
   assert.match(markup, /aria-label="Gender"/);
 });
 
-test("shows previous and next person actions while searching", () => {
-  const markup = renderWithProviders(<RankingsPagerRail navigation={{ currentPosition: 100, total: 10_000, onJumpUp: () => undefined, onJumpDown: () => undefined }} search={{ active: true, onPrevious: () => undefined, onNext: () => undefined }} />);
-  assert.match(markup, /data-search-navigation="true"/);
-  assert.match(markup, /Previous person/);
-  assert.match(markup, /Next person/);
+test("shows clickable previous and next person actions only while find navigation is active", () => {
+  const props = { navigation: { currentPosition: 100, total: 10_000, onJumpUp: () => undefined, onJumpDown: () => undefined } };
+  const active = renderWithProviders(<RankingsPagerRail {...props} search={{ active: true, onPrevious: () => undefined, onNext: () => undefined }} />);
+  const inactive = renderWithProviders(<RankingsPagerRail {...props} search={{ active: false, onPrevious: () => undefined, onNext: () => undefined }} />);
+  assert.match(active, /data-search-navigation="true"/);
+  assert.match(active, /aria-hidden="false"/);
+  assert.match(active, /Previous person/);
+  assert.match(active, /Next person/);
+  assert.doesNotMatch(active, /Previous person<\/span><\/button><button[^>]+disabled/);
+  assert.doesNotMatch(inactive, /data-search-navigation="true"/);
+  assert.match(inactive, /aria-hidden="true"/);
+  assert.match(inactive, /Previous person<\/span><\/button><button[^>]+disabled/);
+});
+
+test("makes find navigation interactive only while search navigation is active", async () => {
+  const css = await readFile(new URL("./RankingsRail.css", import.meta.url), "utf8");
+  assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \.Jump-pagerActions \{ opacity: 0; pointer-events: none; \}/);
+  assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \.Jump-searchNavigation \{ opacity: 1; pointer-events: auto; \}/);
+  assert.match(css, /\.Jump-searchNavigation \{[^}]*opacity: 0; pointer-events: none;/);
 });

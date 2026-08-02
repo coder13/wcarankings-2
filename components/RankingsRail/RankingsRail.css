@@ -191,6 +191,8 @@
 .Jump-pagerButton + .Jump-pagerButton, .Jump-searchNavigationButton + .Jump-searchNavigationButton { border-left: 1px solid var(--border-subtle); }
 .Jump-pagerButton:hover, .Jump-pagerButton:focus-visible, .Jump-searchNavigationButton:hover, .Jump-searchNavigationButton:focus-visible { color: var(--focus); outline: none; }
 .Jump-searchNavigation { z-index: 1; grid-area: 1 / 1; overflow: hidden; opacity: 0; pointer-events: none; }
+.Jump--pager[data-search-navigation="true"] .Jump-pagerActions { opacity: 0; pointer-events: none; }
+.Jump--pager[data-search-navigation="true"] .Jump-searchNavigation { opacity: 1; pointer-events: auto; }
 
 @media only screen and (max-width: 600px) {
   .Jump--rankings { --rail-control-height: calc(48px - (4px * var(--rail-shrink-progress))); --rail-event-width: 44px; --rail-gender-width: 5em; --rail-select-width: min(8.5em, calc((100vw - 88px - var(--rail-gender-width) - var(--result-type-width)) / 1)); font-size: 1rem; }

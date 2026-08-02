@@ -223,6 +223,7 @@ export type GenderRankingQueryInput = {
   source: string;
   baseConditions: string[];
   conditions: string[];
+  selectColumns: string;
 };
 
 export type RankingPageQueryInput = {

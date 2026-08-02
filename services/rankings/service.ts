@@ -24,6 +24,7 @@ import {
   rankingTable,
   yearlyRankingTable,
 } from "@/services/rankings/helpers";
+import { getRankingEntryEnhancements } from "@/services/rankings/capabilities";
 import {
   filteredPersonMetricQuery,
   genderRankingPageQuery,
@@ -157,6 +158,7 @@ function yearlyFilters(input: QueryInput) {
 }
 
 async function queryGenderPage(input: QueryInput) {
+  const enhancements = await getRankingEntryEnhancements();
   const source = rankingTable(input.type);
   const { region } = rankingShape(input.scope);
   const baseConditions = ["ranking.event_id = ?", "ranking.world_rank > 0"];
@@ -202,7 +204,12 @@ async function queryGenderPage(input: QueryInput) {
   else if (input.search) resultLimit = input.searchLimit;
 
   const result = await query<RankingRow>(
-    genderRankingPageQuery({ source, baseConditions, conditions }),
+    genderRankingPageQuery({
+      source,
+      baseConditions,
+      conditions,
+      selectColumns: rankingColumns("filtered_rank", "filtered_position", enhancements),
+    }),
     [...values, resultLimit],
   );
   const entries = result.rows.slice(0, input.locate ? 1 : input.limit).map((row) => toRankingEntry(row, input.scope));
@@ -245,10 +252,11 @@ async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata) {
       returnedRows: result.rows.length,
     };
   }
+  const enhancements = await getRankingEntryEnhancements();
   const { rank, subRank, conditions, values } = filters(input);
   const pageValues = [...values, input.startRank, input.startRank + PAGE_SIZE];
   const result = await query<RankingRow>(
-    rankingPageQuery(rankingTable(input.type), rankingColumns(rank, subRank), conditions, subRank),
+    rankingPageQuery(rankingTable(input.type), rankingColumns(rank, subRank, enhancements), conditions, subRank),
     pageValues,
   );
   return {
@@ -267,7 +275,9 @@ export async function queryMysql(input: QueryInput) {
     ? { rank: "public_rank", subRank: "position", ...yearlyFilters(input) }
     : filters(input);
   const source = yearly ? yearlyRankingTable(input.type) : rankingTable(input.type);
-  const selectColumns = yearly ? yearlyColumns(input.type) : rankingColumns(rank, subRank);
+  const selectColumns = yearly
+    ? yearlyColumns(input.type)
+    : rankingColumns(rank, subRank, await getRankingEntryEnhancements());
   let from = `FROM ${source} ranking`;
   if (yearly) {
     from = `FROM ${source} ranking LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1 LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id LEFT JOIN countries country ON country.id = facts.person_country_id LEFT JOIN competitions competition ON competition.id = facts.competition_id`;

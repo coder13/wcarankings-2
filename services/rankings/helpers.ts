@@ -20,8 +20,19 @@ export function rankingShape(scope: RegionScope) {
   return { rank: "world_rank", subRank: "world_sub_rank", region: null } as const;
 }
 
-export function rankingColumns(rank: string, subRank: string) {
-  return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record, world_rank_delta, world_rank_delta_state, continent_rank_delta, continent_rank_delta_state, country_rank_delta, country_rank_delta_state, record_streak_weeks`;
+export type RankingEntryEnhancements = {
+  rankDeltas: boolean;
+};
+
+export function rankingColumns(
+  rank: string,
+  subRank: string,
+  { rankDeltas }: RankingEntryEnhancements = { rankDeltas: true },
+) {
+  const enhancements = rankDeltas
+    ? "world_rank_delta, world_rank_delta_state, continent_rank_delta, continent_rank_delta_state, country_rank_delta, country_rank_delta_state, record_streak_weeks"
+    : "NULL AS world_rank_delta, NULL AS world_rank_delta_state, NULL AS continent_rank_delta, NULL AS continent_rank_delta_state, NULL AS country_rank_delta, NULL AS country_rank_delta_state, NULL AS record_streak_weeks";
+  return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record, ${enhancements}`;
 }
 
 export function genderCondition(alias: string, genders: readonly GenderFilter[]) {

@@ -46,3 +46,6 @@ SELECT event_id, person_id,
   MAX(CASE WHEN scope = 'continent' THEN streak_weeks END) AS continent_record_streak_weeks,
   MAX(CASE WHEN scope = 'country' THEN streak_weeks END) AS country_record_streak_weeks
 FROM holders GROUP BY event_id, person_id;
+
+ALTER TABLE record_streaks_average
+  ADD PRIMARY KEY (event_id, person_id);

@@ -87,3 +87,6 @@ LEFT JOIN prior_bests
   ON prior_bests.person_id = current_bests.person_id
  AND prior_bests.event_id = current_bests.event_id
 ;
+
+ALTER TABLE weekly_rank_deltas_single
+  ADD PRIMARY KEY (event_id, person_id);

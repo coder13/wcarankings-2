@@ -3,6 +3,9 @@ import test from "node:test";
 
 import {
   DEFAULT_PROJECTION_NAMES,
+  COMPATIBILITY_PROJECTION_TASKS,
+  COMPATIBILITY_TABLE_TASK_COUNT,
+  createTableProgress,
   projectionBuildPlan,
   projectionConcurrency,
   projectionNamesForRefresh,
@@ -179,4 +182,63 @@ test("projection build concurrency defaults to two and accepts configured bounds
 test("a full schema refresh keeps the default semantic projections when selection is omitted", () => {
   assert.deepEqual(projectionNamesForRefresh(undefined), DEFAULT_PROJECTION_NAMES);
   assert.deepEqual(projectionNamesForRefresh([]), []);
+});
+
+test("compatibility helper tables are indexed, scheduled, and counted as build work", () => {
+  const helpers = COMPATIBILITY_PROJECTION_TASKS.filter(({ name }) =>
+    name.startsWith("compatibility-weekly-rank-deltas") || name.startsWith("compatibility-record-streaks"));
+  assert.equal(helpers.length, 4);
+  for (const task of helpers) {
+    assert.equal(task.dependencies[0], "raw-wca");
+    assert.ok(task.table);
+    assert.ok(task.estimatedDurationMs > 0);
+  }
+  const source = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
+    name === "compatibility-ranking-entries-single-source");
+  assert.deepEqual(source.dependencies, [
+    "compatibility-weekly-rank-deltas-single",
+    "compatibility-record-streaks-single",
+  ]);
+  const averageSource = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
+    name === "compatibility-ranking-entries-average-source");
+  assert.deepEqual(averageSource.dependencies, [
+    "compatibility-weekly-rank-deltas-average",
+    "compatibility-record-streaks-average",
+  ]);
+  assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 9);
+  const progress = createTableProgress(COMPATIBILITY_TABLE_TASK_COUNT);
+  let lastProgress;
+  for (const task of COMPATIBILITY_PROJECTION_TASKS) {
+    if (task.table) lastProgress = progress.start(task.table);
+  }
+  assert.equal(lastProgress, "[9/9]");
+});
+
+test("compatibility source views wait for their two helper tables", async () => {
+  const names = new Set([
+    "compatibility-weekly-rank-deltas-single",
+    "compatibility-record-streaks-single",
+    "compatibility-ranking-entries-single-source",
+  ]);
+  const events = [];
+  const tasks = COMPATIBILITY_PROJECTION_TASKS
+    .filter(({ name }) => names.has(name))
+    .map((task) => ({
+      ...task,
+      async run() {
+        events.push(`start:${task.name}`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        events.push(`finish:${task.name}`);
+      },
+    }));
+
+  await runDependencyAwareTasks(tasks, {
+    createConnection: async () => fakeConnection(events.length + 1, []),
+    concurrency: 2,
+    satisfiedDependencies: ["raw-wca"],
+  });
+
+  const sourceStart = events.indexOf("start:compatibility-ranking-entries-single-source");
+  assert.ok(sourceStart > events.indexOf("finish:compatibility-weekly-rank-deltas-single"));
+  assert.ok(sourceStart > events.indexOf("finish:compatibility-record-streaks-single"));
 });

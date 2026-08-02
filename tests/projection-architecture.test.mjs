@@ -304,6 +304,7 @@ test("weekly rank deltas are materialized in the compatibility ranking projectio
     assert.match(sql, /RANK\(\) OVER/);
     assert.doesNotMatch(sql, /result_value > current_bests\.result_value/);
     assert.doesNotMatch(sql, /WHERE current_bests\.week_start = latest_week\.week_start/);
+    assert.match(sql, /ADD PRIMARY KEY \(event_id, person_id\)/);
   }
   assert.match(source, /weekly_rank_deltas_single/);
   assert.match(source, /world_rank_delta_state/);
@@ -326,6 +327,7 @@ test("record streaks are materialized from current values and Thursday weeks", a
     assert.match(sql, /MIN\(scoped_results\.week_start\)/);
     assert.match(sql, /DATEDIFF/);
     assert.match(sql, /streak_weeks/);
+    assert.match(sql, /ADD PRIMARY KEY \(event_id, person_id\)/);
   }
   assert.match(source, /record_streaks_single/);
   assert.match(source, /record_streak_weeks/);

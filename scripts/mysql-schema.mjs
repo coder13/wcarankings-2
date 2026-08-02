@@ -220,9 +220,16 @@ export const RETIRED_PROJECTION_TABLES = [
 ];
 
 export const COMPATIBILITY_PROJECTION_TASKS = [
-  { name: "compatibility-ranking-entries-single", dependencies: [], table: "ranking_entries_single", estimatedDurationMs: 120_000 },
-  { name: "compatibility-ranking-entries-average", dependencies: [], table: "ranking_entries_average", estimatedDurationMs: 120_000 },
-  { name: "compatibility-result-entries-single", dependencies: [], table: "result_entries_single", estimatedDurationMs: 150_000 },
+  { name: "compatibility-weekly-rank-deltas-single", dependencies: ["raw-wca"], table: "weekly_rank_deltas_single", estimatedDurationMs: 360_000 },
+  { name: "compatibility-weekly-rank-deltas-average", dependencies: ["raw-wca"], table: "weekly_rank_deltas_average", estimatedDurationMs: 360_000 },
+  { name: "compatibility-record-streaks-single", dependencies: ["raw-wca"], table: "record_streaks_single", estimatedDurationMs: 180_000 },
+  { name: "compatibility-record-streaks-average", dependencies: ["raw-wca"], table: "record_streaks_average", estimatedDurationMs: 180_000 },
+  { name: "compatibility-ranking-entries-single-source", dependencies: ["compatibility-weekly-rank-deltas-single", "compatibility-record-streaks-single"], estimatedDurationMs: 0 },
+  { name: "compatibility-ranking-entries-average-source", dependencies: ["compatibility-weekly-rank-deltas-average", "compatibility-record-streaks-average"], estimatedDurationMs: 0 },
+  { name: "compatibility-result-entries-single-source", dependencies: ["raw-wca"], estimatedDurationMs: 0 },
+  { name: "compatibility-ranking-entries-single", dependencies: ["compatibility-ranking-entries-single-source"], table: "ranking_entries_single", estimatedDurationMs: 120_000 },
+  { name: "compatibility-ranking-entries-average", dependencies: ["compatibility-ranking-entries-average-source"], table: "ranking_entries_average", estimatedDurationMs: 120_000 },
+  { name: "compatibility-result-entries-single", dependencies: ["compatibility-result-entries-single-source"], table: "result_entries_single", estimatedDurationMs: 150_000 },
   {
     name: "compatibility-ranking-counts",
     dependencies: ["compatibility-ranking-entries-single", "compatibility-ranking-entries-average"],
@@ -236,6 +243,12 @@ export const COMPATIBILITY_PROJECTION_TASKS = [
     estimatedDurationMs: 15_000,
   },
 ];
+
+// Source-view tasks coordinate dependencies but do not create a published
+// table. Keep progress tied strictly to the table work operators can observe.
+export const COMPATIBILITY_TABLE_TASK_COUNT = COMPATIBILITY_PROJECTION_TASKS
+  .filter(({ table }) => table)
+  .length;
 
 // Initial scheduling hints. The per-task logs provide the data to tune these
 // values as the projection workload evolves; they do not affect SQL semantics.
@@ -528,6 +541,38 @@ async function buildCompatibilityTable(connection, table, source, indexFile, tab
   }, { tableProgress, tableName: table });
 }
 
+function renameCompatibilitySql(sql, {
+  bestSingle,
+  bestAverage,
+  entriesSources,
+  resultEntriesSource,
+  projectionSuffix,
+}) {
+  return sql
+    .replaceAll("wca_best_single", bestSingle)
+    .replaceAll("wca_best_average", bestAverage)
+    .replaceAll("weekly_rank_deltas_single", `weekly_rank_deltas_single${projectionSuffix}`)
+    .replaceAll("weekly_rank_deltas_average", `weekly_rank_deltas_average${projectionSuffix}`)
+    .replaceAll("record_streaks_single", `record_streaks_single${projectionSuffix}`)
+    .replaceAll("record_streaks_average", `record_streaks_average${projectionSuffix}`)
+    .replaceAll("ranking_entries_single_source", entriesSources.single)
+    .replaceAll("ranking_entries_average_source", entriesSources.average)
+    .replaceAll("result_entries_single_source", resultEntriesSource);
+}
+
+async function createCompatibilitySource(connection, file, names) {
+  await connection.query(renameCompatibilitySql(await projectionSql(file), names));
+}
+
+async function buildCompatibilityHelperTable(connection, file, names, tableProgress) {
+  await executeTableStatements(
+    connection,
+    renameCompatibilitySql(await projectionSql(file), names),
+    [],
+    { tableProgress },
+  );
+}
+
 function compatibilityProjectionTasks({
   entriesTables,
   entriesSources,
@@ -535,9 +580,40 @@ function compatibilityProjectionTasks({
   resultEntriesTable,
   resultCountsTable,
   resultEntriesSource,
+  bestSingle,
+  bestAverage,
+  projectionSuffix,
   tableProgress,
 }) {
+  const names = {
+    bestSingle,
+    bestAverage,
+    entriesSources,
+    resultEntriesSource,
+    projectionSuffix,
+  };
   const runners = {
+    "compatibility-weekly-rank-deltas-single": (connection) => buildCompatibilityHelperTable(
+      connection, "weekly_rank_deltas_single.sql", names, tableProgress,
+    ),
+    "compatibility-weekly-rank-deltas-average": (connection) => buildCompatibilityHelperTable(
+      connection, "weekly_rank_deltas_average.sql", names, tableProgress,
+    ),
+    "compatibility-record-streaks-single": (connection) => buildCompatibilityHelperTable(
+      connection, "record_streaks_single.sql", names, tableProgress,
+    ),
+    "compatibility-record-streaks-average": (connection) => buildCompatibilityHelperTable(
+      connection, "record_streaks_average.sql", names, tableProgress,
+    ),
+    "compatibility-ranking-entries-single-source": (connection) => createCompatibilitySource(
+      connection, "ranking_entries_single_source.sql", names,
+    ),
+    "compatibility-ranking-entries-average-source": (connection) => createCompatibilitySource(
+      connection, "ranking_entries_average_source.sql", names,
+    ),
+    "compatibility-result-entries-single-source": (connection) => createCompatibilitySource(
+      connection, "result_entries_single_source.sql", names,
+    ),
     "compatibility-ranking-entries-single": (connection) => buildCompatibilityTable(
       connection, entriesTables.single, entriesSources.single, "ranking_entries_indexes.sql", tableProgress,
     ),
@@ -730,19 +806,18 @@ export async function refreshMysqlSchema(
       await dropManagedObject(connection, name);
     }
 
-    for (const file of ["wca_best_single.sql", "wca_best_average.sql", "weekly_rank_deltas_single.sql", "weekly_rank_deltas_average.sql", "record_streaks_single.sql", "record_streaks_average.sql", "ranking_entries_single_source.sql", "ranking_entries_average_source.sql", "result_entries_single_source.sql"]) {
-      const statement = await projectionSql(file);
-      const renamed = statement
-        .replaceAll("wca_best_single", bestSingle)
-        .replaceAll("wca_best_average", bestAverage)
-        .replaceAll("weekly_rank_deltas_single", `weekly_rank_deltas_single${projectionSuffix}`)
-        .replaceAll("weekly_rank_deltas_average", `weekly_rank_deltas_average${projectionSuffix}`)
-        .replaceAll("record_streaks_single", `record_streaks_single${projectionSuffix}`)
-        .replaceAll("record_streaks_average", `record_streaks_average${projectionSuffix}`)
-        .replaceAll("ranking_entries_single_source", entriesSources.single)
-        .replaceAll("ranking_entries_average_source", entriesSources.average)
-        .replaceAll("result_entries_single_source", resultEntriesSource);
-      await connection.query(renamed);
+    const names = {
+      bestSingle,
+      bestAverage,
+      entriesSources,
+      resultEntriesSource,
+      projectionSuffix,
+    };
+    // These are small raw-table views. The expensive helper tables and the
+    // dependent source views are scheduled below, so they can use both build
+    // workers and accurately contribute to table progress.
+    for (const file of ["wca_best_single.sql", "wca_best_average.sql"]) {
+      await createCompatibilitySource(connection, file, names);
     }
   }
 
@@ -752,7 +827,7 @@ export async function refreshMysqlSchema(
     satisfiedProjectionNames,
   );
   const tableProgress = createTableProgress(
-    (includeCompatibility ? COMPATIBILITY_PROJECTION_TASKS.length : 0)
+    (includeCompatibility ? COMPATIBILITY_TABLE_TASK_COUNT : 0)
       + await countProjectionTables(semanticProjections),
   );
   const semanticTasks = semanticProjections.map((projection) => ({
@@ -769,6 +844,9 @@ export async function refreshMysqlSchema(
       resultEntriesTable,
       resultCountsTable,
       resultEntriesSource,
+      bestSingle,
+      bestAverage,
+      projectionSuffix,
       tableProgress,
     }) : [];
   await runDependencyAwareTasks([
