@@ -29,7 +29,7 @@ WHERE result.person_country_id <> ''
   AND (result.best > 0 OR result.average > 0)
 GROUP BY
   result.event_id, result.person_id,
-  result.person_country_id, country.continent_id;
+  result.person_country_id, result.person_continent_id;
 
 DROP TEMPORARY TABLE IF EXISTS sum_of_ranks_historical_bests;
 

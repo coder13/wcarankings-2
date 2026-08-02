@@ -117,6 +117,9 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(metricScores, /CREATE TABLE person_metric_counts AS/);
   assert.match(sumScores, /CREATE TEMPORARY TABLE sum_of_ranks_historical_bests/);
   assert.match(sumScores, /result\.person_country_id/);
+  assert.match(sumScores, /result\.person_continent_id/);
+  assert.match(sumScores, /result\.person_country_id, result\.person_continent_id/);
+  assert.doesNotMatch(sumScores, /result\.person_country_id, country\.continent_id/);
   assert.match(sumScores, /MIN\(CASE WHEN result\.best > 0/);
   assert.match(sumScores, /MIN\(CASE WHEN result\.average > 0/);
   assert.match(sumScores, /FROM ranks_single rank/);
