@@ -214,9 +214,6 @@ export type ResultRankingsQueryInput = {
   rankColumn: string;
   positionColumn: string;
   conditions: string[];
-  sourceConditions: string[];
-  gender: string[];
-  scope: string;
 };
 
 export type GenderRankingQueryInput = {

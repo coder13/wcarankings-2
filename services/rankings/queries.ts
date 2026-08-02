@@ -137,24 +137,19 @@ export function personCompetitionRankingCountQuery() {
 }
 
 export function resultRankingsQuery(input: ResultRankingsQueryInput) {
-  const partition = input.scope === "world" ? "" : `, ranking.${input.scope}_id`;
-  const source = input.gender.length
-    ? `(SELECT ranking.*, RANK() OVER (PARTITION BY ranking.event_id${partition} ORDER BY ranking.result_value) AS filtered_rank, ROW_NUMBER() OVER (PARTITION BY ranking.event_id${partition} ORDER BY ranking.result_value, ranking.result_id) AS filtered_position, COUNT(*) OVER (PARTITION BY ranking.event_id${partition}) AS filtered_total FROM ${input.source} ranking WHERE ${input.sourceConditions.join(" AND ")})`
-    : input.source;
   return sqlFragment`WITH page AS (
       SELECT
         ranking.result_id,
         ranking.result_value,
         ranking.${input.rankColumn} AS rank,
         ranking.${input.positionColumn} AS position,
-        ${input.gender.length ? "ranking.filtered_total AS total_count," : ""}
         ranking.person_id,
         ranking.country_id,
         ranking.continent_id,
         ranking.competition_id,
         ranking.record_code
-      FROM ${source} ranking
-      WHERE ${(input.gender.length ? input.conditions : input.sourceConditions).join(" AND ")}
+      FROM ${input.source} ranking
+      WHERE ${input.conditions.join(" AND ")}
       ORDER BY ranking.${input.positionColumn}
       LIMIT ?
     )
@@ -171,8 +166,10 @@ export function resultRankingsQuery(input: ResultRankingsQueryInput) {
     ORDER BY page.position`;
 }
 
-export function resultRankingCountsQuery() {
-  return "SELECT count FROM result_ranking_counts WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?";
+export function resultRankingCountsQuery(gender = false) {
+  return gender
+    ? "SELECT count FROM result_gender_ranking_counts WHERE event_id = ? AND result_type = ? AND gender_set = ? AND scope = ? AND region_id = ?"
+    : "SELECT count FROM result_ranking_counts WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?";
 }
 
 export function genderRankingPageQuery(input: GenderRankingQueryInput) {

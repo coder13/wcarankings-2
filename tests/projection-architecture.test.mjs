@@ -345,10 +345,11 @@ test("backfills only the active competition-event projection", async () => {
 });
 
 test("person search resolves IDs before querying projections", async () => {
-  const [searchQueries, rankings, results, compatibilityResults] = await Promise.all([
+  const [searchQueries, rankings, results, genderResults, compatibilityResults] = await Promise.all([
     readFile(new URL("services/people/queries.ts", root), "utf8"),
     readFile(new URL("services/rankings/service.ts", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_rankings_single.sql", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/result_gender_rankings_single.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_entries_single_indexes.sql", root), "utf8"),
   ]);
 
@@ -360,6 +361,9 @@ test("person search resolves IDs before querying projections", async () => {
   assert.match(rankings, /person_id IN/);
   assert.doesNotMatch(rankings, /person_name \$\{operator\}/);
   assert.match(results, /person_id, event_id, world_position, result_id/);
+  assert.match(genderResults, /FIND_IN_SET/);
+  assert.match(genderResults, /PARTITION BY gender_set, event_id/);
+  assert.match(genderResults, /idx_gender_results_single_world/);
   assert.match(compatibilityResults, /PRIMARY KEY \(result_id\)/);
   assert.doesNotMatch(compatibilityResults, /ADD INDEX/);
 });

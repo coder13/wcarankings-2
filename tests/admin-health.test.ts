@@ -3,6 +3,14 @@ import test from "node:test";
 import { capabilityTables, getCapabilityStatus } from "@/lib/admin-health";
 
 test("maps capability state to the tables each feature actually owns", () => {
+  assert.deepEqual(capabilityTables.resultRankings, [
+    "result_rankings_single",
+    "result_rankings_average",
+    "result_gender_rankings_single",
+    "result_gender_rankings_average",
+    "result_ranking_counts",
+    "result_gender_ranking_counts",
+  ]);
   assert.deepEqual(capabilityTables.competitionRankings, [
     "competition_podium_members",
     "competition_event_stats",
