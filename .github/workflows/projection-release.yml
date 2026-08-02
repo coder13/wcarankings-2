@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "17 5 * * *"
+    # 8:30 PM PDT / 7:30 PM PST: the Pacific low-traffic window year-round.
+    - cron: "30 3 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
