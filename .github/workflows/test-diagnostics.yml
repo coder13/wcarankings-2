@@ -19,34 +19,17 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      - name: Run test files independently
+      - name: Show exact remaining failures
         run: |
           set +e
           failed=0
           for test_file in \
-            tests/chunk-projection-dump.test.mjs \
-            tests/cloudflare-cache-rule.test.mjs \
-            tests/database-timeout.test.mjs \
             tests/deploy-workflow.test.mjs \
-            tests/person-lookup-index.integration.mjs \
-            tests/projection-release-artifact.test.mjs \
             tests/projection-release-plan.test.mjs \
-            tests/ranking-generation-activation.test.mjs \
-            tests/release-compatibility.test.mjs \
-            tests/projection-transfer.test.mjs \
-            tests/rendered-html.test.mjs \
-            tests/scroll-engine.test.mjs \
-            tests/result-projections.test.mjs \
-            tests/projection-architecture.test.mjs \
-            tests/projection-scheduler.test.mjs; do
-            output=$(mktemp)
-            node --test "$test_file" >"$output" 2>&1
+            tests/result-projections.test.mjs; do
+            echo "===== $test_file ====="
+            node --test "$test_file"
             status=$?
-            if [ "$status" -ne 0 ]; then
-              failed=1
-              echo "FAILED: $test_file"
-              grep -E '^(not ok|# (AssertionError|Error|Subtest:)|  (expected|actual|operator):)' "$output" | tail -n 80 || tail -n 80 "$output"
-            fi
-            rm -f "$output"
+            if [ "$status" -ne 0 ]; then failed=1; fi
           done
           exit "$failed"
