@@ -688,6 +688,13 @@ main {
   );
   backdrop-filter: var(--edge-blur-filter);
   -webkit-backdrop-filter: var(--edge-blur-filter);
+  opacity: 0;
+  transition: opacity 150ms var(--cubic-enter);
+}
+
+.ViewportEdgeGradients[data-top-visible="true"] .ViewportEdgeGradient--top,
+.ViewportEdgeGradients[data-bottom-visible="true"] .ViewportEdgeGradient--bottom {
+  opacity: 1;
 }
 
 .ViewportEdgeGradient--top {

@@ -151,6 +151,8 @@ test("renders the rankings shell with extracted components", () => {
     },
   });
   assert.match(markup, /class="ViewportEdgeGradients"/);
+  assert.match(markup, /data-top-visible="false"/);
+  assert.match(markup, /data-bottom-visible="false"/);
   assert.match(markup, /WCA Lists/);
   assert.match(markup, /Avery Chen/);
   assert.doesNotMatch(markup, /sub-rank/);

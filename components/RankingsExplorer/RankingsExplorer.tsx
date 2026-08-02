@@ -18,6 +18,7 @@ import { useRankingBoundaryShortcuts } from "./useRankingBoundaryShortcuts";
 import { useRankingCommands } from "./useRankingCommands";
 import { useRankingDataRuntime } from "./useRankingDataRuntime";
 import { useRankingInteractionRuntime } from "./useRankingInteractionRuntime";
+import { useHasScrolled } from "./useRailScrollProgress";
 import { useRankingsFilters } from "./useRankingsFilters";
 import { useVimNavigation } from "./useVimNavigation";
 import type {
@@ -84,6 +85,12 @@ export function RankingsExplorer({
     patchFilters: url.patchFilters,
   });
 
+  const hasScrolled = useHasScrolled();
+  const pagerEnabled =
+    !data.listMembers.selection.active &&
+    (!source || data.window.state.total > RESULTS_PAGE_SIZE);
+  const pagerVisible = data.window.state.pagerNavigationBusy || hasScrolled;
+
   return (
     <RankingsExplorerContext
       value={{
@@ -117,7 +124,10 @@ export function RankingsExplorer({
       }}
     >
       <RankingsAppShell>
-        <ViewportEdgeGradients />
+        <ViewportEdgeGradients
+          topVisible={hasScrolled}
+          bottomVisible={pagerEnabled && pagerVisible}
+        />
         <RankingsExplorerHeader />
         <RankingsTopRail />
         <main>
