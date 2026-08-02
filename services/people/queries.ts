@@ -38,3 +38,10 @@ export function personIdsQuery(input: PersonIdSearchInput) {
      ORDER BY (wca_id = ?) DESC, name, wca_id
      LIMIT ?`;
 }
+
+export function personCompetitionCountsQuery(personIds: string[]) {
+  return `SELECT person_id, COUNT(DISTINCT competition_id) AS competition_count
+     FROM results
+     WHERE person_id IN (${personIds.map(() => "?").join(", ")})
+     GROUP BY person_id`;
+}
