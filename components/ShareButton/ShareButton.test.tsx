@@ -67,7 +67,9 @@ test("does not copy after the user cancels native sharing", async () => {
     url: exactUrl,
     title: "Favorite cubers",
     share: async () => {
-      throw { name: "AbortError" };
+      const error = new Error("Share cancelled");
+      error.name = "AbortError";
+      throw error;
     },
     writeText: async () => {
       copied = true;
