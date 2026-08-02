@@ -4,6 +4,7 @@ import { WCA_EVENTS } from "@/lib/wca";
 import { ListMembershipRequestRows } from "../ListOwnerControls/ListMembershipRequestRows";
 import { ResultsTable } from "../ResultsTable/ResultsTable";
 import { useRankingsExplorer } from "./RankingsExplorerContext";
+import { emptyOwnerListMessage } from "./list-empty-state";
 import type { RankingViewportRendering } from "./useRankingViewport";
 
 export function RankingsResults({
@@ -27,6 +28,7 @@ export function RankingsResults({
   const { state: ranking } = data.window;
   const { listMembers } = data;
   const membershipRequests = list?.membershipRequests;
+  const emptyListMessage = emptyOwnerListMessage(list?.owner);
 
   let results = null;
   if (ranking.error) {
@@ -38,8 +40,8 @@ export function RankingsResults({
           entries: ranking.entries,
           eventId: filters.eventId,
           rankingType: ranking.entriesRankingType,
-          emptyState: list?.owner?.memberCount === 0
-            ? <div className="listMessage">Add cubers to this list to get started.</div>
+          emptyState: emptyListMessage
+            ? <div className="listMessage">{emptyListMessage}</div>
             : undefined,
           hideIdentityIds:
             filters.subject === "competitions" || filters.subject === "cities",
