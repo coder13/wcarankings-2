@@ -19,14 +19,21 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Show checkout identity and test sources
+      - name: Record test sources before install
         run: |
           git rev-parse HEAD
+          wc -l tests/deploy-workflow.test.mjs tests/projection-release-plan.test.mjs tests/result-projections.test.mjs
+          sha256sum tests/deploy-workflow.test.mjs tests/projection-release-plan.test.mjs tests/result-projections.test.mjs > /tmp/tests-before.sha
+      - run: pnpm install --frozen-lockfile
+      - name: Compare test sources after install
+        run: |
+          wc -l tests/deploy-workflow.test.mjs tests/projection-release-plan.test.mjs tests/result-projections.test.mjs
+          sha256sum -c /tmp/tests-before.sha || true
+          git status --short
+          git diff -- tests/deploy-workflow.test.mjs tests/projection-release-plan.test.mjs tests/result-projections.test.mjs | head -n 300
           grep -R -n "projection workflow treats WCA export timestamps as exact identities" tests || true
           grep -R -n "explicit group selection expands required dependencies" tests || true
           grep -R -n "ranking entry sources use historical result nationality" tests || true
-          grep -n "PARTITION BY r.event_id, r.person_id" sql/ranking-projections/ranking_entries_*_source.sql
       - name: Run projection tests against branch head
         run: |
           node --test \
