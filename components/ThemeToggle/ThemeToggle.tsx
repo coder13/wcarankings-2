@@ -138,19 +138,17 @@ export function ThemeToggle() {
 
       {open && (
         <div className="themePopover" role="menu" aria-label="Color theme">
-          {THEME_OPTIONS.map((option) => (
+          {THEME_OPTIONS.filter((option) => option !== preference).map((option) => (
             <button
               key={option}
               type="button"
-              role="menuitemradio"
-              aria-checked={preference === option}
+              role="menuitem"
               onClick={() => selectPreference(option)}
             >
               <span className="themeOptionIcon">
                 {option === "system" ? <SystemIcon /> : <ThemeIcon theme={option} />}
               </span>
               <span>{optionLabel(option)}</span>
-              <span className="themeOptionCheck" aria-hidden="true">✓</span>
             </button>
           ))}
         </div>

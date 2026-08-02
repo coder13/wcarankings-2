@@ -16,66 +16,6 @@
 @import "./styles/profile.css";
 @import "./styles/vim.css";
 
-:root,
-:root[data-theme="light"],
-:root[data-theme="dark"],
-:root:not([data-theme]) {
-  --surface-hover: color-mix(in srgb, var(--text-strong) 5%, transparent);
-  --control-hover: color-mix(in srgb, var(--text-strong) 5%, transparent);
-  --search-match-hover: var(--search-match);
-}
-:root[data-theme="dark"] {
-  --surface-hover: color-mix(in srgb, var(--text-strong) 8%, transparent);
-  --control-hover: color-mix(in srgb, var(--text-strong) 8%, transparent);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    --surface-hover: color-mix(in srgb, var(--text-strong) 8%, transparent);
-    --control-hover: color-mix(in srgb, var(--text-strong) 8%, transparent);
-  }
-}
-:root {
-  /* Shared viewport-edge blur controls. Levels use 0 (none) through 1 (full). */
-  --edge-blur-filter: blur(10px) saturate(0.9);
-  --edge-blur-top-filter: blur(16px) saturate(0.9);
-  --edge-blur-color: var(--surface);
-  --edge-blur-surface-strength: 55%;
-  --edge-blur-top-surface-strength: 88%;
-  --edge-blur-start-level: 1;
-  --edge-blur-end-level: 0;
-  --edge-blur-soft-level: 0.96;
-  --edge-blur-mid-level: 0.7;
-  --edge-blur-tail-level: 0.25;
-  --edge-blur-fade-start: 20%;
-  --edge-blur-soft-stop: 45%;
-  --edge-blur-mid-stop: 65%;
-  --edge-blur-tail-stop: 85%;
-  --edge-blur-fade-end: 100%;
-  --edge-blur-top-overlap: 0px;
-  --edge-blur-top-extension: 2em;
-  --edge-blur-top-fade-start: var(--edge-blur-fade-start);
-  --edge-blur-top-soft-stop: 55%;
-  --edge-blur-top-mid-stop: 72%;
-  --edge-blur-top-tail-stop: 88%;
-}
-@media (max-width: 600px) {
-  :root {
-    --phone-system-bar-color: #fffcff;
-    --edge-blur-color: var(--phone-system-bar-color);
-    --edge-blur-surface-strength: 100%;
-    --edge-blur-top-filter: blur(14px) saturate(0.9);
-    --edge-blur-top-surface-strength: 100%;
-    --edge-blur-start-level: 1;
-    --edge-blur-end-level: 0;
-    --edge-blur-fade-start: 0%;
-    --edge-blur-top-overlap: 40px;
-    --edge-blur-top-fade-start: 40px;
-    --edge-blur-top-soft-stop: 75%;
-    --edge-blur-top-mid-stop: 85%;
-    --edge-blur-top-tail-stop: 94%;
-  }
-
-}
 .listPersonAvatar {
   font-size: 0.875rem;
 }
@@ -177,7 +117,7 @@
 .listRemovalActions button:last-child {
   border-color: var(--record-world);
   background: var(--record-world);
-  color: #fff;
+  color: var(--text-on-strong);
 }
 .listRemovalActions button:disabled {
   cursor: wait;
@@ -248,7 +188,7 @@
 .listMemberSelectionRail button:nth-of-type(2) {
   order: 1;
   background: var(--record-world);
-  color: #fff;
+  color: var(--text-on-strong);
 }
 @media (hover: hover) {
   :where(button, a[href], input, select, textarea, [role="button"]):not(
@@ -344,7 +284,7 @@
     z-index: 39;
     inset: 0;
     display: block;
-    background: color-mix(in srgb, #000 42%, transparent);
+    background: var(--modal-scrim);
     animation: listMemberContextBackdropIn 160ms ease-out;
   }
   .listMemberContextMenu {
@@ -699,35 +639,34 @@ main {
 
 .ViewportEdgeGradient--top {
   top: 0;
-  height: calc(5rem + var(--edge-blur-top-extension) + var(--edge-blur-top-overlap));
-  background: color-mix(
-    in srgb,
-    var(--edge-blur-color) var(--edge-blur-top-surface-strength),
-    transparent
+  height: calc(
+    var(--edge-blur-rail-height) + var(--edge-blur-rail-offset) +
+      var(--edge-blur-shadow-extent) + env(safe-area-inset-top)
   );
-  backdrop-filter: var(--edge-blur-top-filter);
-  -webkit-backdrop-filter: var(--edge-blur-top-filter);
   -webkit-mask-image: linear-gradient(
     to bottom,
-    rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-top-fade-start),
-    rgb(0 0 0 / var(--edge-blur-soft-level)) var(--edge-blur-top-soft-stop),
-    rgb(0 0 0 / var(--edge-blur-mid-level)) var(--edge-blur-top-mid-stop),
-    rgb(0 0 0 / var(--edge-blur-tail-level)) var(--edge-blur-top-tail-stop),
+    rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-fade-start),
+    rgb(0 0 0 / var(--edge-blur-soft-level)) var(--edge-blur-soft-stop),
+    rgb(0 0 0 / var(--edge-blur-mid-level)) var(--edge-blur-mid-stop),
+    rgb(0 0 0 / var(--edge-blur-tail-level)) var(--edge-blur-tail-stop),
     rgb(0 0 0 / var(--edge-blur-end-level)) var(--edge-blur-fade-end)
   );
   mask-image: linear-gradient(
     to bottom,
-    rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-top-fade-start),
-    rgb(0 0 0 / var(--edge-blur-soft-level)) var(--edge-blur-top-soft-stop),
-    rgb(0 0 0 / var(--edge-blur-mid-level)) var(--edge-blur-top-mid-stop),
-    rgb(0 0 0 / var(--edge-blur-tail-level)) var(--edge-blur-top-tail-stop),
+    rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-fade-start),
+    rgb(0 0 0 / var(--edge-blur-soft-level)) var(--edge-blur-soft-stop),
+    rgb(0 0 0 / var(--edge-blur-mid-level)) var(--edge-blur-mid-stop),
+    rgb(0 0 0 / var(--edge-blur-tail-level)) var(--edge-blur-tail-stop),
     rgb(0 0 0 / var(--edge-blur-end-level)) var(--edge-blur-fade-end)
   );
 }
 
 .ViewportEdgeGradient--bottom {
   bottom: 0;
-  height: calc(4rem + env(safe-area-inset-bottom));
+  height: calc(
+    var(--edge-blur-rail-height) + var(--edge-blur-rail-offset) +
+      var(--edge-blur-shadow-extent) + env(safe-area-inset-bottom)
+  );
   -webkit-mask-image: linear-gradient(
     to top,
     rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-fade-start),
@@ -809,14 +748,14 @@ main {
   border: 1px solid var(--border);
   border-radius: 0.65em;
   background: var(--surface);
-  box-shadow: 0 0.75em 2.5em rgb(0 0 0 / 18%);
+  box-shadow: 0 0.75em 2.5em var(--shadow-raised);
 }
 
 .themePopover button {
   display: grid;
   width: 100%;
   min-height: 40px;
-  grid-template-columns: 1.5em 1fr 1em;
+  grid-template-columns: 1.5em 1fr;
   align-items: center;
   gap: 0.65em;
   padding: 0.7em 0.85em;
@@ -848,14 +787,6 @@ main {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.7;
-}
-
-.themeOptionCheck {
-  visibility: hidden;
-}
-
-.themePopover button[aria-checked="true"] .themeOptionCheck {
-  visibility: visible;
 }
 
 .profileMenu {
@@ -915,7 +846,7 @@ main {
   border: 1px solid var(--border);
   border-radius: 0.65em;
   background: var(--surface);
-  box-shadow: 0 0.75em 2.5em rgb(0 0 0 / 18%);
+  box-shadow: 0 0.75em 2.5em var(--shadow-raised);
 }
 
 .profileIdentity,

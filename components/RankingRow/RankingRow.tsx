@@ -56,6 +56,7 @@ export function RankingRow({
     rankIsDuplicate = false,
     hideIdentityId = false,
   } = display;
+  const resultContext = entry.competitionName || entry.resultSubtitle;
   const {
     rowIndex,
     onNavigate,
@@ -251,9 +252,9 @@ export function RankingRow({
                 {formattedResult}
               </span>
             </span>
-            {(entry.resultSubtitle ?? entry.competitionName) && (
-              <span className="competitionName" title={entry.resultSubtitle ?? entry.competitionName}>
-                {entry.resultSubtitle ?? entry.competitionName}
+            {resultContext && (
+              <span className="competitionName" title={resultContext}>
+                {resultContext}
               </span>
             )}
           </span>

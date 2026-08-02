@@ -4,7 +4,18 @@ import { useId, useRef, useState } from "react";
 import CloseIcon from "../Icon/close.svg?react";
 import SelectChevronIcon from "../Icon/select-chevron.svg?react";
 import { Dropdown } from "../Dropdown/Dropdown";
+import { flagEmoji } from "@/lib/wca";
 import type { RegionOption, RegionSelection } from "../RankingsExplorer/types";
+
+function regionLabel(option: RegionOption) {
+  return `${regionIcon(option)} ${option.label}`;
+}
+
+function regionIcon(option: RegionOption) {
+  if (option.scope === "country" && option.iso2) return flagEmoji(option.iso2);
+  if (option.scope === "world") return "🌐";
+  return "🗺️";
+}
 
 export function RegionPicker({
   options,
@@ -107,7 +118,10 @@ export function RegionPicker({
         }}
         key={option.key}
       >
-        <span>{option.label}</span>
+        <span>
+          <span aria-hidden="true">{regionIcon(option)} </span>
+          {option.label}
+        </span>
       </button>
     );
   };
@@ -123,7 +137,7 @@ export function RegionPicker({
         id="region-picker-button"
         type="text"
         ref={searchRef}
-        value={open ? query : selectedOption?.label ?? "World"}
+        value={open ? query : selectedOption ? regionLabel(selectedOption) : "World"}
         onFocus={() => {
           if (disabled) return;
           if (!open) setQuery("");

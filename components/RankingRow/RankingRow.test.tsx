@@ -32,6 +32,10 @@ test("renders a result row without exposing internal ordering", () => {
   );
   assert.match(markup, /Cailyn Sinclair/);
   assert.match(markup, /Storybook Open 2026/);
+  assert.ok(
+    markup.indexOf('class="best">12.34') <
+      markup.indexOf('class="competitionName" title="Storybook Open 2026"'),
+  );
   assert.match(markup, /World Record/);
   assert.doesNotMatch(markup, /National Record/);
   assert.match(markup, /United States/);
@@ -42,6 +46,18 @@ test("renders a result row without exposing internal ordering", () => {
   assert.match(markup, /tabindex="0"/);
   assert.match(markup, /aria-label="Rank 42: Cailyn Sinclair, 12\.34"/);
   assert.doesNotMatch(markup, /sub-rank/);
+});
+
+test("shows the competition name beneath a person result when a subtitle is also available", () => {
+  const markup = renderToStaticMarkup(
+    <RankingRow
+      entry={{ ...entry, resultSubtitle: "Individual result details" }}
+      display={{ eventId: "333", rankingType: "single", animationIndex: 0 }}
+    />,
+  );
+
+  assert.match(markup, /class="competitionName" title="Storybook Open 2026"/);
+  assert.doesNotMatch(markup, /class="competitionName" title="Individual result details"/);
 });
 
 test("does not render disabled rank delta UI from a stale response", () => {

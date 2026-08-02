@@ -132,8 +132,8 @@ export function RankingsExplorer({
         <RankingsTopRail />
         <main>
           <RankingsResults viewport={data.resultsViewport} />
-          <RankingsNavigationFooter visibleRank={data.viewport.visibleSubRank} />
         </main>
+        <RankingsNavigationFooter visibleRank={data.viewport.visibleSubRank} />
         <ListMemberManagementOverlays />
         <VimNavigationOverlay />
       </RankingsAppShell>
