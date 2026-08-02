@@ -77,11 +77,12 @@ jobs:
   supersession:
     if: needs.build.result == 'success'
     needs: [plan, build]
-    uses: ./.github/workflows/plan-projections.yml
+    uses: ./.github/workflows/check-projection-supersession.yml
     with:
-      ref: main
       groups: ${{ needs.plan.outputs.release_groups }}
-      refresh_export: ${{ github.event_name != 'push' }}
+      export_value: ${{ needs.plan.outputs.export_value }}
+      production_export_value: ${{ needs.plan.outputs.production_export_value }}
+      fingerprints: ${{ needs.plan.outputs.fingerprints }}
     secrets: inherit
 
   deploy:
@@ -89,8 +90,8 @@ jobs:
       inputs.dry_run != true
       && needs.build.result == 'success'
       && needs.images.result == 'success'
+      && needs.supersession.outputs.safe == 'true'
       && needs.supersession.outputs.required == 'true'
-      && needs.supersession.outputs.fingerprints == needs.plan.outputs.fingerprints
     needs: [plan, images, build, supersession]
     uses: ./.github/workflows/deploy-projections.yml
     with:
@@ -100,7 +101,7 @@ jobs:
       groups: ${{ needs.plan.outputs.release_groups }}
       export_date: ${{ needs.plan.outputs.export_date }}
       export_value: ${{ needs.plan.outputs.export_value }}
-      production_export_value: ${{ needs.plan.outputs.production_export_value }}
+      production_export_value: ${{ needs.supersession.outputs.production_export_value }}
       source_sha: ${{ needs.build.outputs.source_sha }}
       artifact_run_id: ${{ needs.build.outputs.artifact_run_id }}
       artifact_id: ${{ needs.build.outputs.artifact_id }}
@@ -113,4 +114,4 @@ jobs:
     needs: [build, deploy]
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Built artifacts are valid and retained in GHCR; current main superseded activation."
+      - run: echo "Built immutable group artifacts were retained, but metadata changed before activation."
