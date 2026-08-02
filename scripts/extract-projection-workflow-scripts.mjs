@@ -142,4 +142,23 @@ if (!tests.includes("projectionDeployWorkflow")) {
   ].join("\n");
   tests = tests.replace(insertionMarker, fixture);
 }
+function scopeTestToDeploymentScript(name, nextName) {
+  const startMarker = `test(\"${name}\"`;
+  const endMarker = `test(\"${nextName}\"`;
+  const start = tests.indexOf(startMarker);
+  const end = tests.indexOf(endMarker, start + startMarker.length);
+  if (start < 0 || end < 0) throw new Error(`Could not locate test block: ${name}`);
+  const block = tests.slice(start, end);
+  if (!block.includes("projectionDeploymentScript")) {
+    tests = `${tests.slice(0, start)}${block.replaceAll("projectionDeploy", "projectionDeploymentScript")}${tests.slice(end)}`;
+  }
+}
+scopeTestToDeploymentScript(
+  "candidate staging is monitored and the activation lock stays short",
+  "projection deployment protects its remote heredoc from non-input compose children",
+);
+scopeTestToDeploymentScript(
+  "projection deployment protects its remote heredoc from non-input compose children",
+  "server image transfer selection repairs missing unchanged tags",
+);
 await writeFile(testsPath, tests);
