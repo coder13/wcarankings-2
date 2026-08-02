@@ -3,6 +3,7 @@
 import { forwardRef, useCallback, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { MotionConfig, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { useTranslation } from "react-i18next";
+import { TextDropdown, type TextDropdownOption } from "../Dropdown/TextDropdown";
 import { EventPicker, type EventPickerOption } from "../EventPicker/EventPicker";
 import { RegionPicker } from "../RegionPicker/RegionPicker";
 import ArrowDownIcon from "../Icon/arrow-down.svg?react";
@@ -136,6 +137,11 @@ export type RankingsControlsModel<T extends EventPickerOption> = {
   onEventChange: (eventId: T["id"]) => void;
   rankingType: "single" | "average";
   onRankingTypeChange: (rankingType: "single" | "average") => void;
+  period?: {
+    options: readonly TextDropdownOption<string>[];
+    value: string;
+    onChange: (value: string) => void;
+  };
   gender: readonly GenderFilter[];
   onGenderChange: (gender: GenderFilter[]) => void;
   regions: RegionOption[];
@@ -167,6 +173,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({
     onEventChange,
     rankingType,
     onRankingTypeChange,
+    period,
     gender,
     onGenderChange,
     regions,
@@ -217,6 +224,15 @@ export function RankingsControlsRail<T extends EventPickerOption>({
         {showResultType && <div className="Jump-resultTypeControl">
           <button className="Jump-resultTypeToggle" type="button" disabled={event.id === "333mbf"} aria-label={t("rankingsRail.controls.switchToRankingType", { rankingType: nextType })} onClick={() => onRankingTypeChange(nextType)}>{t(`rankingsRail.controls.${rankingType}`)}</button>
         </div>}
+        {period && (
+          <TextDropdown
+            options={period.options}
+            value={period.value}
+            onChange={period.onChange}
+            ariaLabel={t("rankingsRail.controls.personRankingPeriod")}
+            className="personYearDropdown Jump-periodPicker"
+          />
+        )}
         {showGender && <GenderPicker className="Jump-genderPicker" value={gender} onChange={onGenderChange} />}
         <RegionPicker className="Jump-regionPicker" options={regions} selected={regionSelection} onChange={onRegionChange} disabled={regionDisabled} />
         {listAddAction && <button className="Jump-listAddButton" type="button" onClick={listAddAction}>{t("rankingsRail.controls.addToList")}</button>}
@@ -283,7 +299,7 @@ export function RankingsPagerRail({
     <div className="Jump-pagerActions" aria-hidden={searchActive}>
       <button className="Jump-pagerButton" onClick={onJumpUp} type="button" disabled={searchActive || busy}><span>{labels.up}</span><ArrowUpIcon /></button>
       {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={searchActive || busy} aria-label={t("rankingsRail.pager.jumpToMyRanking")}><span>{t("rankingsRail.pager.myRank")}</span></button>}
-      <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={searchActive || busy}><span>{labels.down}</span><ArrowDownIcon /></button>
+      <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={searchActive || busy}><ArrowDownIcon /><span>{labels.down}</span></button>
     </div>
     <div className="Jump-searchNavigation" aria-hidden={!searchActive}><div className="Jump-searchNavigationContent">
       <button className="Jump-searchNavigationButton" onClick={onSearchPrevious} type="button" disabled={!searchActive}><ArrowUpIcon /><span>{t("rankingsRail.pager.previousPerson")}</span></button>

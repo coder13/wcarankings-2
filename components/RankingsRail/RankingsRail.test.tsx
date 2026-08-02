@@ -37,6 +37,13 @@ test("renders the ranking settings and search in one rail", () => {
   assert.match(markup, /aria-label="Gender"/);
 });
 
+test("renders the person ranking period control in the settings rail", () => {
+  const markup = renderWithProviders(<RankingsControlsRail controls={{ event: WCA_EVENTS[0], onEventChange: () => undefined, rankingType: "single", onRankingTypeChange: () => undefined, period: { options: [{ value: "", label: "All time" }, { value: "2026", label: "2026" }], value: "", onChange: () => undefined }, gender: [], onGenderChange: () => undefined, regions, regionSelection: { scope: "world", regionId: "" }, onRegionChange: () => undefined, compactResultType: false }} />);
+  assert.match(markup, /class="[^"]*personYearDropdown Jump-periodPicker"/);
+  assert.match(markup, /aria-label="Person ranking period"/);
+  assert.match(markup, />All time</);
+});
+
 test("shows clickable previous and next person actions only while find navigation is active", () => {
   const props = { navigation: { currentPosition: 100, total: 10_000, onJumpUp: () => undefined, onJumpDown: () => undefined } };
   const active = renderWithProviders(<RankingsPagerRail {...props} search={{ active: true, onPrevious: () => undefined, onNext: () => undefined }} />);

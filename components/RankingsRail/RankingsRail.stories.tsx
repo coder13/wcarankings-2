@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState, type CSSProperties } from "react";
 import { WCA_EVENTS } from "@/lib/wca";
+import { i18n } from "@/lib/i18n";
 import { ALL_EVENT_RANKING_OPTIONS } from "../EventPicker/allEventRankingOptions";
 import type { EventPickerOption } from "../EventPicker/EventPicker";
 import type { RankingEntry, RegionOption, RegionSelection } from "../RankingsExplorer/types";
@@ -17,7 +18,7 @@ const regions: RegionOption[] = [
   { key: "country:US", scope: "country", regionId: "US", label: "United States" },
 ];
 
-function TopRail({ scrollProgress = 0 }: { scrollProgress?: number }) {
+function TopRail({ scrollProgress = 0, showPeriod = false }: { scrollProgress?: number; showPeriod?: boolean }) {
   const [eventId, setEventId] = useState<RailEvent["id"]>("333");
   const [rankingType, setRankingType] = useState<"single" | "average">("single");
   const [regionSelection, setRegionSelection] = useState<RegionSelection>({
@@ -26,6 +27,7 @@ function TopRail({ scrollProgress = 0 }: { scrollProgress?: number }) {
   });
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [period, setPeriod] = useState("");
   const event = allEventOptions.find((candidate) => candidate.id === eventId)!;
   const isAllEventRanking = ALL_EVENT_RANKING_OPTIONS.some((option) => option.id === event.id);
 
@@ -40,6 +42,15 @@ function TopRail({ scrollProgress = 0 }: { scrollProgress?: number }) {
             onEventChange: setEventId,
             rankingType,
             onRankingTypeChange: setRankingType,
+            period: showPeriod ? {
+              options: [
+                { value: "", label: i18n.t("rankingsRail.period.allTime") },
+                { value: "2026", label: "2026" },
+                { value: "2025", label: "2025" },
+              ],
+              value: period,
+              onChange: setPeriod,
+            } : undefined,
             gender: [],
             onGenderChange: () => undefined,
             regions,
@@ -69,8 +80,8 @@ function TopRail({ scrollProgress = 0 }: { scrollProgress?: number }) {
   </div>;
 }
 
-function TopRailStory({ scrollProgress = 0 }: { scrollProgress?: number }) {
-  return <div style={{ minHeight: "18rem", padding: "3rem" }}><TopRail scrollProgress={scrollProgress} /></div>;
+function TopRailStory({ scrollProgress = 0, showPeriod = false }: { scrollProgress?: number; showPeriod?: boolean }) {
+  return <div style={{ minHeight: "18rem", padding: "3rem" }}><TopRail scrollProgress={scrollProgress} showPeriod={showPeriod} /></div>;
 }
 
 function ScrollTransitionStory() {
@@ -108,6 +119,14 @@ export const TopOpen: Story = { render: () => <TopRailStory /> };
 
 export const TopCollapsed: Story = {
   render: () => <TopRailStory scrollProgress={1} />,
+};
+
+export const TopWithYearSelector: Story = {
+  render: () => <TopRailStory showPeriod />,
+};
+
+export const TopCollapsedWithYearSelector: Story = {
+  render: () => <TopRailStory scrollProgress={1} showPeriod />,
 };
 
 export const TopScrollTransition: Story = {

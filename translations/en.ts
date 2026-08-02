@@ -6,6 +6,7 @@ export const en = {
       latitudeFirst: "Latitude: {{hemisphere}} first",
       latitudeSwitch: "Latitude: {{hemisphere}} first. Switch to {{nextHemisphere}} first",
       north: "North",
+      personRankingPeriod: "Person ranking period",
       single: "Single",
       south: "South",
       switchToRankingType: "Switch to {{rankingType}} rankings",
@@ -30,6 +31,10 @@ export const en = {
       jumpToMyRanking: "Jump to my ranking",
       previousPerson: "Previous person",
       nextPerson: "Next person",
+    },
+    period: {
+      allTime: "All time",
+      competitionCount: "Competition count",
     },
   },
 } as const;

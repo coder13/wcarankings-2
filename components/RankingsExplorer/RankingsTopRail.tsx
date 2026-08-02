@@ -6,7 +6,9 @@ import {
   useSyncExternalStore,
   type CSSProperties,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useProjectionFeatureSwitch } from "@/components/ProjectionFeatureSwitchProvider";
+import { i18n } from "@/lib/i18n";
 import { WCA_EVENTS } from "@/lib/wca";
 import { ALL_EVENT_RANKING_OPTIONS } from "../EventPicker/allEventRankingOptions";
 import {
@@ -59,6 +61,7 @@ function buildRegionOptions(regions: RankingsRegions) {
 }
 
 export function RankingsTopRail() {
+  const { t } = useTranslation(undefined, { i18n });
   const featureSwitch = useProjectionFeatureSwitch();
   const {
     config: { source, list, regions: initialRegions, options },
@@ -81,6 +84,24 @@ export function RankingsTopRail() {
   const currentEvent =
     ALL_EVENT_RANKING_OPTIONS.find((option) => option.id === filters.eventId) ??
     WCA_EVENTS.find((event) => event.id === filters.eventId)!;
+  const personRankingPeriod = filters.personCompetitionRanking
+    ? "competitions"
+    : filters.year ? String(filters.year) : "";
+  const personRankingPeriodOptions = [
+    ...(featureSwitch.personCompetitionRankings
+      ? [{ value: "competitions", label: t("rankingsRail.period.competitionCount") }]
+      : []),
+    { value: "", label: t("rankingsRail.period.allTime") },
+    ...data.window.state.availableYears.map((year) => ({
+      value: String(year),
+      label: String(year),
+    })),
+  ];
+  const showPersonRankingPeriod =
+    !source &&
+    options.showSubjectSwitch &&
+    filters.subject === "people" &&
+    personRankingPeriodOptions.length > 1;
   const hidesResultType =
     filters.personCompetitionRanking ||
     (filters.subject === "competitions" && [
@@ -144,6 +165,14 @@ export function RankingsTopRail() {
             onEventPickerTrigger: commands.registerEventPickerTrigger,
             rankingType: filters.rankingType,
             onRankingTypeChange: actions.changeRankingType,
+            period: showPersonRankingPeriod ? {
+              options: personRankingPeriodOptions,
+              value: personRankingPeriod,
+              onChange: (value) => {
+                if (value === "competitions") actions.changePersonCompetitionRanking(true);
+                else actions.changeYear(value ? Number(value) : null);
+              },
+            } : undefined,
             gender: filters.gender,
             onGenderChange: actions.changeGender,
             regions,
