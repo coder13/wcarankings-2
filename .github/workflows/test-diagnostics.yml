@@ -19,7 +19,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      - name: Show exact remaining failures
+      - name: Show compact remaining failures
         run: |
           set +e
           failed=0
@@ -27,9 +27,18 @@ jobs:
             tests/deploy-workflow.test.mjs \
             tests/projection-release-plan.test.mjs \
             tests/result-projections.test.mjs; do
-            echo "===== $test_file ====="
-            node --test "$test_file"
+            output=$(mktemp)
+            node --test --test-reporter=tap "$test_file" >"$output" 2>&1
             status=$?
-            if [ "$status" -ne 0 ]; then failed=1; fi
+            if [ "$status" -ne 0 ]; then
+              failed=1
+              echo "===== FAILED: $test_file ====="
+              awk '
+                /^not ok / { printing=1; remaining=45 }
+                printing { print; remaining-- }
+                printing && remaining <= 0 { printing=0 }
+              ' "$output"
+            fi
+            rm -f "$output"
           done
           exit "$failed"
