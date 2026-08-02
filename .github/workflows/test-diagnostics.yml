@@ -1,0 +1,35 @@
+name: Test Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  isolate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - name: Show exact remaining failures
+        run: |
+          set +e
+          failed=0
+          for test_file in \
+            tests/deploy-workflow.test.mjs \
+            tests/projection-release-plan.test.mjs \
+            tests/result-projections.test.mjs; do
+            echo "===== $test_file ====="
+            node --test "$test_file"
+            status=$?
+            if [ "$status" -ne 0 ]; then failed=1; fi
+          done
+          exit "$failed"
