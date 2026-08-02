@@ -6,7 +6,6 @@ SELECT
   r.person_country_id,
   COALESCE(country.continent_id, '') AS person_continent_id,
   r.competition_id,
-  comp.year AS competition_year,
   STR_TO_DATE(CONCAT(comp.year, '-', LPAD(comp.month, 2, '0'), '-', LPAD(comp.day, 2, '0')), '%Y-%m-%d') AS competition_start_date,
   r.round_type_id,
   COALESCE(round_type.final, 0) AS is_final_round,
@@ -26,12 +25,6 @@ ALTER TABLE result_facts
   ADD PRIMARY KEY (result_id),
   ADD INDEX idx_result_facts_person_event_date (person_id, event_id, competition_start_date, result_id),
   ADD INDEX idx_result_facts_competition_event (competition_id, event_id, result_id),
-  ADD INDEX idx_result_facts_year_country_event_single (
-    competition_year, person_country_id, event_id, best, result_id
-  ),
-  ADD INDEX idx_result_facts_year_country_event_average (
-    competition_year, person_country_id, event_id, average, result_id
-  ),
   ADD INDEX idx_result_facts_single_ranking_cover (
     event_id, best, competition_start_date, competition_id, person_id,
     result_id, round_type_id, person_country_id, person_continent_id

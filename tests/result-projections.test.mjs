@@ -62,13 +62,11 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(fixture, /regional_single_record/);
 });
 
-test("materializes the common single-gender world and continent cohorts", async () => {
-  const [single, average, counts, currentYearSingle, currentYearAverage, schema, groups, resultService] = await Promise.all([
+test("publishes indexed gender result rankings instead of ranking filtered rows at request time", async () => {
+  const [single, average, counts, schema, groups, resultService] = await Promise.all([
     readFile(new URL("sql/ranking-projections/result_gender_rankings_single.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_gender_rankings_average.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_gender_ranking_counts.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/result_current_year_gender_rankings_single.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/result_current_year_gender_rankings_average.sql", root), "utf8"),
     readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
     readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
     readFile(new URL("services/rankings/result.ts", root), "utf8"),
@@ -76,17 +74,14 @@ test("materializes the common single-gender world and continent cohorts", async 
 
   for (const source of [single, average]) {
     assert.match(source, /gender_sets AS/);
+    assert.match(source, /FIND_IN_SET/);
     assert.match(source, /PARTITION BY gender_set, event_id/);
     assert.match(source, /ADD PRIMARY KEY \(gender_set, result_id\)/);
-    assert.doesNotMatch(source, /country_position/);
-    assert.doesNotMatch(source, /'m,f'/);
   }
-  for (const source of [currentYearSingle, currentYearAverage]) assert.match(source, /competition\.year = YEAR\(CURRENT_DATE\)/);
   assert.match(counts, /gender_set/);
   assert.match(schema, /result_gender_rankings_single/);
   assert.match(schema, /result_gender_ranking_counts/);
-  assert.match(groups, /schemaVersion: 3/);
-  assert.match(groups, /current-year-result-rankings/);
+  assert.match(groups, /schemaVersion: 2/);
   assert.match(groups, /result_gender_rankings_average/);
   assert.match(resultService, /result_gender_rankings_\$\{resultType\}/);
   assert.match(resultService, /ranking\.gender_set = \?/);

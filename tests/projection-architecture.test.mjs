@@ -93,9 +93,6 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(importer, /promoteProjectionTables/);
 
   assert.match(facts, /CREATE TABLE result_facts AS/);
-  assert.match(facts, /comp\.year AS competition_year/);
-  assert.match(facts, /idx_result_facts_year_country_event_single/);
-  assert.match(facts, /idx_result_facts_year_country_event_average/);
   assert.match(facts, /FROM results r/);
   assert.doesNotMatch(facts, /AS value1/);
   assert.match(facts, /format\.expected_solve_count/);
