@@ -55,6 +55,7 @@ test("makes find navigation interactive only while search navigation is active",
   const css = await readFile(new URL("./RankingsRail.css", import.meta.url), "utf8");
   assert.match(css, /\.Jump-pagerButton--me \{ padding-inline: \.75em; text-align: center; \}/);
   assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \.Jump-pagerActions \{ opacity: 0; pointer-events: none; \}/);
+  assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \{ width: min\(26em, calc\(100vw - 2em\)\); \}/);
   assert.match(css, /\.Jump--pager\[data-search-navigation="true"\] \.Jump-searchNavigation \{ opacity: 1; pointer-events: auto; \}/);
-  assert.match(css, /\.Jump-searchNavigation \{[^}]*opacity: 0; pointer-events: none;/);
+  assert.match(css, /\.Jump-searchNavigation \{ position: absolute;[^}]*opacity: 0; pointer-events: none;/);
 });

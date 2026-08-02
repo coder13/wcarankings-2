@@ -181,7 +181,7 @@
 .Jump--pager { display: grid; overflow: hidden; }
 .Jump-pagerActions, .Jump-searchNavigationContent { display: flex; min-width: 0; }
 .Jump-pagerActions { grid-area: 1 / 1; width: max-content; max-width: calc(100vw - 2em); opacity: 1; }
-.Jump-searchNavigationContent { width: min(26em, calc(100vw - 2em)); }
+.Jump-searchNavigationContent { width: 100%; }
 .Jump-pagerButton { flex: 0 0 auto; }
 .Jump-pagerButton--up { box-sizing: border-box; width: 9.5em; min-width: 40px; overflow: hidden; padding: 0; }
 .Jump-pagerButtonContent { display: flex; width: 9.5em; height: 100%; flex: 0 0 9.5em; align-items: center; justify-content: center; gap: .5em; }
@@ -190,8 +190,9 @@
 .Jump-pagerButton--me { padding-inline: .75em; text-align: center; }
 .Jump-pagerButton + .Jump-pagerButton, .Jump-searchNavigationButton + .Jump-searchNavigationButton { border-left: 1px solid var(--border-subtle); }
 .Jump-pagerButton:hover, .Jump-pagerButton:focus-visible, .Jump-searchNavigationButton:hover, .Jump-searchNavigationButton:focus-visible { color: var(--focus); outline: none; }
-.Jump-searchNavigation { z-index: 1; grid-area: 1 / 1; overflow: hidden; opacity: 0; pointer-events: none; }
+.Jump-searchNavigation { position: absolute; z-index: 1; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
 .Jump--pager[data-search-navigation="true"] .Jump-pagerActions { opacity: 0; pointer-events: none; }
+.Jump--pager[data-search-navigation="true"] { width: min(26em, calc(100vw - 2em)); }
 .Jump--pager[data-search-navigation="true"] .Jump-searchNavigation { opacity: 1; pointer-events: auto; }
 
 @media only screen and (max-width: 600px) {
