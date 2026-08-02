@@ -7,6 +7,7 @@ import { RankingsExplorerHeader } from "./RankingsExplorerHeader";
 import { RankingsNavigationFooter } from "./RankingsNavigationFooter";
 import { RankingsResults } from "./RankingsResults";
 import { RankingsTopRail } from "./RankingsTopRail";
+import { ViewportEdgeGradients } from "../ViewportEdgeGradients/ViewportEdgeGradients";
 import {
   RankingsAppShell,
   VimNavigationOverlay,
@@ -116,6 +117,7 @@ export function RankingsExplorer({
       }}
     >
       <RankingsAppShell>
+        <ViewportEdgeGradients />
         <RankingsExplorerHeader />
         <RankingsTopRail />
         <main>

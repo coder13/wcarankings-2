@@ -674,20 +674,17 @@ main {
   }
 }
 
-.stickyRankingsRail > .RankingsRailTransition,
-.JumpControlsVisibility:has(.Jump[data-direction="down"])
-  > .RankingsRailTransition {
-  position: relative;
-  isolation: isolate;
+.ViewportEdgeGradients {
+  position: fixed;
+  z-index: 5;
+  inset: 0;
+  pointer-events: none;
 }
 
-.stickyRankingsRail > .RankingsRailTransition::before,
-.JumpControlsVisibility:has(.Jump[data-direction="down"])
-  > .RankingsRailTransition::before {
+.ViewportEdgeGradient {
   position: absolute;
-  z-index: 0;
-  left: 50%;
-  width: 100vw;
+  right: 0;
+  left: 0;
   background: color-mix(
     in srgb,
     var(--edge-blur-color) var(--edge-blur-surface-strength),
@@ -695,14 +692,11 @@ main {
   );
   backdrop-filter: var(--edge-blur-filter);
   -webkit-backdrop-filter: var(--edge-blur-filter);
-  content: "";
-  pointer-events: none;
-  transform: translateX(-50%);
 }
 
-.stickyRankingsRail > .RankingsRailTransition::before {
-  top: calc(-1em - var(--edge-blur-top-overlap));
-  bottom: calc(0px - var(--edge-blur-top-extension));
+.ViewportEdgeGradient--top {
+  top: 0;
+  height: calc(5rem + var(--edge-blur-top-extension) + var(--edge-blur-top-overlap));
   background: color-mix(
     in srgb,
     var(--edge-blur-color) var(--edge-blur-top-surface-strength),
@@ -728,12 +722,9 @@ main {
   );
 }
 
-.JumpControlsVisibility:has(.Jump[data-direction="down"])
-  > .RankingsRailTransition::before {
-  top: -1em;
-  bottom: calc(
-    -1em - var(--jump-controls-bottom-offset, 0px) - env(safe-area-inset-bottom)
-  );
+.ViewportEdgeGradient--bottom {
+  bottom: 0;
+  height: calc(4rem + env(safe-area-inset-bottom));
   -webkit-mask-image: linear-gradient(
     to top,
     rgb(0 0 0 / var(--edge-blur-start-level)) 0 var(--edge-blur-fade-start),
@@ -750,13 +741,6 @@ main {
     rgb(0 0 0 / var(--edge-blur-tail-level)) var(--edge-blur-tail-stop),
     rgb(0 0 0 / var(--edge-blur-end-level)) var(--edge-blur-fade-end)
   );
-}
-
-.stickyRankingsRail > .RankingsRailTransition > .Jump,
-.JumpControlsVisibility:has(.Jump[data-direction="down"])
-  > .RankingsRailTransition
-  > .Jump {
-  z-index: 1;
 }
 
 .stickyRankingsRail .findBar--rail {

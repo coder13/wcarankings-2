@@ -144,6 +144,7 @@ test("renders the rankings shell with extracted components", () => {
       listName: "Pacific Northwest cubers",
     },
   });
+  assert.match(markup, /class="ViewportEdgeGradients"/);
   assert.match(markup, /WCA Lists/);
   assert.match(markup, /Avery Chen/);
   assert.doesNotMatch(markup, /sub-rank/);

@@ -218,7 +218,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({
     );
   }
   return (
-    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType} animateLayout>
+    <RankingsRail className={`Jump--rankings${showResultType ? "" : " Jump--withoutResultType"}${hemisphere ? " Jump--withHemisphere" : ""}${listAddAction ? " Jump--withListAdd" : ""}`} direction="up" compactResultType={compactResultType}>
       <div className="Jump-railSettings">
         {primaryControl}
         {showResultType && <div className="Jump-resultTypeControl">
