@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useCallback, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { forwardRef, useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { MotionConfig, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { TextDropdown, type TextDropdownOption } from "../Dropdown/TextDropdown";
@@ -248,6 +248,8 @@ export type RankingsPagerNavigation = {
   total: number;
   onJumpUp: () => void;
   onJumpDown: () => void;
+  onJumpToTop?: () => void;
+  onJumpToEnd?: () => void;
   onFocusMe?: (wcaId: string) => void;
 };
 
@@ -271,6 +273,8 @@ export function RankingsPagerRail({
     total,
     onJumpUp,
     onJumpDown,
+    onJumpToTop,
+    onJumpToEnd,
     onFocusMe,
   } = navigation;
   const {
@@ -288,18 +292,39 @@ export function RankingsPagerRail({
         ? t("rankingsRail.pager.jumpToEnd")
         : t("rankingsRail.pager.jumpDown", { distance: formatRankingNumber(5000) }),
   };
-  const [wasBusy, setWasBusy] = useState(busy);
-  const [busyLabels, setBusyLabels] = useState(currentLabels);
-  if (busy !== wasBusy) {
-    setWasBusy(busy);
-    if (busy) setBusyLabels(currentLabels);
-  }
-  const labels = busy ? busyLabels : currentLabels;
+  const [pendingDirection, setPendingDirection] = useState<-1 | 1 | null>(null);
+  useEffect(() => {
+    if (!busy) setPendingDirection(null);
+  }, [busy]);
+  const labels = busy && pendingDirection
+    ? {
+      ...currentLabels,
+      [pendingDirection === -1 ? "up" : "down"]: pendingDirection === -1
+        ? t("rankingsRail.pager.jumpToTop")
+        : t("rankingsRail.pager.jumpToEnd"),
+    }
+    : currentLabels;
+  const jumpUp = () => {
+    if (busy) {
+      onJumpToTop?.();
+      return;
+    }
+    setPendingDirection(-1);
+    onJumpUp();
+  };
+  const jumpDown = () => {
+    if (busy) {
+      onJumpToEnd?.();
+      return;
+    }
+    setPendingDirection(1);
+    onJumpDown();
+  };
   return <RankingsRail className="Jump--pager" direction="down" searchNavigation={searchActive}>
     <div className="Jump-pagerActions" aria-hidden={searchActive}>
-      <button className="Jump-pagerButton" onClick={onJumpUp} type="button" disabled={searchActive || busy}><span>{labels.up}</span><ArrowUpIcon /></button>
+      <button className="Jump-pagerButton" onClick={jumpUp} type="button" disabled={searchActive}><span>{labels.up}</span><ArrowUpIcon /></button>
       {wcaId && onFocusMe && <button className="Jump-pagerButton Jump-pagerButton--me" onClick={() => onFocusMe(wcaId)} type="button" disabled={searchActive || busy} aria-label={t("rankingsRail.pager.jumpToMyRanking")}><span>{t("rankingsRail.pager.myRank")}</span></button>}
-      <button className="Jump-pagerButton" onClick={onJumpDown} type="button" disabled={searchActive || busy}><ArrowDownIcon /><span>{labels.down}</span></button>
+      <button className="Jump-pagerButton" onClick={jumpDown} type="button" disabled={searchActive}><ArrowDownIcon /><span>{labels.down}</span></button>
     </div>
     <div className="Jump-searchNavigation" aria-hidden={!searchActive}><div className="Jump-searchNavigationContent">
       <button className="Jump-searchNavigationButton" onClick={onSearchPrevious} type="button" disabled={!searchActive}><ArrowUpIcon /><span>{t("rankingsRail.pager.previousPerson")}</span></button>

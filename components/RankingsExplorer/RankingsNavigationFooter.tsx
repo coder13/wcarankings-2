@@ -57,6 +57,8 @@ export function RankingsNavigationFooter({ visibleRank }: { visibleRank: number 
           total: data.window.state.total,
           onJumpUp: navigation.jumpUp,
           onJumpDown: navigation.jumpDown,
+          onJumpToTop: () => navigation.resetToRank(1),
+          onJumpToEnd: navigation.jumpToEnd,
           onFocusMe: filters.subject === "people" && options.showMyRank
             ? navigation.focusMyRanking
             : undefined,

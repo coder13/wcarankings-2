@@ -21,9 +21,9 @@ test("describes an end-bound pager jump", () => {
   assert.match(markup, />Jump to end</);
 });
 
-test("disables pager actions while a jump is settling", () => {
+test("keeps directional pager actions interactive while a jump is settling", () => {
   const markup = renderWithProviders(<RankingsPagerRail navigation={{ busy: true, currentPosition: 5_001, total: 10_000, onJumpUp: () => undefined, onJumpDown: () => undefined }} search={{ active: false, onPrevious: () => undefined, onNext: () => undefined }} />);
-  assert.match(markup, /disabled=""/);
+  assert.doesNotMatch(markup, /Jump-pagerButton"[^>]*disabled=""/);
 });
 
 test("renders the ranking settings and search in one rail", () => {
