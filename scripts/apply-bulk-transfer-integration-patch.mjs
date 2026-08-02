@@ -10,8 +10,8 @@ if (!content.includes("      - name: Exercise bulk projection table transfer\n")
           transfer_root=$(mktemp -d)
           cleanup_transfer() {
             docker compose exec -T db mariadb \\
-              --user=root --password="$MYSQL_ROOT_PASSWORD" \\
-              --execute="DROP TABLE IF EXISTS \\`$MYSQL_DATABASE\\`.bulk_transfer_alpha, \\`$MYSQL_DATABASE\\`.bulk_transfer_beta;" \\
+              --user=root --password="$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" \\
+              --execute="DROP TABLE IF EXISTS bulk_transfer_alpha, bulk_transfer_beta;" \\
               >/dev/null 2>&1 || true
             rm -rf "$transfer_root"
           }
