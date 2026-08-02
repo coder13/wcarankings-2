@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
   schedule:
-    # 8:30 PM PDT / 7:30 PM PST: the Pacific low-traffic window year-round.
-    - cron: "30 3 * * *"
+    # Leave a 30-minute buffer after WCA's midnight UTC public export.
+    - cron: "30 0 * * *"
   workflow_dispatch:
     inputs:
       dry_run:

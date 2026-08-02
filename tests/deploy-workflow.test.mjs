@@ -309,7 +309,7 @@ printf 'result baseline=%s delta=%s ceiling=%s\\n' "$DATABASE_CPU_BASELINE" "$DA
 test("server and projection releases have independent triggers and queues", () => {
   assert.match(serverRelease, /push:[\s\S]*branches: \[main\]/);
   assert.match(projectionRelease, /push:[\s\S]*schedule:[\s\S]*workflow_dispatch:/);
-  assert.match(projectionRelease, /cron: "30 3 \* \* \*"/);
+  assert.match(projectionRelease, /cron: "30 0 \* \* \*"/);
   assert.match(serverRelease, /production-server-release/);
   assert.match(projectionRelease, /production-projection-release/);
   assert.match(serverRelease, /cancel-in-progress: false/);
