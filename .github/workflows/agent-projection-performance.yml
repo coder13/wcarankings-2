@@ -31,14 +31,15 @@ jobs:
         run: |
           node scripts/apply-projection-correctness-patches.mjs
           node scripts/apply-projection-correctness-test-patches.mjs
+      - name: Prepare one shared WCA export cache
+        run: node scripts/apply-shared-export-cache-patch.mjs
       - name: Apply direct GHCR deployment patch
         run: |
-          if grep -q 'Stage exact generation directly from GHCR' .github/workflows/deploy-projections.yml; then
-            exit 0
+          if ! grep -q 'Stage exact generation directly from GHCR' .github/workflows/deploy-projections.yml; then
+            sed -i '1i const prefix = "${prefix}"; const required_db_kib = "${required_db_kib}"; const available_db_kib = "${available_db_kib}"; const required_tmp_kib = "${required_tmp_kib}"; const available_tmp_kib = "${available_tmp_kib}"; const SERVER_IP = "${SERVER_IP}"; const SERVER_USER = "${SERVER_USER}"; const ARTIFACT_ID = "${ARTIFACT_ID}";' scripts/apply-direct-ghcr-deploy-patch.mjs
+            node scripts/apply-direct-ghcr-deploy-patch.mjs
           fi
-          sed -i '1i const prefix = "${prefix}"; const required_db_kib = "${required_db_kib}"; const available_db_kib = "${available_db_kib}"; const required_tmp_kib = "${required_tmp_kib}"; const available_tmp_kib = "${available_tmp_kib}"; const SERVER_IP = "${SERVER_IP}"; const SERVER_USER = "${SERVER_USER}"; const ARTIFACT_ID = "${ARTIFACT_ID}";' scripts/apply-direct-ghcr-deploy-patch.mjs
-          grep -o '\${[A-Za-z_][A-Za-z0-9_]*}' scripts/apply-direct-ghcr-deploy-patch.mjs | sort -u
-          node scripts/apply-direct-ghcr-deploy-patch.mjs
+          node scripts/apply-direct-ghcr-deploy-test-patches.mjs
       - run: pnpm install --frozen-lockfile
       - run: node --check scripts/*.mjs
       - run: node --test tests/projection-release-artifact.test.mjs tests/projection-architecture.test.mjs tests/projection-transfer.test.mjs tests/deploy-workflow.test.mjs
