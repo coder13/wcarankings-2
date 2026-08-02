@@ -1,15 +1,16 @@
 name: Agent Projection Performance
 
 on:
-  push:
-    branches: [agent/projection-pipeline-performance]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: github.event.head_commit.message == 'Run projection performance patcher'
+    if: github.head_ref == 'agent/projection-pipeline-performance'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
