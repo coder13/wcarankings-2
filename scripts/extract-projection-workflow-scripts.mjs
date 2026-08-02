@@ -16,11 +16,64 @@ function extractRunStep(workflow, name) {
     .trimEnd();
 }
 
+function secureRegistryTransfer(stage) {
+  const insecureInvocation = `ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \\
+  "GHCR_TOKEN='$GHCR_TOKEN' \\
+   GHCR_ACTOR='$GHCR_ACTOR' \\
+   ARTIFACT_ID='$ARTIFACT_ID'`;
+  const secureInvocation = `local_auth_directory=$(mktemp -d)
+cleanup_local_auth() {
+  docker --config "$local_auth_directory" logout ghcr.io >/dev/null 2>&1 || true
+  rm -rf "$local_auth_directory"
+}
+trap cleanup_local_auth EXIT
+printf '%s' "$GHCR_TOKEN" \\
+  | docker --config "$local_auth_directory" login ghcr.io \\
+      --username "$GHCR_ACTOR" --password-stdin >/dev/null
+scp -q -o BatchMode=yes "$local_auth_directory/config.json" \\
+  "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json"
+ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \\
+  "ARTIFACT_ID='$ARTIFACT_ID'`;
+  if (!stage.includes(insecureInvocation)) {
+    throw new Error("Could not locate GHCR token-bearing SSH invocation");
+  }
+  let secured = stage.replace(insecureInvocation, secureInvocation);
+  const remoteLogin = `auth_directory=$(mktemp -d)
+stage_directory=$(mktemp -d)
+cleanup_stage() {
+  docker --config "$auth_directory" logout ghcr.io >/dev/null 2>&1 || true
+  rm -rf "$auth_directory" "$stage_directory"
+}
+trap cleanup_stage EXIT TERM INT HUP
+
+printf '%s' "$GHCR_TOKEN" \\
+  | docker --config "$auth_directory" login ghcr.io \\
+      --username "$GHCR_ACTOR" --password-stdin >/dev/null`;
+  const remoteConfig = `auth_directory=$(mktemp -d)
+stage_directory=$(mktemp -d)
+cleanup_stage() {
+  docker --config "$auth_directory" logout ghcr.io >/dev/null 2>&1 || true
+  rm -rf "$auth_directory" "$stage_directory"
+}
+trap cleanup_stage EXIT TERM INT HUP
+install -m 600 "/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json" \\
+  "$auth_directory/config.json"
+rm -f "/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json"`;
+  if (!secured.includes(remoteLogin)) {
+    throw new Error("Could not locate remote GHCR login block");
+  }
+  secured = secured.replace(remoteLogin, remoteConfig);
+  secured += `\ncleanup_local_auth\ntrap - EXIT`;
+  return secured;
+}
+
 const deployWorkflowPath = ".github/workflows/deploy-projections.yml";
 const deployWorkflow = await readFile(deployWorkflowPath, "utf8");
 const validate = extractRunStep(deployWorkflow, "Validate immutable release coordinates");
 const verify = extractRunStep(deployWorkflow, "Verify projection release integrity and compatibility");
-const stage = extractRunStep(deployWorkflow, "Stage exact generation directly from GHCR");
+const stage = secureRegistryTransfer(
+  extractRunStep(deployWorkflow, "Stage exact generation directly from GHCR"),
+);
 const activate = extractRunStep(deployWorkflow, "Prepare and atomically activate ranking generation");
 const refreshSystem = extractRunStep(deployWorkflow, "Refresh database-backed system lists");
 const refreshBoard = extractRunStep(deployWorkflow, "Refresh WCA Board list");
