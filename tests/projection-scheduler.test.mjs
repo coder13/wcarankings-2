@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -10,6 +11,7 @@ import {
   projectionBuildPlan,
   projectionConcurrency,
   projectionNamesForRefresh,
+  renameCompatibilitySql,
   runDependencyAwareTasks,
 } from "../scripts/mysql-schema.mjs";
 
@@ -243,4 +245,21 @@ test("compatibility source views wait for result facts", async () => {
     "start:compatibility-ranking-entries-single-source",
     "finish:compatibility-ranking-entries-single-source",
   ]);
+});
+
+test("compatibility SQL uses the matching staged result facts table", async () => {
+  const source = await readFile(new URL("../sql/ranking-projections/ranking_entries_single_source.sql", import.meta.url), "utf8");
+  const sql = renameCompatibilitySql(source, {
+    bestSingle: "wca_best_single_staging",
+    bestAverage: "wca_best_average_staging",
+    entriesSources: {
+      single: "ranking_entries_single_source_staging",
+      average: "ranking_entries_average_source_staging",
+    },
+    resultEntriesSource: "result_entries_single_source_staging",
+    resultFacts: "result_facts_staging",
+  });
+
+  assert.match(sql, /FROM result_facts_staging r/);
+  assert.doesNotMatch(sql, /FROM result_facts r/);
 });
