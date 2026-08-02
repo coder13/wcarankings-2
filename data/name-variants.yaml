@@ -1,0 +1,113 @@
+# Explicit name groups for name-based rankings and lists.
+#
+# Keep this file curated: do not infer new variants from spelling similarity.
+# `canonical` is the display label; every listed `variants` value is matched to
+# that label. A variant must appear in only one group within its population.
+version: 1
+
+groups:
+  male:
+    - canonical: Lucas
+      variants: [Lucas, Luke, Luca, Lukas, Luka, Łukasz]
+    - canonical: Alexander
+      variants: [Alexander, Alex, Alexandre, Aleksander, Aleksandr, Xander]
+    - canonical: Daniel
+      variants: [Daniel, Dan, Danny]
+    - canonical: Andrew
+      variants: [Andrew, Andre, Andres, Andreas, Andrei, Andrey, Andrii]
+    - canonical: David
+      variants: [David, Davi, Dawid]
+    - canonical: Muhammad
+      variants: [Muhammad, Mohammad, Mohamed, Mohammed, Muhammed]
+    - canonical: Jacob
+      variants: [Jacob, Jake, Jakub, Jakob]
+    - canonical: Samuel
+      variants: [Samuel, Sam]
+    - canonical: Max
+      variants: [Max, Maxim, Maxwell, Maxime, Maximilian, Maximiliano, Maksim, Maksym, Maksymilian]
+    - canonical: Thomas
+      variants: [Thomas, Tom, Tomás, Tomasz, Tommy]
+    - canonical: Benjamin
+      variants: [Benjamin, Ben]
+    - canonical: Michael
+      variants: [Michael, Mike, Michał, Mikhail]
+    - canonical: Nicolas
+      variants: [Nicolas, Nicholas, Nick, Nico]
+    - canonical: Joshua
+      variants: [Joshua, Josh]
+    - canonical: William
+      variants: [William, Will]
+    - canonical: Leo
+      variants: [Leo, Leon, Leonardo]
+    - canonical: Nathan
+      variants: [Nathan, Nathaniel, Nate]
+    - canonical: Luis
+      variants: [Luis, Luiz, Louis]
+    - canonical: James
+      variants: [James, Jamie, Jaime]
+    - canonical: Matthew
+      variants: [Matthew, Matt]
+    - canonical: Joseph
+      variants: [Joseph, Joe, Joey]
+    - canonical: Eric
+      variants: [Eric, Erik, Erick]
+    - canonical: Christian
+      variants: [Christian, Cristian]
+    - canonical: Mark
+      variants: [Mark, Marc, Markus, Marko]
+    - canonical: Victor
+      variants: [Victor, Viktor, Vitor]
+    - canonical: Aiden
+      variants: [Aiden, Aidan]
+    - canonical: George
+      variants: [George, Jorge]
+    - canonical: Christopher
+      variants: [Christopher, Chris]
+    - canonical: Charles
+      variants: [Charles, Charlie]
+    - canonical: Rafael
+      variants: [Rafael, Raphael]
+    - canonical: Stephen
+      variants: [Stephen, Steven, Stefan, Stepan]
+
+  female_or_other:
+    - canonical: Ana
+      variants: [Ana, Anna, Anne]
+    - canonical: Maria
+      variants: [Maria, Marie, Mary]
+    - canonical: Sofia
+      variants: [Sofia, Sophia, Sophie, Sofya]
+    - canonical: Sara
+      variants: [Sara, Sarah]
+    - canonical: Isabella
+      variants: [Isabella, Isabel, Isabelle, Isabela]
+    - canonical: Julia
+      variants: [Julia, Giulia, Julie, Juliette]
+    - canonical: Emma
+      variants: [Emma, Ema]
+    - canonical: Hannah
+      variants: [Hannah, Hanna, Hana]
+    - canonical: Emily
+      variants: [Emily, Emilie]
+    - canonical: Lucia
+      variants: [Lucia, Lucie, Luciana, Lucy]
+    - canonical: Alexandra
+      variants: [Alexandra, Aleksandra, Alexa, Alexia]
+    - canonical: Katie
+      variants: [Katie, Kate, Kaitlyn, Caitlin]
+    - canonical: Elizabeth
+      variants: [Elizabeth, Elisabeth, Elizaveta]
+    - canonical: Natalia
+      variants: [Natalia, Natalie]
+    - canonical: Victoria
+      variants: [Victoria, Viktoria, Vitoria]
+    - canonical: Anastasia
+      variants: [Anastasia, Anastasiia, Anastasiya]
+    - canonical: Clara
+      variants: [Clara, Klara]
+    - canonical: Gabriela
+      variants: [Gabriela, Gabriella, Gabrielle]
+    - canonical: Angela
+      variants: [Angela, Angelica, Angelina]
+    - canonical: Rebecca
+      variants: [Rebecca, Rebeca, Rebekah]
