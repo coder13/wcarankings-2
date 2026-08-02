@@ -4,6 +4,10 @@ import { AppHeader } from "../AppHeader/AppHeader";
 import { TextDropdown } from "../Dropdown/TextDropdown";
 import { useProjectionFeatureSwitch } from "../ProjectionFeatureSwitchProvider";
 import {
+  ShareButton,
+  shouldShowListShare,
+} from "../ShareButton/ShareButton";
+import {
   CITY_RANKING_OPTIONS,
   COMPETITION_RANKING_OPTIONS,
 } from "./helpers/rankingModes";
@@ -20,6 +24,7 @@ export function RankingsExplorerHeader() {
     config: { source, options: { showSubjectSwitch } },
     filters,
     filterActions: actions,
+    search,
   } = useRankingsExplorer();
   const featureSwitch = useProjectionFeatureSwitch();
   const {
@@ -86,10 +91,18 @@ export function RankingsExplorerHeader() {
     );
   }
 
+  const showShare = shouldShowListShare({
+    hasList: Boolean(source),
+    searchOpen: search.state.open,
+    searchQuery: search.state.query,
+    regexSearch: search.state.regexSearch,
+  });
+
   return (
     <AppHeader
       subject={headerSubject}
       onSubjectChange={changeHeaderSubject}
+      actions={showShare && source ? <ShareButton title={source.listName} /> : undefined}
     >
       {source
         ? <span className="listRankingName">{source.listName}</span>
