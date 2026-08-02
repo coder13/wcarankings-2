@@ -12,6 +12,7 @@ import {
 } from "./helpers/navigation";
 import { orderSearchMatches } from "./helpers/search";
 import { shouldFallbackToFirstPage } from "./useRankingPageLoader";
+import { getTopRailScrollProgress } from "./useRailScrollProgress";
 import { competitionRankingPath } from "./useRankingFilterActions";
 import type { RankingsFilterState } from "./rankingsUrl";
 import { serializeRankingsUrl, type RankingsUrlState } from "./rankingsUrl";
@@ -29,6 +30,11 @@ const rankingEntry: RankingEntry = {
   competitionName: "Storybook Open 2026",
   recordBadges: ["NR"],
 };
+
+test("clamps top rail progress during elastic overscroll", () => {
+  assert.equal(getTopRailScrollProgress(-80, 100), 0);
+  assert.equal(getTopRailScrollProgress(200, 100), 1);
+});
 
 function pathnameForFilters(filters: RankingsFilterState) {
   if (filters.subject === "results") return "/results";

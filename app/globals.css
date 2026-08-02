@@ -277,10 +277,11 @@
   }
 }
 .stickyRankingsRail {
-  --rail-lift-progress: clamp(0, calc(var(--rail-scroll-progress, 0) * 2), 1);
+  --rail-scroll-progress-clamped: clamp(0, var(--rail-scroll-progress, 0), 1);
+  --rail-lift-progress: clamp(0, calc(var(--rail-scroll-progress-clamped) * 2), 1);
   --rail-shrink-progress: clamp(
     0,
-    calc((var(--rail-scroll-progress, 0) - 0.5) * 2),
+    calc((var(--rail-scroll-progress-clamped) - 0.5) * 2),
     1
   );
   --list-owner-control-height: calc(
@@ -321,11 +322,6 @@
 }
 
 @media (max-width: 600px) {
-  .stickyRankingsRail {
-    --list-owner-control-height: calc(
-      48px - (4px * var(--rail-scroll-progress, 0))
-    );
-  }
   .stickyRankingsRail > .listOwnerControls {
     right: 0.35rem;
   }

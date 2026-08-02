@@ -14,8 +14,9 @@
 .Jump svg { width: 22px; height: 22px; }
 
 .Jump--rankings {
-  --rail-lift-progress: clamp(0, calc(var(--rail-scroll-progress, 0) * 2), 1);
-  --rail-shrink-progress: clamp(0, calc((var(--rail-scroll-progress, 0) - 0.5) * 2), 1);
+  --rail-scroll-progress-clamped: clamp(0, var(--rail-scroll-progress, 0), 1);
+  --rail-lift-progress: clamp(0, calc(var(--rail-scroll-progress-clamped) * 2), 1);
+  --rail-shrink-progress: clamp(0, calc((var(--rail-scroll-progress-clamped) - 0.5) * 2), 1);
   --rail-control-height: calc(52px - (12px * var(--rail-shrink-progress)));
   --rail-icon-slot-width: 44px;
   --rail-event-width: calc(44px + ((9em - 44px) * (1 - var(--rail-shrink-progress))));
