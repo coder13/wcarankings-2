@@ -1,4 +1,4 @@
-import { prefersReducedMotion } from "@/lib/motion-preferences";
+import { prefersReducedMotion } from "../../lib/motion-preferences.ts";
 
 export const SCROLL_SETTLE_DELAY_MS = 100;
 export const DEFAULT_ROW_HEIGHT = 65.45;
