@@ -110,6 +110,7 @@ export default async function ListPage({
                 listId: list.publicId,
                 visibility: list.visibility,
                 joinPolicy: list.joinPolicy,
+                memberCount: list.memberCount,
               }
             : undefined,
           membership: list.kind === "user" &&

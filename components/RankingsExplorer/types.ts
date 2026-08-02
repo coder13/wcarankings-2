@@ -89,6 +89,7 @@ export type RankingsListConfig = {
     listId: string;
     visibility: "public" | "private";
     joinPolicy: "open" | "closed";
+    memberCount: number;
   };
   membership?: {
     listId: string;

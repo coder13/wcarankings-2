@@ -2,7 +2,7 @@
 
 import { RankingRow } from "../RankingRow/RankingRow";
 import { rankingEntryKey, type RankingEntry } from "../RankingsExplorer/types";
-import type { Key, Ref } from "react";
+import type { Key, ReactNode, Ref } from "react";
 import { usePersonRowDetails } from "./usePersonRowDetails";
 
 type RenderedTableRow = {
@@ -18,6 +18,7 @@ export type ResultsTableData = {
   rankingType: "single" | "average";
   hideIdentityIds?: boolean;
   hasMore: boolean;
+  emptyState?: ReactNode;
 };
 
 export type ResultsTableVirtualization = {
@@ -70,6 +71,7 @@ export function ResultsTable({
     rankingType,
     hideIdentityIds = false,
     hasMore,
+    emptyState,
   } = data;
   const {
     listRef,
@@ -171,7 +173,7 @@ export function ResultsTable({
             </div>
           );
         } else {
-          content = <div className="listMessage">That’s all, folks</div>;
+          content = emptyState ?? <div className="listMessage">That’s all, folks</div>;
         }
 
         return (
