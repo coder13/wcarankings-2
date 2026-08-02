@@ -1,0 +1,34 @@
+name: Agent Projection Performance
+
+on:
+  push:
+    branches: [agent/projection-pipeline-performance]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'Run projection performance patcher'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/projection-pipeline-performance
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: node scripts/apply-projection-performance-patches.mjs
+      - run: pnpm install --frozen-lockfile
+      - run: node --check scripts/*.mjs
+      - run: node --test tests/projection-release-artifact.test.mjs tests/projection-architecture.test.mjs tests/projection-transfer.test.mjs tests/deploy-workflow.test.mjs
+      - name: Commit validated changes
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Implement projection pipeline performance improvements [skip ci]'
+          git push origin HEAD:agent/projection-pipeline-performance
