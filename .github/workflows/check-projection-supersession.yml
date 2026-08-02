@@ -1,0 +1,108 @@
+name: Check Projection Supersession
+
+on:
+  workflow_call:
+    inputs:
+      groups:
+        required: true
+        type: string
+      export_value:
+        required: true
+        type: string
+      production_export_value:
+        required: true
+        type: string
+      fingerprints:
+        required: true
+        type: string
+    outputs:
+      safe:
+        value: ${{ jobs.check.outputs.safe }}
+      required:
+        value: ${{ jobs.check.outputs.required }}
+      production_export_value:
+        value: ${{ jobs.check.outputs.production_export_value }}
+    secrets:
+      SERVER_IP:
+        required: true
+      DEPLOY_SSH_KEY:
+        required: true
+      DEPLOY_KNOWN_HOSTS:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      safe: ${{ steps.check.outputs.safe }}
+      required: ${{ steps.check.outputs.required }}
+      production_export_value: ${{ steps.production.outputs.export_value }}
+    env:
+      SERVER_IP: ${{ secrets.SERVER_IP }}
+      SERVER_USER: www
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Configure read-only production access
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Read current production generation
+        id: production
+        run: |
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+            'cd /srv/wcarankings && docker compose run --rm -T data-tools \
+              /app/scripts/activate-ranking-generation.mjs state' \
+            > /tmp/production-projection-state.json
+          jq -e 'type == "object"' /tmp/production-projection-state.json >/dev/null
+          export_value=$(jq -r '.exportId // empty' /tmp/production-projection-state.json)
+          test -n "$export_value"
+          echo "export_value=$export_value" >> "$GITHUB_OUTPUT"
+
+      - name: Compare current metadata with built release
+        id: check
+        env:
+          GROUPS: ${{ inputs.groups }}
+          EXPECTED_EXPORT: ${{ inputs.export_value }}
+          EXPECTED_PRODUCTION_EXPORT: ${{ inputs.production_export_value }}
+          EXPECTED_FINGERPRINTS: ${{ inputs.fingerprints }}
+          CURRENT_PRODUCTION_EXPORT: ${{ steps.production.outputs.export_value }}
+        run: |
+          set -euo pipefail
+          node scripts/resolve-wca-export.mjs > /tmp/wca-export.json
+          latest_export=$(jq -r '.exportDate' /tmp/wca-export.json)
+          node scripts/projection-release-plan.mjs \
+            "--export-id=$latest_export" \
+            "--production-export-id=$CURRENT_PRODUCTION_EXPORT" \
+            --state-file=/tmp/production-projection-state.json \
+            "--groups=$GROUPS" > /tmp/current-plan.json
+          current_fingerprints=$(jq -cS '.groups' /tmp/current-plan.json)
+          expected_fingerprints=$(jq -cS . <<<"$EXPECTED_FINGERPRINTS")
+          required=$(jq -r '.required' /tmp/current-plan.json)
+          safe=true
+          if [ "$latest_export" != "$EXPECTED_EXPORT" ]; then safe=false; fi
+          if [ "$current_fingerprints" != "$expected_fingerprints" ]; then safe=false; fi
+          if [ "$CURRENT_PRODUCTION_EXPORT" != "$EXPECTED_PRODUCTION_EXPORT" ] && [ "$required" = true ]; then
+            safe=false
+          fi
+          echo "safe=$safe" >> "$GITHUB_OUTPUT"
+          echo "required=$required" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Projection supersession"
+            echo "- Safe to activate: $safe"
+            echo "- Activation still required: $required"
+            echo "- Latest WCA export: $latest_export"
+            echo "- Current production export: $CURRENT_PRODUCTION_EXPORT"
+          } >> "$GITHUB_STEP_SUMMARY"
