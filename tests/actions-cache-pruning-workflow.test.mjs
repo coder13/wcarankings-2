@@ -18,4 +18,6 @@ test("prunes Actions caches on closed pull requests and on a weekly schedule", a
   assert.match(workflow, /TARGET_BYTES: "7500000000"/);
   assert.match(workflow, /gh cache delete/);
   assert.match(workflow, /--sort last_accessed_at --order asc/);
+  assert.match(workflow, /read -r cache_id cache_key <<< "\$oldest"/);
+  assert.doesNotMatch(workflow, /\n\$oldest\nEOF\n/);
 });

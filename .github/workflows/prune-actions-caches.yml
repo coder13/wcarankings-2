@@ -65,9 +65,7 @@ jobs:
           while [ "$total_bytes" -gt "$TARGET_BYTES" ]; do
             oldest=$(jq -r '.[0] | [.id, .key] | @tsv' "$caches_file")
             [ -n "$oldest" ] || break
-            IFS=$'\t' read -r cache_id cache_key <<EOF
-$oldest
-EOF
+            IFS=$'\t' read -r cache_id cache_key <<< "$oldest"
             delete_cache "$cache_id" "$cache_key"
             refresh_caches
             total_bytes=$(jq '[.[].sizeInBytes] | add // 0' "$caches_file")
