@@ -5,7 +5,7 @@ import { featureSwitchFromTables } from "../lib/projection-feature-switch";
 test("derives the bootstrap capability snapshot from verified active tables", () => {
   const featureSwitch = featureSwitchFromTables([
     "ranking_entries_single", "ranking_entries_average", "ranking_counts", "result_entries_single", "result_counts",
-    "result_rankings_single", "result_rankings_average", "result_ranking_counts",
+    "result_rankings_single", "result_rankings_average", "result_gender_rankings_single", "result_gender_rankings_average", "result_ranking_counts", "result_gender_ranking_counts",
     "competition_podium_members", "competition_event_stats", "competition_stats",
     "city_event_stats", "entity_ranking_counts", "person_sum_of_ranks_scores",
     "person_year_ranking_cohorts", "person_year_rankings_single",

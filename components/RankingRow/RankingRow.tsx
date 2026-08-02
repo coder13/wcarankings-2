@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RANKING_ENTRY_ENHANCEMENTS_ENABLED } from "@/lib/ranking-entry-enhancements";
 import { formatWcaResult, flagEmoji, RECORD_BADGE_LABELS } from "@/lib/wca";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { formatRankingNumber, type RankingEntry } from "../RankingsExplorer/types";
@@ -94,22 +95,30 @@ export function RankingRow({
   const id = entry.personId;
   const countryName = entry.countryName || "Country unavailable";
   const recordBadge = entry.recordBadges[0];
-  const recordStreakWeeks = entry.recordStreakWeeks && entry.recordStreakWeeks > 0
+  const recordStreakWeeks = RANKING_ENTRY_ENHANCEMENTS_ENABLED && entry.recordStreakWeeks && entry.recordStreakWeeks > 0
     ? entry.recordStreakWeeks
     : null;
   const recordBadgeLabel = recordBadge
     ? `${RECORD_BADGE_LABELS[recordBadge]}${recordStreakWeeks ? `, unbeaten for ${recordStreakWeeks} competition weeks` : ""}`
     : null;
-  const rankDeltaLabel = entry.rankDeltaState === "new"
-    ? "new ranking"
-    : entry.rankDelta && entry.rankDelta > 0
-      ? `up ${Math.abs(entry.rankDelta)} places`
-      : entry.rankDelta && entry.rankDelta < 0
-        ? `down ${Math.abs(entry.rankDelta)} places`
-        : null;
-  const rankDeltaIcon = entry.rankDeltaState === "new"
-    ? "New"
-    : entry.rankDelta && entry.rankDelta > 0 ? "↑" : entry.rankDelta && entry.rankDelta < 0 ? "↓" : null;
+  let rankDeltaLabel: string | null = null;
+  let rankDeltaIcon: string | null = null;
+  let rankDeltaClass = "";
+  if (RANKING_ENTRY_ENHANCEMENTS_ENABLED) {
+    if (entry.rankDeltaState === "new") {
+      rankDeltaLabel = "new ranking";
+      rankDeltaIcon = "New";
+      rankDeltaClass = "new";
+    } else if (entry.rankDelta && entry.rankDelta > 0) {
+      rankDeltaLabel = `up ${Math.abs(entry.rankDelta)} places`;
+      rankDeltaIcon = "↑";
+      rankDeltaClass = "up";
+    } else if (entry.rankDelta && entry.rankDelta < 0) {
+      rankDeltaLabel = `down ${Math.abs(entry.rankDelta)} places`;
+      rankDeltaIcon = "↓";
+      rankDeltaClass = "down";
+    }
+  }
   const formattedResult = entry.formattedValue ??
     formatWcaResult(eventId, entry.best, rankingType);
   const inferredProfileHref = /^\d{4}[A-Z]{4}\d{2}$/.test(id) ? `/person/${id}` : "";
@@ -208,7 +217,7 @@ export function RankingRow({
           <span className={`rank${rankIsDuplicate ? " rank--duplicate" : ""}`}>
             {formatRankingNumber(rank)}
             {rankDeltaIcon && rankDeltaLabel && (
-              <span className={`rankDelta rankDelta--${entry.rankDeltaState === "new" ? "new" : entry.rankDelta! > 0 ? "up" : "down"}`} aria-label={rankDeltaLabel} title={rankDeltaLabel}>
+              <span className={`rankDelta rankDelta--${rankDeltaClass}`} aria-label={rankDeltaLabel} title={rankDeltaLabel}>
                 <span aria-hidden="true">{rankDeltaIcon}</span>{entry.rankDeltaState === "new" ? null : Math.abs(entry.rankDelta ?? 0)}
               </span>
             )}

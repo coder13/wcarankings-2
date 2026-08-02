@@ -44,39 +44,39 @@ test("renders a result row without exposing internal ordering", () => {
   assert.doesNotMatch(markup, /sub-rank/);
 });
 
-test("renders an accessible upward rank delta", () => {
+test("does not render disabled rank delta UI from a stale response", () => {
   const markup = renderToStaticMarkup(
     <RankingRow
       entry={{ ...entry, rankDelta: 12, rankDeltaState: "changed" }}
       display={{ eventId: "333", rankingType: "single", animationIndex: 0 }}
     />,
   );
-  assert.match(markup, /aria-label="up 12 places"/);
-  assert.match(markup, />↑<\/span>12/);
-  assert.match(markup, /, up 12 places"/);
+  assert.doesNotMatch(markup, /aria-label="up 12 places"/);
+  assert.doesNotMatch(markup, />↑<\/span>12/);
+  assert.doesNotMatch(markup, /, up 12 places"/);
 });
 
-test("renders a first-ranking state without inventing a delta", () => {
+test("does not render disabled first-ranking UI from a stale response", () => {
   const markup = renderToStaticMarkup(
     <RankingRow
       entry={{ ...entry, rankDelta: null, rankDeltaState: "new" }}
       display={{ eventId: "333", rankingType: "single", animationIndex: 0 }}
     />,
   );
-  assert.match(markup, /aria-label="new ranking"/);
-  assert.match(markup, />New<\/span>/);
-  assert.match(markup, /, new ranking"/);
+  assert.doesNotMatch(markup, /aria-label="new ranking"/);
+  assert.doesNotMatch(markup, />New<\/span>/);
+  assert.doesNotMatch(markup, /, new ranking"/);
 });
 
-test("adds the record streak to the badge text and accessible label", () => {
+test("does not render disabled record streak UI from a stale response", () => {
   const markup = renderToStaticMarkup(
     <RankingRow
       entry={{ ...entry, recordBadges: ["WR"], recordStreakWeeks: 18 }}
       display={{ eventId: "333", rankingType: "single", animationIndex: 0 }}
     />,
   );
-  assert.match(markup, /WR · 18w/);
-  assert.match(markup, /World Record, unbeaten for 18 competition weeks/);
+  assert.doesNotMatch(markup, /WR · 18w/);
+  assert.doesNotMatch(markup, /unbeaten for 18 competition weeks/);
 });
 
 test("can hide an identity ID for competition ranking rows", () => {

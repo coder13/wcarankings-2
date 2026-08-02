@@ -91,46 +91,25 @@ WITH historical AS (
   LEFT JOIN countries country ON country.id = p.country_id
   LEFT JOIN wca_best_average best ON best.person_id = r.person_id AND best.event_id = r.event_id
   LEFT JOIN competitions comp ON comp.id = best.competition_id
-), deltas AS (
-  SELECT * FROM weekly_rank_deltas_average
-), streaks AS (
-  SELECT * FROM record_streaks_average
 )
 SELECT world_rows.event_id, world_rows.person_id, world_rows.person_name, world_rows.country_id, world_rows.country_name, world_rows.country_iso2,
   world_rows.continent_id, world_rows.best, world_rows.competition_id, world_rows.competition_name,
   world_rows.is_world_record, world_rows.is_continent_record, world_rows.is_country_record,
   world_rows.world_rank, world_rows.continent_rank, world_rows.country_rank,
-  world_sub_rank, continent_sub_rank, country_sub_rank,
-  deltas.world_rank_delta, deltas.world_rank_delta_state,
-  deltas.continent_rank_delta, deltas.continent_rank_delta_state,
-  deltas.country_rank_delta, deltas.country_rank_delta_state,
-  CASE WHEN world_rows.is_world_record = 1 THEN streaks.world_record_streak_weeks WHEN world_rows.is_continent_record = 1 THEN streaks.continent_record_streak_weeks WHEN world_rows.is_country_record = 1 THEN streaks.country_record_streak_weeks END AS record_streak_weeks
+  world_sub_rank, continent_sub_rank, country_sub_rank
 FROM world_rows
-LEFT JOIN deltas ON deltas.event_id = world_rows.event_id AND deltas.person_id = world_rows.person_id
-LEFT JOIN streaks ON streaks.event_id = world_rows.event_id AND streaks.person_id = world_rows.person_id
 UNION ALL
 SELECT country_rows.event_id, country_rows.person_id, country_rows.person_name, country_rows.country_id, country_rows.country_name, country_rows.country_iso2,
   country_rows.continent_id, country_rows.best, country_rows.competition_id, country_rows.competition_name,
   country_rows.is_world_record, country_rows.is_continent_record, country_rows.is_country_record,
   country_rows.world_rank, country_rows.continent_rank, country_rows.country_rank,
-  world_sub_rank, continent_sub_rank, country_sub_rank,
-  deltas.world_rank_delta, deltas.world_rank_delta_state,
-  deltas.continent_rank_delta, deltas.continent_rank_delta_state,
-  deltas.country_rank_delta, deltas.country_rank_delta_state,
-  CASE WHEN country_rows.is_world_record = 1 THEN streaks.world_record_streak_weeks WHEN country_rows.is_continent_record = 1 THEN streaks.continent_record_streak_weeks WHEN country_rows.is_country_record = 1 THEN streaks.country_record_streak_weeks END AS record_streak_weeks
+  world_sub_rank, continent_sub_rank, country_sub_rank
 FROM country_rows
-LEFT JOIN deltas ON deltas.event_id = country_rows.event_id AND deltas.person_id = country_rows.person_id
-LEFT JOIN streaks ON streaks.event_id = country_rows.event_id AND streaks.person_id = country_rows.person_id
 UNION ALL
 SELECT continent_rows.event_id, continent_rows.person_id, continent_rows.person_name, continent_rows.country_id, continent_rows.country_name, continent_rows.country_iso2,
   continent_rows.continent_id, continent_rows.best, continent_rows.competition_id, continent_rows.competition_name,
   continent_rows.is_world_record, continent_rows.is_continent_record, continent_rows.is_country_record,
   continent_rows.world_rank, continent_rows.continent_rank, continent_rows.country_rank,
-  world_sub_rank, continent_sub_rank, country_sub_rank,
-  deltas.world_rank_delta, deltas.world_rank_delta_state,
-  deltas.continent_rank_delta, deltas.continent_rank_delta_state,
-  deltas.country_rank_delta, deltas.country_rank_delta_state,
-  CASE WHEN continent_rows.is_world_record = 1 THEN streaks.world_record_streak_weeks WHEN continent_rows.is_continent_record = 1 THEN streaks.continent_record_streak_weeks WHEN continent_rows.is_country_record = 1 THEN streaks.country_record_streak_weeks END AS record_streak_weeks
+  world_sub_rank, continent_sub_rank, country_sub_rank
 FROM continent_rows
-LEFT JOIN deltas ON deltas.event_id = continent_rows.event_id AND deltas.person_id = continent_rows.person_id
-LEFT JOIN streaks ON streaks.event_id = continent_rows.event_id AND streaks.person_id = continent_rows.person_id;
+;

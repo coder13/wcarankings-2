@@ -102,8 +102,6 @@ test("bootstrap fails closed without complete, valid export metadata", async () 
   const tables = [
     "ranking_generation_state", "export_metadata",
     "ranking_entries_single", "ranking_entries_average", "ranking_counts",
-    "weekly_rank_deltas_single", "weekly_rank_deltas_average",
-    "record_streaks_single", "record_streaks_average",
     "result_entries_single", "result_counts",
   ];
   for (const exportRows of [
@@ -135,8 +133,6 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
   const tables = [
     "ranking_generation_state", "export_metadata",
     "ranking_entries_single", "ranking_entries_average", "ranking_counts",
-    "weekly_rank_deltas_single", "weekly_rank_deltas_average",
-    "record_streaks_single", "record_streaks_average",
     "result_entries_single", "result_counts",
     "competition_podium_members", "competition_event_stats", "competition_stats",
     "city_event_stats",

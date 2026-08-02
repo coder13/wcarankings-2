@@ -62,6 +62,32 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(fixture, /regional_single_record/);
 });
 
+test("publishes indexed gender result rankings instead of ranking filtered rows at request time", async () => {
+  const [single, average, counts, schema, groups, resultService] = await Promise.all([
+    readFile(new URL("sql/ranking-projections/result_gender_rankings_single.sql", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/result_gender_rankings_average.sql", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/result_gender_ranking_counts.sql", root), "utf8"),
+    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
+    readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
+    readFile(new URL("services/rankings/result.ts", root), "utf8"),
+  ]);
+
+  for (const source of [single, average]) {
+    assert.match(source, /gender_sets AS/);
+    assert.match(source, /FIND_IN_SET/);
+    assert.match(source, /PARTITION BY gender_set, event_id/);
+    assert.match(source, /ADD PRIMARY KEY \(gender_set, result_id\)/);
+  }
+  assert.match(counts, /gender_set/);
+  assert.match(schema, /result_gender_rankings_single/);
+  assert.match(schema, /result_gender_ranking_counts/);
+  assert.match(groups, /schemaVersion: 2/);
+  assert.match(groups, /result_gender_rankings_average/);
+  assert.match(resultService, /result_gender_rankings_\$\{resultType\}/);
+  assert.match(resultService, /ranking\.gender_set = \?/);
+  assert.doesNotMatch(resultService, /worktree_gender_result_rankings/);
+});
+
 test("normal rankings retain separate historical country and continent bests", async () => {
   const [single, average, listRankings, fixture, resultAttemptsMigration, personLookupMigration] = await Promise.all([
     readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
