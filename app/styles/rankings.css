@@ -316,15 +316,6 @@
   font-size: 0.95rem;
 }
 
-.listMessage--empty-list {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.listMessage--empty-list strong {
-  color: var(--text);
-}
-
 .siteFooter {
   display: flex;
   align-items: center;

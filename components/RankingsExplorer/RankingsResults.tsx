@@ -38,12 +38,9 @@ export function RankingsResults({
           entries: ranking.entries,
           eventId: filters.eventId,
           rankingType: ranking.entriesRankingType,
-          emptyState: list?.owner?.memberCount === 0 ? (
-            <div className="listMessage listMessage--empty-list">
-              <strong>No cubers in this list yet.</strong>
-              <span>Use + Add above to add cubers and see their rankings.</span>
-            </div>
-          ) : undefined,
+          emptyState: list?.owner?.memberCount === 0
+            ? <div className="listMessage">Add cubers with + Add above.</div>
+            : undefined,
           hideIdentityIds:
             filters.subject === "competitions" || filters.subject === "cities",
           hasMore: ranking.hasMore,
