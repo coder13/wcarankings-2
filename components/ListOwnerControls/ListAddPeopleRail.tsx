@@ -111,8 +111,7 @@ export function ListAddPeopleRail({
     router.refresh();
   };
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
+  const submitCurrentValue = () => {
     const action = resolveListAddSubmission(value, entries, activeIndex);
     if (action.type === "commit-buffer") {
       void commit();
@@ -128,6 +127,11 @@ export function ListAddPeopleRail({
     } else if (action.type === "select-person") {
       select([action.person]);
     }
+  };
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    submitCurrentValue();
   };
 
   const resetSearch = () => {
@@ -197,6 +201,11 @@ export function ListAddPeopleRail({
             }}
             onKeyDown={(event) => {
               const highlightedPerson = highlightedPersonForBuffer(entries, activeIndex);
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submitCurrentValue();
+                return;
+              }
               if (event.key === "Tab" && highlightedPerson) {
                 event.preventDefault();
                 select([highlightedPerson]);
