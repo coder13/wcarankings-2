@@ -1,0 +1,51 @@
+name: Bulk Projection Transfer
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bulk-projection-transfer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  round-trip:
+    runs-on: ubuntu-latest
+    env:
+      MYSQL_DATABASE: wcarankings
+      MYSQL_USER: wcarankings
+      MYSQL_PASSWORD: local-development-password
+      MYSQL_ROOT_PASSWORD: local-root-password
+      DATABASE_URL: mysql://wcarankings:local-development-password@db:3306/wcarankings
+
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build data-tools image
+        run: docker build --file Dockerfile.data-tools --tag wcarankings-data-tools:pull-request .
+
+      - name: Start MariaDB
+        run: |
+          docker compose up -d db
+          until docker compose exec -T db mariadb-admin ping \
+            -h 127.0.0.1 \
+            -u"$MYSQL_USER" \
+            -p"$MYSQL_PASSWORD" \
+            --silent; do
+            sleep 2
+          done
+
+      - name: Exercise bulk projection table transfer
+        run: bash scripts/test-bulk-projection-transfer.sh
+
+      - name: Clean up containers
+        if: always()
+        run: docker compose down --volumes --remove-orphans
