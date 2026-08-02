@@ -19,26 +19,39 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      - name: Show compact remaining failures
+      - name: Show assertion metadata only
         run: |
+          cat > /tmp/failure-reporter.mjs <<'REPORTER'
+          export default async function* failureReporter(source) {
+            for await (const event of source) {
+              if (event.type !== 'test:fail') continue;
+              const error = event.data.details?.error || {};
+              const expected = typeof error.expected === 'string'
+                ? error.expected.slice(0, 300)
+                : JSON.stringify(error.expected)?.slice(0, 300);
+              const stack = String(error.stack || '')
+                .split('\n')
+                .filter((line) => line.includes('/tests/'))
+                .slice(0, 3);
+              yield `${JSON.stringify({
+                name: event.data.name,
+                operator: error.operator,
+                expected,
+                generatedMessage: error.generatedMessage,
+                stack,
+              })}\n`;
+            }
+          }
+          REPORTER
           set +e
           failed=0
           for test_file in \
             tests/deploy-workflow.test.mjs \
             tests/projection-release-plan.test.mjs \
             tests/result-projections.test.mjs; do
-            output=$(mktemp)
-            node --test --test-reporter=tap "$test_file" >"$output" 2>&1
+            echo "===== $test_file ====="
+            node --test --test-reporter=/tmp/failure-reporter.mjs "$test_file"
             status=$?
-            if [ "$status" -ne 0 ]; then
-              failed=1
-              echo "===== FAILED: $test_file ====="
-              awk '
-                /^not ok / { printing=1; remaining=45 }
-                printing { print; remaining-- }
-                printing && remaining <= 0 { printing=0 }
-              ' "$output"
-            fi
-            rm -f "$output"
+            if [ "$status" -ne 0 ]; then failed=1; fi
           done
           exit "$failed"
