@@ -40,3 +40,17 @@ common paths.
 The next measurements are the lazy country/year query plan and cache-fill time,
 then a separate average-result benchmark using the same personal-history
 pattern.
+
+## Lazy country/year check
+
+For `m / 333 / Canada / 2023`, the unindexed source filter scanned all 29.2M
+solves and took 7.60 seconds. A benchmark-only covering index on
+`(gender, event_id, country_id, competition_start_date, solve_value,
+competition_id, result_id, attempt_number)` built in 1m 27s and reduced the
+same filter to 25.8 ms. Ranking the 43,174 matching solves and returning the
+first 101 rows took 66.8 ms.
+
+This makes indexed lazy country/year ranking a viable fallback. It should use a
+date range rather than `YEAR(competition_start_date)` so the index remains
+sargable, and its index/storage cost still needs to be measured on the final
+`solve_facts` artifact before production adoption.
