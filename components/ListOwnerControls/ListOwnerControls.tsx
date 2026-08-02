@@ -110,7 +110,7 @@ export function ListOwnerControls({
         onClick={() => setSettingsOpen((open) => !open)}
         aria-label="List settings"
       >
-        ⋮
+        <span className="listOwnerMenuIcon" aria-hidden="true" />
       </button>
       {settingsOpen && (
         <div className="listSettingsMenu" role="menu">
