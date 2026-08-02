@@ -10,6 +10,7 @@ WITH gender_sets AS (
   SELECT
     gender_sets.gender_set,
     result.result_id,
+    NULL AS attempt_number,
     result.event_id,
     result.person_id,
     result.competition_id,

@@ -85,7 +85,8 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/);
   assert.match(schema, /name: "sum-of-ranks"[\s\S]*dependencies: \[\]/);
   assert.match(groups, /name: "compatibility"/);
-  assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts"\]/);
+  assert.match(groups, /name: "solve-facts"/);
+  assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts", "solve-facts"\]/);
   assert.match(groups, /name: "city-rankings"[\s\S]*dependencies: \["result-facts", "competition-rankings"\]/);
   assert.match(groups, /name: "sum-of-ranks"[\s\S]*projectionNames: \["sum-of-ranks"\]/);
   assert.match(groups, /name: "person-competition-rankings"[\s\S]*person_competition_ranking_counts/);
@@ -102,9 +103,9 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(people, /world_position/);
   assert.match(results, /CREATE TABLE result_rankings_single AS/);
   assert.match(results, /CREATE TABLE result_rankings_average AS/);
-  assert.match(results, /FROM result_facts result/);
+  assert.match(results, /FROM solve_facts solve/);
   assert.doesNotMatch(results, /LEFT JOIN countries/);
-  assert.doesNotMatch(results, /competition_start_date/);
+  assert.match(results, /competition_start_date, competition_id, result_id, attempt_number/);
   assert.match(results, /ROW_NUMBER\(\)/);
   assert.match(results, /RANK\(\) OVER/);
   assert.doesNotMatch(results, /DENSE_RANK\(\) OVER/);
@@ -361,8 +362,7 @@ test("person search resolves IDs before querying projections", async () => {
   assert.match(rankings, /person_id IN/);
   assert.doesNotMatch(rankings, /person_name \$\{operator\}/);
   assert.match(results, /person_id, event_id, world_position, result_id/);
-  assert.match(genderResults, /FIND_IN_SET/);
-  assert.match(genderResults, /PARTITION BY gender_set, event_id/);
+  assert.match(genderResults, /PARTITION BY gender, event_id/);
   assert.match(genderResults, /idx_gender_results_single_world/);
   assert.match(compatibilityResults, /PRIMARY KEY \(result_id\)/);
   assert.doesNotMatch(compatibilityResults, /ADD INDEX/);

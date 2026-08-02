@@ -142,6 +142,13 @@ const projectionDefinitions = [
     // country, competition, and historical record code at read time.
     enabledByDefault: true,
   },
+  {
+    name: "solve-facts",
+    dependencies: ["result-facts"],
+    files: ["solve_facts.sql"],
+    tables: ["solve_facts"],
+    enabledByDefault: true,
+  },
   { name: "person-event-rankings", dependencies: ["result-facts"], files: ["person_event_rankings.sql"], tables: ["person_event_rankings"] },
   {
     name: "person-year-rankings",
@@ -152,9 +159,9 @@ const projectionDefinitions = [
   },
   {
     name: "result-rankings",
-    dependencies: ["result-facts"],
-    files: ["result_rankings_single.sql", "result_rankings_average.sql", "result_gender_rankings_single.sql", "result_gender_rankings_average.sql"],
-    tables: ["result_rankings_single", "result_rankings_average", "result_gender_rankings_single", "result_gender_rankings_average"],
+    dependencies: ["result-facts", "solve-facts"],
+    files: ["result_rankings_single.sql", "result_rankings_average.sql", "result_gender_rankings_single.sql", "result_gender_rankings_average.sql", "solve_personal_rankings.sql"],
+    tables: ["result_rankings_single", "result_rankings_average", "result_gender_rankings_single", "result_gender_rankings_average", "solve_personal_rankings"],
     enabledByDefault: true,
   },
   {

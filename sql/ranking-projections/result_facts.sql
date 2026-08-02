@@ -6,6 +6,7 @@ SELECT
   r.person_country_id,
   COALESCE(country.continent_id, '') AS person_continent_id,
   r.competition_id,
+  comp.year AS competition_year,
   STR_TO_DATE(CONCAT(comp.year, '-', LPAD(comp.month, 2, '0'), '-', LPAD(comp.day, 2, '0')), '%Y-%m-%d') AS competition_start_date,
   r.round_type_id,
   COALESCE(round_type.final, 0) AS is_final_round,

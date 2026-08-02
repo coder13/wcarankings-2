@@ -1,6 +1,7 @@
 CREATE TABLE result_rankings_average AS
 SELECT
   result.result_id,
+  NULL AS attempt_number,
   result.event_id,
   result.person_id,
   result.competition_id,

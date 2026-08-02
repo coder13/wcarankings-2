@@ -89,6 +89,7 @@ export type PersonCompetitionRankingRow = {
 
 export type ResultRankingRow = {
   result_id: number;
+  attempt_number: number | null;
   result_value: number;
   rank: number;
   position: number;

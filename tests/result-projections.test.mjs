@@ -62,7 +62,7 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(fixture, /regional_single_record/);
 });
 
-test("publishes indexed gender result rankings instead of ranking filtered rows at request time", async () => {
+test("publishes common gender result rankings and keeps uncommon single cohorts lazy", async () => {
   const [single, average, counts, schema, groups, resultService] = await Promise.all([
     readFile(new URL("sql/ranking-projections/result_gender_rankings_single.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_gender_rankings_average.sql", root), "utf8"),
@@ -72,19 +72,18 @@ test("publishes indexed gender result rankings instead of ranking filtered rows 
     readFile(new URL("services/rankings/result.ts", root), "utf8"),
   ]);
 
-  for (const source of [single, average]) {
-    assert.match(source, /gender_sets AS/);
-    assert.match(source, /FIND_IN_SET/);
-    assert.match(source, /PARTITION BY gender_set, event_id/);
-    assert.match(source, /ADD PRIMARY KEY \(gender_set, result_id\)/);
-  }
+  assert.match(single, /FROM solve_facts solve/);
+  assert.match(single, /PARTITION BY gender, event_id/);
+  assert.match(single, /ADD PRIMARY KEY \(result_id, attempt_number\)/);
+  assert.match(average, /gender_sets AS/);
   assert.match(counts, /gender_set/);
   assert.match(schema, /result_gender_rankings_single/);
   assert.match(schema, /result_gender_ranking_counts/);
-  assert.match(groups, /schemaVersion: 2/);
+  assert.match(groups, /name: "solve-facts"/);
   assert.match(groups, /result_gender_rankings_average/);
   assert.match(resultService, /result_gender_rankings_\$\{resultType\}/);
-  assert.match(resultService, /ranking\.gender_set = \?/);
+  assert.match(resultService, /lazySingle/);
+  assert.match(resultService, /lazySingleResultRankingsQuery/);
   assert.doesNotMatch(resultService, /worktree_gender_result_rankings/);
 });
 

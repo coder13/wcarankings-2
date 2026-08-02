@@ -7,11 +7,12 @@ import {
   parseResultType,
   parseGender,
   parseScope,
+  parseYear,
 } from "@/lib/api/projection";
 import { searchPersonIds } from "@/services/people/service";
 import { getRecordBadges } from "@/lib/wca";
 import type { ResultRankingRow } from "@/services/rankings/types";
-import { resultRankingCountsQuery, resultRankingsQuery } from "@/services/rankings/queries";
+import { lazySingleResultRankingsQuery, resultRankingCountsQuery, resultRankingsQuery } from "@/services/rankings/queries";
 
 function parsePageStart(params: URLSearchParams) {
   const raw = params.get("start") ?? "0";
@@ -41,19 +42,31 @@ export async function loadResultRankings(params: URLSearchParams) {
   const regexSearch = params.get("mode") === "vim";
   const baseTable = resultType === "average" ? "result_rankings_average" : "result_rankings_single";
   const gender = parseGender(params);
+  const year = parseYear(params);
   const genderSet = gender.join(",");
+  const lazySingle = resultType === "single" && (year !== null || scope === "country" || (gender.length > 1));
   const table = gender.length ? `result_gender_rankings_${resultType}` : baseTable;
   const rankColumn = `${scope}_rank`;
   const positionColumn = `${scope}_position`;
   const conditions = ["ranking.event_id = ?"];
   const values: unknown[] = [eventId];
+  const lazyConditions = ["solve.event_id = ?"];
+  const lazyValues: unknown[] = [eventId];
   if (gender.length) {
-    conditions.push("ranking.gender_set = ?");
+    conditions.push(resultType === "single" ? "ranking.gender = ?" : "ranking.gender_set = ?");
     values.push(genderSet);
+    lazyConditions.push(`solve.gender IN (${gender.map(() => "?").join(", ")})`);
+    lazyValues.push(...gender);
   }
   if (scope !== "world") {
     conditions.push(`ranking.${scope}_id = ?`);
     values.push(regionId);
+    lazyConditions.push(`solve.${scope}_id = ?`);
+    lazyValues.push(regionId);
+  }
+  if (year !== null) {
+    lazyConditions.push("solve.competition_start_date >= ?", "solve.competition_start_date < ?");
+    lazyValues.push(`${year}-01-01`, `${year + 1}-01-01`);
   }
   let peopleTimings = { queueMs: 0, statementMs: 0 };
   let peopleReturnedRows = 0;
@@ -84,23 +97,25 @@ export async function loadResultRankings(params: URLSearchParams) {
     }
     conditions.push(`ranking.person_id IN (${people.personIds.map(() => "?").join(", ")})`);
     values.push(...people.personIds);
+    lazyConditions.push(`solve.person_id IN (${people.personIds.map(() => "?").join(", ")})`);
+    lazyValues.push(...people.personIds);
     rowLimit = parseSearchLimit(params);
-  } else {
+  } else if (!lazySingle) {
     conditions.push(`ranking.${positionColumn} > ?`);
     values.push(start);
   }
 
-  const rows = await query<ResultRankingRow>(
-    resultRankingsQuery({
+  const rows = await query<ResultRankingRow & { total_count?: number }>(
+    lazySingle ? lazySingleResultRankingsQuery(lazyConditions) : resultRankingsQuery({
       source: table,
       rankColumn,
       positionColumn,
       conditions,
     }),
-    [...values, rowLimit],
+    lazySingle ? [...lazyValues, start, rowLimit] : [...values, rowLimit],
   );
 
-  const counts = gender.length
+  const counts = lazySingle ? null : gender.length
     ? await query<{ count: number }>(resultRankingCountsQuery(true), [
         eventId,
         resultType,
@@ -117,7 +132,7 @@ export async function loadResultRankings(params: URLSearchParams) {
   const pageRows = search ? rows.rows : rows.rows.slice(0, limit);
   const last = pageRows.at(-1);
   const entries = pageRows.map((row) => ({
-    entryKey: `result:${resultType}:${row.result_id}`,
+    entryKey: `result:${resultType}:${row.result_id}:${row.attempt_number ?? 0}`,
     resultId: Number(row.result_id),
     rank: Number(row.rank),
     subRank: Number(row.position),
@@ -137,7 +152,7 @@ export async function loadResultRankings(params: URLSearchParams) {
       continentId: row.continent_id,
     }),
   }));
-  const total = search ? entries.length : Number(counts.rows[0]?.count ?? 0);
+  const total = search ? entries.length : lazySingle ? Number(rows.rows[0]?.total_count ?? 0) : Number(counts?.rows[0]?.count ?? 0);
 
   return {
     data: {
