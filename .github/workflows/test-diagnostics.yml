@@ -12,46 +12,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: agent/projection-pipeline-performance
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - name: Show assertion metadata only
+      - name: Show checkout identity and test sources
         run: |
-          cat > /tmp/failure-reporter.mjs <<'REPORTER'
-          export default async function* failureReporter(source) {
-            for await (const event of source) {
-              if (event.type !== 'test:fail') continue;
-              const error = event.data.details?.error || {};
-              const expected = typeof error.expected === 'string'
-                ? error.expected.slice(0, 300)
-                : JSON.stringify(error.expected)?.slice(0, 300);
-              const stack = String(error.stack || '')
-                .split('\n')
-                .filter((line) => line.includes('/tests/'))
-                .slice(0, 3);
-              yield `${JSON.stringify({
-                name: event.data.name,
-                operator: error.operator,
-                expected,
-                generatedMessage: error.generatedMessage,
-                stack,
-              })}\n`;
-            }
-          }
-          REPORTER
-          set +e
-          failed=0
-          for test_file in \
+          git rev-parse HEAD
+          grep -R -n "projection workflow treats WCA export timestamps as exact identities" tests || true
+          grep -R -n "explicit group selection expands required dependencies" tests || true
+          grep -R -n "ranking entry sources use historical result nationality" tests || true
+          grep -n "PARTITION BY r.event_id, r.person_id" sql/ranking-projections/ranking_entries_*_source.sql
+      - name: Run projection tests against branch head
+        run: |
+          node --test \
             tests/deploy-workflow.test.mjs \
             tests/projection-release-plan.test.mjs \
-            tests/result-projections.test.mjs; do
-            echo "===== $test_file ====="
-            node --test --test-reporter=/tmp/failure-reporter.mjs "$test_file"
-            status=$?
-            if [ "$status" -ne 0 ]; then failed=1; fi
-          done
-          exit "$failed"
+            tests/result-projections.test.mjs
