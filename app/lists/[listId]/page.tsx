@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
+import { formatRankingDocumentTitle } from "@/lib/ranking-document-title";
 import { getAuthUser } from "@/services/auth/auth";
 import { loadListRankings } from "@/services/lists/rankings";
 import {
@@ -19,7 +22,7 @@ import { isEventId, isRankingType, normalizeGenderFilters, parseRegionQuery, typ
 
 export const dynamic = "force-dynamic";
 
-async function getListPageData(listId: string) {
+const getListPageData = cache(async (listId: string) => {
   try {
     const [list, user] = await Promise.all([
       resolveList(listId),
@@ -37,6 +40,26 @@ async function getListPageData(listId: string) {
     if (error instanceof ListNotFoundError) notFound();
     throw error;
   }
+});
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ listId: string }>;
+}): Promise<Metadata> {
+  const { listId } = await params;
+  const { list } = await getListPageData(listId);
+
+  return {
+    title: formatRankingDocumentTitle({
+      subject: "people",
+      eventId: "333",
+      rankingType: "single",
+      competitionRanking: "best-result",
+      cityRanking: "fastest-single",
+      listName: list.name,
+    }),
+  };
 }
 
 export default async function ListPage({
