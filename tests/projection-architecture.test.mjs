@@ -306,6 +306,8 @@ test("compatibility projections omit disabled weekly ranking enhancements", asyn
     assert.doesNotMatch(source, /record_streaks_/);
     assert.doesNotMatch(source, /record_streak_weeks/);
   }
+  assert.match(single, /COALESCE\(person\.gender, ''\) AS gender/);
+  assert.match(average, /COALESCE\(person\.gender, ''\) AS gender/);
 });
 
 test("backfills only the active competition-event projection", async () => {

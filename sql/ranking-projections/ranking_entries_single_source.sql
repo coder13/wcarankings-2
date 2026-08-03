@@ -22,6 +22,7 @@ WITH historical AS (
   SELECT
     historical.event_id, historical.person_id,
     COALESCE(person.name, historical.person_id) AS person_name,
+    COALESCE(person.gender, '') AS gender,
     historical.country_id,
     COALESCE(country.name, historical.country_id, '') AS country_name,
     COALESCE(country.iso2, '') AS country_iso2,
@@ -47,6 +48,7 @@ WITH historical AS (
   SELECT
     historical.event_id, historical.person_id,
     COALESCE(person.name, historical.person_id) AS person_name,
+    COALESCE(person.gender, '') AS gender,
     historical.country_id,
     COALESCE(country.name, historical.country_id, '') AS country_name,
     COALESCE(country.iso2, '') AS country_iso2,
@@ -73,6 +75,7 @@ WITH historical AS (
   SELECT
     ranking.event_id, ranking.person_id,
     COALESCE(person.name, ranking.person_id) AS person_name,
+    COALESCE(person.gender, '') AS gender,
     COALESCE(person.country_id, '') AS country_id,
     COALESCE(country.name, person.country_id, '') AS country_name,
     COALESCE(country.iso2, '') AS country_iso2,
@@ -95,19 +98,19 @@ WITH historical AS (
   LEFT JOIN wca_best_single best ON best.person_id = ranking.person_id AND best.event_id = ranking.event_id
   LEFT JOIN competitions comp ON comp.id = best.competition_id
 )
-SELECT event_id, person_id, person_name, country_id, country_name, country_iso2,
+SELECT event_id, person_id, person_name, gender, country_id, country_name, country_iso2,
   continent_id, best, competition_id, competition_name,
   is_world_record, is_continent_record, is_country_record,
   world_rank, continent_rank, country_rank, world_sub_rank, continent_sub_rank, country_sub_rank
 FROM world_rows
 UNION ALL
-SELECT event_id, person_id, person_name, country_id, country_name, country_iso2,
+SELECT event_id, person_id, person_name, gender, country_id, country_name, country_iso2,
   continent_id, best, competition_id, competition_name,
   is_world_record, is_continent_record, is_country_record,
   world_rank, continent_rank, country_rank, world_sub_rank, continent_sub_rank, country_sub_rank
 FROM country_rows
 UNION ALL
-SELECT event_id, person_id, person_name, country_id, country_name, country_iso2,
+SELECT event_id, person_id, person_name, gender, country_id, country_name, country_iso2,
   continent_id, best, competition_id, competition_name,
   is_world_record, is_continent_record, is_country_record,
   world_rank, continent_rank, country_rank, world_sub_rank, continent_sub_rank, country_sub_rank
