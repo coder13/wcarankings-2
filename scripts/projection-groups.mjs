@@ -66,15 +66,20 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
   },
   {
     name: "person-competition-rankings",
-    schemaVersion: 2,
+    schemaVersion: 3,
     dependencies: ["result-facts"],
-    projectionNames: ["person-competition-rankings"],
+    projectionNames: ["person-event-rankings", "person-ranking-counts", "person-metric-values", "person-metric-scores", "person-competition-rankings"],
     tables: [
+      "person_event_rankings",
+      "person_ranking_counts",
+      "person_metric_values",
+      "person_metric_scores",
+      "person_metric_counts",
       "person_competition_counts",
       "person_competition_rankings",
       "person_competition_ranking_counts",
     ],
-    sqlFiles: ["person_competition_rankings.sql"],
+    sqlFiles: ["person_event_rankings.sql", "projection_counts.sql", "person_metric_values.sql", "person_metric_scores.sql", "person_competition_rankings.sql"],
   },
   {
     name: "city-rankings",

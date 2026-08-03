@@ -35,7 +35,6 @@ async function getListPageData(listId: string) {
     return { list, regions, user, isOwner, membershipState, membershipRequests };
   } catch (error) {
     if (error instanceof ListNotFoundError) notFound();
-    console.error("[list-page] failed to load list metadata", { listId, error });
     throw error;
   }
 }
@@ -75,13 +74,7 @@ export default async function ListPage({
   });
   if (regionSelection.scope !== "world") rankingParams.set("region", regionSelection.regionId);
   if (gender.length) rankingParams.set("gender", gender.join(","));
-  let rankings: Awaited<ReturnType<typeof loadListRankings>>;
-  try {
-    rankings = await loadListRankings(list, rankingParams);
-  } catch (error) {
-    console.error("[list-page] failed to load list rankings", { listId, error });
-    throw error;
-  }
+  const rankings = await loadListRankings(list, rankingParams);
   const rankingListId = list.systemAlias ?? list.publicId;
   if (!rankingListId) notFound();
   return (

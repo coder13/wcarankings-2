@@ -150,7 +150,7 @@ const projectionDefinitions = [
     tables: ["solve_facts"],
     enabledByDefault: true,
   },
-  { name: "person-event-rankings", dependencies: ["result-facts"], files: ["person_event_rankings.sql"], tables: ["person_event_rankings"] },
+  { name: "person-event-rankings", dependencies: ["result-facts"], files: ["person_event_rankings.sql"], tables: ["person_event_rankings"], enabledByDefault: true },
   {
     name: "person-year-rankings",
     dependencies: ["result-facts"],
@@ -172,9 +172,9 @@ const projectionDefinitions = [
     tables: ["result_ranking_counts", "result_gender_ranking_counts"],
     enabledByDefault: true,
   },
-  { name: "person-ranking-counts", dependencies: ["person-event-rankings"], files: ["projection_counts.sql"], tables: ["person_ranking_counts"] },
-  { name: "person-metric-values", dependencies: ["person-event-rankings"], files: ["person_metric_values.sql"], tables: ["person_metric_values"] },
-  { name: "person-metric-scores", dependencies: ["person-metric-values"], files: ["person_metric_scores.sql"], tables: ["person_metric_scores", "person_metric_counts"] },
+  { name: "person-ranking-counts", dependencies: ["person-event-rankings"], files: ["projection_counts.sql"], tables: ["person_ranking_counts"], enabledByDefault: true },
+  { name: "person-metric-values", dependencies: ["person-event-rankings"], files: ["person_metric_values.sql"], tables: ["person_metric_values"], enabledByDefault: true },
+  { name: "person-metric-scores", dependencies: ["person-metric-values"], files: ["person_metric_scores.sql"], tables: ["person_metric_scores", "person_metric_counts"], enabledByDefault: true },
   {
     name: "competition-stats",
     dependencies: [],
