@@ -1,5 +1,10 @@
 import { query } from "@/db";
-import { ensureDynamicListRankingTarget, raiseListRankingRebuildPriority } from "@/lib/list-ranking-cache";
+import {
+  ensureDynamicListRankingTarget,
+  isListRankingCacheable,
+  listRankingFilterKey,
+  raiseListRankingRebuildPriority,
+} from "@/lib/list-ranking-cache";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import {
   getRecordBadges,
@@ -11,11 +16,6 @@ import {
   type RankingType,
 } from "@/lib/wca";
 import type { ListRankingRow, ListSummary, ScopedRankingSource } from "@/services/lists/types";
-import { listRankingsQuery } from "@/services/lists/queries";
-
-function rankingTable(type: RankingType) {
-  return type === "average" ? "ranking_entries_average" : "ranking_entries_single";
-}
 
 export function parseListRankingInput(searchParams: URLSearchParams) {
   const rawEventId = searchParams.get("eventId") ?? searchParams.get("event");
@@ -65,12 +65,18 @@ async function loadScopedRankings(
   minimumPageLimit = 0,
 ) {
   const input = parseListRankingInput(searchParams);
-  const source = rankingTable(input.type);
+  const source = "person_event_rankings";
   let rankingColumn = "world_rank";
   if (input.region.scope === "continent") rankingColumn = "continent_rank";
   if (input.region.scope === "country") rankingColumn = "country_rank";
-  const scopedConditions = [...scopedSource.conditions, `ranking.${rankingColumn} > 0`];
-  const scopedValues = [...scopedSource.values];
+  const scopedConditions = [
+    "ranking.event_id = ?",
+    ...scopedSource.conditions,
+    "ranking.result_type = ?",
+    `ranking.${rankingColumn} > 0`,
+  ];
+  const scopedValues = [input.eventId, ...scopedSource.values];
+  scopedValues.push(input.type);
   if (input.region.scope === "continent") {
     scopedConditions.push("ranking.continent_id = ?");
     scopedValues.push(input.region.regionId);
@@ -79,10 +85,8 @@ async function loadScopedRankings(
     scopedValues.push(input.region.regionId);
   }
   if (input.gender.length) {
-    scopedConditions.push(
-      `(${input.gender.map(() => "(? = 'o' AND (person_gender.gender = 'o' OR person_gender.gender IS NULL)) OR person_gender.gender = ?").join(" OR ")})`,
-    );
-    scopedValues.push(...input.gender.flatMap((gender) => [gender, gender]));
+    scopedConditions.push(`ranking.gender IN (${input.gender.map(() => "?").join(",")})`);
+    scopedValues.push(...input.gender);
   }
   const conditions = ["sub_rank > ?"];
   const values: unknown[] = [input.start];
@@ -96,12 +100,39 @@ async function loadScopedRankings(
   const effectiveLimit = Math.max(input.limit, minimumPageLimit);
   values.push(input.locate ? 1 : effectiveLimit + 1);
 
+  const rankingColumns = input.gender.length
+    ? `RANK() OVER (ORDER BY ranking.result_value) AS rank,
+       ROW_NUMBER() OVER (ORDER BY ranking.result_value, ranking.person_id) AS sub_rank`
+    : `ranking.${rankingColumn} AS rank, ranking.${rankingColumn.replace("rank", "position")} AS sub_rank`;
   const result = await query<ListRankingRow>(
-    listRankingsQuery({ source: scopedSource.from(source), scopedConditions, conditions }),
-    [input.eventId, ...scopedValues, ...values],
+    `WITH scoped_rankings AS (
+       SELECT ${rankingColumns}, COUNT(*) OVER () AS total,
+         ranking.person_id, ranking.result_id, ranking.result_value AS best,
+         ranking.country_id, ranking.continent_id
+       FROM ${scopedSource.from(source)}
+       WHERE ${scopedConditions.join(" AND ")}
+     ), page AS (
+       SELECT * FROM scoped_rankings WHERE ${conditions.join(" AND ")}
+       ORDER BY sub_rank LIMIT ?
+     )
+     SELECT page.rank, page.sub_rank, page.total, page.person_id,
+       COALESCE(person.name, page.person_id) AS person_name,
+       page.country_id, COALESCE(country.name, page.country_id) AS country_name,
+       COALESCE(country.iso2, '') AS country_iso2, page.continent_id, page.best,
+       facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name,
+       IF(facts.${input.type === "average" ? "regional_average_record" : "regional_single_record"} = 'WR', 1, 0) AS is_world_record,
+       IF(facts.${input.type === "average" ? "regional_average_record" : "regional_single_record"} IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR'), 1, 0) AS is_continent_record,
+       IF(facts.${input.type === "average" ? "regional_average_record" : "regional_single_record"} = 'NR', 1, 0) AS is_country_record
+     FROM page
+     JOIN result_facts facts ON facts.result_id = page.result_id
+     LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
+     LEFT JOIN countries country ON country.id = page.country_id
+     LEFT JOIN competitions competition ON competition.id = facts.competition_id
+     ORDER BY page.sub_rank`,
+    [...scopedValues, ...values],
   );
 
-  const selectedRows = result.rows.slice(0, input.locate ? 1 : effectiveLimit);
+  const selectedRows = result.rows.slice(0, input.locate ? 1 : input.limit);
   const total = Number(result.rows[0]?.total ?? 0);
   const metadata = await getCurrentRankingsMetadata();
   return {
@@ -124,10 +155,10 @@ async function loadScopedRankings(
         continentId: row.continent_id,
       }),
     })),
-    hasMore: !input.locate && result.rows.length > effectiveLimit,
+    hasMore: !input.locate && result.rows.length > input.limit,
     nextStart:
-      !input.locate && result.rows.length > effectiveLimit
-        ? input.start + effectiveLimit
+      !input.locate && result.rows.length > input.limit
+        ? input.start + input.limit
         : null,
     total,
     exportDate: metadata.exportDate,
@@ -146,6 +177,11 @@ async function loadCachedTargetRankings(
   const currentDataVersion = dataVersion.rows[0]?.value;
   const rankingsDataVersion = input.rankingsDataVersion ?? currentDataVersion;
   const effectiveMembershipVersion = input.membershipVersion ?? membershipVersion;
+  const filterKey = listRankingFilterKey({
+    scope: input.region.scope,
+    regionId: input.region.regionId,
+    genders: input.gender,
+  });
   if (!rankingsDataVersion) return null;
   const recordColumn = input.type === "average" ? "regional_average_record" : "regional_single_record";
   const cache = await query<ListRankingRow>(
@@ -158,10 +194,10 @@ async function loadCachedTargetRankings(
         IF(facts.${recordColumn} = 'CR', 1, 0) AS is_continent_record,
         IF(facts.${recordColumn} = 'NR', 1, 0) AS is_country_record
       FROM list_ranking_cache_versions version
-      JOIN list_ranking_cache_scopes scope
+      JOIN list_person_ranking_cache_scopes scope
         ON scope.cache_version_id = version.id
        AND scope.event_id = ? AND scope.result_type = ?
-      JOIN list_ranking_cache_entries entry
+      JOIN list_person_ranking_cache_entries entry
         ON entry.cache_version_id = version.id
        AND entry.event_id = scope.event_id AND entry.result_type = scope.result_type
       JOIN person_event_rankings ranking
@@ -173,7 +209,8 @@ async function loadCachedTargetRankings(
       LEFT JOIN countries country ON country.id = person.country_id
       LEFT JOIN result_facts facts ON facts.result_id = entry.result_id
       LEFT JOIN competitions competition ON competition.id = facts.competition_id
-      WHERE version.target_key = ? AND version.membership_version = ?
+      WHERE version.target_key = ? AND version.grain = 'person' AND version.filter_key = ?
+        AND version.membership_version = ?
         AND version.rankings_data_version = ? AND version.status IN ('building', 'ready')
         AND scope.completed_count > ?
         AND entry.list_position > ?
@@ -182,6 +219,7 @@ async function loadCachedTargetRankings(
       input.eventId,
       input.type,
       targetKey,
+      filterKey,
       effectiveMembershipVersion,
       rankingsDataVersion,
       input.start,
@@ -193,14 +231,15 @@ async function loadCachedTargetRankings(
     const exists = await query<{ id: number }>(
       `SELECT version.id
        FROM list_ranking_cache_versions version
-       JOIN list_ranking_cache_scopes scope
+       JOIN list_person_ranking_cache_scopes scope
          ON scope.cache_version_id = version.id
         AND scope.event_id = ? AND scope.result_type = ?
-       WHERE version.target_key = ? AND version.membership_version = ?
+       WHERE version.target_key = ? AND version.grain = 'person' AND version.filter_key = ?
+         AND version.membership_version = ?
          AND version.rankings_data_version = ? AND version.status IN ('building', 'ready')
          AND scope.completed_count > ?
        LIMIT 1`,
-      [input.eventId, input.type, targetKey, effectiveMembershipVersion, rankingsDataVersion, input.start],
+      [input.eventId, input.type, targetKey, filterKey, effectiveMembershipVersion, rankingsDataVersion, input.start],
     );
     if (!exists.rows.length) return null;
   }
@@ -244,12 +283,10 @@ async function loadCachedListRankings(
 
 export async function loadListRankings(list: ListSummary, searchParams: URLSearchParams) {
   const input = parseListRankingInput(searchParams);
-  const isDefaultScope =
-    input.region.scope === "world" &&
-    input.gender.length === 0 &&
-    !input.search &&
-    !input.locate;
-  if (isDefaultScope) {
+  const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
+  const cacheable = !input.search && !input.locate && isListRankingCacheable("person", input.type, filter);
+  const filterKey = listRankingFilterKey(filter);
+  if (cacheable) {
     const cached = await loadCachedListRankings(list, input);
     if (cached) {
       return {
@@ -265,22 +302,21 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
       };
     }
     if (!input.membershipVersion && !input.rankingsDataVersion) {
-      void raiseListRankingRebuildPriority(list).catch(() => undefined);
+      void raiseListRankingRebuildPriority(list, "person", filterKey).catch(() => undefined);
     }
   }
   const rankings = await loadScopedRankings(
     {
       from: (source) => `list_members AS member
        JOIN ${source} AS ranking
-         ON ranking.person_id = member.person_id
-        AND ranking.event_id = ?`,
+         ON ranking.person_id = member.person_id`,
       conditions: ["member.list_id = ?"],
       values: [list.id],
     },
     searchParams,
-    isDefaultScope ? 100 : 0,
+    cacheable ? 100 : 0,
   );
-  const fallbackDataVersion = isDefaultScope
+  const fallbackDataVersion = cacheable
     ? (await query<{ value: string }>(
       "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
     )).rows[0]?.value ?? null
@@ -295,7 +331,7 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
       membershipVersion: list.membershipVersion,
     },
     ...rankings,
-    cacheMembershipVersion: isDefaultScope ? list.membershipVersion : undefined,
+    cacheMembershipVersion: cacheable ? list.membershipVersion : undefined,
     cacheDataVersion: fallbackDataVersion,
   };
 }
@@ -312,9 +348,11 @@ export async function loadDynamicListRankings(personIds: string[], searchParams:
     };
   }
   const input = parseListRankingInput(searchParams);
-  const isDefaultScope = input.region.scope === "world" && input.gender.length === 0 && !input.search && !input.locate;
-  if (isDefaultScope) {
-    const target = await ensureDynamicListRankingTarget(personIds);
+  const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
+  const cacheable = !input.search && !input.locate && isListRankingCacheable("person", input.type, filter);
+  const filterKey = listRankingFilterKey(filter);
+  if (cacheable) {
+    const target = await ensureDynamicListRankingTarget(personIds, "person", filterKey);
     if (target) {
       const cached = await loadCachedTargetRankings(target.targetKey, target.membershipVersion, input);
       if (cached) return cached;
@@ -324,7 +362,7 @@ export async function loadDynamicListRankings(personIds: string[], searchParams:
   return loadScopedRankings(
     {
       from: (source) => `${source} AS ranking`,
-      conditions: ["ranking.event_id = ?", `ranking.person_id IN (${placeholders})`],
+      conditions: [`ranking.person_id IN (${placeholders})`],
       values: [...personIds],
     },
     searchParams,
