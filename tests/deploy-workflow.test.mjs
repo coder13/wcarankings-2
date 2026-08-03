@@ -355,6 +355,8 @@ test("labeled PR projection builds run the scroll benchmark and publish a reusab
   assert.match(builder, /benchmark:ranking-scroll/);
   assert.match(builder, /ranking-scroll-benchmark-\$\{\{ github\.run_id \}\}/);
   assert.match(builder, /Import generated projection groups/);
+  assert.match(builder, /Install MariaDB client/);
+  assert.match(groupBuilder, /Install MariaDB client/);
 });
 
 test("main projection releases carry exact cached artifacts into the deploy bundle", () => {

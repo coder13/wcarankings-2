@@ -58,6 +58,13 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Install MariaDB client
+        run: |
+          command -v mariadb >/dev/null || {
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends mariadb-client
+          }
+
       - run: pnpm install --frozen-lockfile --prod
 
       - uses: oras-project/setup-oras@v1
