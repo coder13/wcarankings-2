@@ -3,7 +3,11 @@ import test from "node:test";
 
 import { rankingEntryEnhancementsFromColumns } from "@/services/rankings/capabilities";
 import { rankingColumns } from "@/services/rankings/helpers";
-import { genderRankingPageQuery, rankingPageQuery } from "@/services/rankings/queries";
+import {
+  genderPersonRankingRowsQuery,
+  genderRankingPageQuery,
+  rankingPageQuery,
+} from "@/services/rankings/queries";
 
 const enhancedColumns = [
   "world_rank_delta",
@@ -92,4 +96,20 @@ test("gender-filtered rankings use the same pre-activation fallback and post-act
   for (const column of enhancedColumns) {
     assert.equal([...active.matchAll(new RegExp(`\\b${column}\\b`, "g"))].length, 1);
   }
+});
+
+test("combined gender person rankings use scope position and dense world-rank tie groups", () => {
+  const sql = genderPersonRankingRowsQuery({
+    genderCount: 2,
+    recordColumn: "facts.regional_single_record",
+    positionColumn: "country_position",
+    regionColumn: "country_id",
+  });
+
+  assert.match(sql, /ranking\.world_rank/);
+  assert.match(sql, /ORDER BY ranking\.country_position, ranking\.person_id/);
+  assert.match(sql, /ranking\.gender IN \(\?, \?\)/);
+  assert.match(sql, /ranking\.country_id = \?/);
+  assert.match(sql, /LIMIT \? OFFSET \?/);
+  assert.doesNotMatch(sql, /RANK\(\) OVER/);
 });

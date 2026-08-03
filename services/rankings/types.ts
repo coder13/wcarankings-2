@@ -224,6 +224,23 @@ export type GenderRankingQueryInput = {
   selectColumns: string;
 };
 
+export type GenderPersonRankingRow = {
+  person_id: string;
+  result_id: number;
+  result_value: number;
+  country_id: string;
+  country_name: string;
+  country_iso2: string;
+  continent_id: string;
+  person_name: string;
+  world_rank: number;
+  competition_id: string;
+  competition_name: string;
+  is_world_record: number;
+  is_continent_record: number;
+  is_country_record: number;
+};
+
 export type RankingPageQueryInput = {
   selectColumns: string;
   from: string;

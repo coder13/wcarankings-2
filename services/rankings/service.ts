@@ -10,7 +10,7 @@ import {
   RANKINGS_WINDOW_SIZE,
 } from "@/services/rankings/cache";
 import { searchPersonIds } from "@/services/people/service";
-import { ApiInputError, parseGender, parseYear } from "@/lib/api/projection";
+import { addTimings, ApiInputError, parseGender, parseYear } from "@/lib/api/projection";
 import {
   getRecordBadges,
   isRankingEventId,
@@ -31,6 +31,9 @@ import { getRankingEntryEnhancements } from "@/services/rankings/capabilities";
 import {
   filteredPersonMetricQuery,
   filteredYearlyRankingPageQuery,
+  genderPersonRankingCountQuery,
+  genderPersonRankingPrefixCountQuery,
+  genderPersonRankingRowsQuery,
   genderRankingPageQuery,
   personMetricEndQuery,
   personMetricQuery,
@@ -42,6 +45,7 @@ import {
 } from "@/services/rankings/queries";
 import type {
   FilteredPersonMetricRow,
+  GenderPersonRankingRow,
   PersonMetricRow,
   QueryInput,
   RankingRow,
@@ -169,6 +173,9 @@ function yearlyFilters(input: QueryInput) {
 }
 
 async function queryGenderPage(input: QueryInput) {
+  if (input.year === null && !input.search && !input.locate) {
+    return queryGenderPersonPage(input);
+  }
   const enhancements = await getRankingEntryEnhancements();
   const source = rankingTable(input.type);
   const { region } = rankingShape(input.scope);
@@ -246,6 +253,75 @@ async function queryGenderPage(input: QueryInput) {
     timings: result.timings,
     queryCount: 1,
     returnedRows: result.rows.length,
+  };
+}
+
+async function queryGenderPersonPage(input: QueryInput) {
+  const positionColumn = input.scope === "continent"
+    ? "continent_position"
+    : input.scope === "country" ? "country_position" : "world_position";
+  const regionColumn = input.scope === "continent"
+    ? "continent_id"
+    : input.scope === "country" ? "country_id" : null;
+  const recordColumn = input.type === "average"
+    ? "facts.regional_average_record"
+    : "facts.regional_single_record";
+  const filterValues: unknown[] = [input.eventId, input.type, ...input.gender];
+  if (regionColumn) filterValues.push(input.regionId);
+  const totalPromise = query<{ count: number }>(
+    genderPersonRankingCountQuery(input.gender.length, regionColumn),
+    filterValues,
+  );
+  const pageValues = [...filterValues, input.limit + 1, input.startRank - 1];
+  const result = await query<GenderPersonRankingRow>(
+    genderPersonRankingRowsQuery({
+      genderCount: input.gender.length,
+      recordColumn,
+      positionColumn,
+      regionColumn,
+    }),
+    pageValues,
+  );
+  const firstValue = result.rows[0]?.result_value;
+  const prefix = firstValue === undefined
+    ? { rows: [{ count: 0 }], timings: { queueMs: 0, statementMs: 0 } }
+    : await query<{ count: number }>(
+      genderPersonRankingPrefixCountQuery(input.gender.length, regionColumn),
+      [input.eventId, input.type, ...input.gender, firstValue, ...(regionColumn ? [input.regionId] : [])],
+    );
+  const totalResult = await totalPromise;
+  const total = Number(totalResult.rows[0]?.count ?? 0);
+  const prefixCount = Number(prefix.rows[0]?.count ?? 0);
+  let previousWorldRank: number | null = null;
+  let filteredRank = prefixCount + 1;
+  const rankedRows = result.rows.map((row, index) => {
+    const worldRank = Number(row.world_rank);
+    if (previousWorldRank !== null && worldRank !== previousWorldRank) {
+      filteredRank = prefixCount + index + 1;
+    }
+    previousWorldRank = worldRank;
+    return {
+      ...row,
+      rank: filteredRank,
+      sub_rank: input.startRank + index,
+      best: Number(row.result_value),
+    } as unknown as RankingRow;
+  });
+  const entries = rankedRows.slice(0, input.limit).map((row) => toRankingEntry(row, input.scope));
+  return {
+    data: {
+      entries,
+      hasMore: rankedRows.length > input.limit,
+      nextPageStart: rankedRows.length > input.limit ? input.startRank + input.limit : null,
+      previousPageStart: input.startRank > 1 ? Math.max(1, input.startRank - input.limit) : null,
+      total,
+      exportDate: null,
+      startPosition: input.startRank - 1,
+      lastRank: entries.at(-1)?.subRank ?? null,
+    },
+    timings: addTimings(addTimings(result.timings, prefix.timings), totalResult.timings),
+    queryCount: firstValue === undefined ? 2 : 3,
+    returnedRows: result.rows.length + (firstValue === undefined ? 0 : 1) + 1,
   };
 }
 
