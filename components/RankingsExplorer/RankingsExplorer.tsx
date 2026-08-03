@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
+import { formatRankingDocumentTitle } from "@/lib/ranking-document-title";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
 import { RankingsExplorerContext } from "./RankingsExplorerContext";
-import { RankingsDocumentTitle } from "./RankingsDocumentTitle";
 import { RankingsExplorerHeader } from "./RankingsExplorerHeader";
 import { RankingsNavigationFooter } from "./RankingsNavigationFooter";
 import { RankingsResults } from "./RankingsResults";
@@ -49,6 +50,27 @@ export function RankingsExplorer({
   list,
 }: RankingsExplorerProps) {
   const url = useRankingsFilters();
+  useEffect(() => {
+    document.title = formatRankingDocumentTitle({
+      subject: url.filters.subject,
+      eventId: url.filters.eventId,
+      rankingType: url.filters.rankingType,
+      competitionRanking: url.filters.competitionRanking,
+      cityRanking: url.filters.cityRanking,
+      year: url.filters.year,
+      personCompetitionRanking: url.filters.personCompetitionRanking,
+      listName: source?.listName,
+    });
+  }, [
+    source?.listName,
+    url.filters.cityRanking,
+    url.filters.competitionRanking,
+    url.filters.eventId,
+    url.filters.personCompetitionRanking,
+    url.filters.rankingType,
+    url.filters.subject,
+    url.filters.year,
+  ]);
   const data = useRankingDataRuntime({
     filters: url.filters,
     initialData: initial?.data,
@@ -124,7 +146,6 @@ export function RankingsExplorer({
         vim,
       }}
     >
-      <RankingsDocumentTitle />
       <RankingsAppShell>
         <ViewportEdgeGradients
           topVisible={hasScrolled}
