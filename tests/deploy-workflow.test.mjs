@@ -384,6 +384,9 @@ test("group artifacts use GHCR and cached dependencies hydrate before isolated b
   assert.match(groupBuilder, /oras pull "\$\{repository\}@\$\{digest\}"/);
   assert.match(groupBuilder, /oras push "\$ref"/);
   assert.match(groupBuilder, /application\/vnd\.cuberanks\.projection\.tables\.v1\+gzip/);
+  assert.match(groupBuilder, /archive_name=\$\(basename "\$archive"\)/);
+  assert.match(groupBuilder, /metadata_name=\$\(basename "\$metadata"\)/);
+  assert.match(groupBuilder, /result_attempts \(result_id BIGINT NOT NULL, attempt_number INT NOT NULL, value INT NOT NULL\)/);
   assert.match(groupBuilder, /import-projection-transfer\.mjs/);
   assert.match(groupBuilder, /publish-projection-transfer\.mjs --hydrate/);
   assert.match(groupBuilder, /--satisfied-groups="\$HYDRATE_GROUPS"/);

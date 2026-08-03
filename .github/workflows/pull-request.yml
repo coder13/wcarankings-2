@@ -116,7 +116,7 @@ jobs:
             --user="$MYSQL_USER" \
             --password="$MYSQL_PASSWORD" \
             "$MYSQL_DATABASE" \
-            --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL)"
+            --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL, value INT NOT NULL)"
           docker compose run --rm \
             -e FLYWAY_TABLE=flyway_schema_history_app \
             flyway migrate
@@ -210,7 +210,8 @@ jobs:
               );
               CREATE TABLE result_attempts (
                 result_id BIGINT NOT NULL,
-                attempt_number INT NOT NULL
+                attempt_number INT NOT NULL,
+                value INT NOT NULL
               );
             "
           docker compose run --rm \

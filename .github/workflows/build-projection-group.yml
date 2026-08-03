@@ -86,7 +86,7 @@ jobs:
           until docker compose exec -T db mariadb-admin ping -h 127.0.0.1 \
             -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --silent; do sleep 2; done
           docker compose exec -T db mariadb --user="$MYSQL_USER" --password="$MYSQL_PASSWORD" \
-            "$MYSQL_DATABASE" --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL)"
+            "$MYSQL_DATABASE" --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL, value INT NOT NULL)"
           docker compose run --rm flyway migrate
           docker compose run --rm -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
             -e FLYWAY_TABLE=flyway_schema_history_results flyway migrate
@@ -169,6 +169,8 @@ jobs:
           tag="$fingerprint"
           if [ "$corrupt" = true ]; then tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
           ref="ghcr.io/${owner}/wcarankings-projection-${GROUP}:${tag}"
+          archive_name=$(basename "$archive")
+          metadata_name=$(basename "$metadata")
           pushd "$directory" >/dev/null
           oras push "$ref" \
             --artifact-type application/vnd.cuberanks.projection.group.v4 \
@@ -177,8 +179,8 @@ jobs:
             --annotation "io.wcarankings.artifact-fingerprint=$fingerprint" \
             --annotation "io.wcarankings.format-version=4" \
             "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json" \
-            "$archive:application/vnd.cuberanks.projection.tables.v1+gzip" \
-            "$metadata:application/vnd.cuberanks.projection.transfer.v4+json"
+            "$archive_name:application/vnd.cuberanks.projection.tables.v1+gzip" \
+            "$metadata_name:application/vnd.cuberanks.projection.transfer.v4+json"
           popd >/dev/null
           digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
           {

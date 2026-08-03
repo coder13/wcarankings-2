@@ -395,7 +395,8 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
       mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="
         CREATE TABLE IF NOT EXISTS result_attempts (
           result_id BIGINT NOT NULL,
-          attempt_number INT NOT NULL
+          attempt_number INT NOT NULL,
+          value INT NOT NULL
         );
       "
     '
@@ -491,7 +492,8 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
         mariadb --user=root --password="$MARIADB_ROOT_PASSWORD" "$CANDIDATE_SCHEMA" --execute="
           CREATE TABLE IF NOT EXISTS result_attempts (
             result_id BIGINT NOT NULL,
-            attempt_number INT NOT NULL
+            attempt_number INT NOT NULL,
+            value INT NOT NULL
           );
         "
       '
