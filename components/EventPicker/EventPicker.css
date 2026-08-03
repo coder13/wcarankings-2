@@ -26,9 +26,8 @@
   display: none;
 }
 
-.EventPicker-preview--named,
-.EventPicker-option--named {
-  font-weight: 700;
+.EventPicker-preview--named {
+  font-weight: 400;
 }
 
 .EventPicker-symbol {
@@ -79,7 +78,7 @@
 
 .EventPicker-option {
   font-size: 1.25em;
-  border-radius: 0;
+  border-radius: 0.65rem;
 }
 
 .EventPicker-option--named {

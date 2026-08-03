@@ -28,6 +28,14 @@ const MOBILE_CONTROLS_QUERY = "(max-width: 600px)";
 const PODIUM_EVENT_OPTIONS = WCA_EVENTS.filter(
   (event) => event.id !== "333mbf",
 );
+const currentYear = new Date().getFullYear();
+const FALLBACK_PERSON_RANKING_YEARS = [
+  ...Array.from(
+    { length: currentYear - 2003 + 1 },
+    (_, index) => currentYear - index,
+  ),
+  1982,
+];
 
 function subscribeMobileControls(listener: () => void) {
   const media = window.matchMedia(MOBILE_CONTROLS_QUERY);
@@ -89,12 +97,16 @@ export function RankingsTopRail() {
   let personRankingPeriod = "";
   if (filters.personCompetitionRanking) personRankingPeriod = "competitions";
   else if (filters.year) personRankingPeriod = String(filters.year);
+  let personRankingYears = rankings.availableYears;
+  if (personRankingYears.length === 0 && rankings.loading) {
+    personRankingYears = FALLBACK_PERSON_RANKING_YEARS;
+  }
   const personRankingPeriodOptions = [
     ...(featureSwitch.personCompetitionRankings
       ? [{ value: "competitions", label: t("rankingsRail.period.competitionCount") }]
       : []),
     { value: "", label: t("rankingsRail.period.allTime") },
-    ...rankings.availableYears.map((year) => ({
+    ...personRankingYears.map((year) => ({
       value: String(year),
       label: String(year),
     })),

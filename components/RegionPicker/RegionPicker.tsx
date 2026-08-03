@@ -250,7 +250,7 @@ export function RegionPicker({
         {filteredOptions.length === 0 ? (
           <div className="regionEmpty">No matching regions</div>
         ) : (
-          <div className="regionOptions">
+          <div className="regionOptions" tabIndex={-1}>
             {options[0] && renderOption(options[0])}
             {continents.length > 0 && (
               <div className="regionGroupLabel">Continents</div>

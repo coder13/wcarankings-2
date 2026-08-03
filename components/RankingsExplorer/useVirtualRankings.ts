@@ -195,7 +195,7 @@ export function useVirtualRankings({
     previousDatasetKeyRef.current = datasetKey;
     scrollAnimation.cancel();
     expansion.reset({ resizeRow: resizeGlobalRow });
-    window.scrollTo({ top: listOffset, behavior: "auto" });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }, [
     datasetKey,
     expansion,

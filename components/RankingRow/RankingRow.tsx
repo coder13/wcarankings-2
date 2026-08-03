@@ -10,6 +10,7 @@ type RankingRowDisplay = {
   eventId: string;
   rankingType: "single" | "average";
   animationIndex: number;
+  alternate?: boolean;
   searchMatched?: boolean;
   highlighted?: boolean;
   rankIsDuplicate?: boolean;
@@ -52,6 +53,7 @@ export function RankingRow({
     eventId,
     rankingType,
     animationIndex,
+    alternate = false,
     searchMatched = false,
     highlighted = false,
     rankIsDuplicate = false,
@@ -172,7 +174,7 @@ export function RankingRow({
       }}
     >
       <div
-          className={`row${animationIndex % 2 === 1 ? " row--alternate" : ""}${
+          className={`row${alternate ? " row--alternate" : ""}${
           searchMatched ? " row--searchResult" : ""
         }${
           highlighted ? " row--searchMatch" : ""

@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { WCA_EVENTS } from "@/lib/wca";
 import { ListMembershipRequestRows } from "../ListOwnerControls/ListMembershipRequestRows";
+import { LoadingSpinner } from "../LoadingSpinner/LoadingSpinner";
 import { ResultsTable } from "../ResultsTable/ResultsTable";
 import { useRankingsExplorer } from "./RankingsExplorerContext";
 import { emptyOwnerListMessage } from "./list-empty-state";
@@ -60,7 +61,9 @@ export function RankingsResults() {
     );
   } else if (rankings.loading && rankings.items.length === 0) {
     results = (
-      <div className="listMessage listMessage--delayed">Loading rankings…</div>
+      <div className="listMessage listMessage--initialLoading listMessage--delayed">
+        <LoadingSpinner label="Loading rankings" />
+      </div>
     );
   } else if (rankings.total === 0) {
     results = emptyState;

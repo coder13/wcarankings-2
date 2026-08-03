@@ -89,6 +89,11 @@ function RailSearch({ model }: { model: RankingsRailSearch }) {
     onSearchCycle,
   } = model;
   const inputRef = useRef<HTMLInputElement>(null);
+  const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
+  const dismissed = dismissedQuery === findQuery;
+  const displayedQuery = dismissed ? "" : findQuery;
+  const hasSearchText = displayedQuery.length > 0;
+  const searchOpen = findOpen && !dismissed;
 
   const setInputElement = useCallback((input: HTMLInputElement | null) => {
     inputRef.current = input;
@@ -96,36 +101,60 @@ function RailSearch({ model }: { model: RankingsRailSearch }) {
   }, [searchInputRef]);
 
   let status = findError;
-  if (!status && findQuery.trim()) {
+  if (!status && displayedQuery.trim()) {
     status = findMatches.length
       ? t("rankingsRail.search.status", { current: findIndex + 1, total: findMatches.length })
       : t("rankingsRail.search.noMatches");
   }
   const openSearch = () => {
+    setDismissedQuery(null);
     onSearchOpen();
     inputRef.current?.focus();
     window.setTimeout(() => inputRef.current?.focus(), 25);
+  };
+  const dismissSearch = () => {
+    setDismissedQuery(findQuery);
+    inputRef.current?.blur();
+    onSearchClose();
   };
 
   return (
     <div
       className="findBar findBar--rail"
-      data-open={findOpen}
-      data-has-text={findQuery.length > 0}
+      data-open={searchOpen}
+      data-has-text={hasSearchText}
       role="search"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
         event.preventDefault();
         event.stopPropagation();
-        if (findQuery) onSearchQueryChange("");
-        inputRef.current?.blur();
-        onSearchClose();
+        dismissSearch();
       }}
     >
-      <button className="findIcon" type="button" onMouseDown={(event) => event.preventDefault()} onClick={openSearch} aria-label={t("rankingsRail.search.search")} title={t("rankingsRail.search.searchWithShortcut")}><SearchIcon /></button>
-      <input ref={setInputElement} className="findInput" type="text" tabIndex={findOpen || findQuery ? 0 : -1} value={findQuery} onChange={(event) => onSearchQueryChange(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") { event.preventDefault(); onSearchCycle(event.shiftKey ? -1 : 1); } }} aria-label={t("rankingsRail.search.find")} />
+      <button className="findIcon" type="button" tabIndex={hasSearchText ? 0 : -1} onMouseDown={(event) => event.preventDefault()} onClick={openSearch} aria-label={t("rankingsRail.search.search")} title={t("rankingsRail.search.searchWithShortcut")}><SearchIcon /></button>
+      <input ref={setInputElement} className="findInput" type="text" tabIndex={0} value={displayedQuery} onFocus={onSearchOpen} onChange={(event) => {
+        setDismissedQuery(null);
+        onSearchQueryChange(event.target.value);
+      }} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === "Tab" && !hasSearchText) {
+          if (event.shiftKey) {
+            onSearchClose();
+            return;
+          }
+          event.preventDefault();
+          onSearchClose();
+          window.requestAnimationFrame(() => {
+            document.querySelector<HTMLElement>(".listItem")?.focus();
+          });
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          onSearchCycle(event.shiftKey ? -1 : 1);
+        }
+      }} aria-label={t("rankingsRail.search.find")} />
       <span className={`findStatus${findError ? " isError" : ""}`} aria-live="polite">{findLoading || findPending ? <span className="searchSpinner" aria-label={t("rankingsRail.search.searching")} /> : status}</span>
-      <button className="findClose" type="button" tabIndex={findOpen || findQuery ? 0 : -1} onMouseDown={(event) => event.preventDefault()} onClick={() => { inputRef.current?.blur(); onSearchClose(); }} aria-label={t("rankingsRail.search.close")}><CloseIcon /></button>
+      <button className="findClose" type="button" tabIndex={searchOpen || hasSearchText ? 0 : -1} onMouseDown={(event) => event.preventDefault()} onClick={dismissSearch} aria-label={t("rankingsRail.search.close")}><CloseIcon /></button>
     </div>
   );
 }
@@ -292,22 +321,16 @@ export function RankingsPagerRail({
         ? t("rankingsRail.pager.jumpToEnd")
         : t("rankingsRail.pager.jumpDown", { distance: formatRankingNumber(5000) }),
   };
-  const [pendingDirection, setPendingDirection] = useState<-1 | 1 | null>(null);
-  const activePendingDirection = busy ? pendingDirection : null;
-  const labels = activePendingDirection
-    ? {
-      ...currentLabels,
-      [activePendingDirection === -1 ? "up" : "down"]: activePendingDirection === -1
-        ? t("rankingsRail.pager.jumpToTop")
-        : t("rankingsRail.pager.jumpToEnd"),
-    }
+  const [pendingLabels, setPendingLabels] = useState<typeof currentLabels | null>(null);
+  const labels = busy
+    ? pendingLabels ?? currentLabels
     : currentLabels;
   const jumpUp = () => {
     if (busy) {
       onJumpToTop?.();
       return;
     }
-    setPendingDirection(-1);
+    setPendingLabels(currentLabels);
     onJumpUp();
   };
   const jumpDown = () => {
@@ -315,7 +338,7 @@ export function RankingsPagerRail({
       onJumpToEnd?.();
       return;
     }
-    setPendingDirection(1);
+    setPendingLabels(currentLabels);
     onJumpDown();
   };
   return <RankingsRail className="Jump--pager" direction="down" searchNavigation={searchActive}>

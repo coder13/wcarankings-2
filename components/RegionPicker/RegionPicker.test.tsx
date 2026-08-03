@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RegionPicker } from "./RegionPicker";
@@ -14,6 +15,7 @@ test("renders the selected region input", () => {
   assert.match(markup, /aria-label="Region"/);
   assert.match(markup, /role="combobox"/);
   assert.match(markup, /aria-autocomplete="list"/);
+  assert.match(markup, /class="regionOptions" tabindex="-1"/);
   assert.match(markup, /value="🌐 World"/);
   assert.doesNotMatch(markup, /aria-label="Clear region"/);
 });
@@ -93,4 +95,16 @@ test("shows an icon for every region scope", () => {
   assert.match(markup, /🗺️[^<]*<\/span>\s*Africa/);
   assert.match(markup, /🗺️[^<]*<\/span>\s*North America/);
   assert.match(markup, /🇺🇸[^<]*<\/span>\s*United States/);
+});
+
+test("matches event picker hover and keyboard-focus treatments", async () => {
+  const css = await readFile(
+    new URL("../../app/styles/controls.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(css, /\.Dropdown-menu \.regionOption \{\s*border-radius: 0\.65rem;/);
+  assert.match(css, /\.regionOption:hover \{\s*color: var\(--focus\);/);
+  assert.match(css, /\.regionOption\.isSelected \{\s*background: var\(--surface-selected\);/);
+  assert.match(css, /\.regionOption\.isActive,\s*\.regionOption:focus-visible \{[^}]*box-shadow: inset 0 0 0 2px var\(--focus-ring\);/);
 });

@@ -99,6 +99,7 @@ export function ResultsTable({
               ? entry.personId === search.highlightedPersonId
               : false}
             data-alternate={virtualRow.globalIndex % 2 === 1}
+            data-loading={!entry || undefined}
             data-details-loading={Boolean(
               entry && virtualRow.expanded && rowDetails.pending,
             )}
@@ -117,6 +118,7 @@ export function ResultsTable({
                   rankingType,
                   hideIdentityId: hideIdentityIds,
                   animationIndex: mountedIndex,
+                  alternate: virtualRow.globalIndex % 2 === 1,
                   searchMatched: search.searchMatchPersonIds?.has(entry.personId),
                   highlighted: entry.personId === search.highlightedPersonId,
                   rankIsDuplicate: virtualRow.rankIsDuplicate,
@@ -153,7 +155,12 @@ export function ResultsTable({
                 }}
               />
             ) : (
-              <div className="listMessage">Loading rankings…</div>
+              <div
+                className={`row row--loading${
+                  virtualRow.globalIndex % 2 === 1 ? " row--alternate" : ""
+                }`}
+                aria-hidden="true"
+              />
             )}
           </div>
         );

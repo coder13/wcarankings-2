@@ -133,6 +133,18 @@ test("renders the rankings shell with extracted components", () => {
   assert.doesNotMatch(markup, /Jump to top/);
 });
 
+test("renders a full-width spinner and fallback periods before rankings load", () => {
+  const markup = renderExplorerMarkup({ initial: undefined });
+
+  assert.match(markup, /listMessage--initialLoading/);
+  assert.match(markup, /role="status" aria-label="Loading rankings"/);
+  assert.match(markup, /aria-label="Person ranking period"/);
+  assert.match(markup, />All time</);
+  assert.match(markup, new RegExp(`>${new Date().getFullYear()}<`));
+  assert.match(markup, />2003</);
+  assert.match(markup, />1982</);
+});
+
 test("keeps gender filters available for sum of ranks", () => {
   const markup = renderExplorerMarkup({
     options: { showAllEventRankingOptions: true },

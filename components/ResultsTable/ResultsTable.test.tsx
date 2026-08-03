@@ -80,3 +80,56 @@ test("renders cached ranking items without a loading replacement", () => {
   assert.match(markup, /Fast Solver/);
   assert.doesNotMatch(markup, /Loading rankings/);
 });
+
+test("keeps row striping tied to the global ranking index", () => {
+  const displacedItem = {
+    ...items[0],
+    key: 101,
+    globalIndex: 101,
+  };
+  const markup = renderWithProviders(
+    <ResultsTable
+      data={{
+        items: [displacedItem],
+        eventId: "333",
+        rankingType: "single",
+      }}
+      virtualization={{ totalHeight: 65, listOffset: 0 }}
+      search={{ highlightedPersonId: "" }}
+      interaction={{
+        onRowNavigate: () => undefined,
+        onToggleExpanded: () => undefined,
+      }}
+    />,
+  );
+
+  assert.match(markup, /class="row row--alternate"/);
+});
+
+test("renders unloaded rankings as empty striped rows", () => {
+  const loadingItems = items.map((item, index) => ({
+    ...item,
+    key: 100 + index,
+    globalIndex: 100 + index,
+    entry: null,
+  }));
+  const markup = renderWithProviders(
+    <ResultsTable
+      data={{
+        items: loadingItems,
+        eventId: "333",
+        rankingType: "single",
+      }}
+      virtualization={{ totalHeight: 130, listOffset: 0 }}
+      search={{ highlightedPersonId: "" }}
+      interaction={{
+        onRowNavigate: () => undefined,
+        onToggleExpanded: () => undefined,
+      }}
+    />,
+  );
+
+  assert.doesNotMatch(markup, /Loading rankings/);
+  assert.match(markup, /class="row row--loading"/);
+  assert.match(markup, /class="row row--loading row--alternate"/);
+});
