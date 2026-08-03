@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { RankingEntry } from "../RankingsExplorer/types";
+import type { VirtualRankingItem } from "../RankingsExplorer/useVirtualRankings";
 import { ResultsTable } from "./ResultsTable";
 
 const entries: RankingEntry[] = [
@@ -41,30 +42,40 @@ const entries: RankingEntry[] = [
   },
 ];
 
+const items: VirtualRankingItem[] = entries.map((entry, index) => ({
+  index,
+  globalIndex: index,
+  key: index,
+  start: index * 65,
+  end: (index + 1) * 65,
+  size: 65,
+  lane: 0,
+  entry,
+  rankIsDuplicate: index > 0 && entries[index - 1].rank === entry.rank,
+  expanded: false,
+  expandedContentHeight: 0,
+  expansionProgress: 0,
+}));
+
 const meta = {
   title: "Core UI/Molecules/ResultsTable",
   component: ResultsTable,
   parameters: { layout: "fullscreen" },
   args: {
     data: {
-      entries,
+      items,
       eventId: "333",
       rankingType: "single",
-      hasMore: true,
     },
     virtualization: {
-      renderedRows: entries.map((_, index) => ({ index, key: index, start: index * 65.45 })),
-      renderedListHeight: entries.length * 65.45,
+      totalHeight: entries.length * 65,
       listOffset: 0,
-      measureElement: () => undefined,
-    },
-    status: {
-      loading: false,
-      preserveListDuringLoad: false,
-      loadingMore: false,
     },
     search: { highlightedPersonId: "" },
-    interaction: { onRowNavigate: () => undefined },
+    interaction: {
+      onRowNavigate: () => undefined,
+      onToggleExpanded: () => undefined,
+    },
   },
 } satisfies Meta<typeof ResultsTable>;
 
@@ -72,9 +83,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-export const Loading: Story = {
-  args: { status: { ...meta.args.status, loading: true } },
-};
 export const Highlighted: Story = {
   args: { search: { highlightedPersonId: "2024TIED02" } },
 };

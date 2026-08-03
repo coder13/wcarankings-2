@@ -1,15 +1,12 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { RankingsFilterState } from "./rankingsUrl";
+import type { InitialRankingData, RankingSource } from "./types";
 import { useListMemberManagement } from "./useListMemberManagement";
 import { useRankingDataSource } from "./useRankingDataSource";
-import { useRankingNavigationSession } from "./useRankingNavigationSession";
-import { useRankingPageLoader } from "./useRankingPageLoader";
-import { useRankingPagination } from "./useRankingPagination";
-import { useRankingViewport } from "./useRankingViewport";
-import { useRankingWindow } from "./useRankingWindow";
-import type { InitialRankingData, RankingSource } from "./types";
+import { useRankingListOffset } from "./useRankingListOffset";
+import { useVirtualRankings } from "./useVirtualRankings";
 
 export function useRankingDataRuntime({
   filters,
@@ -23,69 +20,29 @@ export function useRankingDataRuntime({
   ownerListId?: string;
 }) {
   const dataSource = useRankingDataSource({ filters, source, initialData });
-  const window = useRankingWindow({
-    initialData,
-    rankingType: filters.rankingType,
-    queryFilters: dataSource.queryFilters,
-    listKey: dataSource.listKey,
+  const [initialDataset] = useState({
+    key: dataSource.listKey,
+    data: initialData,
   });
-  const { patch, reload: reloadWindow } = window.actions;
-  const updateListOffset = useCallback(
-    (listOffset: number) => patch({ listOffset }),
-    [patch],
-  );
-  const viewport = useRankingViewport({
-    entries: window.state.entries,
-    startRank: window.state.startRank,
-    startPosition: window.state.startPosition,
-    listOffset: window.state.listOffset,
-    focusedExpandedPersonId: window.state.focusedExpandedPersonId,
-    expandableRows: filters.subject === "people",
-    hasMore: window.state.hasMore,
-    loading: window.state.loading,
-    loadingPrevious: window.state.loadingPrevious,
-    measurementKey: dataSource.listKey,
-    onListOffsetChange: updateListOffset,
-  });
-  const session = useRankingNavigationSession({
-    pageKey: dataSource.listKey,
-    initialPageRequestKey: initialData
-      ? `${dataSource.listKey}:${initialData.startRank}`
-      : "",
-    patchWindow: patch,
+  const listOffset = useRankingListOffset();
+  const rankings = useVirtualRankings({
+    datasetKey: dataSource.listKey,
+    api: dataSource.rangeApi,
+    initialData:
+      initialDataset.key === dataSource.listKey
+        ? initialDataset.data
+        : undefined,
+    listOffset,
+    expandableRows:
+      filters.subject === "people" && !filters.personCompetitionRanking,
   });
   const reload = useCallback(() => {
-    session.actions.forceNextPageLoad();
-    patch({ startRank: 1 });
-    reloadWindow();
-  }, [patch, reloadWindow, session.actions]);
+    void rankings.reload();
+  }, [rankings]);
   const listMembers = useListMemberManagement({
     listId: ownerListId,
     onRemoved: reload,
   });
-  const pagination = useRankingPagination({
-    window,
-    dataSource,
-    viewport,
-    session,
-  });
 
-  useRankingPageLoader({
-    pageKey: dataSource.listKey,
-    dataSource,
-    window,
-    viewport,
-    session,
-  });
-
-  return {
-    dataSource,
-    window,
-    viewport,
-    resultsViewport: viewport.rendering,
-    session,
-    pagination,
-    reload,
-    listMembers,
-  };
+  return { dataSource, rankings, reload, listMembers };
 }

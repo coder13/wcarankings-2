@@ -92,7 +92,7 @@ export function RankingsTopRail() {
       ? [{ value: "competitions", label: t("rankingsRail.period.competitionCount") }]
       : []),
     { value: "", label: t("rankingsRail.period.allTime") },
-    ...data.window.state.availableYears.map((year) => ({
+    ...data.rankings.availableYears.map((year) => ({
       value: String(year),
       label: String(year),
     })),

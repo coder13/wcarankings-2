@@ -3,40 +3,25 @@
 import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { trackGoogleAnalyticsEvent } from "@/lib/helpers/analytics/google-analytics";
-import {
-  normalizeGenderFilters,
-  type GenderFilter,
-} from "@/lib/wca";
-import {
-  animateScrollTo,
-  getCurrentViewportSubRank,
-  getScrollAnimationDuration,
-} from "./scrollEngine";
-import { RANKING_ROW_HEIGHT } from "./rankingLayout";
-import { rankingPageStart } from "./rankingsQueries";
-import { subjectPath } from "./helpers/navigation";
-import type { CityRanking, CompetitionRanking } from "./helpers/rankingModes";
+import { normalizeGenderFilters, type GenderFilter } from "@/lib/wca";
 import type {
   ExplorerSubject,
   NavigationSubject,
 } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
+import { subjectPath } from "./helpers/navigation";
+import type { CityRanking, CompetitionRanking } from "./helpers/rankingModes";
 import type { RankingsFilterState } from "./rankingsUrl";
-import type { useRankingViewport } from "./useRankingViewport";
-import type { useRankingWindow } from "./useRankingWindow";
-import type { RankingsUrlNavigation, RankingsUrlUpdate } from "./useRankingsUrlState";
+import type {
+  RankingsUrlNavigation,
+  RankingsUrlUpdate,
+} from "./useRankingsUrlState";
 import type { RegionOption, RegionSelection } from "./types";
-import type { useRankingNavigationSession } from "./useRankingNavigationSession";
 
 type PatchFilters = (
   patch: Partial<RankingsFilterState>,
   navigation?: RankingsUrlNavigation,
   urlPatch?: RankingsUrlUpdate,
 ) => void;
-
-type FilterViewport = Pick<
-  ReturnType<typeof useRankingViewport>,
-  "containerRef" | "entriesRef" | "startRankRef" | "scrollStateRef"
->;
 
 export function competitionRankingPath(ranking: CompetitionRanking) {
   return `/competitions/${ranking}`;
@@ -65,10 +50,6 @@ function rankingTypeForEvent(
 export function useRankingFilterActions({
   state,
   patchFilters,
-  patchWindow,
-  viewport,
-  session,
-  preserveSearchOnNextRequest,
 }: {
   state: {
     subject: ExplorerSubject;
@@ -82,10 +63,6 @@ export function useRankingFilterActions({
     gender: readonly GenderFilter[];
   };
   patchFilters: PatchFilters;
-  patchWindow: ReturnType<typeof useRankingWindow>["actions"]["patch"];
-  viewport: FilterViewport;
-  session: ReturnType<typeof useRankingNavigationSession>;
-  preserveSearchOnNextRequest: () => void;
 }) {
   const router = useRouter();
   const {
@@ -98,91 +75,18 @@ export function useRankingFilterActions({
     rankingType,
     gender,
   } = state;
-  const {
-    containerRef,
-    entriesRef,
-    startRankRef,
-    scrollStateRef,
-  } = viewport;
-  const {
-    pendingFirstPageFallbackRef,
-    pendingNavigationAppendRef,
-    pendingRankRef,
-    pendingScrollDirectionRef,
-    pendingScrollToTopRef,
-    preserveListDuringLoadRef,
-  } = session.refs;
-
-  const preserveFromCurrentPosition = useCallback(() => {
-    const viewportSubRank = getCurrentViewportSubRank(
-      containerRef.current,
-      entriesRef.current,
-      startRankRef.current,
-    );
-    pendingRankRef.current = viewportSubRank;
-    pendingScrollToTopRef.current = false;
-    pendingScrollDirectionRef.current = null;
-    pendingFirstPageFallbackRef.current = true;
-    preserveSearchOnNextRequest();
-    preserveListDuringLoadRef.current = true;
-    patchWindow({
-      preserveListDuringLoad: true,
-      startRank: rankingPageStart(viewportSubRank) + 1,
-    });
-  }, [
-    containerRef,
-    entriesRef,
-    patchWindow,
-    pendingFirstPageFallbackRef,
-    pendingRankRef,
-    pendingScrollDirectionRef,
-    pendingScrollToTopRef,
-    preserveListDuringLoadRef,
-    preserveSearchOnNextRequest,
-    startRankRef,
-  ]);
-
-  const resetToTop = useCallback((preserveList: boolean) => {
-    pendingRankRef.current = 1;
-    pendingScrollToTopRef.current = true;
-    pendingScrollDirectionRef.current = null;
-    pendingNavigationAppendRef.current = false;
-    preserveListDuringLoadRef.current = preserveList;
-    patchWindow({
-      preserveListDuringLoad: preserveList,
-      startRank: 1,
-    });
-  }, [
-    patchWindow,
-    pendingNavigationAppendRef,
-    pendingRankRef,
-    pendingScrollDirectionRef,
-    pendingScrollToTopRef,
-    preserveListDuringLoadRef,
-  ]);
 
   const changeRankingType = useCallback((next: "single" | "average") => {
-    if (next === rankingType || eventId === "333mbf" || eventId === "sor-kinch")
+    if (next === rankingType || eventId === "333mbf" || eventId === "sor-kinch") {
       return;
-    preserveFromCurrentPosition();
+    }
     patchFilters({ rankingType: next });
     trackGoogleAnalyticsEvent("ranking_result_type_changed", {
       result_type: next,
     });
-  }, [eventId, patchFilters, preserveFromCurrentPosition, rankingType]);
+  }, [eventId, patchFilters, rankingType]);
 
   const changeEvent = useCallback((nextEventId: string) => {
-    resetToTop(true);
-    pendingFirstPageFallbackRef.current = false;
-    preserveSearchOnNextRequest();
-    animateScrollTo(
-      scrollStateRef.current,
-      0,
-      "smooth",
-      getScrollAnimationDuration(
-        Math.max(1, Math.round(window.scrollY / RANKING_ROW_HEIGHT)),
-      ),
-    );
     const nextRankingType = rankingTypeForEvent(
       nextEventId,
       rankingType,
@@ -192,37 +96,25 @@ export function useRankingFilterActions({
     trackGoogleAnalyticsEvent("ranking_event_changed", {
       event_id: nextEventId,
     });
-  }, [
-    competitionRanking,
-    patchFilters,
-    pendingFirstPageFallbackRef,
-    preserveSearchOnNextRequest,
-    rankingType,
-    resetToTop,
-    scrollStateRef,
-    subject,
-  ]);
+  }, [competitionRanking, patchFilters, rankingType, subject]);
 
   const changeRegion = useCallback((option: RegionOption) => {
-    preserveFromCurrentPosition();
-    pendingNavigationAppendRef.current = false;
     patchFilters({
       regionSelection: { scope: option.scope, regionId: option.regionId },
     });
     trackGoogleAnalyticsEvent("ranking_scope_changed", {
       scope_type: option.scope,
     });
-  }, [patchFilters, pendingNavigationAppendRef, preserveFromCurrentPosition]);
+  }, [patchFilters]);
 
   const changeGender = useCallback((nextGender: GenderFilter[]) => {
     const normalized = normalizeGenderFilters(nextGender);
     if (normalized.join(",") === gender.join(",")) return;
-    resetToTop(false);
     patchFilters({ gender: normalized });
     trackGoogleAnalyticsEvent("ranking_gender_changed", {
       gender: normalized.length ? normalized.join(",") : "any",
     });
-  }, [gender, patchFilters, resetToTop]);
+  }, [gender, patchFilters]);
 
   const changeSubject = useCallback((nextSubject: NavigationSubject) => {
     if (nextSubject === "lists") {
@@ -230,7 +122,6 @@ export function useRankingFilterActions({
       return;
     }
     if (nextSubject === subject) return;
-    resetToTop(true);
     let nextPath = subjectPath(nextSubject);
     if (nextSubject === "people") {
       if (personCompetitionRanking) nextPath = "/persons/competitions";
@@ -241,7 +132,7 @@ export function useRankingFilterActions({
       { history: "push", pathname: nextPath },
       { search: "", wcaId: "", focusMe: false },
     );
-  }, [patchFilters, personCompetitionRanking, resetToTop, router, subject, year]);
+  }, [patchFilters, personCompetitionRanking, router, subject, year]);
 
   const leaveList = useCallback((nextSubject: NavigationSubject) => {
     router.push(nextSubject === "lists" ? "/lists" : subjectPath(nextSubject));
@@ -249,7 +140,6 @@ export function useRankingFilterActions({
 
   const changeYear = useCallback((nextYear: number | null) => {
     if (nextYear === year) return;
-    resetToTop(true);
     patchFilters(
       { year: nextYear, personCompetitionRanking: false },
       {
@@ -258,44 +148,39 @@ export function useRankingFilterActions({
       },
       { search: "", wcaId: "", focusMe: false },
     );
-  }, [patchFilters, resetToTop, year]);
+  }, [patchFilters, year]);
 
   const changePersonCompetitionRanking = useCallback((enabled: boolean) => {
     if (enabled === personCompetitionRanking) return;
-    resetToTop(true);
     patchFilters(
       { personCompetitionRanking: enabled, year: null },
       { history: "push", pathname: enabled ? "/persons/competitions" : "/" },
       { search: "", wcaId: "", focusMe: false },
     );
-  }, [patchFilters, personCompetitionRanking, resetToTop]);
+  }, [patchFilters, personCompetitionRanking]);
 
   const changeCompetitionRanking = useCallback((next: CompetitionRanking) => {
     if (next === competitionRanking) return;
-    resetToTop(true);
     patchFilters(
       { competitionRanking: next },
       { history: "push", pathname: competitionRankingPath(next) },
     );
-  }, [competitionRanking, patchFilters, resetToTop]);
+  }, [competitionRanking, patchFilters]);
 
   const changeCityRanking = useCallback((next: CityRanking) => {
     if (next === cityRanking) return;
-    resetToTop(true);
     patchFilters(
       {
         cityRanking: next,
-        rankingType:
-          next === "fastest-average" ? "average" : "single",
+        rankingType: next === "fastest-average" ? "average" : "single",
       },
       { history: "push", pathname: cityRankingPath(next) },
     );
-  }, [cityRanking, patchFilters, resetToTop]);
+  }, [cityRanking, patchFilters]);
 
-  const changeHemisphere = useCallback((hemisphere: "north" | "south") => {
-    patchFilters({ latitudeHemisphere: hemisphere });
-    patchWindow({ startRank: 1 });
-  }, [patchFilters, patchWindow]);
+  const changeHemisphere = useCallback((latitudeHemisphere: "north" | "south") => {
+    patchFilters({ latitudeHemisphere });
+  }, [patchFilters]);
 
   return useMemo(() => ({
     changeRankingType,
@@ -310,16 +195,16 @@ export function useRankingFilterActions({
     changeCityRanking,
     changeHemisphere,
   }), [
-    changeCompetitionRanking,
     changeCityRanking,
+    changeCompetitionRanking,
     changeEvent,
     changeGender,
     changeHemisphere,
+    changePersonCompetitionRanking,
     changeRankingType,
     changeRegion,
     changeSubject,
     changeYear,
-    changePersonCompetitionRanking,
     leaveList,
   ]);
 }

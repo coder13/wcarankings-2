@@ -5,67 +5,57 @@ import { ListMembershipRequestRows } from "../ListOwnerControls/ListMembershipRe
 import { ResultsTable } from "../ResultsTable/ResultsTable";
 import { useRankingsExplorer } from "./RankingsExplorerContext";
 import { emptyOwnerListMessage } from "./list-empty-state";
-import type { RankingViewportRendering } from "./useRankingViewport";
 
-export function RankingsResults({
-  viewport: {
-    containerRef,
-    listRef,
-    renderedRows,
-    renderedListHeight,
-    measureElement,
-    resizeRow,
-  },
-}: {
-  viewport: RankingViewportRendering;
-}) {
+export function RankingsResults() {
   const {
     config: { list },
     filters,
-    data,
+    data: { rankings, listMembers },
     interactions,
   } = useRankingsExplorer();
-  const { state: ranking } = data.window;
-  const { listMembers } = data;
   const membershipRequests = list?.membershipRequests;
   const emptyListMessage = emptyOwnerListMessage(list?.owner);
+  const emptyState = (
+    <div className="listMessage">
+      {emptyListMessage ?? "No rankings match these filters."}
+    </div>
+  );
 
-  let results = null;
-  if (ranking.error) {
-    results = <div className="listMessage">{ranking.error}</div>;
+  let results;
+  if (rankings.error || interactions.navigation.error) {
+    results = (
+      <div className="listMessage">
+        {rankings.error || interactions.navigation.error}
+      </div>
+    );
+  } else if (rankings.loading && rankings.items.length === 0) {
+    results = (
+      <div className="listMessage listMessage--delayed">Loading rankings…</div>
+    );
+  } else if (rankings.total === 0) {
+    results = emptyState;
   } else {
     results = (
       <ResultsTable
         data={{
-          entries: ranking.entries,
+          items: rankings.items,
           eventId: filters.eventId,
-          rankingType: ranking.entriesRankingType,
-          emptyState: emptyListMessage
-            ? <div className="listMessage">{emptyListMessage}</div>
-            : undefined,
+          rankingType: filters.rankingType,
+          emptyState,
           hideIdentityIds:
             filters.subject === "competitions" || filters.subject === "cities",
-          hasMore: ranking.hasMore,
         }}
         virtualization={{
-          listRef,
-          renderedRows,
-          renderedListHeight,
-          listOffset: ranking.listOffset,
-          measureElement,
-          resizeRow,
-        }}
-        status={{
-          loading: ranking.loading,
-          preserveListDuringLoad: ranking.preserveListDuringLoad,
-          loadingMore: ranking.loadingMore,
+          totalHeight: rankings.totalHeight,
+          listOffset: rankings.listOffset,
         }}
         search={{
-          highlightedPersonId: ranking.highlightedPersonId,
+          highlightedPersonId: interactions.navigation.highlightedPersonId,
           searchMatchPersonIds: interactions.search.state.matchPersonIds,
         }}
         interaction={{
-          onRowNavigate: data.pagination.navigateRow,
+          onRowNavigate: interactions.navigation.navigateRow,
+          onToggleExpanded: rankings.toggleExpanded,
           memberSelectionMode: listMembers.selection.active,
           selectedMemberIds: listMembers.selection.personIds,
           onMemberToggle: listMembers.selection.toggle,
@@ -76,10 +66,6 @@ export function RankingsResults({
             filters.subject === "people" &&
             !filters.personCompetitionRanking &&
             WCA_EVENTS.some((event) => event.id === filters.eventId),
-          initialExpandedPersonId:
-            filters.subject === "people" && !filters.personCompetitionRanking
-              ? ranking.focusedExpandedPersonId
-              : "",
           onFocusedPersonChange:
             filters.subject === "people" && !filters.personCompetitionRanking
               ? interactions.navigation.updateFocusedPerson
@@ -90,14 +76,12 @@ export function RankingsResults({
   }
 
   return (
-    <div className="outerListWrapper" ref={containerRef}>
+    <div className="outerListWrapper" data-rankings-list-container>
       <div className="listContainer">
-        {list?.notice && (
-          <div className="listMessage">{list.notice}</div>
-        )}
-        {ranking.focusNotice && (
+        {list?.notice && <div className="listMessage">{list.notice}</div>}
+        {interactions.navigation.focusNotice && (
           <div className="listMessage listMessage--notice">
-            {ranking.focusNotice}
+            {interactions.navigation.focusNotice}
           </div>
         )}
         {membershipRequests && (
@@ -105,9 +89,6 @@ export function RankingsResults({
             listId={membershipRequests.listId}
             initialRequests={membershipRequests.requests}
           />
-        )}
-        {ranking.loadingPrevious && (
-          <div className="listMessage">Loading earlier rankings…</div>
         )}
         {results}
       </div>

@@ -411,11 +411,11 @@ ul {
 }
 
 .app.app--searching {
-  padding-bottom: calc(3.5em + 50vh);
+  padding-bottom: calc(3.5em + 195px);
 }
 
 .app.app--searching.app--vimMode {
-  padding-bottom: calc(6em + 50vh);
+  padding-bottom: calc(6em + 195px);
 }
 
 .app,

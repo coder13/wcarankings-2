@@ -1,15 +1,12 @@
 import Link from "next/link";
-import { AnimatePresence, motion } from "motion/react";
-import type { ReactNode } from "react";
 import type { PersonEventBest, PersonEventDetails } from "@/lib/person-event-details";
 import { rankingScope } from "../RankingsExplorer/types";
-
-const ACCORDION_TRANSITION_SECONDS = 0.2;
 
 type RankingDetailsState = {
   visible: boolean;
   closing: boolean;
-  skipAnimation: boolean;
+  height: number;
+  progress: number;
   error: string;
 };
 
@@ -139,43 +136,6 @@ function AccordionSkeleton({ singleResultOnly }: { singleResultOnly: boolean }) 
   );
 }
 
-function AccordionFrame({
-  closing,
-  initial,
-  ready,
-  children,
-}: {
-  closing: boolean;
-  initial: boolean;
-  ready: boolean;
-  children: ReactNode;
-}) {
-  let initialAnimation: false | { height: number; marginBottom: number; opacity: number } = {
-    height: 0,
-    marginBottom: 0,
-    opacity: 0,
-  };
-  if (initial || closing) initialAnimation = false;
-
-  return (
-    <motion.div
-      className={`rowAccordion${ready ? " rowAccordion--ready" : ""}`}
-      initial={initialAnimation}
-      animate={closing
-        ? { height: 0, marginBottom: 0, opacity: 0 }
-        : { height: "auto", marginBottom: "0.4rem", opacity: 1 }}
-      exit={{ height: 0, marginBottom: 0, opacity: 0 }}
-      transition={{
-        height: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
-        marginBottom: { duration: ACCORDION_TRANSITION_SECONDS, ease: [0.2, 0.7, 0.2, 1] },
-        opacity: { duration: ACCORDION_TRANSITION_SECONDS * 0.5, ease: "easeOut" },
-      }}
-    >
-      <div className="rowAccordionInner">{children}</div>
-    </motion.div>
-  );
-}
-
 export function RankingDetailsPanel({
   state,
   data,
@@ -183,56 +143,55 @@ export function RankingDetailsPanel({
   state: RankingDetailsState;
   data: RankingDetailsData;
 }) {
-  const { visible, closing, skipAnimation, error } = state;
+  const { visible, closing, height, progress, error } = state;
   const { eventId, details, profileHref } = data;
   const singleResultOnly = eventId === "333mbf";
   const pending = visible && !details && !error;
 
+  if (!visible) return null;
+
   return (
-    <AnimatePresence initial={false} mode="sync">
-      {visible && (
-        <AccordionFrame
-          key="ranking-details"
-          closing={closing}
-          initial={skipAnimation}
-          ready={!pending}
-        >
-          <div className="rowAccordionContent">
-            {error && !details && <div className="rowAccordionState">{error}</div>}
-            {details && (
-              <>
-                <div className={`rowAccordionResults${singleResultOnly ? " rowAccordionResults--singleOnly" : ""}`}>
+    <div
+      className={`rowAccordion${!pending ? " rowAccordion--ready" : ""}`}
+      data-closing={closing}
+      style={{ height: `${height}px`, opacity: progress }}
+    >
+      <div className="rowAccordionInner">
+        <div className="rowAccordionContent">
+          {error && !details && <div className="rowAccordionState">{error}</div>}
+          {details && (
+            <>
+              <div className={`rowAccordionResults${singleResultOnly ? " rowAccordionResults--singleOnly" : ""}`}>
+                <ResultDetail
+                  label="Single"
+                  best={details.single}
+                  details={details}
+                  only={singleResultOnly}
+                />
+                {!singleResultOnly && (
                   <ResultDetail
-                    label="Single"
-                    best={details.single}
+                    label="Average"
+                    best={details.average}
                     details={details}
-                    only={singleResultOnly}
                   />
-                  {!singleResultOnly && (
-                    <ResultDetail
-                      label="Average"
-                      best={details.average}
-                      details={details}
-                    />
-                  )}
-                </div>
-                <footer
-                  className="rowAccordionFooter"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <Link href={profileHref}>Full competitor profile</Link>
-                </footer>
-              </>
-            )}
-          </div>
-          <div
-            className={`rowAccordionLoading${pending ? "" : " rowAccordionLoading--hidden"}`}
-            aria-hidden={!pending}
-          >
-            <AccordionSkeleton singleResultOnly={singleResultOnly} />
-          </div>
-        </AccordionFrame>
-      )}
-    </AnimatePresence>
+                )}
+              </div>
+              <footer
+                className="rowAccordionFooter"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Link href={profileHref}>Full competitor profile</Link>
+              </footer>
+            </>
+          )}
+        </div>
+        <div
+          className={`rowAccordionLoading${pending ? "" : " rowAccordionLoading--hidden"}`}
+          aria-hidden={!pending}
+        >
+          <AccordionSkeleton singleResultOnly={singleResultOnly} />
+        </div>
+      </div>
+    </div>
   );
 }

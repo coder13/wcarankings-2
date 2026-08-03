@@ -13,7 +13,7 @@ export type RankingsExplorerContextValue = {
   filters: RankingsFilterState;
   data: Pick<
     ReturnType<typeof useRankingDataRuntime>,
-    "window" | "pagination" | "reload" | "listMembers"
+    "rankings" | "reload" | "listMembers"
   >;
   interactions: ReturnType<typeof useRankingInteractionRuntime>;
   commands: RankingCommands;

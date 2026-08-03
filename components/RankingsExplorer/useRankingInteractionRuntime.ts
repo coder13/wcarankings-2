@@ -5,11 +5,9 @@ import type {
   RankingsFilterState,
 } from "./useRankingsFilters";
 import type { useRankingsUrlState } from "./useRankingsUrlState";
-import { useCancelRankingNavigationOnInput } from "./useExplorerKeyboardShortcuts";
 import type { useRankingDataRuntime } from "./useRankingDataRuntime";
 import { useRankingFilterActions } from "./useRankingFilterActions";
 import { useRankingNavigation } from "./useRankingNavigation";
-import { useRankingSearchNavigation } from "./useRankingSearchNavigation";
 import { useRankingsSearch } from "./useRankingsSearch";
 
 export function useRankingInteractionRuntime({
@@ -23,41 +21,24 @@ export function useRankingInteractionRuntime({
   url: Pick<ReturnType<typeof useRankingsUrlState>, "state" | "write">;
   data: ReturnType<typeof useRankingDataRuntime>;
 }) {
-  const { dataSource, window, viewport, session } = data;
-  const searchNavigation = useRankingSearchNavigation({ data });
+  const navigation = useRankingNavigation({
+    filters,
+    dataSource: data.dataSource,
+    rankings: data.rankings,
+    url,
+  });
   const search = useRankingsSearch({
     query: filters.search,
     regexSearch: filters.regexSearch,
-    requestKey: dataSource.listKey,
-    request: dataSource.requests.searchRankings,
-    onMatch: searchNavigation.jumpToMatch,
-    onReset: searchNavigation.reset,
-    onPrefetch: dataSource.requests.prefetchSearchResultPages,
+    requestKey: data.dataSource.listKey,
+    request: data.dataSource.requests.searchRankings,
+    onMatch: navigation.jumpToEntry,
+    onReset: navigation.clearHighlight,
     patchFilters,
   });
   const filterActions = useRankingFilterActions({
     state: filters,
     patchFilters,
-    patchWindow: window.actions.patch,
-    viewport,
-    session,
-    preserveSearchOnNextRequest: search.actions.preserveOnNextRequest,
-  });
-  const navigation = useRankingNavigation({
-    filters,
-    data,
-    search: {
-      controller: search,
-      cancelMotion: searchNavigation.cancelMotion,
-    },
-    url,
-  });
-
-  useCancelRankingNavigationOnInput({
-    viewport,
-    searchNavigation,
-    windowController: window,
-    navigationSession: session,
   });
 
   return { search, filterActions, navigation };

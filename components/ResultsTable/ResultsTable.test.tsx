@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderWithProviders } from "@/tests/render-providers";
 import type { RankingEntry } from "../RankingsExplorer/types";
+import type { VirtualRankingItem } from "../RankingsExplorer/useVirtualRankings";
 import { ResultsTable } from "./ResultsTable";
 
 const entries: RankingEntry[] = [
@@ -31,19 +32,31 @@ const entries: RankingEntry[] = [
   },
 ];
 
+const items: VirtualRankingItem[] = entries.map((entry, index) => ({
+  index,
+  globalIndex: index,
+  key: index,
+  start: index * 65,
+  end: (index + 1) * 65,
+  size: 65,
+  lane: 0,
+  entry,
+  rankIsDuplicate: index > 0 && entries[index - 1].rank === entry.rank,
+  expanded: false,
+  expandedContentHeight: 0,
+  expansionProgress: 0,
+}));
+
 test("renders rows and highlights tied results", () => {
   const markup = renderWithProviders(
     <ResultsTable
-      data={{ entries, eventId: "333", rankingType: "single", hasMore: true }}
-      virtualization={{
-        renderedRows: entries.map((_, index) => ({ index, key: index, start: index * 65.45 })),
-        renderedListHeight: 123.2,
-        listOffset: 0,
-        measureElement: () => undefined,
-      }}
-      status={{ loading: false, preserveListDuringLoad: false, loadingMore: false }}
+      data={{ items, eventId: "333", rankingType: "single" }}
+      virtualization={{ totalHeight: 130, listOffset: 0 }}
       search={{ highlightedPersonId: "2024TIED02" }}
-      interaction={{ onRowNavigate: () => undefined }}
+      interaction={{
+        onRowNavigate: () => undefined,
+        onToggleExpanded: () => undefined,
+      }}
     />,
   );
   assert.match(markup, /Fast Solver/);
@@ -51,19 +64,16 @@ test("renders rows and highlights tied results", () => {
   assert.match(markup, /rank--duplicate/);
 });
 
-test("keeps already rendered rankings visible while refreshing", () => {
+test("renders cached ranking items without a loading replacement", () => {
   const markup = renderWithProviders(
     <ResultsTable
-      data={{ entries, eventId: "333", rankingType: "single", hasMore: true }}
-      virtualization={{
-        renderedRows: entries.map((_, index) => ({ index, key: index, start: index * 65.45 })),
-        renderedListHeight: 123.2,
-        listOffset: 0,
-        measureElement: () => undefined,
-      }}
-      status={{ loading: true, preserveListDuringLoad: false, loadingMore: false }}
+      data={{ items, eventId: "333", rankingType: "single" }}
+      virtualization={{ totalHeight: 130, listOffset: 0 }}
       search={{ highlightedPersonId: "" }}
-      interaction={{ onRowNavigate: () => undefined }}
+      interaction={{
+        onRowNavigate: () => undefined,
+        onToggleExpanded: () => undefined,
+      }}
     />,
   );
 

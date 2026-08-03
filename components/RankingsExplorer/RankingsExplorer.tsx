@@ -88,8 +88,8 @@ export function RankingsExplorer({
   const hasScrolled = useHasScrolled();
   const pagerEnabled =
     !data.listMembers.selection.active &&
-    (!source || data.window.state.total > RESULTS_PAGE_SIZE);
-  const pagerVisible = data.window.state.pagerNavigationBusy || hasScrolled;
+    (!source || data.rankings.total > RESULTS_PAGE_SIZE);
+  const pagerVisible = data.rankings.jumpAnimating || hasScrolled;
 
   return (
     <RankingsExplorerContext
@@ -113,8 +113,7 @@ export function RankingsExplorer({
         },
         filters: url.filters,
         data: {
-          window: data.window,
-          pagination: data.pagination,
+          rankings: data.rankings,
           reload: data.reload,
           listMembers: data.listMembers,
         },
@@ -131,9 +130,9 @@ export function RankingsExplorer({
         <RankingsExplorerHeader />
         <RankingsTopRail />
         <main>
-          <RankingsResults viewport={data.resultsViewport} />
+          <RankingsResults />
         </main>
-        <RankingsNavigationFooter visibleRank={data.viewport.visibleSubRank} />
+        <RankingsNavigationFooter />
         <ListMemberManagementOverlays />
         <VimNavigationOverlay />
       </RankingsAppShell>

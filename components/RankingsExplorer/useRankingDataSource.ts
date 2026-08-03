@@ -92,8 +92,18 @@ export function useRankingDataSource({
   seedSavedListVersionWindow(queryFilters, initialData);
   const listKey = JSON.stringify(rankingWindowQueryKey(queryFilters));
   const requests = useRankingsQueryApi(queryFilters);
+  const rangeApi = useMemo(
+    () => ({
+      cacheKey: listKey,
+      fetchRange: (
+        request: { start: number; count: number },
+        signal: AbortSignal,
+      ) => requests.getRange(request.start, request.count, signal),
+    }),
+    [listKey, requests],
+  );
 
-  return { listKey, queryFilters, requests };
+  return { listKey, requests, rangeApi };
 }
 
 export type RankingDataSource = ReturnType<typeof useRankingDataSource>;

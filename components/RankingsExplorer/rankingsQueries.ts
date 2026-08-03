@@ -1,18 +1,12 @@
 "use client";
 
 import {
-  keepPreviousData,
   queryOptions,
-  useInfiniteQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import type { GenderFilter } from "@/lib/wca";
-import {
-  getNavigationWindowPageStarts,
-  getSearchBridgePageStarts,
-} from "./scrollEngine";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
   InitialRankingData,
@@ -21,12 +15,9 @@ import type {
   RankingSource,
   RegionSelection,
 } from "./types";
-import { rankingEntryKey } from "./types";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const PAGE_STALE_TIME_MS = 5 * 60 * 1000;
-const SEARCH_PREFETCH_RADIUS = 3;
-const NAVIGATION_ADJACENT_PAGE_COUNT = 2;
 
 export type RankingQueryFilters = {
   eventId: string;
@@ -178,8 +169,9 @@ async function requestRankingPage(
     const body = (await response.json()) as { error?: string };
     throw new Error(body.error ?? "Rankings are unavailable.");
   }
-  const data = (await response.json()) as RankingPage & {
-    entries: Array<RankingEntry & { position?: number }>;
+  type RawRankingEntry = RankingEntry & { position?: number };
+  const data = (await response.json()) as Omit<RankingPage, "entries"> & {
+    entries: RawRankingEntry[];
   };
   const versionKey = savedListVersionKey(filters);
   if (versionKey && data.cacheMembershipVersion && data.cacheDataVersion) {
@@ -189,9 +181,9 @@ async function requestRankingPage(
     });
   }
   return {
-    entries: data.entries.map(({ position, ...entry }) => ({
+    entries: data.entries.map((entry) => ({
       ...entry,
-      subRank: entry.subRank ?? position ?? 0,
+      subRank: entry.subRank ?? entry.position ?? 0,
     })),
     hasMore: data.hasMore,
     nextPageStart: data.nextPageStart,
@@ -201,6 +193,10 @@ async function requestRankingPage(
     total: data.total,
     exportDate: data.exportDate ?? null,
     availableYears: data.availableYears,
+    cacheMembershipVersion: data.cacheMembershipVersion,
+    cacheDataVersion:
+      data.cacheDataVersion ??
+      response.headers.get("X-Rankings-Data-Version"),
     offlineStale: response.headers.get("X-Rankings-Offline-Stale") === "1",
   } satisfies RankingPage;
 }
@@ -217,54 +213,6 @@ function rankingPageQueryOptions(
   });
 }
 
-function initialRankingPage(initialData: InitialRankingData): RankingPage {
-  return {
-    entries: initialData.entries,
-    hasMore: initialData.hasMore,
-    nextPageStart: initialData.nextPageStart,
-    previousPageStart: initialData.previousPageStart,
-    startPosition: initialData.startPosition,
-    lastRank: initialData.lastRank,
-    total: initialData.total,
-    exportDate: initialData.exportDate,
-    availableYears: initialData.availableYears,
-  };
-}
-
-export function useRankingInfiniteQuery(
-  filters: RankingQueryFilters,
-  start: number,
-  initialData?: InitialRankingData,
-) {
-  const queryClient = useQueryClient();
-  return useInfiniteQuery({
-    queryKey: rankingWindowQueryKey(filters),
-    initialPageParam: rankingPageStart(start) + 1,
-    queryFn: ({ pageParam }) =>
-      queryClient.fetchQuery(rankingPageQueryOptions(filters, pageParam)),
-    getNextPageParam: (page) => page.nextPageStart ?? undefined,
-    getPreviousPageParam: (page) => page.previousPageStart ?? undefined,
-    initialData: initialData
-      ? {
-          pages: [initialRankingPage(initialData)],
-          pageParams: [initialData.startRank],
-        }
-      : undefined,
-    placeholderData: keepPreviousData,
-    staleTime: PAGE_STALE_TIME_MS,
-  });
-}
-
-function mergePages(pages: RankingPage[]) {
-  const seen = new Set<string>();
-  return pages.flatMap((page) => page.entries.filter((entry) => {
-    const key = rankingEntryKey(entry);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }));
-}
-
 export function useRankingsQueryApi(filters: RankingQueryFilters) {
   const queryClient = useQueryClient();
 
@@ -273,140 +221,49 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       rankingPageQueryOptions(filters, start),
     );
 
-    const getEndWindow = async (endSubRank: number) => {
-      const finalPageStart = rankingPageStart(endSubRank);
-      const pageStarts = [
-        Math.max(0, finalPageStart - PAGE_SIZE),
-        finalPageStart,
-      ].filter((value, index, values) => values.indexOf(value) === index);
+    const getRange = async (
+      start: number,
+      count: number,
+      signal?: AbortSignal,
+    ) => {
+      signal?.throwIfAborted();
+      const end = Math.max(start, start + count);
+      const firstPageStart = Math.floor(start / PAGE_SIZE) * PAGE_SIZE;
+      const finalPageStart = Math.floor(
+        Math.max(start, end - 1) / PAGE_SIZE,
+      ) * PAGE_SIZE;
+      const pageStarts = Array.from(
+        { length: (finalPageStart - firstPageStart) / PAGE_SIZE + 1 },
+        (_, index) => firstPageStart + index * PAGE_SIZE,
+      );
       const pages = await Promise.all(
         pageStarts.map((pageStart) => getPage(pageStart + 1)),
       );
-      const firstPage = pages[0];
-      const lastPage = pages.at(-1) ?? firstPage;
+      signal?.throwIfAborted();
+      const rows: Record<number, RankingEntry> = {};
+      for (const page of pages) {
+        page.entries.forEach((entry, entryIndex) => {
+          const globalIndex = entry.subRank > 0
+            ? entry.subRank - 1
+            : page.startPosition + entryIndex;
+          if (globalIndex >= start && globalIndex < end) {
+            rows[globalIndex] = entry;
+          }
+        });
+      }
+      const metadata = pages.at(-1) ?? pages[0];
       return {
-        ...lastPage,
-        entries: mergePages(pages),
-        startPosition: firstPage.startPosition,
-        previousPageStart: firstPage.previousPageStart,
-      };
-    };
-
-    const getNavigationWindow = async (
-      targetSubRank: number,
-      direction: -1 | 1,
-    ) => {
-      const targetPageStart = rankingPageStart(targetSubRank);
-      const pages = (await Promise.all(
-        getNavigationWindowPageStarts(
-          targetPageStart,
-          direction,
-          PAGE_SIZE,
-          NAVIGATION_ADJACENT_PAGE_COUNT,
-        )
-          .map((pageStart) => getPage(pageStart + 1)),
-      ))
-        .filter((page) => page.entries.length > 0);
-      const firstPage = pages[0];
-      if (!firstPage) return getPage(targetPageStart + 1);
-      const lastPage = pages.at(-1) ?? firstPage;
-      return {
-        ...lastPage,
-        entries: mergePages(pages),
-        startPosition: firstPage.startPosition,
-        previousPageStart: firstPage.previousPageStart,
-        nextPageStart: lastPage.nextPageStart,
+        rows,
+        total: metadata?.total ?? 0,
+        dataVersion:
+          metadata?.cacheDataVersion ?? metadata?.exportDate ?? "current",
+        exportDate: metadata?.exportDate ?? null,
+        availableYears: metadata?.availableYears ?? [],
+        offlineStale: Boolean(metadata?.offlineStale),
       };
     };
 
     const peopleFilters = { ...filters, resource: "people" } satisfies RankingQueryFilters;
-    const getPeoplePage = (start: number) => queryClient.fetchQuery(
-      rankingPageQueryOptions(peopleFilters, start),
-    );
-    const getPersonWindow = async (
-      match: Pick<RankingEntry, "personId" | "subRank">,
-    ) => {
-      const targetPageStart = rankingPageStart(match.subRank);
-      const starts = [targetPageStart - PAGE_SIZE, targetPageStart, targetPageStart + PAGE_SIZE]
-        .filter((value) => value >= 0)
-        .filter((value, index, values) => values.indexOf(value) === index);
-      const pages = await Promise.all(
-        starts.map((pageStart) => getPeoplePage(pageStart + 1)),
-      );
-      const entries = mergePages(pages);
-      if (!entries.some((entry) => entry.personId === match.personId)) {
-        throw new Error("Could not locate the selected ranking result.");
-      }
-      const firstPage = pages[0];
-      const lastPage = pages.at(-1) ?? firstPage;
-      return {
-        ...lastPage,
-        entries,
-        startPosition: firstPage.startPosition,
-        previousPageStart: firstPage.previousPageStart,
-        nextPageStart: lastPage.nextPageStart,
-      };
-    };
-
-    const getDistantSearchWindow = async (
-      currentPageStart: number,
-      match: RankingEntry,
-      direction: -1 | 1,
-    ) => {
-      const targetPageStart = rankingPageStart(match.subRank);
-      const starts = [
-        currentPageStart,
-        ...getSearchBridgePageStarts(
-          currentPageStart,
-          targetPageStart,
-          direction,
-          PAGE_SIZE,
-        ),
-        targetPageStart - PAGE_SIZE,
-        targetPageStart,
-        targetPageStart + PAGE_SIZE,
-      ]
-        .filter((value) => value >= 0)
-        .filter((value, index, values) => values.indexOf(value) === index)
-        .sort((left, right) => left - right);
-      const pages = (await Promise.all(
-        starts.map((pageStart) => getPeoplePage(pageStart + 1)),
-      )).filter((page) => page.entries.length > 0);
-      const entries = mergePages(pages);
-      if (!entries.some((entry) => entry.personId === match.personId)) {
-        throw new Error("Could not locate the selected ranking result.");
-      }
-      const firstPage = pages[0];
-      const lastPage = pages.at(-1) ?? firstPage;
-      return {
-        ...lastPage,
-        entries,
-        startPosition: firstPage.startPosition,
-        previousPageStart: firstPage.previousPageStart,
-        nextPageStart: lastPage.nextPageStart,
-      };
-    };
-
-    const prefetchSearchResultPages = (
-      matches: Array<RankingEntry | null | undefined>,
-      currentMatchIndex: number,
-    ) => {
-      if (matches.length < 2 || currentMatchIndex < 0) return;
-      const requested = new Set<number>();
-      for (const direction of [-1, 1] as const) {
-        for (let distance = 1; distance <= SEARCH_PREFETCH_RADIUS; distance += 1) {
-          const matchIndex =
-            (currentMatchIndex + direction * distance + matches.length) % matches.length;
-          const match = matches[matchIndex];
-          if (!match) continue;
-          const requestKey = rankingPageStart(match.subRank);
-          if (requested.has(requestKey)) continue;
-          requested.add(requestKey);
-          void getPersonWindow(match).catch(() => undefined);
-        }
-      }
-    };
-
     const searchRankings = async (
       search: string,
       regexSearch: boolean,
@@ -453,12 +310,7 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       });
 
     return {
-      getPage,
-      getEndWindow,
-      getNavigationWindow,
-      getPersonWindow,
-      getDistantSearchWindow,
-      prefetchSearchResultPages,
+      getRange,
       searchRankings,
       locateRanking,
     };

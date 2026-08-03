@@ -9,7 +9,7 @@ import { formatFooterDate, formatRankingsFreshness } from "./types";
 
 function RankingsFooter({ standalone = false }: { standalone?: boolean }) {
   const { config: { release }, data } = useRankingsExplorer();
-  const { offlineStale, exportDate } = data.window.state;
+  const { offlineStale, exportDate } = data.rankings;
 
   return (
     <footer className={`siteFooter${standalone ? " siteFooter--standalone" : ""}`}>
@@ -31,7 +31,7 @@ function RankingsFooter({ standalone = false }: { standalone?: boolean }) {
   );
 }
 
-export function RankingsNavigationFooter({ visibleRank }: { visibleRank: number }) {
+export function RankingsNavigationFooter() {
   const {
     config: { source, options },
     filters,
@@ -41,20 +41,20 @@ export function RankingsNavigationFooter({ visibleRank }: { visibleRank: number 
   const hasScrolled = useHasScrolled();
   const pagerEnabled =
     !data.listMembers.selection.active &&
-    (!source || data.window.state.total > RESULTS_PAGE_SIZE);
+    (!source || data.rankings.total > RESULTS_PAGE_SIZE);
 
   if (!pagerEnabled) return <RankingsFooter standalone />;
 
   return (
     <JumpControlsVisibility
-      visible={data.window.state.pagerNavigationBusy || hasScrolled}
+      visible={data.rankings.jumpAnimating || hasScrolled}
       fallback={<RankingsFooter />}
     >
       <RankingsPagerRail
         navigation={{
-          busy: data.window.state.pagerNavigationBusy,
-          currentPosition: visibleRank,
-          total: data.window.state.total,
+          busy: data.rankings.jumpAnimating,
+          currentPosition: data.rankings.currentIndex + 1,
+          total: data.rankings.total,
           onJumpUp: navigation.jumpUp,
           onJumpDown: navigation.jumpDown,
           onJumpToTop: () => navigation.resetToRank(1),

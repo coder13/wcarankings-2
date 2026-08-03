@@ -28,7 +28,8 @@ type RankingRowInteraction = {
 type RankingRowDetails = {
   expanded?: boolean;
   closing?: boolean;
-  skipAccordionAnimation?: boolean;
+  height?: number;
+  progress?: number;
   eventDetails?: PersonEventDetails | null;
   detailsError?: string;
   onPrefetchDetails?: (entry: RankingEntry) => void;
@@ -68,7 +69,8 @@ export function RankingRow({
   const {
     expanded = false,
     closing = false,
-    skipAccordionAnimation = false,
+    height = 0,
+    progress = 0,
     eventDetails,
     onPrefetchDetails,
     onCancelPrefetchDetails,
@@ -89,7 +91,7 @@ export function RankingRow({
   }, []);
   const style = {
     "--t-animation-delay": `${animationIndex * 10}ms`,
-    minHeight: "65.45px",
+    minHeight: "65px",
   } as CSSProperties;
   const rank = entry.rank;
   const name = entry.personName;
@@ -149,6 +151,7 @@ export function RankingRow({
       className="listItem"
       data-person-id={entry.personId}
       data-row-index={rowIndex}
+      data-global-index={rowIndex}
       style={style}
       tabIndex={0}
       aria-label={`Rank ${formatRankingNumber(rank)}: ${name}, ${formattedResult}${rankDeltaLabel ? `, ${rankDeltaLabel}` : ""}`}
@@ -263,7 +266,8 @@ export function RankingRow({
           state={{
             visible: accordionVisible,
             closing,
-            skipAnimation: skipAccordionAnimation,
+            height,
+            progress,
             error: detailsError,
           }}
           data={{
