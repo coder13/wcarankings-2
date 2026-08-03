@@ -5,6 +5,8 @@ import type { CachePool, RankingsPageKey } from "@/services/rankings/types";
 export const RANKINGS_CACHE_REFRESH_MS = 60_000;
 export const RANKINGS_CACHE_CAPACITY_333 = 512;
 export const RANKINGS_CACHE_CAPACITY_DEFAULT = 128;
+export const RANKINGS_WINDOW_SIZE = 400;
+export const RANKINGS_WINDOW_CACHE_CAPACITY = 128;
 
 export type RankingsCachePoolSnapshot = {
   eventId: string;
@@ -183,6 +185,36 @@ export class RankingsPageCache<T extends object> {
 }
 
 export const rankingsPageCache = new RankingsPageCache<Record<string, unknown>>();
+
+/** Shared process-local windows used to serve adjacent 50-row pages from one query. */
+export class RankingsWindowCache<T extends object> {
+  private readonly cache = new LRUCache<string, T>({ max: RANKINGS_WINDOW_CACHE_CAPACITY });
+  private readonly pending = new Map<string, Promise<T>>();
+
+  clear() {
+    this.cache.clear();
+    this.pending.clear();
+  }
+
+  async getWithStatus(key: string, load: () => Promise<T>) {
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return { value: cached, outcome: "hit" as const };
+    const inFlight = this.pending.get(key);
+    if (inFlight) return { value: await inFlight, outcome: "coalesced" as const };
+    const request = load().then((value) => {
+      this.cache.set(key, value);
+      return value;
+    });
+    this.pending.set(key, request);
+    try {
+      return { value: await request, outcome: "miss" as const };
+    } finally {
+      this.pending.delete(key);
+    }
+  }
+}
+
+export const rankingsWindowCache = new RankingsWindowCache<Record<string, unknown>>();
 
 export function normalPageKey(input: RankingsPageKey) {
   return { ...input, startRank: Math.max(1, Math.floor(input.startRank)) };

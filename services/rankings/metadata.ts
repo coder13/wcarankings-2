@@ -1,6 +1,10 @@
 import { query } from "@/db";
 import type { RankingType, RegionScope } from "@/lib/wca";
-import { RANKINGS_CACHE_REFRESH_MS, rankingsPageCache } from "@/services/rankings/cache";
+import {
+  RANKINGS_CACHE_REFRESH_MS,
+  rankingsPageCache,
+  rankingsWindowCache,
+} from "@/services/rankings/cache";
 import { countKey, yearCountKey } from "@/services/rankings/helpers";
 import {
   rankingCountsQuery,
@@ -98,6 +102,7 @@ export async function refreshRankingsMetadata() {
           const next = await loadSnapshot();
           snapshot = next;
           rankingsPageCache.clear();
+          rankingsWindowCache.clear();
           readiness = null;
         }
         return snapshot;

@@ -11,6 +11,8 @@ import {
 } from "@/lib/api/projection";
 import { searchPersonIds } from "@/services/people/service";
 import { getRecordBadges } from "@/lib/wca";
+import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
+import { rankingsWindowCache, RANKINGS_WINDOW_SIZE } from "@/services/rankings/cache";
 import type { ResultRankingRow } from "@/services/rankings/types";
 import {
   filteredResultRankingsQuery,
@@ -37,17 +39,97 @@ function parseSearchLimit(params: URLSearchParams) {
   return limit;
 }
 
-export async function loadResultRankings(params: URLSearchParams) {
+function resultWindowKey(
+  params: URLSearchParams,
+  windowStart: number,
+  dataVersion: string,
+) {
+  return JSON.stringify({
+    dataVersion,
+    eventId: params.get("eventId") ?? params.get("event"),
+    result: params.get("result") ?? params.get("type"),
+    region: params.get("region") ?? "world",
+    gender: params.getAll("gender").sort(),
+    year: params.get("year"),
+    windowStart,
+  });
+}
+
+function sliceResultWindow(
+  data: Record<string, unknown>,
+  start: number,
+  limit: number,
+  windowStart: number,
+) {
+  const windowEntries = Array.isArray(data.entries) ? data.entries as Array<Record<string, unknown>> : [];
+  const entries = windowEntries.slice(start - windowStart, start - windowStart + limit);
+  const total = Number(data.total ?? 0);
+  const hasMore = start + entries.length < total;
+  return {
+    ...data,
+    entries,
+    hasMore,
+    nextPageStart: hasMore ? start + limit : null,
+    previousPageStart: start > 0 ? Math.max(0, start - limit) : null,
+    startPosition: start,
+    lastRank: entries.at(-1)?.rank ?? null,
+    total,
+  };
+}
+
+type ResultWindowOverride = { start: number; limit: number };
+
+export async function loadResultRankings(
+  params: URLSearchParams,
+  windowOverride?: ResultWindowOverride,
+) {
   const eventId = parseEvent(params);
   const resultType = parseResultType(params, eventId);
   const { scope, regionId } = parseScope(params);
-  const start = parsePageStart(params);
-  const limit = parseLimit(params);
+  const requestedStart = parsePageStart(params);
+  const requestedLimit = parseLimit(params);
+  const start = windowOverride?.start ?? requestedStart;
+  const limit = windowOverride?.limit ?? requestedLimit;
   const search = (params.get("search") ?? "").trim().slice(0, 80);
   const regexSearch = params.get("mode") === "vim";
   const baseTable = resultType === "average" ? "result_rankings_average" : "result_rankings_single";
   const gender = parseGender(params);
   const year = parseYear(params);
+  if (!windowOverride && !search) {
+    const metadata = await getCurrentRankingsMetadata();
+    const windowStart = Math.floor(requestedStart / RANKINGS_WINDOW_SIZE) * RANKINGS_WINDOW_SIZE;
+    const cached = await rankingsWindowCache.getWithStatus(
+      resultWindowKey(params, windowStart, metadata.fetchedAt),
+      async () => loadResultRankings(params, { start: windowStart, limit: RANKINGS_WINDOW_SIZE })
+        .then((result) => result as unknown as Record<string, unknown>),
+    );
+    const value = cached.value as unknown as {
+      data: Record<string, unknown>;
+      diagnostics: { timings: { queueMs: number; statementMs: number }; queryCount: number; returnedRows: number };
+    };
+    const data = sliceResultWindow(value.data, requestedStart, requestedLimit, windowStart);
+    const nextWindowStart = windowStart + RANKINGS_WINDOW_SIZE;
+    if (
+      requestedStart - windowStart >= RANKINGS_WINDOW_SIZE / 2 &&
+      nextWindowStart < Number(data.total ?? 0)
+    ) {
+      void rankingsWindowCache.getWithStatus(
+        resultWindowKey(params, nextWindowStart, metadata.fetchedAt),
+        async () => loadResultRankings(params, { start: nextWindowStart, limit: RANKINGS_WINDOW_SIZE })
+          .then((result) => result as unknown as Record<string, unknown>),
+      ).catch((error) => console.warn("Result ranking window prefetch failed", error));
+    }
+    return {
+      data,
+      diagnostics: {
+        ...value.diagnostics,
+        ...(cached.outcome === "hit"
+          ? { timings: { queueMs: 0, statementMs: 0 }, queryCount: 0, returnedRows: 0 }
+          : {}),
+        cacheOutcome: cached.outcome,
+      },
+    };
+  }
   const genderSet = gender.join(",");
   const lazySingle = resultType === "single" && (year !== null || gender.length > 0);
   const lazyAverage = resultType === "average" && (year !== null || gender.length > 0);
@@ -212,6 +294,7 @@ export async function loadResultRankings(params: URLSearchParams) {
       ),
       queryCount,
       returnedRows: peopleReturnedRows + rows.rows.length + (counts?.rows.length ?? 0),
+      cacheOutcome: "bypass" as const,
     },
   };
 }

@@ -136,6 +136,8 @@ async function fetchList(scenario, page, config) {
     total: Number(payload?.total ?? 0),
     firstRank: entries[0]?.rank ?? null,
     lastRank: entries.at(-1)?.rank ?? null,
+    firstSubRank: entries[0]?.subRank ?? null,
+    lastSubRank: entries.at(-1)?.subRank ?? null,
     cache: response?.headers.get("x-rankings-cache") ?? "none",
     dataVersion: response?.headers.get("x-rankings-data-version") ?? "none",
     ...parseServerTiming(response?.headers.get("server-timing")),
@@ -146,6 +148,7 @@ async function fetchList(scenario, page, config) {
       + ` start=${result.requestedStart} status=${result.status}`
       + ` latency=${result.elapsedMs.toFixed(1)}ms rows=${result.rows}`
       + ` ranks=${result.firstRank ?? "-"}-${result.lastRank ?? "-"}`
+      + ` subRanks=${result.firstSubRank ?? "-"}-${result.lastSubRank ?? "-"}`
       + ` total=${result.total} cache=${result.cache}`
       + (result.timing_db !== undefined ? ` db=${result.timing_db.toFixed(1)}ms` : "")
       + (result.error ? ` error=${result.error}` : ""),
@@ -233,7 +236,7 @@ const scenarios = [
 ];
 
 const report = {
-  reportVersion: 2,
+  reportVersion: 3,
   runId,
   label: label || null,
   generatedAt: new Date().toISOString(),
