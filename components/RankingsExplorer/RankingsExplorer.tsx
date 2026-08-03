@@ -3,6 +3,7 @@
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
 import { RankingsExplorerContext } from "./RankingsExplorerContext";
+import { RankingsDocumentTitle } from "./RankingsDocumentTitle";
 import { RankingsExplorerHeader } from "./RankingsExplorerHeader";
 import { RankingsNavigationFooter } from "./RankingsNavigationFooter";
 import { RankingsResults } from "./RankingsResults";
@@ -123,6 +124,7 @@ export function RankingsExplorer({
         vim,
       }}
     >
+      <RankingsDocumentTitle />
       <RankingsAppShell>
         <ViewportEdgeGradients
           topVisible={hasScrolled}
