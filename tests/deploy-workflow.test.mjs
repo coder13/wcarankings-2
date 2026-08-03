@@ -375,12 +375,16 @@ test("projection deployment accepts and smoke-tests every capability group", asy
   assert.match(projectionDeploy, /person-competition-rankings,\*\) retry_endpoint "\/api\/rankings\/people\/competitions\?start=0&limit=1"/);
 });
 
-test("group artifacts use GHCR and cached dependencies hydrate before isolated builds", () => {
-  assert.match(builder, /projection-build-matrix\.mjs --wave=1/);
-  assert.match(builder, /projection-build-matrix\.mjs --wave=2/);
-  assert.match(builder, /projection-build-matrix\.mjs --wave=3/);
-  assert.match(builder, /wave-three:/);
-  assert.match(builder, /strategy:[\s\S]*matrix:/);
+test("bundled group artifacts share one isolated build database", () => {
+  assert.match(builder, /build:\n\s+if: inputs\.build_groups != ''/);
+  assert.match(builder, /uses: \.\/\.github\/workflows\/build-projection-group\.yml/);
+  assert.match(builder, /groups: \$\{\{ inputs\.build_groups \}\}/);
+  assert.doesNotMatch(builder, /projection-build-matrix\.mjs/);
+  assert.doesNotMatch(builder, /wave-one:|wave-two:|wave-three:/);
+  assert.match(groupBuilder, /groups:/);
+  assert.match(groupBuilder, /GROUPS: \$\{\{ inputs\.groups \}\}/);
+  assert.match(groupBuilder, /--groups="\$GROUPS"/);
+  assert.match(groupBuilder, /for group in \$\(printf '%s' "\$GROUPS"/);
   assert.match(groupBuilder, /oras pull "\$\{repository\}@\$\{digest\}"/);
   assert.match(groupBuilder, /oras push "\$ref"/);
   assert.match(groupBuilder, /application\/vnd\.cuberanks\.projection\.tables\.v1\+gzip/);
@@ -432,7 +436,7 @@ test("Node dependency consumers use the pinned pnpm lockfile", () => {
 });
 
 test("raw export downloads use the writable runner cache directory", () => {
-  const rawExport = builder.slice(builder.indexOf("  raw-export:"), builder.indexOf("  matrix:"));
+  const rawExport = builder.slice(builder.indexOf("  raw-export:"), builder.indexOf("  build:"));
   assert.match(rawExport, /WCA_EXPORT_CACHE_DIR: \/tmp\/wca-export-cache/);
 });
 

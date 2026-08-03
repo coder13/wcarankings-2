@@ -103,79 +103,16 @@ jobs:
           path: /tmp/wca-export-cache
           key: wca-sql-export-${{ inputs.export_date }}
 
-  matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      wave_one: ${{ steps.plan.outputs.wave_one }}
-      wave_two: ${{ steps.plan.outputs.wave_two }}
-      wave_two_required: ${{ steps.plan.outputs.wave_two_required }}
-      wave_three: ${{ steps.plan.outputs.wave_three }}
-      wave_three_required: ${{ steps.plan.outputs.wave_three_required }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref }}
-      - name: Plan isolated build waves
-        id: plan
-        env:
-          BUILD_GROUPS: ${{ inputs.build_groups }}
-        run: |
-          wave_one=$(node scripts/projection-build-matrix.mjs --wave=1)
-          wave_two=$(node scripts/projection-build-matrix.mjs --wave=2)
-          wave_three=$(node scripts/projection-build-matrix.mjs --wave=3)
-          echo "wave_one=$wave_one" >> "$GITHUB_OUTPUT"
-          echo "wave_two=$wave_two" >> "$GITHUB_OUTPUT"
-          echo "wave_two_required=$(jq -r '.include | length > 0' <<<"$wave_two")" >> "$GITHUB_OUTPUT"
-          echo "wave_three=$wave_three" >> "$GITHUB_OUTPUT"
-          echo "wave_three_required=$(jq -r '.include | length > 0' <<<"$wave_three")" >> "$GITHUB_OUTPUT"
-
-  wave-one:
+  build:
     if: inputs.build_groups != ''
-    needs: [matrix, raw-export]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix.outputs.wave_one) }}
+    needs: raw-export
     uses: ./.github/workflows/build-projection-group.yml
     with:
       ref: ${{ inputs.ref }}
       export_date: ${{ inputs.export_date }}
       export_value: ${{ inputs.export_value }}
-      group: ${{ matrix.group }}
-      hydrate_groups: ${{ matrix.hydrate_groups }}
-      fingerprints: ${{ inputs.fingerprints }}
-      available_artifacts: ${{ inputs.available_artifacts }}
-    secrets: inherit
-
-  wave-two:
-    if: needs.matrix.outputs.wave_two_required == 'true'
-    needs: [matrix, wave-one]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix.outputs.wave_two) }}
-    uses: ./.github/workflows/build-projection-group.yml
-    with:
-      ref: ${{ inputs.ref }}
-      export_date: ${{ inputs.export_date }}
-      export_value: ${{ inputs.export_value }}
-      group: ${{ matrix.group }}
-      hydrate_groups: ${{ matrix.hydrate_groups }}
-      fingerprints: ${{ inputs.fingerprints }}
-      available_artifacts: ${{ inputs.available_artifacts }}
-    secrets: inherit
-
-  wave-three:
-    if: needs.matrix.outputs.wave_three_required == 'true'
-    needs: [matrix, wave-two]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix.outputs.wave_three) }}
-    uses: ./.github/workflows/build-projection-group.yml
-    with:
-      ref: ${{ inputs.ref }}
-      export_date: ${{ inputs.export_date }}
-      export_value: ${{ inputs.export_value }}
-      group: ${{ matrix.group }}
-      hydrate_groups: ${{ matrix.hydrate_groups }}
+      groups: ${{ inputs.build_groups }}
+      hydrate_groups: ${{ inputs.hydrate_groups }}
       fingerprints: ${{ inputs.fingerprints }}
       available_artifacts: ${{ inputs.available_artifacts }}
     secrets: inherit
@@ -183,12 +120,9 @@ jobs:
   compose:
     if: >-
       always()
-      && needs.matrix.result == 'success'
       && needs.raw-export.result == 'success'
-      && (needs.wave-one.result == 'success' || needs.wave-one.result == 'skipped')
-      && (needs.wave-two.result == 'success' || needs.wave-two.result == 'skipped')
-      && (needs.wave-three.result == 'success' || needs.wave-three.result == 'skipped')
-    needs: [matrix, raw-export, wave-one, wave-two, wave-three]
+      && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    needs: [raw-export, build]
     runs-on: ubuntu-latest
     outputs:
       artifact_name: ${{ steps.release.outputs.name }}
@@ -319,10 +253,8 @@ jobs:
       && inputs.run_benchmark == true
       && inputs.build_groups != ''
       && needs.raw-export.result == 'success'
-      && (needs.wave-one.result == 'success' || needs.wave-one.result == 'skipped')
-      && (needs.wave-two.result == 'success' || needs.wave-two.result == 'skipped')
-      && (needs.wave-three.result == 'success' || needs.wave-three.result == 'skipped')
-    needs: [raw-export, wave-one, wave-two, wave-three]
+      && needs.build.result == 'success'
+    needs: [raw-export, build]
     runs-on: ubuntu-latest
     env:
       MYSQL_DATABASE: wcarankings
