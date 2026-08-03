@@ -52,6 +52,11 @@
 
 .delayControl input {
   width: 5rem;
+}
+
+.delayControl input,
+.jumpControl input,
+.jumpControl button {
   height: 2rem;
   padding-inline: 0.5rem;
   border: 1px solid var(--border-subtle);
@@ -66,9 +71,29 @@
     outline-color 150ms ease;
 }
 
-.delayControl input:focus-visible {
+.jumpControl {
+  display: flex;
+  flex: none;
+  gap: 0.35rem;
+}
+
+.jumpControl input {
+  width: 6.5rem;
+}
+
+.jumpControl button {
+  cursor: pointer;
+}
+
+.delayControl input:focus-visible,
+.jumpControl input:focus-visible,
+.jumpControl button:focus-visible {
   border-color: var(--primary);
   outline-color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.jumpControl button:hover {
+  border-color: var(--primary);
 }
 
 .debugInfo {
@@ -97,7 +122,15 @@
   }
 
   .controls {
+    display: none;
+  }
+
+  .jumpControl {
     width: 100%;
-    justify-content: space-between;
+  }
+
+  .jumpControl input {
+    flex: 1;
+    width: auto;
   }
 }

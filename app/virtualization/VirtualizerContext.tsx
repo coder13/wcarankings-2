@@ -6,12 +6,21 @@ import {
   type VirtualItem,
 } from "@tanstack/react-virtual";
 import { keepPreviousData, queryOptions, useQuery } from "@tanstack/react-query";
-import { createContext, use, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  use,
+  useCallback,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { flushSync } from "react-dom";
 import {
   useRankingsApi,
   type RankingRowData,
   type RankingsApi,
 } from "./RankingsApiContext";
+import { useInterruptibleWindowScroll } from "./useInterruptibleWindowScroll";
 
 export const TOTAL_ROWS = 500_000;
 export const ROW_HEIGHT = 65;
@@ -21,6 +30,10 @@ export const RECENTER_TARGET_ROW = 250;
 export const OVERSCAN_ROWS = 12;
 export const LIST_OFFSET = 64;
 export const RANGE_CACHE_BUCKET_ROWS = 50;
+export const MAX_JUMP_ANIMATION_ROWS = 250;
+export const JUMP_ANIMATION_DURATION_SECONDS = 0.6;
+export const JUMP_ANIMATION_EASE = [0.32, 0.72, 0, 1] as const;
+export const JUMP_VIEWPORT_ANCHOR = 1 / 3;
 
 const RANGE_CACHE_TIME_MS = 5 * 60 * 1000;
 const PLAYGROUND_FILTERS = {
@@ -50,6 +63,7 @@ type VirtualizerContextValue = {
   totalHeight: number;
   scrollOffset: number;
   baseIndex: number;
+  jumpToIndex: (index: number) => void;
 };
 
 const VirtualizerContext = createContext<VirtualizerContextValue | null>(null);
@@ -113,6 +127,10 @@ function useVirtualRankingItems(
 export function VirtualRankingsProvider({ children }: { children: ReactNode }) {
   const [baseIndex, setBaseIndex] = useState(0);
   const baseIndexRef = useRef(baseIndex);
+  const scrollAnimation = useInterruptibleWindowScroll({
+    duration: JUMP_ANIMATION_DURATION_SECONDS,
+    ease: JUMP_ANIMATION_EASE,
+  });
   const virtualizer = useWindowVirtualizer({
     count: windowCount,
     estimateSize: () => ROW_HEIGHT,
@@ -123,6 +141,12 @@ export function VirtualRankingsProvider({ children }: { children: ReactNode }) {
       observeWindowOffset(instance, (physicalOffset, isScrolling) => {
         const localOffset = Math.max(0, physicalOffset - LIST_OFFSET);
         const localIndex = localOffset / ROW_HEIGHT;
+
+        if (scrollAnimation.isActive()) {
+          callback(physicalOffset, isScrolling);
+          return;
+        }
+
         const currentBaseIndex = baseIndexRef.current;
         const nearTop = localIndex <= edgeRows && currentBaseIndex > 0;
         const nearBottom =
@@ -158,6 +182,75 @@ export function VirtualRankingsProvider({ children }: { children: ReactNode }) {
         callback(recenteredOffset, isScrolling);
       }),
   });
+
+  const jumpToIndex = useCallback(
+    (requestedIndex: number) => {
+      const targetIndex = Math.min(
+        TOTAL_ROWS - 1,
+        Math.max(0, Math.trunc(requestedIndex)),
+      );
+      const currentLocalIndex = Math.max(
+        0,
+        (window.scrollY +
+          window.innerHeight * JUMP_VIEWPORT_ANCHOR -
+          LIST_OFFSET -
+          ROW_HEIGHT / 2) /
+          ROW_HEIGHT,
+      );
+      const currentGlobalIndex = baseIndexRef.current + currentLocalIndex;
+      const direction = Math.sign(targetIndex - currentGlobalIndex);
+
+      if (direction === 0) {
+        scrollAnimation.cancel();
+        return;
+      }
+
+      const nextBaseIndex = Math.min(
+        maximumBaseIndex,
+        Math.max(0, targetIndex - targetLocalIndex),
+      );
+      const finalLocalIndex = targetIndex - nextBaseIndex;
+      const maximumScrollOffset = Math.max(
+        0,
+        LIST_OFFSET + windowCount * ROW_HEIGHT - window.innerHeight,
+      );
+      const finalOffset = Math.min(
+        maximumScrollOffset,
+        Math.max(
+          0,
+          LIST_OFFSET +
+            finalLocalIndex * ROW_HEIGHT +
+            ROW_HEIGHT / 2 -
+            window.innerHeight * JUMP_VIEWPORT_ANCHOR,
+        ),
+      );
+      const availableAnimationRows =
+        direction > 0
+          ? finalOffset / ROW_HEIGHT
+          : (maximumScrollOffset - finalOffset) / ROW_HEIGHT;
+      const animatedRows = Math.max(
+        0,
+        Math.min(
+          Math.abs(targetIndex - currentGlobalIndex),
+          MAX_JUMP_ANIMATION_ROWS,
+          availableAnimationRows,
+        ),
+      );
+      const startingOffset =
+        finalOffset - direction * animatedRows * ROW_HEIGHT;
+
+      scrollAnimation.start({
+        from: startingOffset,
+        to: finalOffset,
+        prepare: () => {
+          baseIndexRef.current = nextBaseIndex;
+          flushSync(() => setBaseIndex(nextBaseIndex));
+        },
+      });
+    },
+    [scrollAnimation],
+  );
+
   const items = useVirtualRankingItems(
     virtualizer.getVirtualItems(),
     baseIndex,
@@ -170,6 +263,7 @@ export function VirtualRankingsProvider({ children }: { children: ReactNode }) {
         totalHeight: Math.round(virtualizer.getTotalSize()),
         scrollOffset: Math.round(virtualizer.scrollOffset ?? 0),
         baseIndex,
+        jumpToIndex,
       }}
     >
       {children}

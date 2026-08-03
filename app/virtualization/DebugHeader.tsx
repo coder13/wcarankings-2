@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useMockApiControls } from "./RankingsApiContext";
 import {
   OVERSCAN_ROWS,
@@ -10,13 +11,14 @@ import {
 import styles from "./VirtualizationPlayground.module.css";
 
 export function DebugHeader() {
+  const [jumpRank, setJumpRank] = useState(5_000);
   const {
     averageDelayMs,
     varianceMs,
     setAverageDelayMs,
     setVarianceMs,
   } = useMockApiControls();
-  const { items, totalHeight, scrollOffset, baseIndex } =
+  const { items, totalHeight, scrollOffset, baseIndex, jumpToIndex } =
     useVirtualizerContext();
   const firstVirtualItem = items[0];
   const lastVirtualItem = items.at(-1);
@@ -69,6 +71,32 @@ export function DebugHeader() {
             <span>ms</span>
           </label>
         </div>
+        <form
+          className={styles.jumpControl}
+          onSubmit={(event) => {
+            event.preventDefault();
+            jumpToIndex(jumpRank - 1);
+          }}
+        >
+          <input
+            aria-label="Ranking to jump to"
+            inputMode="numeric"
+            max={TOTAL_ROWS}
+            min="1"
+            onChange={(event) =>
+              setJumpRank(
+                Math.min(
+                  TOTAL_ROWS,
+                  Math.max(1, event.currentTarget.valueAsNumber || 1),
+                ),
+              )
+            }
+            step="1"
+            type="number"
+            value={jumpRank}
+          />
+          <button type="submit">Jump</button>
+        </form>
         <output className={styles.debugInfo} title={debugInfo}>
           {debugInfo}
         </output>
