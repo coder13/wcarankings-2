@@ -1,0 +1,49 @@
+.row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: 7ch minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35em;
+  min-height: 65.45px;
+  width: 100%;
+  padding-inline: var(--page-gutter, 1rem);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.0625rem;
+  font-weight: 300;
+}
+
+.alternate {
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.number,
+.result {
+  font-variant-numeric: tabular-nums;
+}
+
+.number {
+  font-size: 1.05em;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result {
+  font-size: 1.08em;
+  font-weight: 500;
+  text-align: right;
+}
+
+@media (max-width: 480px) {
+  .row {
+    grid-template-columns: 5ch minmax(0, 1fr) auto;
+    font-size: 1rem;
+  }
+}
