@@ -128,7 +128,7 @@ jobs:
           [[ "$PRODUCTION_WCA_EXPORT_VALUE" =~ ^[0-9TZUTC:+.\ -]+$ ]]
           for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do
             case "$group" in
-              compatibility|result-facts|result-rankings|competition-rankings|person-competition-rankings|city-rankings|sum-of-ranks|yearly-person-rankings) ;;
+              compatibility|result-facts|solve-facts|result-rankings|competition-rankings|person-competition-rankings|city-rankings|sum-of-ranks|yearly-person-rankings) ;;
               *) echo "Unknown projection group: $group" >&2; exit 1 ;;
             esac
           done
