@@ -74,7 +74,7 @@ test("does not replace SQL failures with synthetic ranking data", async () => {
 });
 
 test("keeps the rankings visual shell and PWA wiring", async () => {
-  const [css, page, layout, manifest, registration, updatePrompt, worker, packageJson] =
+  const [css, page, layout, providers, manifest, registration, worker, packageJson] =
     await Promise.all([
       read(
         "app/globals.css",
@@ -86,9 +86,9 @@ test("keeps the rankings visual shell and PWA wiring", async () => {
       ),
       read("app/RankingsPage.tsx"),
       read("app/layout.tsx"),
+      read("app/AppProviders.tsx"),
       read("app/manifest.ts"),
-      read("components/PwaRegistration/PwaRegistration.tsx"),
-      read("components/PwaUpdatePrompt/PwaUpdatePrompt.tsx"),
+      read("app/usePwaRegistration.ts"),
       read("public/sw.js"),
       read("package.json"),
     ]);
@@ -103,7 +103,8 @@ test("keeps the rankings visual shell and PWA wiring", async () => {
   assert.match(page, /requiresCompetitionRankings && !featureSwitch\.competitionRankings/);
   assert.match(page, /requiresCityRankings && !featureSwitch\.cityEventStats/);
   assert.match(layout, /title:\s*"WCA Rankings"/);
-  assert.match(layout, /PwaRegistration/);
+  assert.doesNotMatch(layout, /PwaRegistration/);
+  assert.match(providers, /usePwaRegistration\(\)/);
   assert.match(layout, /ProjectionFeatureSwitchProvider/);
   assert.match(manifest, /display: "standalone"/);
   assert.match(manifest, /icon-192\.png/);
@@ -112,8 +113,9 @@ test("keeps the rankings visual shell and PWA wiring", async () => {
   assert.match(registration, /updateViaCache: "none"/);
   assert.match(registration, /controllerchange/);
   assert.match(registration, /SKIP_WAITING/);
-  assert.match(registration, /PwaUpdatePrompt/);
-  assert.match(updatePrompt, /Update available/);
+  assert.match(registration, /activateUpdate\(registration\.waiting\)/);
+  assert.match(registration, /worker\.postMessage\(\{ type: SKIP_WAITING_MESSAGE \}\)/);
+  assert.doesNotMatch(registration, /PwaUpdatePrompt|Update available/);
   assert.match(registration, /import\.meta\.env\.PROD/);
   assert.match(registration, /getRegistrations\(\)/);
   assert.match(registration, /registration\.unregister\(\)/);
