@@ -176,6 +176,13 @@ const projectionDefinitions = [
     tables: ["result_ranking_counts"],
     enabledByDefault: true,
   },
+  {
+    name: "person-333-sub-x-rankings",
+    dependencies: ["result-facts"],
+    files: ["person_333_sub_x_rankings.sql", "person_333_sub_x_counts.sql"],
+    tables: ["person_333_sub_x_rankings", "person_333_sub_x_counts"],
+    enabledByDefault: true,
+  },
   { name: "person-ranking-counts", dependencies: ["person-event-rankings"], files: ["projection_counts.sql"], tables: ["person_ranking_counts"] },
   { name: "person-metric-values", dependencies: ["person-event-rankings"], files: ["person_metric_values.sql"], tables: ["person_metric_values"] },
   { name: "person-metric-scores", dependencies: ["person-metric-values"], files: ["person_metric_scores.sql"], tables: ["person_metric_scores", "person_metric_counts"] },

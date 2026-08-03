@@ -4,7 +4,7 @@ import { getCurrentRankingsMetadata, getRankingCount, getYearRankingCount, type 
 import { normalPageKey, rankingsPageCache } from "@/lib/rankings-cache";
 import { searchPersonIds } from "@/lib/person-search";
 import { ApiInputError, parseGender, parseYear } from "@/lib/projection-api";
-import { getRecordBadges, isRankingEventId, isRankingType, isValidRegexPattern, parseRegionQuery, type GenderFilter, type RankingEntry, type RankingType, type RegionScope } from "@/lib/wca";
+import { getRecordBadges, isRankingEventId, isRankingType, isSubX333RankingEventId, isValidRegexPattern, parseRegionQuery, subX333ThresholdForEventId, type GenderFilter, type RankingEntry, type RankingType, type RegionScope } from "@/lib/wca";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const MAX_SEARCH_RESULTS = 500;
@@ -24,6 +24,7 @@ type PersonMetricRow = {
   best: number;
 };
 type FilteredPersonMetricRow = PersonMetricRow & { total_count?: number };
+type SubXRankingRow = PersonMetricRow & { total_count?: number };
 
 function toRankingEntry(row: RankingRow): RankingEntry {
   return { rank: Number(row.rank), subRank: Number(row.sub_rank), personId: row.person_id, personName: row.person_name, countryId: row.country_id, countryName: row.country_name, countryIso2: row.country_iso2, continentId: row.continent_id, best: Number(row.best), competitionId: row.competition_id, competitionName: row.competition_name, recordBadges: getRecordBadges({ isWorldRecord: Number(row.is_world_record) === 1, isContinentRecord: Number(row.is_continent_record) === 1, isCountryRecord: Number(row.is_country_record) === 1, continentId: row.continent_id }) };
@@ -155,7 +156,202 @@ async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata) {
   return { data: normalPageResponse(result.rows, input, metadata), timings: result.timings, queryCount: 1, returnedRows: result.rows.length };
 }
 
+function subXShape(scope: RegionScope) {
+  if (scope === "continent") return { rank: "continent_rank", position: "continent_position", region: "continent_id" } as const;
+  if (scope === "country") return { rank: "country_rank", position: "country_position", region: "country_id" } as const;
+  return { rank: "world_rank", position: "world_position", region: null } as const;
+}
+
+function subXEntry(row: SubXRankingRow): RankingEntry {
+  return {
+    rank: Number(row.rank),
+    subRank: Number(row.sub_rank),
+    personId: row.person_id,
+    personName: row.person_name,
+    countryId: row.country_id,
+    countryName: row.country_name,
+    countryIso2: row.country_iso2,
+    continentId: row.continent_id,
+    best: Number(row.best),
+    competitionId: "",
+    competitionName: "",
+    recordBadges: [],
+  };
+}
+
+async function queryFilteredSubXRankings(input: QueryInput, threshold: number) {
+  const { region } = subXShape(input.scope);
+  const gender = genderCondition("person", input.gender);
+  const conditions = ["ranking.threshold = ?", gender.sql];
+  const values: unknown[] = [threshold, ...gender.values];
+  if (region) { conditions.push(`ranking.${region} = ?`); values.push(input.regionId); }
+
+  const pageConditions: string[] = [];
+  const pageValues: unknown[] = [];
+  let peopleTimings = { queueMs: 0, statementMs: 0 };
+  let peopleReturnedRows = 0;
+  let search = false;
+  if (input.locate) {
+    pageConditions.push("filtered.person_id = ?");
+    pageValues.push(input.locate);
+  } else if (input.search) {
+    search = true;
+    const people = await searchPersonIds(input.search, input.regexSearch, input.searchLimit);
+    peopleTimings = people.timings;
+    peopleReturnedRows = people.returnedRows;
+    if (people.personIds.length === 0) {
+      return { data: { entries: [], hasMore: false, nextPageStart: null, previousPageStart: null, total: 0 }, timings: people.timings, queryCount: 1, returnedRows: people.returnedRows };
+    }
+    pageConditions.push(`filtered.person_id IN (${people.personIds.map(() => "?").join(", ")})`);
+    pageValues.push(...people.personIds);
+  } else if (input.cursorRank) {
+    pageConditions.push("(filtered.sub_rank > ? OR (filtered.sub_rank = ? AND filtered.person_id > ?))");
+    pageValues.push(input.cursorRank, input.cursorRank, input.cursorId);
+  } else {
+    pageConditions.push("filtered.sub_rank >= ?");
+    pageValues.push(input.startRank);
+  }
+
+  const limit = input.locate ? 1 : search ? input.searchLimit : input.limit + 1;
+  const result = await query<SubXRankingRow>(
+    `WITH filtered AS (
+       SELECT
+         DENSE_RANK() OVER (ORDER BY ranking.result_count DESC) AS rank,
+         ROW_NUMBER() OVER (ORDER BY ranking.result_count DESC, ranking.person_id) AS sub_rank,
+         COUNT(*) OVER () AS total_count,
+         ranking.person_id,
+         COALESCE(person.name, ranking.person_id) AS person_name,
+         COALESCE(country.id, '') AS country_id,
+         COALESCE(country.name, country.id, '') AS country_name,
+         COALESCE(country.iso2, '') AS country_iso2,
+         COALESCE(country.continent_id, '') AS continent_id,
+         ranking.result_count AS best
+       FROM person_333_sub_x_rankings ranking
+       LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
+       LEFT JOIN countries country ON country.id = ranking.country_id
+       WHERE ${conditions.join(" AND ")}
+     )
+     SELECT *
+     FROM filtered
+     WHERE ${pageConditions.join(" AND ")}
+     ORDER BY sub_rank
+     LIMIT ?`,
+    [...values, ...pageValues, limit],
+  );
+  const timings = {
+    queueMs: peopleTimings.queueMs + result.timings.queueMs,
+    statementMs: peopleTimings.statementMs + result.timings.statementMs,
+  };
+  const entries = result.rows.slice(0, input.locate ? 1 : search ? result.rows.length : input.limit).map(subXEntry);
+  if (input.locate) return { data: { located: entries[0] ?? null }, timings, queryCount: 1 + (input.search ? 1 : 0), returnedRows: peopleReturnedRows + result.rows.length };
+  if (search) return { data: { entries, hasMore: false, nextPageStart: null, previousPageStart: null, total: entries.length }, timings, queryCount: 2, returnedRows: peopleReturnedRows + result.rows.length };
+  return {
+    data: {
+      entries,
+      hasMore: result.rows.length > input.limit,
+      nextPageStart: result.rows.length > input.limit ? input.startRank + PAGE_SIZE : null,
+      previousPageStart: input.startRank > 1 ? Math.max(1, input.startRank - PAGE_SIZE) : null,
+      startPosition: Math.max(0, input.startRank - 1),
+      lastRank: entries.at(-1)?.subRank ?? null,
+      total: Number(result.rows[0]?.total_count ?? 0),
+      exportDate: null,
+    },
+    timings,
+    queryCount: 1 + (input.search ? 1 : 0),
+    returnedRows: peopleReturnedRows + result.rows.length,
+  };
+}
+
+async function querySubXRankings(input: QueryInput) {
+  const threshold = subX333ThresholdForEventId(input.eventId);
+  if (!threshold) throw new ApiInputError("Unknown Sub-X ranking.");
+  if (input.year !== null) throw new ApiInputError("year is not available for Sub-X rankings.");
+  if (input.gender.length) return queryFilteredSubXRankings(input, threshold);
+  const { rank, position, region } = subXShape(input.scope);
+  const gender = genderCondition("person", input.gender);
+  const baseConditions = ["ranking.threshold = ?"];
+  const baseValues: unknown[] = [threshold];
+  if (region) { baseConditions.push(`ranking.${region} = ?`); baseValues.push(input.regionId); }
+  if (gender.sql) { baseConditions.push(gender.sql); baseValues.push(...gender.values); }
+
+  let peopleTimings = { queueMs: 0, statementMs: 0 };
+  let peopleReturnedRows = 0;
+  const pageConditions: string[] = [];
+  const pageValues: unknown[] = [];
+  let search = false;
+  if (input.locate) {
+    pageConditions.push("person_id = ?");
+    pageValues.push(input.locate);
+  } else if (input.search) {
+    search = true;
+    const people = await searchPersonIds(input.search, input.regexSearch, input.searchLimit);
+    peopleTimings = people.timings;
+    peopleReturnedRows = people.returnedRows;
+    if (people.personIds.length === 0) {
+      return { data: { entries: [], hasMore: false, nextPageStart: null, previousPageStart: null, total: 0 }, timings: people.timings, queryCount: 1, returnedRows: people.returnedRows };
+    }
+    pageConditions.push(`person_id IN (${people.personIds.map(() => "?").join(", ")})`);
+    pageValues.push(...people.personIds);
+  } else if (input.cursorRank) {
+    pageConditions.push(`(${position} > ? OR (${position} = ? AND person_id > ?))`);
+    pageValues.push(input.cursorRank, input.cursorRank, input.cursorId);
+  } else {
+    pageConditions.push(`${position} >= ?`);
+    pageValues.push(input.startRank);
+  }
+
+  const selectColumns = `${rank} AS rank, ${position} AS sub_rank, ranking.person_id,
+    COALESCE(person.name, ranking.person_id) AS person_name,
+    COALESCE(country.id, '') AS country_id,
+    COALESCE(country.name, country.id, '') AS country_name,
+    COALESCE(country.iso2, '') AS country_iso2,
+    COALESCE(country.continent_id, '') AS continent_id,
+    ranking.result_count AS best`;
+  const from = `FROM person_333_sub_x_rankings ranking
+    LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
+    LEFT JOIN countries country ON country.id = ranking.country_id`;
+  const limit = input.locate ? 1 : search ? input.searchLimit : input.limit + 1;
+  const result = await query<SubXRankingRow>(
+    `SELECT ${selectColumns} ${from}
+     WHERE ${baseConditions.join(" AND ")} AND ${pageConditions.join(" AND ")}
+     ORDER BY ${position}, ranking.person_id
+     LIMIT ?`,
+    [...baseValues, ...pageValues, limit],
+  );
+  const timings = {
+    queueMs: peopleTimings.queueMs + result.timings.queueMs,
+    statementMs: peopleTimings.statementMs + result.timings.statementMs,
+  };
+  const entries = result.rows.slice(0, input.locate ? 1 : search ? result.rows.length : input.limit).map(subXEntry);
+  if (input.locate) return { data: { located: entries[0] ?? null }, timings, queryCount: 1 + (input.search ? 1 : 0), returnedRows: peopleReturnedRows + result.rows.length };
+  if (search) return { data: { entries, hasMore: false, nextPageStart: null, previousPageStart: null, total: entries.length }, timings, queryCount: 2, returnedRows: peopleReturnedRows + result.rows.length };
+
+  const totalResult = await query<{ count: number }>(
+    "SELECT count FROM person_333_sub_x_counts WHERE threshold = ? AND scope = ? AND region_id = ?",
+    [threshold, input.scope, input.regionId],
+  );
+  return {
+    data: {
+      entries,
+      hasMore: result.rows.length > input.limit,
+      nextPageStart: result.rows.length > input.limit ? input.startRank + PAGE_SIZE : null,
+      previousPageStart: input.startRank > 1 ? Math.max(1, input.startRank - PAGE_SIZE) : null,
+      startPosition: Math.max(0, input.startRank - 1),
+      lastRank: entries.at(-1)?.subRank ?? null,
+      total: Number(totalResult.rows[0]?.count ?? 0),
+      exportDate: null,
+    },
+    timings: {
+      queueMs: timings.queueMs + totalResult.timings.queueMs,
+      statementMs: timings.statementMs + totalResult.timings.statementMs,
+    },
+    queryCount: 2 + (input.search ? 1 : 0),
+    returnedRows: peopleReturnedRows + result.rows.length + totalResult.rows.length,
+  };
+}
+
 export async function queryMysql(input: QueryInput) {
+  if (isSubX333RankingEventId(input.eventId)) return querySubXRankings(input);
   if (input.eventId === "SOR" || input.eventId === "sor-kinch")
     return queryPersonMetric(input);
   if (input.gender.length && input.year === null) return queryGenderPage(input);
@@ -453,7 +649,7 @@ async function queryFilteredPersonMetric(input: QueryInput, kinch: boolean, gend
 function parseInput(searchParams: URLSearchParams): QueryInput {
   const eventId = isRankingEventId(searchParams.get("eventId") ?? searchParams.get("event")) ? searchParams.get("eventId") ?? searchParams.get("event")! : "333";
   const rawType = searchParams.get("result") ?? searchParams.get("type");
-  const type = eventId === "333mbf" || eventId === "sor-kinch" ? "single" : isRankingType(rawType) ? rawType : "single";
+  const type = eventId === "333mbf" || eventId === "sor-kinch" || isSubX333RankingEventId(eventId) ? "single" : isRankingType(rawType) ? rawType : "single";
   const { scope, regionId } = parseRegionQuery(searchParams.get("region"));
   const kinchOrder = searchParams.get("kinch") === "continent" ? "continent" : "regional";
   if (scope !== "world" && !regionId) throw new Error("Choose a region before loading rankings.");
@@ -469,7 +665,7 @@ function parseInput(searchParams: URLSearchParams): QueryInput {
 export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams) {
   const input = parseInput(searchParams);
   if (input.year !== null && (input.eventId === "SOR" || input.eventId === "sor-kinch")) throw new ApiInputError("year is only available for person event rankings.");
-  if (input.eventId === "SOR" || input.eventId === "sor-kinch") {
+  if (input.eventId === "SOR" || input.eventId === "sor-kinch" || isSubX333RankingEventId(input.eventId)) {
     const result = await queryMysql(input);
     return { ...result, cacheOutcome: "bypass" as const, dataVersion: null };
   }

@@ -178,6 +178,30 @@ test("does not introduce entries or sub-rank vocabulary in new schemas", async (
   }
 });
 
+test("registers the 3x3 Sub-X projection with indexed regional counts", async () => {
+  const [schema, rankings, counts] = await Promise.all([
+    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/person_333_sub_x_rankings.sql", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/person_333_sub_x_counts.sql", root), "utf8"),
+  ]);
+
+  assert.match(schema, /name: "person-333-sub-x-rankings"[\s\S]*dependencies: \["result-facts"\]/);
+  assert.match(schema, /person_333_sub_x_rankings\.sql/);
+  assert.match(schema, /person_333_sub_x_counts\.sql/);
+  assert.match(rankings, /FROM thresholds\n  JOIN result_facts facts/);
+  assert.match(rankings, /facts\.best > 0/);
+  assert.match(rankings, /facts\.best < thresholds\.threshold/);
+  assert.match(rankings, /PRIMARY KEY \(threshold, person_id\)/);
+  assert.match(rankings, /idx_person_333_sub_x_world/);
+  assert.match(rankings, /idx_person_333_sub_x_continent/);
+  assert.match(rankings, /idx_person_333_sub_x_country/);
+  assert.match(rankings, /ROW_NUMBER\(\) OVER/);
+  assert.match(counts, /PRIMARY KEY \(threshold, scope, region_id\)/);
+  assert.match(counts, /'world' AS scope/);
+  assert.match(counts, /'continent' AS scope/);
+  assert.match(counts, /'country' AS scope/);
+});
+
 test("exposes bounded resource APIs without projection name scans", async () => {
   const [shared, people, results, rankings, entities, search] = await Promise.all([
     readFile(new URL("lib/projection-api.ts", root), "utf8"),

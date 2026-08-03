@@ -36,9 +36,11 @@ import {
   type GenderFilter,
   isRankingEventId,
   isRankingType,
+  isSubX333RankingEventId,
   normalizeGenderFilters,
   parseRegionQuery,
   WCA_EVENTS,
+  type SubX333RankingEventId,
 } from "@/lib/wca";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import {
@@ -525,7 +527,7 @@ export function RankingsExplorer({
   initialData?: InitialRankingData;
   initialSearch?: string;
   initialRegexSearch?: boolean;
-  initialEventId?: (typeof WCA_EVENTS)[number]["id"] | "SOR" | "sor-kinch";
+  initialEventId?: (typeof WCA_EVENTS)[number]["id"] | "SOR" | "sor-kinch" | SubX333RankingEventId;
   initialRankingType?: "single" | "average";
   initialGender?: readonly GenderFilter[];
   initialYear?: number | null;
@@ -2782,7 +2784,8 @@ export function RankingsExplorer({
     if (
       nextRankingType === rankingType ||
       eventId === "333mbf" ||
-      eventId === "sor-kinch"
+      eventId === "sor-kinch" ||
+      isSubX333RankingEventId(eventId)
     )
       return;
     const viewportSubRank = getCurrentViewportSubRank(
@@ -2810,7 +2813,7 @@ export function RankingsExplorer({
   };
 
   const changeEvent = (
-    nextEventId: (typeof WCA_EVENTS)[number]["id"] | "SOR" | "sor-kinch"
+    nextEventId: (typeof WCA_EVENTS)[number]["id"] | "SOR" | "sor-kinch" | SubX333RankingEventId
   ) => {
     pendingRankRef.current = 1;
     pendingScrollToTopRef.current = true;
@@ -2830,7 +2833,7 @@ export function RankingsExplorer({
     const nextRankingType =
       subject === "competitions" && competitionRanking === "podiums"
         ? podiumRankingType(nextEventId)
-        : nextEventId === "333mbf" || nextEventId === "sor-kinch"
+        : nextEventId === "333mbf" || nextEventId === "sor-kinch" || isSubX333RankingEventId(nextEventId)
           ? "single"
           : rankingType;
     setRankingType(nextRankingType);
@@ -2946,6 +2949,7 @@ export function RankingsExplorer({
         | (typeof WCA_EVENTS)[number]["id"]
         | "SOR"
         | "sor-kinch"
+        | SubX333RankingEventId
     );
   };
   const changeListSubject = (nextSubject: NavigationSubject) => {
@@ -3016,7 +3020,7 @@ export function RankingsExplorer({
           onRegionChange={changeRegion}
           onEventPickerTrigger={(trigger) => { railEventPickerTriggerRef.current = trigger; }}
           compactResultType={topRailProgress >= 1 || Boolean(rankingSource) && isMobileControls}
-          showResultType={!(eventId === "SOR" || eventId === "sor-kinch" || (subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count")))}
+          showResultType={!(eventId === "SOR" || eventId === "sor-kinch" || isSubX333RankingEventId(eventId) || (subject === "competitions" && (competitionRanking === "podiums" || competitionRanking === "latitude" || competitionRanking === "competitor-count")))}
           showEventPicker={!(subject === "competitions" && (competitionRanking === "latitude" || competitionRanking === "competitor-count"))}
           showRegion
           showGender={subject === "people" || subject === "results"}

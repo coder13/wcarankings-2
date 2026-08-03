@@ -6,7 +6,7 @@ import type {
   RankingPage,
 } from "@/components/RankingsExplorer/types";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
-import { isEventId, isRankingEventId, isRankingType, isValidRegexPattern, normalizeGenderFilters, parseRegionQuery, type GenderFilter, WCA_EVENTS } from "@/lib/wca";
+import { isEventId, isRankingEventId, isRankingType, isSubX333RankingEventId, isValidRegexPattern, normalizeGenderFilters, parseRegionQuery, type GenderFilter, WCA_EVENTS } from "@/lib/wca";
 import { getRegions } from "@/lib/regions";
 import { loadRankings } from "@/lib/rankings";
 import { loadCompetitionRankings } from "@/lib/semantic-entity-rankings";
@@ -108,7 +108,7 @@ async function getInitialRankings(
   const rawEventId = getSearchParamWithLegacyKey(searchParams, "eventId", "event");
   const rawRankingType = getSearchParamWithLegacyKey(searchParams, "result", "type");
   const eventId = isRankingEventId(rawEventId) ? rawEventId : "333";
-  const rankingType = eventId === "333mbf" || eventId === "sor-kinch" ? "single" : isRankingType(rawRankingType) ? rawRankingType : "single";
+  const rankingType = eventId === "333mbf" || eventId === "sor-kinch" || isSubX333RankingEventId(eventId) ? "single" : isRankingType(rawRankingType) ? rawRankingType : "single";
   const { scope, regionId } = parseRegionQuery(getSearchParam(searchParams, "region"));
   const gender = getGenderFilters(searchParams);
   const year = yearOverride === null ? getSearchParam(searchParams, "year") : String(yearOverride);
@@ -304,7 +304,7 @@ export async function RankingsPage({
     initialSubject === "people" && rawEventId === "SOR" ? rawEventId : null;
   const rankingType = initialSubject === "competitions" && initialCompetitionRanking === "podiums"
     ? ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average"
-    : eventId === "333mbf" || eventId === "sor-kinch"
+    : eventId === "333mbf" || eventId === "sor-kinch" || isSubX333RankingEventId(eventId)
       ? "single"
       : isRankingType(rawRankingType) ? rawRankingType : "single";
   const { scope, regionId } = parseRegionQuery(getSearchParam(resolvedSearchParams, "region"));

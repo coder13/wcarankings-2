@@ -1,3 +1,4 @@
+import { SUB_X_333_RANKING_EVENTS } from "@/lib/wca";
 import type { EventPickerOption } from "./EventPicker";
 
 export const ALL_EVENT_RANKING_OPTIONS = [
@@ -13,6 +14,7 @@ export const ALL_EVENT_RANKING_OPTIONS = [
     shortName: "SoR Kinch",
     symbol: "%",
   },
+  ...SUB_X_333_RANKING_EVENTS,
 ] as const satisfies readonly EventPickerOption[];
 
 export type AllEventRankingOption = (typeof ALL_EVENT_RANKING_OPTIONS)[number];

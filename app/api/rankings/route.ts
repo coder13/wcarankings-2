@@ -6,7 +6,7 @@ import { loadDynamicListRankings, loadListRankings } from "@/lib/list-rankings";
 import { assertCanViewList, resolveList } from "@/lib/lists";
 import { loadRankingsWithDiagnostics } from "@/lib/rankings";
 import { ApiInputError } from "@/lib/projection-api";
-import { isRankingEventId, isRankingType, parseRegionQuery } from "@/lib/wca";
+import { isRankingEventId, isRankingType, isSubX333RankingEventId, parseRegionQuery } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   const listId = searchParams.get("list")?.trim();
   const hasDynamicList = searchParams.has("wca_ids");
   const eventId = isRankingEventId(rawEventId) ? rawEventId : "333";
-  const type = eventId === "333mbf" || eventId === "sor-kinch" ? "single" : isRankingType(rawType) ? rawType : "single";
+  const type = eventId === "333mbf" || eventId === "sor-kinch" || isSubX333RankingEventId(eventId) ? "single" : isRankingType(rawType) ? rawType : "single";
   const { scope } = parseRegionQuery(searchParams.get("region"));
 
   try {

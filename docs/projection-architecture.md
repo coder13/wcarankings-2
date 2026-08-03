@@ -61,12 +61,15 @@ purpose. Existing `_entries` tables can remain temporarily for compatibility.
 
 ## Active projection graph
 
-The default import currently activates one new product projection:
+The default import currently activates these product projections:
 
 ```text
 ranks_single + ranks_average + historical results
 └── temporary historical bests and ranked event values
     └── person_sum_of_ranks_scores
+
+result_facts
+└── person_333_sub_x_rankings + person_333_sub_x_counts
 ```
 
 The result, general person-metric, competition, city, and time-based grains
@@ -312,6 +315,22 @@ count
 ```
 
 ## Person metrics
+
+### Active 3x3 Sub-X rankings
+
+`person_333_sub_x_rankings` has one row per threshold and person. It counts
+positive official 3x3 single results whose round `best` is below the selected
+threshold. The public WCA export v2 does not include the five per-attempt solve
+values, so this projection intentionally counts the available exported single
+results instead of reconstructing hidden solve attempts. Thresholds are stored
+in centiseconds and initially cover Sub-5, Sub-6, Sub-7, Sub-8, Sub-9,
+Sub-10, Sub-11, Sub-12, Sub-15, and Sub-20.
+
+The projection stores one row per threshold and person. It uses the person's
+current country and continent for display and regional cohorts, then ranks
+World, continent, and country cohorts by descending count with WCA ID as the
+deterministic position tie-breaker. `person_333_sub_x_counts` stores page totals
+by threshold and scope.
 
 ### Active Sum of Ranks and Kinch projections
 

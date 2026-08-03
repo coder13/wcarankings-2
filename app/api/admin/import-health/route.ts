@@ -41,6 +41,8 @@ const expectedProjectionTables = [
   "person_sum_of_ranks_scores",
   "competition_podium_members",
   "competition_event_stats",
+  "person_333_sub_x_rankings",
+  "person_333_sub_x_counts",
 ] as const;
 
 function serializeRun(run: ImportRunRow | null) {
@@ -96,7 +98,9 @@ export async function GET() {
             'result_counts',
             'person_sum_of_ranks_scores',
             'competition_podium_members',
-            'competition_event_stats'
+            'competition_event_stats',
+            'person_333_sub_x_rankings',
+            'person_333_sub_x_counts'
           )
       `),
     ]);

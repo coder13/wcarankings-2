@@ -4,6 +4,10 @@ export type GenderFilters = readonly GenderFilter[];
 export type RegionScope = "world" | "continent" | "country";
 export type RecordBadgeCode = "WR" | "AfR" | "AsR" | "ER" | "NaR" | "OcR" | "SaR" | "NR";
 
+export const SUB_X_333_THRESHOLDS = [500, 600, 700, 800, 900, 1000, 1100, 1200, 1500, 2000] as const;
+export type SubX333Threshold = (typeof SUB_X_333_THRESHOLDS)[number];
+export type SubX333RankingEventId = `333-sub-${SubX333Threshold}`;
+
 export const RECORD_BADGE_LABELS: Record<RecordBadgeCode, string> = {
   WR: "World Record",
   AfR: "African Record",
@@ -55,6 +59,27 @@ export const WCA_EVENTS = [
   { id: "333mbf", name: "3x3x3 Multi-Blind", shortName: "Multi-BLD" },
 ] as const;
 
+function formatSubXThreshold(threshold: SubX333Threshold) {
+  return Number.isInteger(threshold / 100)
+    ? String(threshold / 100)
+    : (threshold / 100).toFixed(2).replace(/0$/, "");
+}
+
+export const SUB_X_333_RANKING_EVENTS = SUB_X_333_THRESHOLDS.map((threshold) => {
+  const seconds = formatSubXThreshold(threshold);
+  return {
+    id: `333-sub-${threshold}` as SubX333RankingEventId,
+    name: `Most Sub-${seconds} 3x3 Singles`,
+    shortName: `Sub-${seconds}`,
+    symbol: `<${seconds}`,
+  };
+}) as readonly {
+  id: SubX333RankingEventId;
+  name: string;
+  shortName: string;
+  symbol: string;
+}[];
+
 export const FALLBACK_CONTINENTS = [
   { id: "_Africa", name: "Africa" },
   { id: "_Asia", name: "Asia" },
@@ -82,6 +107,20 @@ export const FALLBACK_COUNTRIES = [
   { id: "United Kingdom", name: "United Kingdom" },
   { id: "USA", name: "United States" },
 ];
+
+export function isSubX333RankingEventId(value: string | null): value is SubX333RankingEventId {
+  return SUB_X_333_RANKING_EVENTS.some((event) => event.id === value);
+}
+
+export function subX333ThresholdForEventId(value: string) {
+  return isSubX333RankingEventId(value)
+    ? Number(value.replace("333-sub-", "")) as SubX333Threshold
+    : null;
+}
+
+export function isCountRankingEventId(value: string | null) {
+  return isSubX333RankingEventId(value);
+}
 
 export function isRankingType(value: string | null): value is RankingType {
   return value === "single" || value === "average";
@@ -126,7 +165,7 @@ export function isEventId(value: string | null): value is (typeof WCA_EVENTS)[nu
 }
 
 export function isRankingEventId(value: string | null) {
-  return value === "SOR" || value === "sor-kinch" || isEventId(value);
+  return value === "SOR" || value === "sor-kinch" || isSubX333RankingEventId(value) || isEventId(value);
 }
 
 export function isValidRegexPattern(value: string) {
@@ -146,7 +185,7 @@ export function formatWcaResult(eventId: string, value: number, rankingType: Ran
     }).format(value);
   }
   if (value <= 0) return value === -1 ? "DNF" : "—";
-  if (eventId === "SOR") return new Intl.NumberFormat().format(value);
+  if (eventId === "SOR" || isCountRankingEventId(eventId)) return new Intl.NumberFormat().format(value);
 
   if (eventId === "333fm") {
     return rankingType === "average" ? (value / 100).toFixed(2) : `${value}`;
