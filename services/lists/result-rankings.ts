@@ -11,7 +11,7 @@ import { searchPersonIds } from "@/services/people/service";
 import { filteredResultRankingsQuery } from "@/services/rankings/queries";
 import type { ResultRankingRow } from "@/services/rankings/types";
 import type { ListSummary } from "@/services/lists/types";
-import { parseListRankingInput } from "@/services/lists/rankings";
+import { parseListRankingInput } from "@/services/lists/input";
 
 type ResultListTarget = {
   targetKey: string;
@@ -114,7 +114,6 @@ async function loadCachedResults(
     [
       input.eventId,
       input.type,
-      ...(input.type === "single" ? [] : []),
       ...(sourceGenderValue ? [sourceGenderValue] : []),
       target.targetKey,
       filterKey,

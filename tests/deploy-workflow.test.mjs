@@ -448,7 +448,6 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(projectionDeploymentScript, /import-projection-transfer\.mjs/);
   assert.match(projectionDeploymentScript, /--concurrency=2/);
   assert.match(projectionDeploymentScript, /WCA_PROJECTION_INDEX_CONCURRENCY=2/);
-  assert.doesNotMatch(projectionDeploymentScript, /chunk-projection-dump\.mjs/);
   assert.match(projectionDeploymentScript, /candidate_work_label="wcarankings\.projection-artifact=\$\{ARTIFACT_ID\}"/);
   assert.match(projectionDeploymentScript, /candidate_work_pid=\$1[\s\S]*?wait "\$candidate_work_pid"/);
   assert.match(projectionDeploymentScript, /docker ps -q --filter "label=\$\{candidate_work_label\}"/);

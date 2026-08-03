@@ -41,7 +41,7 @@ node scripts/projection-release-coordinate.mjs verify \
   --source-sha="$EXPECTED_SOURCE_SHA"
 normalize_export_identity() {
   node --input-type=module --eval '
-    import { normalizeExportDate } from "./scripts/projection-transfer-date.mjs";
+    import { normalizeExportDate } from "./scripts/lib/projection-transfer-date.mjs";
     const normalized = normalizeExportDate(process.argv[1]);
     if (!normalized) {
       console.error(`Invalid projection export identity: ${process.argv[1]}`);

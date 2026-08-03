@@ -1,7 +1,8 @@
 import { groupDependencyClosure, projectionGroup } from "./projection-groups.mjs";
+import { argumentValue } from "./lib/cli.mjs";
 
 const selected = (process.env.BUILD_GROUPS || "").split(",").filter(Boolean);
-const wave = Number(process.argv.find((value) => value.startsWith("--wave="))?.slice(7) || 1);
+const wave = Number(argumentValue("wave") || 1);
 if (!Number.isInteger(wave) || wave < 1) throw new Error("--wave must be a positive integer");
 const selectedSet = new Set(selected);
 

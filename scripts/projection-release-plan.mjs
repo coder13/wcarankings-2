@@ -9,7 +9,8 @@ import {
   downstreamGroupClosure,
   projectionGroup,
 } from "./projection-groups.mjs";
-import { normalizeExportDate } from "./projection-transfer-date.mjs";
+import { normalizeExportDate } from "./lib/projection-transfer-date.mjs";
+import { argumentValue, listArgument } from "./lib/cli.mjs";
 
 const SEMANTIC_FINGERPRINT_FORMAT_VERSION = 3;
 const ARTIFACT_FINGERPRINT_FORMAT_VERSION = 3;
@@ -269,12 +270,6 @@ export async function projectionReleasePlan({
   };
 }
 
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
-}
-
 async function readJsonFile(path, fallback = {}) {
   return path ? JSON.parse(await readFile(path, "utf8")) : fallback;
 }
@@ -282,7 +277,7 @@ async function readJsonFile(path, fallback = {}) {
 async function cli() {
   const command = process.argv[2] === "semantic" ? "semantic" : "release";
   const statePath = argumentValue("state-file");
-  const groups = argumentValue("groups").split(",").map((name) => name.trim()).filter(Boolean);
+  const groups = listArgument("groups");
   const productionState = await readJsonFile(statePath);
   if (command === "semantic") {
     const plan = await projectionSemanticPlan({

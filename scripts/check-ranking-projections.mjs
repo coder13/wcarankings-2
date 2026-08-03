@@ -1,5 +1,6 @@
 import mysql from "mysql2/promise";
 import { PUBLISHED_PROJECTION_TABLES } from "./mysql-schema.mjs";
+import { databaseOptions } from "./lib/database.mjs";
 
 const TABLES = [...PUBLISHED_PROJECTION_TABLES, "export_metadata"];
 const ENTRY_COLUMNS = [
@@ -112,19 +113,6 @@ const COMPETITION_PODIUM_INDEXES = [
   "PRIMARY",
   "idx_comp_podium_members_person",
 ];
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: process.env.DATABASE_NAME_OVERRIDE
-      || decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 async function main() {
   const connection = await mysql.createConnection(databaseOptions());

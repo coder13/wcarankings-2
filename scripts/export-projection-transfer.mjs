@@ -2,11 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length) || "";
-}
+import { argumentValue } from "./lib/cli.mjs";
 
 function run(command, args, options = {}) {
   return new Promise((resolveRun, reject) => {

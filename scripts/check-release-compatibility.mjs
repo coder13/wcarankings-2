@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import { argumentValue } from "./lib/cli.mjs";
 
 export function checkServerDatasetCompatibility({ server, datasetSchemaVersion }) {
   const version = Number(datasetSchemaVersion);
@@ -14,12 +15,6 @@ export function checkServerDatasetCompatibility({ server, datasetSchemaVersion }
     );
   }
   return { compatible: true, datasetSchemaVersion: version, minimum, maximum };
-}
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
 }
 
 async function main() {

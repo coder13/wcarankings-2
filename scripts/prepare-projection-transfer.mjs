@@ -1,23 +1,13 @@
 import mysql from "mysql2/promise";
 import { DEPLOYMENT_PROJECTION_GROUPS, dropManagedObject } from "./mysql-schema.mjs";
+import { argumentValue } from "./lib/cli.mjs";
+import { databaseOptions } from "./lib/database.mjs";
 
-const groupName = process.argv.find((value) => value.startsWith("--group="))?.slice("--group=".length);
+const groupName = argumentValue("group");
 const group = DEPLOYMENT_PROJECTION_GROUPS.find(({ name }) => name === groupName);
 if (!group) throw new Error(`Unknown deployment projection group: ${groupName || "(missing)"}.`);
 const manifestTable = `projection_transfer_manifest_${group.name.replaceAll("-", "_")}`;
 const indexesTable = `projection_transfer_indexes_${group.name.replaceAll("-", "_")}`;
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 const connection = await mysql.createConnection(databaseOptions());
 try {

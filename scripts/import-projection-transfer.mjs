@@ -1,24 +1,9 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length) || "";
-}
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: url.port || "3306",
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: process.env.DATABASE_NAME_OVERRIDE
-      || decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
+import { argumentValue } from "./lib/cli.mjs";
+import { databaseOptions } from "./lib/database.mjs";
+import { runPool } from "./lib/concurrency.mjs";
 
 function mariadbArguments(options) {
   return [
@@ -46,18 +31,6 @@ function runMariaDb(options, { input, sql } = {}) {
     });
     if (input) child.stdin.end(input);
   });
-}
-
-async function runPool(items, concurrency, task) {
-  let cursor = 0;
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor;
-      cursor += 1;
-      await task(items[index], index);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
 }
 
 const directory = resolve(argumentValue("directory"));

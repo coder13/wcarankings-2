@@ -4,15 +4,16 @@ import {
   dropManagedObject,
   promoteProjectionTables,
 } from "./mysql-schema.mjs";
-import { normalizeExportDate } from "./projection-transfer-date.mjs";
+import { normalizeExportDate } from "./lib/projection-transfer-date.mjs";
+import { argumentValue, hasArgument, listArgument } from "./lib/cli.mjs";
+import { databaseOptions } from "./lib/database.mjs";
+import { runPool } from "./lib/concurrency.mjs";
 
-const selectedNames = (process.argv.find((value) => value.startsWith("--groups="))?.slice("--groups=".length) || "")
-  .split(",").filter(Boolean);
-const prepareOnly = process.argv.includes("--prepare-only");
-const hydrate = process.argv.includes("--hydrate");
+const selectedNames = listArgument("groups");
+const prepareOnly = hasArgument("prepare-only");
+const hydrate = hasArgument("hydrate");
 if (prepareOnly && hydrate) throw new Error("--prepare-only and --hydrate cannot be combined.");
-const expectedExportDate = process.argv.find((value) => value.startsWith("--expected-export-date="))
-  ?.slice("--expected-export-date=".length);
+const expectedExportDate = argumentValue("expected-export-date");
 const groups = selectedNames.length === 0
   ? DEPLOYMENT_PROJECTION_GROUPS
   : DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) => selectedNames.includes(name));
@@ -25,19 +26,6 @@ if (!Number.isSafeInteger(indexConcurrency) || indexConcurrency < 1 || indexConc
   throw new Error("WCA_PROJECTION_INDEX_CONCURRENCY must be between 1 and 4");
 }
 
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: process.env.DATABASE_NAME_OVERRIDE
-      || decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
-
 async function tableExists(connection, table) {
   const [rows] = await connection.query(
     `SELECT 1
@@ -47,18 +35,6 @@ async function tableExists(connection, table) {
     [table],
   );
   return rows.length > 0;
-}
-
-async function runPool(items, concurrency, task) {
-  let cursor = 0;
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor;
-      cursor += 1;
-      await task(items[index]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
 }
 
 const options = databaseOptions();

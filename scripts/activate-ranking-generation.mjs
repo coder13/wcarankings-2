@@ -6,7 +6,9 @@ import {
   PROJECTION_CAPABILITIES,
   PROJECTION_ARTIFACT_FORMAT_VERSION,
 } from "./projection-groups.mjs";
-import { normalizeExportDate } from "./projection-transfer-date.mjs";
+import { normalizeExportDate } from "./lib/projection-transfer-date.mjs";
+import { argumentValue } from "./lib/cli.mjs";
+import { databaseOptions } from "./lib/database.mjs";
 
 export const WCA_RAW_TABLES = [
   "persons",
@@ -26,24 +28,6 @@ export const WCA_RAW_TABLES = [
 ];
 
 const LOCK_NAME = "wcarankings-ranking-generation";
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
-}
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 function identifier(value, label) {
   if (!/^[a-z][a-z0-9_]{0,63}$/.test(value || "")) {

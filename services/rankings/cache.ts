@@ -186,7 +186,7 @@ export class RankingsPageCache<T extends object> {
 
 export const rankingsPageCache = new RankingsPageCache<Record<string, unknown>>();
 
-/** Shared process-local windows used to serve adjacent 50-row pages from one query. */
+/** Shared process-local windows used to serve adjacent 50-row pages from one 400-row query. */
 export class RankingsWindowCache<T extends object> {
   private readonly cache = new LRUCache<string, T>({ max: RANKINGS_WINDOW_CACHE_CAPACITY });
   private readonly pending = new Map<string, Promise<T>>();

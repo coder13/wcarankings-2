@@ -7,16 +7,12 @@ import {
   PROJECTION_ARTIFACT_FORMAT_VERSION,
   projectionGroup,
 } from "./projection-groups.mjs";
+import { argumentValue, listArgument } from "./lib/cli.mjs";
 
 export const PROJECTION_RELEASE_MANIFEST = "projection-release.json";
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
-}
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length) || "";
 }
 
 function validateCoordinate(group, coordinate) {
@@ -139,7 +135,7 @@ export async function verifyProjectionReleaseCoordinate({
 async function cli() {
   const command = process.argv[2];
   const directory = resolve(argumentValue("directory") || ".");
-  const groups = argumentValue("groups").split(",").filter(Boolean);
+  const groups = listArgument("groups");
   if (command === "create") {
     const fingerprints = JSON.parse(await readFile(argumentValue("fingerprints-file"), "utf8"));
     const coordinates = JSON.parse(await readFile(argumentValue("coordinates-file"), "utf8"));

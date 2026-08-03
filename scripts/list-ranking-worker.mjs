@@ -1,22 +1,12 @@
 import { randomUUID } from "node:crypto";
 import mysql from "mysql2/promise";
+import { hasArgument } from "./lib/cli.mjs";
+import { databaseOptions } from "./lib/database.mjs";
 
 const POLL_MS = Math.max(250, Number(process.env.LIST_RANKING_WORKER_POLL_MS) || 2_000);
 const LEASE_SECONDS = Math.max(30, Number(process.env.LIST_RANKING_WORKER_LEASE_SECONDS) || 600);
 const CHUNK_SIZE = Math.max(1, Math.min(1_000, Number(process.env.LIST_RANKING_WORKER_CHUNK_SIZE) || 1_000));
-const RUN_ONCE = process.argv.includes("--once");
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.slice(1)),
-  };
-}
+const RUN_ONCE = hasArgument("once");
 
 async function claimJob(connection) {
   const token = randomUUID();

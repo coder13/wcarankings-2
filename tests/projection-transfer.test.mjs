@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { normalizeExportDate } from "../scripts/projection-transfer-date.mjs";
+import { normalizeExportDate } from "../scripts/lib/projection-transfer-date.mjs";
 
 const prepare = await readFile(
   new URL("../scripts/prepare-projection-transfer.mjs", import.meta.url),
@@ -52,7 +52,7 @@ test("projection index publication overrides the application account timeout", (
 });
 
 test("can preflight transfer rows, dates, and indexes before production cutover", () => {
-  assert.match(publish, /prepareOnly = process\.argv\.includes\("--prepare-only"\)/);
+  assert.match(publish, /prepareOnly = hasArgument\("prepare-only"\)/);
   assert.match(publish, /expectedExportDate/);
   assert.match(publish, /DELETE FROM/);
   assert.match(publish, /publication was not requested/);
