@@ -34,6 +34,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_benchmark:
+        description: Run the ranking scroll benchmark against the generated database.
+        required: false
+        default: false
+        type: boolean
     outputs:
       artifact_name:
         value: ${{ jobs.build.outputs.artifact_name }}
@@ -69,6 +74,7 @@ jobs:
       DATABASE_URL: mysql://wcarankings:projection-build@127.0.0.1:13307/wcarankings
       WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
       RELEASE_DIR: /tmp/projection-release
+      BENCHMARK_REPORT_DIR: benchmark-reports
 
     steps:
       - uses: actions/checkout@v4
@@ -177,6 +183,29 @@ jobs:
             --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
             --include-compatibility="$(jq -r '.includeCompatibility' /tmp/build-plan.json)"
 
+          if [ '${{ inputs.run_benchmark }}' = true ]; then
+            docker build --tag wcarankings-app:projection-benchmark .
+            docker tag wcarankings-app:projection-benchmark wcarankings-app:latest
+            DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@db:3306/$MYSQL_DATABASE" \
+              DATABASE_STATEMENT_TIMEOUT_MS=60000 \
+              DEPLOYED_MAIN_SHA="${{ steps.source.outputs.sha }}" \
+              docker compose up --detach app
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error http://127.0.0.1:3000/api/health/live >/dev/null; then
+                break
+              fi
+              if [ "$attempt" = 30 ]; then
+                docker compose logs app
+                exit 1
+              fi
+              sleep 2
+            done
+            pnpm run benchmark:ranking-scroll -- \
+              --target=http://127.0.0.1:3000 \
+              --report-dir="$BENCHMARK_REPORT_DIR" \
+              --label=projection-build
+          fi
+
           for group in $(printf '%s' "$BUILD_GROUPS" | tr ',' ' '); do
             directory="/tmp/built/${group}"
             mkdir -p "$directory"
@@ -211,7 +240,9 @@ jobs:
             fingerprint=$(jq -r --arg group "$group" '.groups[$group].artifactFingerprint' /tmp/fingerprints.json)
             corrupt=$(jq -r --arg group "$group" '.[$group].valid == false' <<<"$AVAILABLE_ARTIFACTS")
             tag="$fingerprint"
-            if [ "$corrupt" = true ]; then tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
+            if [ "$corrupt" = true ] || [ '${{ inputs.run_benchmark }}' = true ]; then
+              tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            fi
             ref="ghcr.io/${owner}/wcarankings-projection-${group}:${tag}"
             archive=$(jq -r --arg group "$group" '.groups[$group].archive.file' "$directory/projection-release.json")
             metadata=$(jq -r --arg group "$group" '.groups[$group].metadata.file' "$directory/projection-release.json")
@@ -274,6 +305,15 @@ jobs:
           path: /tmp/projection-release
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload ranking scroll benchmark report
+        if: always() && inputs.run_benchmark == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ranking-scroll-benchmark-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmark-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Clean runner database
         if: always() && inputs.build_groups != ''

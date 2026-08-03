@@ -23,6 +23,7 @@ const [
   serverDeploy,
   projectionDeploy,
   pullRequest,
+  prProjectionRelease,
   flywayHistoryRepair,
 ] = await Promise.all([
   workflow("server-production.yml"),
@@ -33,6 +34,7 @@ const [
   workflow("deploy-server.yml"),
   workflow("deploy-projections.yml"),
   workflow("pull-request.yml"),
+  workflow("pr-projection-release.yml"),
   readFile(new URL("../scripts/prepare-flyway-history.mjs", import.meta.url), "utf8"),
 ]);
 
@@ -328,6 +330,28 @@ test("incremental planning classifies active, cached, build, and hydrate groups"
   assert.match(planner, /Quarantining corrupt projection artifact/);
   assert.match(projectionRelease, /supersession:/);
   assert.match(projectionRelease, /ref: main/);
+});
+
+test("labeled PR projection builds run the scroll benchmark and publish a reusable repair artifact", () => {
+  assert.match(prProjectionRelease, /pull_request:\s*\n\s+types: \[labeled\]/);
+  assert.match(prProjectionRelease, /github\.event\.label\.name == 'build-projections'/);
+  assert.match(prProjectionRelease, /force_rebuild: true/);
+  assert.match(prProjectionRelease, /bypass_artifact_cache: true/);
+  assert.match(prProjectionRelease, /run_benchmark: true/);
+  assert.match(builder, /run_benchmark:/);
+  assert.match(builder, /docker build --tag wcarankings-app:projection-benchmark/);
+  assert.match(builder, /DATABASE_STATEMENT_TIMEOUT_MS=60000/);
+  assert.match(builder, /docker compose up --detach app/);
+  assert.match(builder, /benchmark:ranking-scroll/);
+  assert.match(builder, /ranking-scroll-benchmark-\$\{\{ github\.run_id \}\}/);
+  assert.match(builder, /inputs\.run_benchmark.*repair-\$\{GITHUB_RUN_ID\}/s);
+});
+
+test("main projection releases carry exact cached artifacts into the deploy bundle", () => {
+  assert.match(projectionRelease, /available_artifacts: \$\{\{ needs\.plan\.outputs\.available_artifacts \}\}/);
+  assert.match(builder, /AVAILABLE_ARTIFACTS: \$\{\{ inputs\.available_artifacts \}\}/);
+  assert.match(planner, /- Cached: \$\(jq -r '\.cachedGroups/);
+  assert.match(projectionRelease, /needs\.supersession\.outputs\.fingerprints == needs\.plan\.outputs\.fingerprints/);
 });
 
 test("projection deployment accepts and smoke-tests every capability group", async () => {

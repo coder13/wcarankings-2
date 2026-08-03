@@ -24,6 +24,7 @@ jobs:
     with:
       ref: ${{ github.event.pull_request.head.sha }}
       force_rebuild: true
+      bypass_artifact_cache: true
     secrets: inherit
 
   build:
@@ -40,4 +41,5 @@ jobs:
       fingerprints: ${{ needs.plan.outputs.fingerprints }}
       available_artifacts: ${{ needs.plan.outputs.available_artifacts }}
       include_raw: ${{ needs.plan.outputs.raw_required == 'true' }}
+      run_benchmark: true
     secrets: inherit
