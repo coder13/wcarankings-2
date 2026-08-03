@@ -1,4 +1,4 @@
-.spinner {
+.LoadingSpinner {
   display: inline-grid;
   width: 1.5rem;
   height: 1.5rem;
@@ -7,35 +7,35 @@
   place-items: center;
 }
 
-.icon {
+.LoadingSpinner-icon {
   width: 100%;
   height: 100%;
-  animation: spin 700ms linear infinite;
+  animation: LoadingSpinner-spin 700ms linear infinite;
 }
 
-.track,
-.arc {
+.LoadingSpinner-track,
+.LoadingSpinner-arc {
   fill: none;
   stroke: currentColor;
   stroke-width: 3;
 }
 
-.track {
+.LoadingSpinner-track {
   opacity: 0.2;
 }
 
-.arc {
+.LoadingSpinner-arc {
   stroke-linecap: round;
 }
 
-@keyframes spin {
+@keyframes LoadingSpinner-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .icon {
+  .LoadingSpinner-icon {
     animation: none;
   }
 }
