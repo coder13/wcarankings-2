@@ -1,27 +1,33 @@
 CREATE TABLE person_event_rankings AS
 WITH candidates AS (
   SELECT result_id, event_id, person_id, person_country_id AS country_id,
-    person_continent_id AS continent_id, 'single' AS result_type, best AS result_value,
+    person_continent_id AS continent_id,
+    CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END AS gender,
+    'single' AS result_type, best AS result_value,
     ROW_NUMBER() OVER (
       PARTITION BY person_id, event_id
       ORDER BY best, competition_start_date, competition_id, result_id
     ) AS personal_position
   FROM result_facts
+  JOIN persons person ON person.wca_id = result_facts.person_id AND person.sub_id = 1
   WHERE best > 0
   UNION ALL
   SELECT result_id, event_id, person_id, person_country_id,
-    person_continent_id, 'average', average,
+    person_continent_id,
+    CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END,
+    'average', average,
     ROW_NUMBER() OVER (
       PARTITION BY person_id, event_id
       ORDER BY average, competition_start_date, competition_id, result_id
     )
   FROM result_facts
+  JOIN persons person ON person.wca_id = result_facts.person_id AND person.sub_id = 1
   WHERE average > 0
 ), bests AS (
   SELECT * FROM candidates WHERE personal_position = 1
 )
 SELECT
-  person_id, event_id, result_type, result_id, result_value, country_id, continent_id,
+  person_id, event_id, result_type, result_id, result_value, country_id, continent_id, gender,
   DENSE_RANK() OVER (PARTITION BY event_id, result_type ORDER BY result_value) AS world_rank,
   ROW_NUMBER() OVER (
     PARTITION BY event_id, result_type
@@ -54,4 +60,9 @@ ALTER TABLE person_event_rankings
   ADD PRIMARY KEY (person_id, event_id, result_type),
   ADD INDEX idx_person_event_world (event_id, result_type, world_position, person_id),
   ADD INDEX idx_person_event_continent (event_id, result_type, continent_id, continent_position, person_id),
-  ADD INDEX idx_person_event_country (event_id, result_type, country_id, country_position, person_id);
+  ADD INDEX idx_person_event_country (event_id, result_type, country_id, country_position, person_id),
+  ADD INDEX idx_person_event_continent_value (event_id, result_type, continent_id, result_value, person_id),
+  ADD INDEX idx_person_event_country_value (event_id, result_type, country_id, result_value, person_id),
+  ADD INDEX idx_person_event_gender_value (event_id, result_type, gender, result_value, person_id),
+  ADD INDEX idx_person_event_continent_gender_value (event_id, result_type, continent_id, gender, result_value, person_id),
+  ADD INDEX idx_person_event_country_gender_value (event_id, result_type, country_id, gender, result_value, person_id);

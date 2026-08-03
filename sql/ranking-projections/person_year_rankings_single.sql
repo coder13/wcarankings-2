@@ -53,4 +53,5 @@ JOIN person_year_ranking_cohorts cohort
 ALTER TABLE person_year_rankings_single
   ADD PRIMARY KEY (year, event_id, cohort_id, person_id),
   ADD INDEX idx_person_year_single_browse (year, event_id, cohort_id, position, person_id),
+  ADD INDEX idx_person_year_single_value (year, event_id, cohort_id, result_value, person_id),
   ADD INDEX idx_person_year_single_person (year, event_id, cohort_id, person_id);

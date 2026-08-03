@@ -88,6 +88,7 @@ test("gender-filtered rankings use the same pre-activation fallback and post-act
   assert.match(active, /world_rank_delta/);
   assert.match(active, /record_streak_weeks/);
   assert.doesNotMatch(active, /NULL AS world_rank_delta/);
+  assert.doesNotMatch(active, /JOIN persons gender_person/);
   for (const column of enhancedColumns) {
     assert.equal([...active.matchAll(new RegExp(`\\b${column}\\b`, "g"))].length, 1);
   }

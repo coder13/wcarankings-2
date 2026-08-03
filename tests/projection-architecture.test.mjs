@@ -100,6 +100,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(facts, /idx_result_facts_single_ranking_cover/);
   assert.match(facts, /idx_result_facts_average_ranking_cover/);
   assert.match(people, /CREATE TABLE person_event_rankings AS/);
+  assert.match(people, /AS gender/);
   assert.match(people, /world_position/);
   assert.match(results, /CREATE TABLE result_rankings_single AS/);
   assert.match(results, /CREATE TABLE result_rankings_average AS/);
@@ -287,7 +288,7 @@ test("only exposes APIs backed by active projections", async () => {
   }
 });
 
-test("weekly rank deltas are materialized in the compatibility ranking projection", async () => {
+test("weekly rank deltas remain available but are disabled from compatibility refreshes", async () => {
   const [schema, groups, single, average, source] = await Promise.all([
     readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
     readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
@@ -295,8 +296,8 @@ test("weekly rank deltas are materialized in the compatibility ranking projectio
     readFile(new URL("sql/ranking-projections/weekly_rank_deltas_average.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
   ]);
-  assert.match(schema, /weekly_rank_deltas_single/);
-  assert.match(groups, /weekly_rank_deltas_average\.sql/);
+  assert.doesNotMatch(schema, /compatibility-weekly-rank-deltas/);
+  assert.doesNotMatch(groups, /weekly_rank_deltas_average\.sql/);
   for (const sql of [single, average]) {
     assert.match(sql, /CREATE TABLE weekly_rank_deltas_/);
     assert.match(sql, /DAYOFWEEK/);
@@ -307,11 +308,11 @@ test("weekly rank deltas are materialized in the compatibility ranking projectio
     assert.doesNotMatch(sql, /WHERE current_bests\.week_start = latest_week\.week_start/);
     assert.match(sql, /ADD PRIMARY KEY \(event_id, person_id\)/);
   }
-  assert.match(source, /weekly_rank_deltas_single/);
-  assert.match(source, /world_rank_delta_state/);
+  assert.doesNotMatch(source, /weekly_rank_deltas_single/);
+  assert.match(source, /CAST\(NULL AS CHAR\(10\)\) AS world_rank_delta_state/);
 });
 
-test("record streaks are materialized from current values and Thursday weeks", async () => {
+test("record streaks remain available but are disabled from compatibility refreshes", async () => {
   const [schema, groups, single, average, source] = await Promise.all([
     readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
     readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
@@ -319,8 +320,8 @@ test("record streaks are materialized from current values and Thursday weeks", a
     readFile(new URL("sql/ranking-projections/record_streaks_average.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
   ]);
-  assert.match(schema, /record_streaks_single/);
-  assert.match(groups, /record_streaks_average\.sql/);
+  assert.doesNotMatch(schema, /compatibility-record-streaks/);
+  assert.doesNotMatch(groups, /record_streaks_average\.sql/);
   for (const sql of [single, average]) {
     assert.match(sql, /CREATE TABLE record_streaks_/);
     assert.match(sql, /DAYOFWEEK/);
@@ -330,8 +331,8 @@ test("record streaks are materialized from current values and Thursday weeks", a
     assert.match(sql, /streak_weeks/);
     assert.match(sql, /ADD PRIMARY KEY \(event_id, person_id\)/);
   }
-  assert.match(source, /record_streaks_single/);
-  assert.match(source, /record_streak_weeks/);
+  assert.doesNotMatch(source, /record_streaks_single/);
+  assert.match(source, /CAST\(NULL AS SIGNED\) AS record_streak_weeks/);
 });
 
 test("backfills only the active competition-event projection", async () => {

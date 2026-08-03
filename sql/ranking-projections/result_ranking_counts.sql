@@ -8,6 +8,11 @@ FROM result_rankings_single
 WHERE continent_id <> ''
 GROUP BY event_id, continent_id
 UNION ALL
+SELECT event_id, 'single', 'country', country_id, COUNT(*)
+FROM result_rankings_single
+WHERE country_id <> ''
+GROUP BY event_id, country_id
+UNION ALL
 SELECT event_id, 'average', 'world', '', COUNT(*)
 FROM result_rankings_average
 GROUP BY event_id

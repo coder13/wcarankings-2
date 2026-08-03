@@ -33,4 +33,16 @@ ALTER TABLE result_facts
   ADD INDEX idx_result_facts_average_ranking_cover (
     event_id, average, competition_start_date, competition_id, person_id,
     result_id, round_type_id, person_country_id, person_continent_id
+  ),
+  ADD INDEX idx_result_facts_average_country_year (
+    event_id, person_country_id, competition_start_date, average,
+    competition_id, result_id, person_id
+  ),
+  ADD INDEX idx_result_facts_average_country_value (
+    event_id, person_country_id, average, competition_start_date,
+    competition_id, result_id, person_id
+  ),
+  ADD INDEX idx_result_facts_average_continent_year (
+    event_id, person_continent_id, competition_start_date, average,
+    competition_id, result_id, person_id
   );

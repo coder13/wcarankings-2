@@ -27,6 +27,7 @@ import {
 import { getRankingEntryEnhancements } from "@/services/rankings/capabilities";
 import {
   filteredPersonMetricQuery,
+  filteredYearlyRankingPageQuery,
   genderRankingPageQuery,
   personMetricEndQuery,
   personMetricQuery,
@@ -97,8 +98,13 @@ function filters(input: QueryInput) {
   return { rank, subRank, conditions, values };
 }
 
-function normalPageResponse(rows: RankingRow[], input: QueryInput, metadata: RankingsMetadata) {
-  const total =
+function normalPageResponse(
+  rows: RankingRow[],
+  input: QueryInput,
+  metadata: RankingsMetadata,
+  filteredTotal?: number,
+) {
+  const total = filteredTotal ?? (
     input.year === null
       ? getRankingCount(metadata, input.eventId, input.type, input.scope, input.regionId)
       : getYearRankingCount(
@@ -108,7 +114,8 @@ function normalPageResponse(rows: RankingRow[], input: QueryInput, metadata: Ran
           input.type,
           input.scope,
           input.regionId,
-        );
+        )
+  );
   const entries = rows.map((row) => toRankingEntry(row, input.scope));
   const startPosition = Math.min(Math.max(0, input.startRank - 1), total);
   const hasMore = input.startRank + entries.length <= total;
@@ -167,7 +174,7 @@ async function queryGenderPage(input: QueryInput) {
     baseConditions.push(`ranking.${region} = ?`);
     baseValues.push(input.regionId);
   }
-  const gender = genderCondition("gender_person", input.gender);
+  const gender = genderCondition("ranking", input.gender);
   if (gender.sql) {
     baseConditions.push(gender.sql);
     baseValues.push(...gender.values);
@@ -241,6 +248,23 @@ async function queryGenderPage(input: QueryInput) {
 async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata) {
   if (input.year !== null) {
     const { conditions, values } = yearlyFilters(input);
+    if (input.gender.length) {
+      const result = await query<RankingRow & { total_count?: number }>(
+        filteredYearlyRankingPageQuery(yearlyRankingTable(input.type), conditions),
+        [...values, input.startRank, input.startRank + PAGE_SIZE],
+      );
+      return {
+        data: normalPageResponse(
+          result.rows,
+          input,
+          metadata,
+          Number(result.rows[0]?.total_count ?? 0),
+        ),
+        timings: result.timings,
+        queryCount: 1,
+        returnedRows: result.rows.length,
+      };
+    }
     const result = await query<RankingRow>(
       yearlyRankingPageQuery(yearlyRankingTable(input.type), yearlyColumns(input.type), conditions),
       [...values, input.startRank, input.startRank + PAGE_SIZE],
@@ -686,7 +710,9 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
     !input.cursorRank &&
     !input.cursorId;
   if (!cacheable) {
-    const result = await queryMysql(input);
+    const result = input.year !== null && input.gender.length
+      ? await queryNormalPage(input, metadata)
+      : await queryMysql(input);
     return {
       ...result,
       data: { ...result.data, availableYears: metadata.availableYears },

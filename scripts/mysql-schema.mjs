@@ -8,6 +8,7 @@ export { DEPLOYMENT_PROJECTION_GROUPS } from "./projection-groups.mjs";
 const INDEXES = [
   ["persons", "idx_persons_wca_sub", "(`wca_id`, `sub_id`)", "wca_id,sub_id"],
   ["persons", "idx_persons_name", "(`name`)", "name"],
+  ["persons", "idx_persons_gender", "(`gender`, `sub_id`, `wca_id`)", "gender,sub_id,wca_id"],
   ["ranks_single", "idx_ranks_single_world", "(`event_id`, `world_rank`, `person_id`)", "event_id,world_rank,person_id"],
   ["ranks_single", "idx_ranks_single_continent", "(`event_id`, `continent_rank`, `person_id`)", "event_id,continent_rank,person_id"],
   ["ranks_single", "idx_ranks_single_country", "(`event_id`, `country_rank`, `person_id`)", "event_id,country_rank,person_id"],
@@ -210,10 +211,6 @@ export const ACTIVE_SEMANTIC_PROJECTION_TABLES = projectionDefinitions
 export const COMPATIBILITY_PROJECTION_TABLES = [
   "ranking_entries_single",
   "ranking_entries_average",
-  "weekly_rank_deltas_single",
-  "weekly_rank_deltas_average",
-  "record_streaks_single",
-  "record_streaks_average",
   "ranking_counts",
   "result_entries_single",
   "result_counts",
@@ -227,12 +224,8 @@ export const RETIRED_PROJECTION_TABLES = [
 ];
 
 export const COMPATIBILITY_PROJECTION_TASKS = [
-  { name: "compatibility-weekly-rank-deltas-single", dependencies: ["raw-wca"], table: "weekly_rank_deltas_single", estimatedDurationMs: 360_000 },
-  { name: "compatibility-weekly-rank-deltas-average", dependencies: ["raw-wca"], table: "weekly_rank_deltas_average", estimatedDurationMs: 360_000 },
-  { name: "compatibility-record-streaks-single", dependencies: ["raw-wca"], table: "record_streaks_single", estimatedDurationMs: 180_000 },
-  { name: "compatibility-record-streaks-average", dependencies: ["raw-wca"], table: "record_streaks_average", estimatedDurationMs: 180_000 },
-  { name: "compatibility-ranking-entries-single-source", dependencies: ["compatibility-weekly-rank-deltas-single", "compatibility-record-streaks-single"], estimatedDurationMs: 0 },
-  { name: "compatibility-ranking-entries-average-source", dependencies: ["compatibility-weekly-rank-deltas-average", "compatibility-record-streaks-average"], estimatedDurationMs: 0 },
+  { name: "compatibility-ranking-entries-single-source", dependencies: [], estimatedDurationMs: 0 },
+  { name: "compatibility-ranking-entries-average-source", dependencies: [], estimatedDurationMs: 0 },
   { name: "compatibility-result-entries-single-source", dependencies: ["raw-wca"], estimatedDurationMs: 0 },
   { name: "compatibility-ranking-entries-single", dependencies: ["compatibility-ranking-entries-single-source"], table: "ranking_entries_single", estimatedDurationMs: 120_000 },
   { name: "compatibility-ranking-entries-average", dependencies: ["compatibility-ranking-entries-average-source"], table: "ranking_entries_average", estimatedDurationMs: 120_000 },
@@ -558,10 +551,6 @@ function renameCompatibilitySql(sql, {
   return sql
     .replaceAll("wca_best_single", bestSingle)
     .replaceAll("wca_best_average", bestAverage)
-    .replaceAll("weekly_rank_deltas_single", `weekly_rank_deltas_single${projectionSuffix}`)
-    .replaceAll("weekly_rank_deltas_average", `weekly_rank_deltas_average${projectionSuffix}`)
-    .replaceAll("record_streaks_single", `record_streaks_single${projectionSuffix}`)
-    .replaceAll("record_streaks_average", `record_streaks_average${projectionSuffix}`)
     .replaceAll("ranking_entries_single_source", entriesSources.single)
     .replaceAll("ranking_entries_average_source", entriesSources.average)
     .replaceAll("result_entries_single_source", resultEntriesSource);
@@ -600,18 +589,6 @@ function compatibilityProjectionTasks({
     projectionSuffix,
   };
   const runners = {
-    "compatibility-weekly-rank-deltas-single": (connection) => buildCompatibilityHelperTable(
-      connection, "weekly_rank_deltas_single.sql", names, tableProgress,
-    ),
-    "compatibility-weekly-rank-deltas-average": (connection) => buildCompatibilityHelperTable(
-      connection, "weekly_rank_deltas_average.sql", names, tableProgress,
-    ),
-    "compatibility-record-streaks-single": (connection) => buildCompatibilityHelperTable(
-      connection, "record_streaks_single.sql", names, tableProgress,
-    ),
-    "compatibility-record-streaks-average": (connection) => buildCompatibilityHelperTable(
-      connection, "record_streaks_average.sql", names, tableProgress,
-    ),
     "compatibility-ranking-entries-single-source": (connection) => createCompatibilitySource(
       connection, "ranking_entries_single_source.sql", names,
     ),
@@ -805,10 +782,6 @@ export async function refreshMysqlSchema(
       resultEntriesSource,
       bestSingle,
       bestAverage,
-      `weekly_rank_deltas_single${projectionSuffix}`,
-      `weekly_rank_deltas_average${projectionSuffix}`,
-      `record_streaks_single${projectionSuffix}`,
-      `record_streaks_average${projectionSuffix}`,
     ]) {
       await dropManagedObject(connection, name);
     }

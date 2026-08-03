@@ -1,5 +1,5 @@
--- Eager common cohorts only. Combined-gender, country, and year requests use
--- the indexed lazy solve_facts path.
+-- Eager gender cohorts are retained for common world/continent filters.
+-- Combined-gender, country, and year requests use the indexed lazy solve_facts path.
 CREATE TABLE result_gender_rankings_single AS
 SELECT
   solve.*,

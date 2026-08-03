@@ -16,10 +16,6 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
     tables: [
       "ranking_entries_single",
       "ranking_entries_average",
-      "weekly_rank_deltas_single",
-      "weekly_rank_deltas_average",
-      "record_streaks_single",
-      "record_streaks_average",
       "ranking_counts",
       "result_entries_single",
       "result_counts",
@@ -27,10 +23,6 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
     sqlFiles: [
       "wca_best_single.sql",
       "wca_best_average.sql",
-      "weekly_rank_deltas_single.sql",
-      "weekly_rank_deltas_average.sql",
-      "record_streaks_single.sql",
-      "record_streaks_average.sql",
       "ranking_entries_single_source.sql",
       "ranking_entries_average_source.sql",
       "result_entries_single_source.sql",
@@ -58,7 +50,7 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
   },
   {
     name: "result-rankings",
-    schemaVersion: 3,
+    schemaVersion: 4,
     dependencies: ["result-facts", "solve-facts"],
     projectionNames: ["result-rankings", "result-ranking-counts"],
     tables: ["result_rankings_single", "result_rankings_average", "result_gender_rankings_single", "result_gender_rankings_average", "solve_personal_rankings", "result_ranking_counts", "result_gender_ranking_counts"],

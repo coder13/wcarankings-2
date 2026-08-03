@@ -184,40 +184,27 @@ test("a full schema refresh keeps the default semantic projections when selectio
   assert.deepEqual(projectionNamesForRefresh([]), []);
 });
 
-test("compatibility helper tables are indexed, scheduled, and counted as build work", () => {
+test("weekly deltas and record streaks stay disabled in compatibility refreshes", () => {
   const helpers = COMPATIBILITY_PROJECTION_TASKS.filter(({ name }) =>
     name.startsWith("compatibility-weekly-rank-deltas") || name.startsWith("compatibility-record-streaks"));
-  assert.equal(helpers.length, 4);
-  for (const task of helpers) {
-    assert.equal(task.dependencies[0], "raw-wca");
-    assert.ok(task.table);
-    assert.ok(task.estimatedDurationMs > 0);
-  }
+  assert.equal(helpers.length, 0);
   const source = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
     name === "compatibility-ranking-entries-single-source");
-  assert.deepEqual(source.dependencies, [
-    "compatibility-weekly-rank-deltas-single",
-    "compatibility-record-streaks-single",
-  ]);
+  assert.deepEqual(source.dependencies, []);
   const averageSource = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
     name === "compatibility-ranking-entries-average-source");
-  assert.deepEqual(averageSource.dependencies, [
-    "compatibility-weekly-rank-deltas-average",
-    "compatibility-record-streaks-average",
-  ]);
-  assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 9);
+  assert.deepEqual(averageSource.dependencies, []);
+  assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 5);
   const progress = createTableProgress(COMPATIBILITY_TABLE_TASK_COUNT);
   let lastProgress;
   for (const task of COMPATIBILITY_PROJECTION_TASKS) {
     if (task.table) lastProgress = progress.start(task.table);
   }
-  assert.equal(lastProgress, "[9/9]");
+  assert.equal(lastProgress, "[5/5]");
 });
 
-test("compatibility source views wait for their two helper tables", async () => {
+test("compatibility source views run without disabled helper tables", async () => {
   const names = new Set([
-    "compatibility-weekly-rank-deltas-single",
-    "compatibility-record-streaks-single",
     "compatibility-ranking-entries-single-source",
   ]);
   const events = [];
@@ -235,10 +222,8 @@ test("compatibility source views wait for their two helper tables", async () => 
   await runDependencyAwareTasks(tasks, {
     createConnection: async () => fakeConnection(events.length + 1, []),
     concurrency: 2,
-    satisfiedDependencies: ["raw-wca"],
   });
 
   const sourceStart = events.indexOf("start:compatibility-ranking-entries-single-source");
-  assert.ok(sourceStart > events.indexOf("finish:compatibility-weekly-rank-deltas-single"));
-  assert.ok(sourceStart > events.indexOf("finish:compatibility-record-streaks-single"));
+  assert.ok(sourceStart >= 0);
 });

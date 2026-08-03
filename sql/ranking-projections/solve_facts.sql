@@ -25,4 +25,12 @@ ALTER TABLE solve_facts
   ADD INDEX idx_solve_facts_country_year (
     gender, event_id, country_id, competition_start_date, solve_value,
     competition_id, result_id, attempt_number
+  ),
+  ADD INDEX idx_solve_facts_event_country_value (
+    event_id, country_id, solve_value, competition_start_date,
+    competition_id, result_id, attempt_number
+  ),
+  ADD INDEX idx_solve_facts_event_continent_value (
+    event_id, continent_id, solve_value, competition_start_date,
+    competition_id, result_id, attempt_number
   );

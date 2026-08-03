@@ -8,6 +8,7 @@ WITH historical AS (
     COALESCE(country.name, r.person_country_id, '') AS country_name,
     COALESCE(country.iso2, '') AS country_iso2,
     COALESCE(country.continent_id, '') AS continent_id,
+    CASE WHEN p.gender IN ('m', 'f') THEN p.gender ELSE 'o' END AS gender,
     r.best,
     COALESCE(r.competition_id, '') AS competition_id,
     COALESCE(comp.name, r.competition_id, '') AS competition_name,
@@ -28,7 +29,7 @@ WITH historical AS (
 ), country_rows AS (
   SELECT
     event_id, person_id, person_name, country_id, country_name, country_iso2,
-    continent_id, best, competition_id, competition_name,
+    continent_id, gender, best, competition_id, competition_name,
     0 AS world_rank,
     0 AS continent_rank,
     RANK() OVER (PARTITION BY event_id, country_id ORDER BY best) AS country_rank,
@@ -46,7 +47,7 @@ WITH historical AS (
 ), continent_rows AS (
   SELECT
     event_id, person_id, person_name, country_id, country_name, country_iso2,
-    continent_id, best, competition_id, competition_name,
+    continent_id, gender, best, competition_id, competition_name,
     0 AS world_rank,
     RANK() OVER (PARTITION BY event_id, continent_id ORDER BY best) AS continent_rank,
     0 AS country_rank,
@@ -70,6 +71,7 @@ WITH historical AS (
     COALESCE(country.name, p.country_id, '') AS country_name,
     COALESCE(country.iso2, '') AS country_iso2,
     COALESCE(country.continent_id, '') AS continent_id,
+    CASE WHEN p.gender IN ('m', 'f') THEN p.gender ELSE 'o' END AS gender,
     r.best,
     COALESCE(best.competition_id, '') AS competition_id,
     COALESCE(comp.name, '') AS competition_name,
@@ -91,46 +93,37 @@ WITH historical AS (
   LEFT JOIN countries country ON country.id = p.country_id
   LEFT JOIN wca_best_single best ON best.person_id = r.person_id AND best.event_id = r.event_id
   LEFT JOIN competitions comp ON comp.id = best.competition_id
-), deltas AS (
-  SELECT * FROM weekly_rank_deltas_single
-), streaks AS (
-  SELECT * FROM record_streaks_single
 )
 SELECT world_rows.event_id, world_rows.person_id, world_rows.person_name, world_rows.country_id, world_rows.country_name, world_rows.country_iso2,
-  world_rows.continent_id, world_rows.best, world_rows.competition_id, world_rows.competition_name,
+  world_rows.continent_id, world_rows.gender, world_rows.best, world_rows.competition_id, world_rows.competition_name,
   world_rows.is_world_record, world_rows.is_continent_record, world_rows.is_country_record,
   world_rows.world_rank, world_rows.continent_rank, world_rows.country_rank,
   world_sub_rank, continent_sub_rank, country_sub_rank,
-  deltas.world_rank_delta, deltas.world_rank_delta_state,
-  deltas.continent_rank_delta, deltas.continent_rank_delta_state,
-  deltas.country_rank_delta, deltas.country_rank_delta_state,
-  CASE WHEN world_rows.is_world_record = 1 THEN streaks.world_record_streak_weeks WHEN world_rows.is_continent_record = 1 THEN streaks.continent_record_streak_weeks WHEN world_rows.is_country_record = 1 THEN streaks.country_record_streak_weeks END AS record_streak_weeks
+  CAST(NULL AS SIGNED) AS world_rank_delta, CAST(NULL AS CHAR(10)) AS world_rank_delta_state,
+  CAST(NULL AS SIGNED) AS continent_rank_delta, CAST(NULL AS CHAR(10)) AS continent_rank_delta_state,
+  CAST(NULL AS SIGNED) AS country_rank_delta, CAST(NULL AS CHAR(10)) AS country_rank_delta_state,
+  CAST(NULL AS SIGNED) AS record_streak_weeks
 FROM world_rows
-LEFT JOIN deltas ON deltas.event_id = world_rows.event_id AND deltas.person_id = world_rows.person_id
-LEFT JOIN streaks ON streaks.event_id = world_rows.event_id AND streaks.person_id = world_rows.person_id
 UNION ALL
 SELECT country_rows.event_id, country_rows.person_id, country_rows.person_name, country_rows.country_id, country_rows.country_name, country_rows.country_iso2,
-  country_rows.continent_id, country_rows.best, country_rows.competition_id, country_rows.competition_name,
+  country_rows.continent_id, country_rows.gender, country_rows.best, country_rows.competition_id, country_rows.competition_name,
   country_rows.is_world_record, country_rows.is_continent_record, country_rows.is_country_record,
   country_rows.world_rank, country_rows.continent_rank, country_rows.country_rank,
   world_sub_rank, continent_sub_rank, country_sub_rank,
-  deltas.world_rank_delta, deltas.world_rank_delta_state,
-  deltas.continent_rank_delta, deltas.continent_rank_delta_state,
-  deltas.country_rank_delta, deltas.country_rank_delta_state,
-  CASE WHEN country_rows.is_world_record = 1 THEN streaks.world_record_streak_weeks WHEN country_rows.is_continent_record = 1 THEN streaks.continent_record_streak_weeks WHEN country_rows.is_country_record = 1 THEN streaks.country_record_streak_weeks END AS record_streak_weeks
+  CAST(NULL AS SIGNED) AS world_rank_delta, CAST(NULL AS CHAR(10)) AS world_rank_delta_state,
+  CAST(NULL AS SIGNED) AS continent_rank_delta, CAST(NULL AS CHAR(10)) AS continent_rank_delta_state,
+  CAST(NULL AS SIGNED) AS country_rank_delta, CAST(NULL AS CHAR(10)) AS country_rank_delta_state,
+  CAST(NULL AS SIGNED) AS record_streak_weeks
 FROM country_rows
-LEFT JOIN deltas ON deltas.event_id = country_rows.event_id AND deltas.person_id = country_rows.person_id
-LEFT JOIN streaks ON streaks.event_id = country_rows.event_id AND streaks.person_id = country_rows.person_id
 UNION ALL
 SELECT continent_rows.event_id, continent_rows.person_id, continent_rows.person_name, continent_rows.country_id, continent_rows.country_name, continent_rows.country_iso2,
-  continent_rows.continent_id, continent_rows.best, continent_rows.competition_id, continent_rows.competition_name,
+  continent_rows.continent_id, continent_rows.gender, continent_rows.best, continent_rows.competition_id, continent_rows.competition_name,
   continent_rows.is_world_record, continent_rows.is_continent_record, continent_rows.is_country_record,
   continent_rows.world_rank, continent_rows.continent_rank, continent_rows.country_rank,
   world_sub_rank, continent_sub_rank, country_sub_rank,
-  deltas.world_rank_delta, deltas.world_rank_delta_state,
-  deltas.continent_rank_delta, deltas.continent_rank_delta_state,
-  deltas.country_rank_delta, deltas.country_rank_delta_state,
-  CASE WHEN continent_rows.is_world_record = 1 THEN streaks.world_record_streak_weeks WHEN continent_rows.is_continent_record = 1 THEN streaks.continent_record_streak_weeks WHEN continent_rows.is_country_record = 1 THEN streaks.country_record_streak_weeks END AS record_streak_weeks
+  CAST(NULL AS SIGNED) AS world_rank_delta, CAST(NULL AS CHAR(10)) AS world_rank_delta_state,
+  CAST(NULL AS SIGNED) AS continent_rank_delta, CAST(NULL AS CHAR(10)) AS continent_rank_delta_state,
+  CAST(NULL AS SIGNED) AS country_rank_delta, CAST(NULL AS CHAR(10)) AS country_rank_delta_state,
+  CAST(NULL AS SIGNED) AS record_streak_weeks
 FROM continent_rows
-LEFT JOIN deltas ON deltas.event_id = continent_rows.event_id AND deltas.person_id = continent_rows.person_id
-LEFT JOIN streaks ON streaks.event_id = continent_rows.event_id AND streaks.person_id = continent_rows.person_id;
+;
