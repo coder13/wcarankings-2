@@ -22,6 +22,7 @@ const manifest = {
   groups: {
     compatibility: { semanticFingerprint: "compat-semantic", artifactFingerprint: "compat-new", artifactDigest: "sha256:compat" },
     "result-facts": { semanticFingerprint: "facts-semantic", artifactFingerprint: "facts-new", artifactDigest: "sha256:facts" },
+    "solve-facts": { semanticFingerprint: "solve-semantic", artifactFingerprint: "solve-new", artifactDigest: "sha256:solve" },
     "result-rankings": { semanticFingerprint: "result-semantic", artifactFingerprint: "result-new", artifactDigest: "sha256:result" },
     "competition-rankings": { semanticFingerprint: "competition-semantic", artifactFingerprint: "competition-new", artifactDigest: "sha256:competition" },
     "person-competition-rankings": { semanticFingerprint: "person-competition-semantic", artifactFingerprint: "person-competition-new", artifactDigest: "sha256:person-competition" },
