@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import type { PatchRankingsFilters } from "./useRankingsFilters";
 import type { RankingCommands } from "./useRankingCommands";
 import type { useRankingsSearch } from "./useRankingsSearch";
+import type { PatchRankingsFilters } from "./useRankingsState";
 import type { useVimNavigation } from "./useVimNavigation";
 
 export function useExplorerKeyboardShortcuts({
@@ -11,11 +11,15 @@ export function useExplorerKeyboardShortcuts({
   vim,
   patchFilters,
   commands,
+  goToTop,
+  goToEnd,
 }: {
   search: ReturnType<typeof useRankingsSearch>;
   vim: ReturnType<typeof useVimNavigation>;
   patchFilters: PatchRankingsFilters;
   commands: RankingCommands;
+  goToTop: () => void;
+  goToEnd: () => void;
 }) {
   const {
     open,
@@ -44,6 +48,26 @@ export function useExplorerKeyboardShortcuts({
       const isEditable =
         target instanceof Element &&
         target.matches("input, textarea, select, [contenteditable='true']");
+
+      const toTop =
+        (event.metaKey && !event.ctrlKey && event.key === "ArrowUp") ||
+        (event.ctrlKey && !event.metaKey && event.key === "Home");
+      const toBottom =
+        (event.metaKey && !event.ctrlKey && event.key === "ArrowDown") ||
+        (event.ctrlKey && !event.metaKey && event.key === "End");
+      if (
+        !isEditable &&
+        !event.altKey &&
+        !event.shiftKey &&
+        (toTop || toBottom)
+      ) {
+        event.preventDefault();
+        if (!event.repeat) {
+          if (toTop) goToTop();
+          else goToEnd();
+        }
+        return;
+      }
 
       if ((event.ctrlKey || event.metaKey) && key === "f") {
         event.preventDefault();
@@ -101,6 +125,8 @@ export function useExplorerKeyboardShortcuts({
     close,
     cycle,
     focusSearch,
+    goToEnd,
+    goToTop,
     mode,
     open,
     patchFilters,

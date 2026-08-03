@@ -13,41 +13,36 @@ async function read(...paths) {
 
 test("composes the rankings UI around URL state and TanStack Query", async () => {
   const [explorer, data, queries, results, url, providers] = await Promise.all([
+    read("components/RankingsExplorer/RankingsExplorer.tsx"),
     read(
-      "components/RankingsExplorer/RankingsExplorer.tsx",
-      "components/RankingsExplorer/useRankingDataRuntime.ts",
-      "components/RankingsExplorer/useRankingInteractionRuntime.ts",
+      "components/RankingsExplorer/useVirtualRankings.ts",
+      "components/RankingsExplorer/useSingleExpandedVirtualRow.ts",
     ),
     read(
-      "components/RankingsExplorer/useRankingWindow.ts",
-      "components/RankingsExplorer/useRankingPagination.ts",
-      "components/RankingsExplorer/useRankingPageLoader.ts",
-      "components/RankingsExplorer/useRankingViewport.ts",
+      "components/RankingsExplorer/rankingsQueries.ts",
+      "components/RankingsExplorer/useRankingsApi.ts",
     ),
-    read("components/RankingsExplorer/rankingsQueries.ts"),
     read(
       "components/RankingsExplorer/RankingsResults.tsx",
       "components/ResultsTable/ResultsTable.tsx",
     ),
     read(
-      "components/RankingsExplorer/useRankingsFilters.ts",
-      "components/RankingsExplorer/useRankingsUrlState.ts",
+      "components/RankingsExplorer/useRankingsState.ts",
       "components/RankingsExplorer/rankingsUrl.ts",
     ),
     read("app/AppProviders.tsx", "app/layout.tsx"),
   ]);
 
-  assert.match(explorer, /useRankingDataRuntime/);
-  assert.match(explorer, /useRankingInteractionRuntime/);
-  assert.doesNotMatch(explorer, /useRankingsRuntime|mockSubjectRows|mockRows/);
-  assert.match(data, /query\.data\?\.pages/);
-  assert.match(data, /fetchNextPage/);
-  assert.match(data, /fetchPreviousPage/);
-  assert.match(queries, /useInfiniteQuery/);
+  assert.match(explorer, /useRankingsApi/);
+  assert.match(explorer, /useVirtualRankings/);
+  assert.doesNotMatch(
+    explorer,
+    /useRankingDataRuntime|useRankingInteractionRuntime|mockSubjectRows|mockRows/,
+  );
+  assert.match(data, /useQuery/);
+  assert.match(data, /useWindowVirtualizer/);
   assert.match(queries, /queryClient\.fetchQuery/);
   assert.match(queries, /RESULTS_PAGE_SIZE/);
-  assert.match(data, /useWindowVirtualizer/);
-  assert.match(results, /That’s all, folks/);
   assert.doesNotMatch(results, /className="loader"|skeleton/i);
   assert.match(url, /usePathname/);
   assert.match(url, /useSearchParams/);

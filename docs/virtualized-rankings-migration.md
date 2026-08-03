@@ -281,9 +281,11 @@ Define the hydration behavior before removing `useRankingViewport`:
 11. Delete special window-fetch helpers that no longer have callers.
 12. Delete the playground after the production path is stable.
 
-`useRankingDataRuntime` should become a thin composition of the production data
-source, `useVirtualRankings`, and list-member management—or disappear if those
-pieces read more clearly at the `RankingsExplorer` level.
+The follow-up ownership cleanup removed `useRankingDataRuntime` and the matching
+interaction wrapper. `RankingsExplorer` now composes URL-backed state, the API
+adapter, `useVirtualRankings`, focused-person behavior, search, and list-member
+management directly. The context exposes those domains without the old
+`data.interactions.navigation` nesting.
 
 ## Verification
 

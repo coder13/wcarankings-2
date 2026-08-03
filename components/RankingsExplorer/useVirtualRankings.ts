@@ -18,6 +18,7 @@ import {
 } from "./rankingLayout";
 import type { InitialRankingData, RankingEntry } from "./types";
 import { useInterruptibleWindowScroll } from "./useInterruptibleWindowScroll";
+import { useRankingListOffset } from "./useRankingListOffset";
 import { useSingleExpandedVirtualRow } from "./useSingleExpandedVirtualRow";
 
 const WINDOW_ROWS = 500;
@@ -97,15 +98,14 @@ export function useVirtualRankings({
   datasetKey,
   api,
   initialData,
-  listOffset,
   expandableRows,
 }: {
   datasetKey: string;
   api: RankingsRangeApi;
   initialData?: InitialRankingData;
-  listOffset: number;
   expandableRows: boolean;
 }) {
+  const listOffset = useRankingListOffset();
   const hydrated = useSyncExternalStore(
     subscribeHydration,
     () => true,

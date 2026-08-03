@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { trackGoogleAnalyticsEvent } from "@/lib/helpers/analytics/google-analytics";
 import { orderSearchMatches } from "./helpers/search";
-import type { PatchRankingsFilters } from "./useRankingsFilters";
+import type { PatchRankingsFilters } from "./useRankingsState";
 import type { RankingEntry } from "./types";
 
 type SearchRequest = (

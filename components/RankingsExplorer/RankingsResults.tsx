@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { WCA_EVENTS } from "@/lib/wca";
 import { ListMembershipRequestRows } from "../ListOwnerControls/ListMembershipRequestRows";
 import { ResultsTable } from "../ResultsTable/ResultsTable";
@@ -10,9 +11,38 @@ export function RankingsResults() {
   const {
     config: { list },
     filters,
-    data: { rankings, listMembers },
-    interactions,
+    rankings,
+    search,
+    focus,
+    listMembers,
   } = useRankingsExplorer();
+  const navigateRow = useCallback((globalIndex: number, direction: -1 | 1) => {
+    const targetIndex = Math.min(
+      rankings.total - 1,
+      Math.max(0, globalIndex + direction),
+    );
+    const selector = `.listItem[data-global-index="${targetIndex}"]`;
+    const mounted = document.querySelector<HTMLElement>(selector);
+    if (mounted) {
+      mounted.focus({ preventScroll: true });
+      mounted.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    rankings.jumpToIndex(targetIndex, false);
+    let attempts = 4;
+    const focusWhenRendered = () => {
+      window.requestAnimationFrame(() => {
+        const row = document.querySelector<HTMLElement>(selector);
+        if (row) {
+          row.focus({ preventScroll: true });
+          return;
+        }
+        attempts -= 1;
+        if (attempts > 0) focusWhenRendered();
+      });
+    };
+    focusWhenRendered();
+  }, [rankings]);
   const membershipRequests = list?.membershipRequests;
   const emptyListMessage = emptyOwnerListMessage(list?.owner);
   const emptyState = (
@@ -22,10 +52,10 @@ export function RankingsResults() {
   );
 
   let results;
-  if (rankings.error || interactions.navigation.error) {
+  if (rankings.error || focus.error) {
     results = (
       <div className="listMessage">
-        {rankings.error || interactions.navigation.error}
+        {rankings.error || focus.error}
       </div>
     );
   } else if (rankings.loading && rankings.items.length === 0) {
@@ -50,11 +80,11 @@ export function RankingsResults() {
           listOffset: rankings.listOffset,
         }}
         search={{
-          highlightedPersonId: interactions.navigation.highlightedPersonId,
-          searchMatchPersonIds: interactions.search.state.matchPersonIds,
+          highlightedPersonId: focus.highlightedPersonId,
+          searchMatchPersonIds: search.state.matchPersonIds,
         }}
         interaction={{
-          onRowNavigate: interactions.navigation.navigateRow,
+          onRowNavigate: navigateRow,
           onToggleExpanded: rankings.toggleExpanded,
           memberSelectionMode: listMembers.selection.active,
           selectedMemberIds: listMembers.selection.personIds,
@@ -68,7 +98,7 @@ export function RankingsResults() {
             WCA_EVENTS.some((event) => event.id === filters.eventId),
           onFocusedPersonChange:
             filters.subject === "people" && !filters.personCompetitionRanking
-              ? interactions.navigation.updateFocusedPerson
+              ? focus.updateFocusedPerson
               : undefined,
         }}
       />
@@ -79,9 +109,9 @@ export function RankingsResults() {
     <div className="outerListWrapper" data-rankings-list-container>
       <div className="listContainer">
         {list?.notice && <div className="listMessage">{list.notice}</div>}
-        {interactions.navigation.focusNotice && (
+        {focus.notice && (
           <div className="listMessage listMessage--notice">
-            {interactions.navigation.focusNotice}
+            {focus.notice}
           </div>
         )}
         {membershipRequests && (

@@ -8,7 +8,7 @@ import {
 import { subjectPath } from "./helpers/navigation";
 import { orderSearchMatches } from "./helpers/search";
 import { getTopRailScrollProgress } from "./useRailScrollProgress";
-import { competitionRankingPath } from "./useRankingFilterActions";
+import { competitionRankingPath } from "./useRankingsState";
 import type { RankingsFilterState } from "./rankingsUrl";
 import { serializeRankingsUrl, type RankingsUrlState } from "./rankingsUrl";
 import type { RankingEntry } from "./types";

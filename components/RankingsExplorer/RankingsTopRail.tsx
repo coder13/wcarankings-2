@@ -66,8 +66,10 @@ export function RankingsTopRail() {
   const {
     config: { source, list, regions: initialRegions, options },
     filters,
-    data,
-    interactions: { filterActions: actions, search },
+    filterActions: actions,
+    rankings,
+    search,
+    listMembers,
     commands,
   } = useRankingsExplorer();
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
@@ -84,15 +86,15 @@ export function RankingsTopRail() {
   const currentEvent =
     ALL_EVENT_RANKING_OPTIONS.find((option) => option.id === filters.eventId) ??
     WCA_EVENTS.find((event) => event.id === filters.eventId)!;
-  const personRankingPeriod = filters.personCompetitionRanking
-    ? "competitions"
-    : filters.year ? String(filters.year) : "";
+  let personRankingPeriod = "";
+  if (filters.personCompetitionRanking) personRankingPeriod = "competitions";
+  else if (filters.year) personRankingPeriod = String(filters.year);
   const personRankingPeriodOptions = [
     ...(featureSwitch.personCompetitionRankings
       ? [{ value: "competitions", label: t("rankingsRail.period.competitionCount") }]
       : []),
     { value: "", label: t("rankingsRail.period.allTime") },
-    ...data.rankings.availableYears.map((year) => ({
+    ...rankings.availableYears.map((year) => ({
       value: String(year),
       label: String(year),
     })),
@@ -128,7 +130,7 @@ export function RankingsTopRail() {
           listId={list.owner.listId}
           initialVisibility={list.owner.visibility}
           initialJoinPolicy={list.owner.joinPolicy}
-          onManageMembers={data.listMembers.selection.start}
+          onManageMembers={listMembers.selection.start}
         />
       )}
       {list?.actions && !list.actions.isOwner && (
@@ -148,7 +150,7 @@ export function RankingsTopRail() {
         <ListAddPeopleRail
           listId={list.owner.listId}
           onCancel={() => setAddPeopleOpen(false)}
-          onAdded={data.reload}
+          onAdded={() => void rankings.reload()}
         />
       ) : (
         <RankingsControlsRail

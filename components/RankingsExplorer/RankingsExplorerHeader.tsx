@@ -12,7 +12,7 @@ export function RankingsExplorerHeader() {
   const {
     config: { source, options: { showSubjectSwitch } },
     filters,
-    interactions: { filterActions: actions },
+    filterActions: actions,
   } = useRankingsExplorer();
   const {
     subject,

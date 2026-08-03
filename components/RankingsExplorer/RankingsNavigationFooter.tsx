@@ -4,12 +4,11 @@ import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import { JumpControlsVisibility } from "../JumpControlsVisibility/JumpControlsVisibility";
 import { RankingsPagerRail } from "../RankingsRail/RankingsRail";
 import { useRankingsExplorer } from "./RankingsExplorerContext";
-import { useHasScrolled } from "./useRailScrollProgress";
 import { formatFooterDate, formatRankingsFreshness } from "./types";
 
 function RankingsFooter({ standalone = false }: { standalone?: boolean }) {
-  const { config: { release }, data } = useRankingsExplorer();
-  const { offlineStale, exportDate } = data.rankings;
+  const { config: { release }, rankings } = useRankingsExplorer();
+  const { offlineStale, exportDate } = rankings;
 
   return (
     <footer className={`siteFooter${standalone ? " siteFooter--standalone" : ""}`}>
@@ -35,32 +34,35 @@ export function RankingsNavigationFooter() {
   const {
     config: { source, options },
     filters,
-    data,
-    interactions: { navigation, search },
+    rankings,
+    search,
+    focus,
+    listMembers,
+    navigation,
+    hasScrolled,
   } = useRankingsExplorer();
-  const hasScrolled = useHasScrolled();
   const pagerEnabled =
-    !data.listMembers.selection.active &&
-    (!source || data.rankings.total > RESULTS_PAGE_SIZE);
+    !listMembers.selection.active &&
+    (!source || rankings.total > RESULTS_PAGE_SIZE);
 
   if (!pagerEnabled) return <RankingsFooter standalone />;
 
   return (
     <JumpControlsVisibility
-      visible={data.rankings.jumpAnimating || hasScrolled}
+      visible={rankings.jumpAnimating || hasScrolled}
       fallback={<RankingsFooter />}
     >
       <RankingsPagerRail
         navigation={{
-          busy: data.rankings.jumpAnimating,
-          currentPosition: data.rankings.currentIndex + 1,
-          total: data.rankings.total,
-          onJumpUp: navigation.jumpUp,
-          onJumpDown: navigation.jumpDown,
-          onJumpToTop: () => navigation.resetToRank(1),
-          onJumpToEnd: navigation.jumpToEnd,
+          busy: rankings.jumpAnimating,
+          currentPosition: rankings.currentIndex + 1,
+          total: rankings.total,
+          onJumpUp: navigation.up,
+          onJumpDown: navigation.down,
+          onJumpToTop: navigation.toTop,
+          onJumpToEnd: navigation.toEnd,
           onFocusMe: filters.subject === "people" && options.showMyRank
-            ? navigation.focusMyRanking
+            ? focus.focusMyRanking
             : undefined,
         }}
         search={{
