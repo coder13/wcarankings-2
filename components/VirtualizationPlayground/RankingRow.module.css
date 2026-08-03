@@ -2,13 +2,8 @@
   position: absolute;
   top: 0;
   left: 0;
-  display: grid;
-  grid-template-columns: 7ch minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.35em;
   width: 100%;
-  height: 65px;
-  padding-inline: var(--page-gutter, 1rem);
+  overflow: hidden;
   background: var(--surface);
   color: var(--text);
   font-size: 1.0625rem;
@@ -17,6 +12,35 @@
 
 .alternate {
   background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.rowHeader {
+  display: grid;
+  grid-template-columns: 7ch minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35em;
+  width: 100%;
+  height: 65px;
+  padding-inline: var(--page-gutter, 1rem);
+  border: 0;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    background-color 150ms ease,
+    outline-color 150ms ease;
+}
+
+.rowHeader:hover {
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+}
+
+.rowHeader:focus-visible {
+  outline-color: color-mix(in srgb, var(--primary) 55%, transparent);
 }
 
 .number,
@@ -41,9 +65,52 @@
   text-align: right;
 }
 
+.details {
+  overflow: hidden;
+  will-change: height, opacity;
+}
+
+.detailsInner {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 2rem;
+  padding: 1.35rem var(--page-gutter, 1rem) 1rem calc(7ch + 0.35em + var(--page-gutter, 1rem));
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
+  box-sizing: border-box;
+}
+
+.detailsInner > div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.detailsLabel,
+.detailsMeta {
+  color: var(--text-muted);
+  font-size: 0.8em;
+}
+
+.detailsValue {
+  overflow: hidden;
+  font-size: 1.25em;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 480px) {
   .row {
-    grid-template-columns: 5ch minmax(0, 1fr) auto;
     font-size: 1rem;
+  }
+
+  .rowHeader {
+    grid-template-columns: 5ch minmax(0, 1fr) auto;
+  }
+
+  .detailsInner {
+    gap: 1rem;
+    padding-left: var(--page-gutter, 1rem);
   }
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  observeWindowOffset,
   useWindowVirtualizer,
   type VirtualItem,
 } from "@tanstack/react-virtual";
@@ -11,7 +10,6 @@ import {
   use,
   useCallback,
   useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -22,9 +20,11 @@ import {
   type RankingsApi,
 } from "./RankingsApiContext";
 import { useInterruptibleWindowScroll } from "./useInterruptibleWindowScroll";
+import { useSingleExpandedVirtualRow } from "./useSingleExpandedVirtualRow";
 
 export const TOTAL_ROWS = 500_000;
 export const ROW_HEIGHT = 65;
+export const EXPANDED_ROW_HEIGHT = 248;
 export const WINDOW_ROWS = 500;
 export const RECENTER_EDGE_ROWS = 100;
 export const RECENTER_TARGET_ROW = 250;
@@ -35,6 +35,8 @@ export const MAX_JUMP_ANIMATION_ROWS = 250;
 export const JUMP_ANIMATION_DURATION_SECONDS = 0.6;
 export const JUMP_ANIMATION_EASE = [0.32, 0.72, 0, 1] as const;
 export const JUMP_VIEWPORT_ANCHOR = 1 / 3;
+export const ROW_EXPANSION_DURATION_SECONDS = 0.2;
+export const ROW_EXPANSION_EASE = [0.2, 0.7, 0.2, 1] as const;
 
 const RANGE_CACHE_TIME_MS = 5 * 60 * 1000;
 const PLAYGROUND_FILTERS = {
@@ -57,6 +59,9 @@ const targetLocalIndex = Math.min(
 type VirtualRankingItem = VirtualItem & {
   globalIndex: number;
   ranking: RankingRowData;
+  expanded: boolean;
+  detailsHeight: number;
+  expansionProgress: number;
 };
 
 type VirtualizerContextValue = {
@@ -64,7 +69,9 @@ type VirtualizerContextValue = {
   totalHeight: number;
   scrollOffset: number;
   baseIndex: number;
+  expandedIndex: number | null;
   jumpToIndex: (index: number) => void;
+  toggleExpanded: (index: number) => void;
 };
 
 const VirtualizerContext = createContext<VirtualizerContextValue | null>(null);
@@ -97,6 +104,7 @@ function rankingRangeQueryOptions(
 function useVirtualRankingItems(
   virtualItems: VirtualItem[],
   baseIndex: number,
+  expandedIndex: number | null,
 ) {
   const api = useRankingsApi();
   const rangeStart =
@@ -111,10 +119,17 @@ function useVirtualRankingItems(
 
   return virtualItems.map((item) => {
     const globalIndex = baseIndex + item.index;
+    const detailsHeight = Math.max(0, item.size - ROW_HEIGHT);
 
     return {
       ...item,
       globalIndex,
+      expanded: globalIndex === expandedIndex,
+      detailsHeight,
+      expansionProgress: Math.min(
+        1,
+        detailsHeight / (EXPANDED_ROW_HEIGHT - ROW_HEIGHT),
+      ),
       ranking: rankingsQuery.data?.rows[globalIndex] ?? {
         index: globalIndex,
         number: globalIndex + 1,
@@ -127,78 +142,102 @@ function useVirtualRankingItems(
 
 export function VirtualRankingsProvider({ children }: { children: ReactNode }) {
   const [baseIndex, setBaseIndex] = useState(0);
-  const baseIndexRef = useRef(baseIndex);
   const scrollAnimation = useInterruptibleWindowScroll({
     duration: JUMP_ANIMATION_DURATION_SECONDS,
     ease: JUMP_ANIMATION_EASE,
   });
+  const expansion = useSingleExpandedVirtualRow({
+    totalRows: TOTAL_ROWS,
+    rowHeight: ROW_HEIGHT,
+    expandedRowHeight: EXPANDED_ROW_HEIGHT,
+    duration: ROW_EXPANSION_DURATION_SECONDS,
+    ease: ROW_EXPANSION_EASE,
+  });
   const virtualizer = useWindowVirtualizer({
     count: windowCount,
-    estimateSize: () => ROW_HEIGHT,
-    getItemKey: (localIndex) => baseIndexRef.current + localIndex,
+    estimateSize: (localIndex) =>
+      expansion.rowSize(baseIndex + localIndex),
+    getItemKey: (localIndex) => baseIndex + localIndex,
     overscan: OVERSCAN_ROWS,
     scrollMargin: LIST_OFFSET,
-    observeElementOffset: (instance, callback) =>
-      observeWindowOffset(instance, (physicalOffset, isScrolling) => {
-        const localOffset = Math.max(0, physicalOffset - LIST_OFFSET);
-        const localIndex = localOffset / ROW_HEIGHT;
-
-        if (scrollAnimation.isActive()) {
-          callback(physicalOffset, isScrolling);
-          return;
-        }
-
-        const currentBaseIndex = baseIndexRef.current;
-        const nearTop = localIndex <= edgeRows && currentBaseIndex > 0;
-        const nearBottom =
-          localIndex >= windowCount - edgeRows &&
-          currentBaseIndex < maximumBaseIndex;
-
-        if (!nearTop && !nearBottom) {
-          callback(physicalOffset, isScrolling);
-          return;
-        }
-
-        const globalIndex = currentBaseIndex + localIndex;
-        const proposedBaseIndex =
-          Math.floor(globalIndex - targetLocalIndex);
-        const nextBaseIndex = Math.min(
-          maximumBaseIndex,
-          Math.max(0, proposedBaseIndex),
-        );
-
-        if (nextBaseIndex === currentBaseIndex) {
-          callback(physicalOffset, isScrolling);
-          return;
-        }
-
-        const recenteredOffset =
-          LIST_OFFSET + (globalIndex - nextBaseIndex) * ROW_HEIGHT;
-        baseIndexRef.current = nextBaseIndex;
-        setBaseIndex(nextBaseIndex);
-        instance.scrollElement?.scrollTo({
-          top: recenteredOffset,
-          behavior: "auto",
-        });
-        callback(recenteredOffset, isScrolling);
-      }),
   });
+
+  useEffect(() => {
+    const recenterWindow = () => {
+      if (scrollAnimation.isActive()) return;
+
+      const globalOffset =
+        expansion.offsetForIndex(baseIndex) +
+        Math.max(0, window.scrollY - LIST_OFFSET);
+      const globalIndex = expansion.indexAtOffset(globalOffset);
+      const localIndex = globalIndex - baseIndex;
+      const nearTop = localIndex <= edgeRows && baseIndex > 0;
+      const nearBottom =
+        localIndex >= windowCount - edgeRows &&
+        baseIndex < maximumBaseIndex;
+      if (!nearTop && !nearBottom) return;
+
+      expansion.finish();
+      const settledGlobalOffset =
+        expansion.offsetForIndex(baseIndex) +
+        Math.max(0, window.scrollY - LIST_OFFSET);
+      const settledGlobalIndex =
+        expansion.indexAtOffset(settledGlobalOffset);
+      const nextBaseIndex = Math.min(
+        maximumBaseIndex,
+        Math.max(
+          0,
+          Math.floor(settledGlobalIndex - targetLocalIndex),
+        ),
+      );
+      if (nextBaseIndex === baseIndex) return;
+
+      const recenteredOffset =
+        LIST_OFFSET +
+        settledGlobalOffset -
+        expansion.offsetForIndex(nextBaseIndex);
+      flushSync(() => setBaseIndex(nextBaseIndex));
+      window.scrollTo({ top: recenteredOffset, behavior: "auto" });
+    };
+
+    window.addEventListener("scroll", recenterWindow, { passive: true });
+    return () => window.removeEventListener("scroll", recenterWindow);
+  }, [baseIndex, expansion, scrollAnimation]);
+
+  const resizeGlobalRow = useCallback(
+    (globalIndex: number, size: number) => {
+      const localIndex = globalIndex - baseIndex;
+      if (localIndex < 0 || localIndex >= windowCount) return;
+      virtualizer.resizeItem(localIndex, size);
+    },
+    [baseIndex, virtualizer],
+  );
+  const toggleExpanded = useCallback(
+    (globalIndex: number) => {
+      expansion.toggle(globalIndex, {
+        resizeRow: resizeGlobalRow,
+        onStart: scrollAnimation.cancel,
+      });
+    },
+    [expansion, resizeGlobalRow, scrollAnimation.cancel],
+  );
 
   const jumpToIndex = useCallback(
     (requestedIndex: number) => {
+      expansion.finish();
       const targetIndex = Math.min(
         TOTAL_ROWS - 1,
         Math.max(0, Math.trunc(requestedIndex)),
       );
-      const currentLocalIndex = Math.max(
-        0,
-        (window.scrollY +
-          window.innerHeight * JUMP_VIEWPORT_ANCHOR -
-          LIST_OFFSET -
-          ROW_HEIGHT / 2) /
-          ROW_HEIGHT,
-      );
-      const currentGlobalIndex = baseIndexRef.current + currentLocalIndex;
+      const currentGlobalOffset =
+        expansion.offsetForIndex(baseIndex) +
+        Math.max(
+          0,
+          window.scrollY +
+            window.innerHeight * JUMP_VIEWPORT_ANCHOR -
+            LIST_OFFSET,
+        );
+      const currentGlobalIndex = expansion.indexAtOffset(currentGlobalOffset);
       const direction = Math.sign(targetIndex - currentGlobalIndex);
 
       if (direction === 0) {
@@ -210,18 +249,23 @@ export function VirtualRankingsProvider({ children }: { children: ReactNode }) {
         maximumBaseIndex,
         Math.max(0, targetIndex - targetLocalIndex),
       );
-      const finalLocalIndex = targetIndex - nextBaseIndex;
+      const nextWindowHeight =
+        expansion.offsetForIndex(nextBaseIndex + windowCount) -
+        expansion.offsetForIndex(nextBaseIndex);
       const maximumScrollOffset = Math.max(
         0,
-        LIST_OFFSET + windowCount * ROW_HEIGHT - window.innerHeight,
+        LIST_OFFSET + nextWindowHeight - window.innerHeight,
       );
+      const targetCenter =
+        expansion.offsetForIndex(targetIndex) +
+        expansion.rowSize(targetIndex) / 2;
       const finalOffset = Math.min(
         maximumScrollOffset,
         Math.max(
           0,
           LIST_OFFSET +
-            finalLocalIndex * ROW_HEIGHT +
-            ROW_HEIGHT / 2 -
+            targetCenter -
+            expansion.offsetForIndex(nextBaseIndex) -
             window.innerHeight * JUMP_VIEWPORT_ANCHOR,
         ),
       );
@@ -244,12 +288,11 @@ export function VirtualRankingsProvider({ children }: { children: ReactNode }) {
         from: startingOffset,
         to: finalOffset,
         prepare: () => {
-          baseIndexRef.current = nextBaseIndex;
           flushSync(() => setBaseIndex(nextBaseIndex));
         },
       });
     },
-    [scrollAnimation],
+    [baseIndex, expansion, scrollAnimation],
   );
 
   useEffect(() => {
@@ -268,16 +311,19 @@ export function VirtualRankingsProvider({ children }: { children: ReactNode }) {
   const items = useVirtualRankingItems(
     virtualizer.getVirtualItems(),
     baseIndex,
+    expansion.expandedIndex,
   );
 
   return (
     <VirtualizerContext.Provider
       value={{
         items,
-        totalHeight: Math.round(virtualizer.getTotalSize()),
-        scrollOffset: Math.round(virtualizer.scrollOffset ?? 0),
+        totalHeight: virtualizer.getTotalSize(),
+        scrollOffset: virtualizer.scrollOffset ?? 0,
         baseIndex,
+        expandedIndex: expansion.expandedIndex,
         jumpToIndex,
+        toggleExpanded,
       }}
     >
       {children}

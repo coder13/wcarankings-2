@@ -18,14 +18,20 @@ export function DebugHeader() {
     setAverageDelayMs,
     setVarianceMs,
   } = useMockApiControls();
-  const { items, totalHeight, scrollOffset, baseIndex, jumpToIndex } =
-    useVirtualizerContext();
+  const {
+    items,
+    totalHeight,
+    scrollOffset,
+    baseIndex,
+    expandedIndex,
+    jumpToIndex,
+  } = useVirtualizerContext();
   const firstVirtualItem = items[0];
   const lastVirtualItem = items.at(-1);
   const debugInfo = firstVirtualItem && lastVirtualItem
     ? `Rows ${(firstVirtualItem.globalIndex + 1).toLocaleString()}–${(
         lastVirtualItem.globalIndex + 1
-      ).toLocaleString()} · base ${(baseIndex + 1).toLocaleString()} · ${WINDOW_ROWS.toLocaleString()} window · ${items.length} mounted · ${scrollOffset.toLocaleString()}px / ${totalHeight.toLocaleString()}px`
+      ).toLocaleString()} · base ${(baseIndex + 1).toLocaleString()} · expanded ${expandedIndex === null ? "none" : (expandedIndex + 1).toLocaleString()} · ${WINDOW_ROWS.toLocaleString()} window · ${items.length} mounted · ${Math.round(scrollOffset).toLocaleString()}px / ${Math.round(totalHeight).toLocaleString()}px`
     : `Measuring ${TOTAL_ROWS.toLocaleString()} rows · ${WINDOW_ROWS.toLocaleString()}-row window · overscan ${OVERSCAN_ROWS}`;
   const minimumDelayMs = Math.max(0, averageDelayMs - varianceMs);
   const maximumDelayMs = averageDelayMs + varianceMs;
