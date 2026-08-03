@@ -1,6 +1,6 @@
 .JumpControlsVisibility {
   position: fixed;
-  z-index: 1;
+  z-index: 20;
   inset-inline: 0;
   display: flex;
   justify-content: center;
@@ -20,7 +20,7 @@
 
 .JumpControlsVisibility:has(.Jump[data-direction="down"]) {
   bottom: 1em;
-  transform: translate3d(0, 6px, 0);
+  transform: translate3d(0, calc(100% + 1em), 0);
 }
 
 .JumpControlsVisibility[data-visible="true"]:has(.Jump[data-direction]) {
@@ -31,6 +31,12 @@
   transition: opacity 150ms var(--cubic-enter) 100ms,
     transform 150ms var(--cubic-enter) 100ms,
     visibility 0s linear 100ms;
+}
+
+.JumpControlsVisibility[data-visible="true"]:has(.Jump[data-direction="down"]) {
+  transition: opacity 150ms var(--cubic-enter) 180ms,
+    transform 150ms var(--cubic-enter) 180ms,
+    visibility 0s linear 180ms;
 }
 
 .JumpControlsFallback {

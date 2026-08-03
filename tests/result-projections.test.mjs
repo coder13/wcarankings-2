@@ -62,38 +62,29 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(fixture, /regional_single_record/);
 });
 
-test("uses filtered fact rankings for scoped, dated, and gendered result queries", async () => {
-  const [single, average, precomputedSingle, precomputedCounts, counts, schema, groups, resultService] = await Promise.all([
+test("publishes indexed gender result rankings instead of ranking filtered rows at request time", async () => {
+  const [single, average, counts, schema, groups, resultService] = await Promise.all([
     readFile(new URL("sql/ranking-projections/result_gender_rankings_single.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_gender_rankings_average.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/result_rankings_single.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/result_ranking_counts.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_gender_ranking_counts.sql", root), "utf8"),
     readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
     readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
     readFile(new URL("services/rankings/result.ts", root), "utf8"),
   ]);
 
-  assert.match(single, /FROM solve_facts solve/);
-  assert.match(single, /PARTITION BY gender, event_id/);
-  assert.match(single, /ADD PRIMARY KEY \(result_id, attempt_number\)/);
-  assert.match(average, /gender_sets AS/);
-  assert.match(precomputedSingle, /PARTITION BY event_id, country_id/);
-  assert.match(precomputedSingle, /AS country_position/);
-  assert.match(precomputedSingle, /idx_results_single_country/);
-  assert.match(precomputedCounts, /SELECT event_id, 'single', 'country'/);
+  for (const source of [single, average]) {
+    assert.match(source, /gender_sets AS/);
+    assert.match(source, /FIND_IN_SET/);
+    assert.match(source, /PARTITION BY gender_set, event_id/);
+    assert.match(source, /ADD PRIMARY KEY \(gender_set, result_id\)/);
+  }
   assert.match(counts, /gender_set/);
   assert.match(schema, /result_gender_rankings_single/);
   assert.match(schema, /result_gender_ranking_counts/);
-  assert.match(groups, /name: "solve-facts"/);
+  assert.match(groups, /schemaVersion: 2/);
   assert.match(groups, /result_gender_rankings_average/);
   assert.match(resultService, /result_gender_rankings_\$\{resultType\}/);
-  assert.match(resultService, /const lazySingle = resultType === "single"/);
-  assert.match(resultService, /const lazyAverage = resultType === "average"/);
-  assert.match(resultService, /const lazySingle = resultType === "single" && \(year !== null \|\| gender\.length > 0\)/);
-  assert.match(resultService, /const lazyAverage = resultType === "average" && \(year !== null \|\| gender\.length > 0\)/);
-  assert.match(resultService, /lazySingleResultRankingsQuery/);
-  assert.match(resultService, /filteredResultRankingsQuery/);
+  assert.match(resultService, /ranking\.gender_set = \?/);
   assert.doesNotMatch(resultService, /worktree_gender_result_rankings/);
 });
 
@@ -111,13 +102,13 @@ test("normal rankings retain separate historical country and continent bests", a
   assert.match(fixture, /'CHANGE1', 'United States', '_North America', 549/);
   assert.match(fixture, /'CHANGE1', 'New Zealand', '_Oceania', 600/);
   assert.match(sources, /PARTITION BY r\.event_id, r\.person_id, COALESCE\(r\.person_country_id, ''\)/);
-  assert.match(sources, /PARTITION BY r\.event_id, r\.person_id, COALESCE\(country\.continent_id, ''\)/);
-  assert.match(sources, /WHERE country_person_position = 1/);
-  assert.match(sources, /WHERE continent_person_position = 1/);
-  assert.match(sources, /FROM results r/);
-  assert.match(sources, /FROM ranks_single r/);
-  assert.match(sources, /FROM ranks_average r/);
-  assert.match(sources, /AS gender/);
+  assert.match(sources, /PARTITION BY r\.event_id, r\.person_id, r\.person_continent_id/);
+  assert.match(sources, /WHERE historical\.country_person_position = 1/);
+  assert.match(sources, /WHERE historical\.continent_person_position = 1/);
+  assert.match(sources, /FROM result_facts r/);
+  assert.match(sources, /LEFT JOIN countries country ON country\.id = historical\.country_id/);
+  assert.match(sources, /FROM ranks_single ranking/);
+  assert.match(sources, /FROM ranks_average ranking/);
   assert.match(sources, /UNION ALL/);
   assert.match(sources, /regional_record = 'NR'/);
   assert.match(listRankings, /let rankingColumn = "world_rank";[\s\S]*input\.region\.scope === "continent"/);

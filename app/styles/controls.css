@@ -80,6 +80,7 @@
 
 .regionOptions {
   max-height: min(30em, 70vh);
+  padding: 0.35em;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -96,22 +97,33 @@
   width: 100%;
   padding: 0.7em 1em;
   border: 0;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface);
+  border-radius: 0.65rem;
+  background: transparent;
   color: var(--text-strong);
   cursor: pointer;
   font-size: 0.95em;
   text-align: left;
+  transition: color 150ms ease;
 }
 
-.regionOption:hover,
-.regionOption.isActive {
-  background: var(--surface-hover);
+.Dropdown-menu .regionOption {
+  border-radius: 0.65rem;
+}
+
+.regionOption:hover {
+  color: var(--focus);
 }
 
 .regionOption.isSelected {
+  background: var(--surface-selected);
   color: var(--text-strong);
-  font-weight: 600;
+}
+
+.regionOption.isActive,
+.regionOption:focus-visible {
+  color: var(--text-strong);
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+  outline: none;
 }
 
 .searchSpinner {

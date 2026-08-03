@@ -2,14 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 
+export function getTopRailScrollProgress(
+  scrollY: number,
+  transformDistance: number,
+) {
+  if (!Number.isFinite(scrollY) || !Number.isFinite(transformDistance) || transformDistance <= 0) {
+    return 0;
+  }
+
+  const raw = Math.max(0, Math.min(1, scrollY / transformDistance));
+  return raw * raw * (3 - 2 * raw);
+}
+
 export function useTopRailScrollProgress(transformDistance: number) {
   const [progress, setProgress] = useState(0);
   const progressRef = useRef(0);
 
   useEffect(() => {
     const update = () => {
-      const raw = Math.max(0, Math.min(1, window.scrollY / transformDistance));
-      const next = raw * raw * (3 - 2 * raw);
+      const next = getTopRailScrollProgress(window.scrollY, transformDistance);
       if (next === progressRef.current) return;
       progressRef.current = next;
       setProgress(next);

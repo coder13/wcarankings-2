@@ -13,41 +13,36 @@ async function read(...paths) {
 
 test("composes the rankings UI around URL state and TanStack Query", async () => {
   const [explorer, data, queries, results, url, providers] = await Promise.all([
+    read("components/RankingsExplorer/RankingsExplorer.tsx"),
     read(
-      "components/RankingsExplorer/RankingsExplorer.tsx",
-      "components/RankingsExplorer/useRankingDataRuntime.ts",
-      "components/RankingsExplorer/useRankingInteractionRuntime.ts",
+      "components/RankingsExplorer/useVirtualRankings.ts",
+      "components/RankingsExplorer/useSingleExpandedVirtualRow.ts",
     ),
     read(
-      "components/RankingsExplorer/useRankingWindow.ts",
-      "components/RankingsExplorer/useRankingPagination.ts",
-      "components/RankingsExplorer/useRankingPageLoader.ts",
-      "components/RankingsExplorer/useRankingViewport.ts",
+      "components/RankingsExplorer/rankingsQueries.ts",
+      "components/RankingsExplorer/useRankingsApi.ts",
     ),
-    read("components/RankingsExplorer/rankingsQueries.ts"),
     read(
       "components/RankingsExplorer/RankingsResults.tsx",
       "components/ResultsTable/ResultsTable.tsx",
     ),
     read(
-      "components/RankingsExplorer/useRankingsFilters.ts",
-      "components/RankingsExplorer/useRankingsUrlState.ts",
+      "components/RankingsExplorer/useRankingsState.ts",
       "components/RankingsExplorer/rankingsUrl.ts",
     ),
     read("app/AppProviders.tsx", "app/layout.tsx"),
   ]);
 
-  assert.match(explorer, /useRankingDataRuntime/);
-  assert.match(explorer, /useRankingInteractionRuntime/);
-  assert.doesNotMatch(explorer, /useRankingsRuntime|mockSubjectRows|mockRows/);
-  assert.match(data, /query\.data\?\.pages/);
-  assert.match(data, /fetchNextPage/);
-  assert.match(data, /fetchPreviousPage/);
-  assert.match(queries, /useInfiniteQuery/);
+  assert.match(explorer, /useRankingsApi/);
+  assert.match(explorer, /useVirtualRankings/);
+  assert.doesNotMatch(
+    explorer,
+    /useRankingDataRuntime|useRankingInteractionRuntime|mockSubjectRows|mockRows/,
+  );
+  assert.match(data, /useQuery/);
+  assert.match(data, /useWindowVirtualizer/);
   assert.match(queries, /queryClient\.fetchQuery/);
   assert.match(queries, /RESULTS_PAGE_SIZE/);
-  assert.match(data, /useWindowVirtualizer/);
-  assert.match(results, /That’s all, folks/);
   assert.doesNotMatch(results, /className="loader"|skeleton/i);
   assert.match(url, /usePathname/);
   assert.match(url, /useSearchParams/);
@@ -74,7 +69,7 @@ test("does not replace SQL failures with synthetic ranking data", async () => {
 });
 
 test("keeps the rankings visual shell and PWA wiring", async () => {
-  const [css, page, layout, manifest, registration, updatePrompt, worker, packageJson] =
+  const [css, page, layout, providers, manifest, registration, worker, packageJson] =
     await Promise.all([
       read(
         "app/globals.css",
@@ -86,9 +81,9 @@ test("keeps the rankings visual shell and PWA wiring", async () => {
       ),
       read("app/RankingsPage.tsx"),
       read("app/layout.tsx"),
+      read("app/AppProviders.tsx"),
       read("app/manifest.ts"),
-      read("components/PwaRegistration/PwaRegistration.tsx"),
-      read("components/PwaUpdatePrompt/PwaUpdatePrompt.tsx"),
+      read("app/usePwaRegistration.ts"),
       read("public/sw.js"),
       read("package.json"),
     ]);
@@ -103,7 +98,8 @@ test("keeps the rankings visual shell and PWA wiring", async () => {
   assert.match(page, /requiresCompetitionRankings && !featureSwitch\.competitionRankings/);
   assert.match(page, /requiresCityRankings && !featureSwitch\.cityEventStats/);
   assert.match(layout, /title:\s*"WCA Rankings"/);
-  assert.match(layout, /PwaRegistration/);
+  assert.doesNotMatch(layout, /PwaRegistration/);
+  assert.match(providers, /usePwaRegistration\(\)/);
   assert.match(layout, /ProjectionFeatureSwitchProvider/);
   assert.match(manifest, /display: "standalone"/);
   assert.match(manifest, /icon-192\.png/);
@@ -112,8 +108,9 @@ test("keeps the rankings visual shell and PWA wiring", async () => {
   assert.match(registration, /updateViaCache: "none"/);
   assert.match(registration, /controllerchange/);
   assert.match(registration, /SKIP_WAITING/);
-  assert.match(registration, /PwaUpdatePrompt/);
-  assert.match(updatePrompt, /Update available/);
+  assert.match(registration, /activateUpdate\(registration\.waiting\)/);
+  assert.match(registration, /worker\.postMessage\(\{ type: SKIP_WAITING_MESSAGE \}\)/);
+  assert.doesNotMatch(registration, /PwaUpdatePrompt|Update available/);
   assert.match(registration, /import\.meta\.env\.PROD/);
   assert.match(registration, /getRegistrations\(\)/);
   assert.match(registration, /registration\.unregister\(\)/);

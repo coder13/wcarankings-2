@@ -1,7 +1,9 @@
 "use client";
 
+import { useCallback, useMemo, useState } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
+import { ViewportEdgeGradients } from "../ViewportEdgeGradients/ViewportEdgeGradients";
 import { RankingsExplorerContext } from "./RankingsExplorerContext";
 import { RankingsExplorerHeader } from "./RankingsExplorerHeader";
 import { RankingsNavigationFooter } from "./RankingsNavigationFooter";
@@ -12,13 +14,18 @@ import {
   VimNavigationOverlay,
 } from "./VimNavigation";
 import { useExplorerKeyboardShortcuts } from "./useExplorerKeyboardShortcuts";
-import { ListMemberManagementOverlays } from "./useListMemberManagement";
-import { useRankingBoundaryShortcuts } from "./useRankingBoundaryShortcuts";
+import {
+  ListMemberManagementOverlays,
+  useListMemberManagement,
+} from "./useListMemberManagement";
+import { useHasScrolled } from "./useRailScrollProgress";
 import { useRankingCommands } from "./useRankingCommands";
-import { useRankingDataRuntime } from "./useRankingDataRuntime";
-import { useRankingInteractionRuntime } from "./useRankingInteractionRuntime";
-import { useRankingsFilters } from "./useRankingsFilters";
+import { useRankingFocus } from "./useRankingFocus";
+import { useRankingsApi } from "./useRankingsApi";
+import { useRankingsSearch } from "./useRankingsSearch";
+import { useRankingsState } from "./useRankingsState";
 import { useVimNavigation } from "./useVimNavigation";
+import { useVirtualRankings } from "./useVirtualRankings";
 import type {
   InitialRankingData,
   RankingsExplorerConfig,
@@ -45,43 +52,85 @@ export function RankingsExplorer({
   source,
   list,
 }: RankingsExplorerProps) {
-  const url = useRankingsFilters();
-  const data = useRankingDataRuntime({
-    filters: url.filters,
+  const state = useRankingsState();
+  const api = useRankingsApi({
+    filters: state.filters,
     initialData: initial?.data,
     source,
-    ownerListId: list?.owner?.listId,
   });
-  const interactions = useRankingInteractionRuntime({
-    filters: url.filters,
-    patchFilters: url.patchFilters,
-    url: { state: url.urlState, write: url.writeUrl },
-    data,
+  const [initialDataset] = useState(() => ({
+    key: api.datasetKey,
+    data: initial?.data,
+  }));
+  const rankings = useVirtualRankings({
+    datasetKey: api.datasetKey,
+    api: api.range,
+    initialData: initialDataset.key === api.datasetKey
+      ? initialDataset.data
+      : undefined,
+    expandableRows:
+      state.filters.subject === "people" &&
+      !state.filters.personCompetitionRanking,
   });
+  const listMembers = useListMemberManagement({
+    listId: list?.owner?.listId,
+    onRemoved: rankings.reload,
+  });
+  const focus = useRankingFocus({
+    filters: state.filters,
+    api,
+    rankings,
+    url: state.url,
+  });
+  const search = useRankingsSearch({
+    query: state.filters.search,
+    regexSearch: state.filters.regexSearch,
+    requestKey: api.datasetKey,
+    request: api.search,
+    onMatch: focus.jumpToEntry,
+    onReset: focus.clearHighlight,
+    patchFilters: state.patchFilters,
+  });
+
+  const toRank = useCallback((rank: number, animate = true) => {
+    focus.clear();
+    rankings.jumpToIndex(rank - 1, animate);
+  }, [focus, rankings]);
+  const navigation = useMemo(() => ({
+    toRank,
+    toTop: () => toRank(1),
+    toEnd: () => toRank(rankings.total),
+    up: () => toRank(rankings.currentIndex + 1 - 5_000),
+    down: () => toRank(rankings.currentIndex + 1 + 5_000),
+  }), [rankings.currentIndex, rankings.total, toRank]);
   const commands = useRankingCommands();
   const vim = useVimNavigation({
-    getCurrentRank: interactions.navigation.getCurrentRank,
-    goToRank: interactions.navigation.resetToRank,
-    goToEnd: interactions.navigation.jumpToEnd,
+    getCurrentRank: () => rankings.currentIndex + 1,
+    goToRank: navigation.toRank,
+    goToEnd: navigation.toEnd,
     jumpSize: RESULTS_PAGE_SIZE * 2,
     search: {
-      active: interactions.search.state.regexSearch,
-      query: interactions.search.state.regexSearch
-        ? interactions.search.state.query
-        : "",
-      reset: interactions.search.actions.reset,
-      setOpen: interactions.search.actions.setOpen,
-      start: interactions.search.actions.startRegexSearch,
+      active: search.state.regexSearch,
+      query: search.state.regexSearch ? search.state.query : "",
+      reset: search.actions.reset,
+      setOpen: search.actions.setOpen,
+      start: search.actions.startRegexSearch,
     },
   });
 
-  useRankingBoundaryShortcuts(interactions.navigation);
   useExplorerKeyboardShortcuts({
     commands,
-    search: interactions.search,
+    search,
     vim,
-    patchFilters: url.patchFilters,
+    patchFilters: state.patchFilters,
+    goToTop: navigation.toTop,
+    goToEnd: navigation.toEnd,
   });
+
+  const hasScrolled = useHasScrolled();
+  const pagerEnabled =
+    !listMembers.selection.active &&
+    (!source || rankings.total > RESULTS_PAGE_SIZE);
 
   return (
     <RankingsExplorerContext
@@ -103,25 +152,29 @@ export function RankingsExplorer({
           },
           release: initial?.release,
         },
-        filters: url.filters,
-        data: {
-          window: data.window,
-          pagination: data.pagination,
-          reload: data.reload,
-          listMembers: data.listMembers,
-        },
-        interactions,
+        filters: state.filters,
+        filterActions: state.actions,
+        rankings,
+        search,
+        focus,
+        listMembers,
+        navigation,
         commands,
         vim,
+        hasScrolled,
       }}
     >
       <RankingsAppShell>
+        <ViewportEdgeGradients
+          topVisible={hasScrolled}
+          bottomVisible={pagerEnabled && (rankings.jumpAnimating || hasScrolled)}
+        />
         <RankingsExplorerHeader />
         <RankingsTopRail />
         <main>
-          <RankingsResults viewport={data.resultsViewport} />
-          <RankingsNavigationFooter visibleRank={data.viewport.visibleSubRank} />
+          <RankingsResults />
         </main>
+        <RankingsNavigationFooter />
         <ListMemberManagementOverlays />
         <VimNavigationOverlay />
       </RankingsAppShell>

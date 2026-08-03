@@ -85,9 +85,10 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/);
   assert.match(schema, /name: "sum-of-ranks"[\s\S]*dependencies: \[\]/);
   assert.match(groups, /name: "compatibility"/);
-  assert.match(groups, /name: "solve-facts"/);
-  assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts", "solve-facts"\]/);
+  assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts"\]/);
   assert.match(groups, /name: "city-rankings"[\s\S]*dependencies: \["result-facts", "competition-rankings"\]/);
+  assert.match(groups, /name: "sum-of-ranks"[\s\S]*dependencies: \["result-facts"\]/);
+  assert.match(groups, /name: "person-competition-rankings"[\s\S]*dependencies: \["result-facts"\]/);
   assert.match(groups, /name: "sum-of-ranks"[\s\S]*projectionNames: \["sum-of-ranks"\]/);
   assert.match(groups, /name: "person-competition-rankings"[\s\S]*person_competition_ranking_counts/);
   assert.match(schema, /enabledByDefault: true/);
@@ -100,13 +101,12 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(facts, /idx_result_facts_single_ranking_cover/);
   assert.match(facts, /idx_result_facts_average_ranking_cover/);
   assert.match(people, /CREATE TABLE person_event_rankings AS/);
-  assert.match(people, /AS gender/);
   assert.match(people, /world_position/);
   assert.match(results, /CREATE TABLE result_rankings_single AS/);
   assert.match(results, /CREATE TABLE result_rankings_average AS/);
-  assert.match(results, /FROM solve_facts solve/);
+  assert.match(results, /FROM result_facts result/);
   assert.doesNotMatch(results, /LEFT JOIN countries/);
-  assert.match(results, /competition_start_date, competition_id, result_id, attempt_number/);
+  assert.match(results, /competition_start_date/);
   assert.match(results, /ROW_NUMBER\(\)/);
   assert.match(results, /RANK\(\) OVER/);
   assert.doesNotMatch(results, /DENSE_RANK\(\) OVER/);
@@ -117,6 +117,9 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(metricScores, /CREATE TABLE person_metric_counts AS/);
   assert.match(sumScores, /CREATE TEMPORARY TABLE sum_of_ranks_historical_bests/);
   assert.match(sumScores, /result\.person_country_id/);
+  assert.match(sumScores, /result\.person_continent_id/);
+  assert.match(sumScores, /result\.person_country_id, result\.person_continent_id/);
+  assert.doesNotMatch(sumScores, /result\.person_country_id, country\.continent_id/);
   assert.match(sumScores, /MIN\(CASE WHEN result\.best > 0/);
   assert.match(sumScores, /MIN\(CASE WHEN result\.average > 0/);
   assert.match(sumScores, /FROM ranks_single rank/);
@@ -172,7 +175,8 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(competitions, /idx_competition_stats_competitor_count/);
   assert.match(competitions, /idx_competition_stats_south/);
   assert.match(personCompetitionRankings, /CREATE TABLE person_competition_counts AS/);
-  assert.match(personCompetitionRankings, /COUNT\(DISTINCT result\.competition_id\)/);
+  assert.match(personCompetitionRankings, /COUNT\(DISTINCT facts\.competition_id\)/);
+  assert.match(personCompetitionRankings, /FROM result_facts/);
   assert.match(personCompetitionRankings, /CREATE TABLE person_competition_rankings AS/);
   assert.match(personCompetitionRankings, /PARTITION BY scope, region_id, gender/);
   assert.match(personCompetitionRankings, /idx_person_competition_rankings_page/);
@@ -181,9 +185,12 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(cities, /fastest_average_rank/);
   assert.match(cities, /person\.gender IN \('m', 'f'\)/);
   assert.match(cities, /SELECT base\.\*, 'all' AS gender FROM base/);
-  assert.match(cities, /COUNT\(DISTINCT scoped\.person_id\) AS competitor_count/);
-  assert.match(cities, /COUNT\(DISTINCT scoped\.competition_id\) AS competition_count/);
+  assert.match(cities, /COUNT\(DISTINCT person_id\) AS competitor_count/);
+  assert.match(cities, /COUNT\(DISTINCT competition_id\) AS competition_count/);
+  assert.match(cities, /attempt_counts AS/);
+  assert.match(cities, /comp\.country_id/);
   assert.match(cities, /official_solve_count/);
+  assert.match(cities, /LEFT JOIN winners USING \(city_name, country_id, event_id, gender\)/);
   assert.match(cities, /ADD PRIMARY KEY \(city_name, country_id, event_id, gender\)/);
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);
   assert.match(counts, /gender = 'all' AND fastest_single IS NOT NULL/);
@@ -288,51 +295,17 @@ test("only exposes APIs backed by active projections", async () => {
   }
 });
 
-test("weekly rank deltas remain available but are disabled from compatibility refreshes", async () => {
-  const [schema, groups, single, average, source] = await Promise.all([
-    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
+test("compatibility projections omit disabled weekly ranking enhancements", async () => {
+  const [groups, single, average] = await Promise.all([
     readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/weekly_rank_deltas_single.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/weekly_rank_deltas_average.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/ranking_entries_average_source.sql", root), "utf8"),
   ]);
-  assert.doesNotMatch(schema, /compatibility-weekly-rank-deltas/);
-  assert.doesNotMatch(groups, /weekly_rank_deltas_average\.sql/);
-  for (const sql of [single, average]) {
-    assert.match(sql, /CREATE TABLE weekly_rank_deltas_/);
-    assert.match(sql, /DAYOFWEEK/);
-    assert.match(sql, /latest_week/);
-    assert.match(sql, /weekly_position/);
-    assert.match(sql, /RANK\(\) OVER/);
-    assert.doesNotMatch(sql, /result_value > current_bests\.result_value/);
-    assert.doesNotMatch(sql, /WHERE current_bests\.week_start = latest_week\.week_start/);
-    assert.match(sql, /ADD PRIMARY KEY \(event_id, person_id\)/);
+  for (const source of [groups, single, average]) {
+    assert.doesNotMatch(source, /weekly_rank_deltas_/);
+    assert.doesNotMatch(source, /record_streaks_/);
+    assert.doesNotMatch(source, /record_streak_weeks/);
   }
-  assert.doesNotMatch(source, /weekly_rank_deltas_single/);
-  assert.match(source, /CAST\(NULL AS CHAR\(10\)\) AS world_rank_delta_state/);
-});
-
-test("record streaks remain available but are disabled from compatibility refreshes", async () => {
-  const [schema, groups, single, average, source] = await Promise.all([
-    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
-    readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/record_streaks_single.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/record_streaks_average.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
-  ]);
-  assert.doesNotMatch(schema, /compatibility-record-streaks/);
-  assert.doesNotMatch(groups, /record_streaks_average\.sql/);
-  for (const sql of [single, average]) {
-    assert.match(sql, /CREATE TABLE record_streaks_/);
-    assert.match(sql, /DAYOFWEEK/);
-    assert.match(sql, /current_values/);
-    assert.match(sql, /MIN\(scoped_results\.week_start\)/);
-    assert.match(sql, /DATEDIFF/);
-    assert.match(sql, /streak_weeks/);
-    assert.match(sql, /ADD PRIMARY KEY \(event_id, person_id\)/);
-  }
-  assert.doesNotMatch(source, /record_streaks_single/);
-  assert.match(source, /CAST\(NULL AS SIGNED\) AS record_streak_weeks/);
 });
 
 test("backfills only the active competition-event projection", async () => {
@@ -363,7 +336,8 @@ test("person search resolves IDs before querying projections", async () => {
   assert.match(rankings, /person_id IN/);
   assert.doesNotMatch(rankings, /person_name \$\{operator\}/);
   assert.match(results, /person_id, event_id, world_position, result_id/);
-  assert.match(genderResults, /PARTITION BY gender, event_id/);
+  assert.match(genderResults, /FIND_IN_SET/);
+  assert.match(genderResults, /PARTITION BY gender_set, event_id/);
   assert.match(genderResults, /idx_gender_results_single_world/);
   assert.match(compatibilityResults, /PRIMARY KEY \(result_id\)/);
   assert.doesNotMatch(compatibilityResults, /ADD INDEX/);

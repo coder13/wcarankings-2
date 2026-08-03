@@ -20,6 +20,10 @@ if (groups.length === 0 || groups.length !== selectedNames.length && selectedNam
 const transferTables = groups.flatMap(({ tables }) => tables);
 const manifestTables = groups.map(({ name }) => `projection_transfer_manifest_${name.replaceAll("-", "_")}`);
 const indexesTables = groups.map(({ name }) => `projection_transfer_indexes_${name.replaceAll("-", "_")}`);
+const indexConcurrency = Number(process.env.WCA_PROJECTION_INDEX_CONCURRENCY || 2);
+if (!Number.isSafeInteger(indexConcurrency) || indexConcurrency < 1 || indexConcurrency > 4) {
+  throw new Error("WCA_PROJECTION_INDEX_CONCURRENCY must be between 1 and 4");
+}
 
 function databaseOptions(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -45,12 +49,21 @@ async function tableExists(connection, table) {
   return rows.length > 0;
 }
 
-const connection = await mysql.createConnection(databaseOptions());
+async function runPool(items, concurrency, task) {
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      await task(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+}
+
+const options = databaseOptions();
+const connection = await mysql.createConnection(options);
 try {
-  // Production constrains the shared application account so accidental ad-hoc
-  // queries cannot run indefinitely. Projection transfer indexes are expected
-  // to exceed that account limit, while the deployment's API monitor remains
-  // responsible for aborting work that affects the live site.
   await connection.query("SET SESSION max_statement_time = 0");
 
   for (const table of manifestTables) if (!await tableExists(connection, table)) throw new Error(`The projection transfer manifest ${table} is missing.`);
@@ -89,7 +102,7 @@ try {
   }
 
   const deferredIndexes = (await Promise.all(indexesTables.map(async (table) => (await connection.query(`SELECT table_name, index_name, index_sql FROM \`${table}\` ORDER BY table_name, index_name`))[0]))).flat();
-  process.stdout.write(`Building ${deferredIndexes.length} deferred projection indexes…\n`);
+  process.stdout.write(`Building ${deferredIndexes.length} deferred projection indexes with concurrency ${indexConcurrency}…\n`);
   const indexesByTable = new Map();
   for (const index of deferredIndexes) {
     const indexes = indexesByTable.get(index.table_name) ?? [];
@@ -97,16 +110,23 @@ try {
     indexesByTable.set(index.table_name, indexes);
   }
   let builtIndexCount = 0;
-  for (const [table, indexes] of indexesByTable) {
+  await runPool([...indexesByTable.entries()], indexConcurrency, async ([table, indexes]) => {
+    const indexConnection = await mysql.createConnection(options);
     const startedAt = performance.now();
-    await connection.query(
-      `ALTER TABLE \`${table}\` ${indexes.map((index) => index.index_sql).join(", ")}`,
-    );
+    try {
+      await indexConnection.query("SET SESSION max_statement_time = 0");
+      await indexConnection.query(
+        `ALTER TABLE \`${table}\` ${indexes.map((index) => index.index_sql).join(", ")}`,
+      );
+    } finally {
+      await indexConnection.end();
+    }
     builtIndexCount += indexes.length;
     process.stdout.write(
       `Built ${indexes.length} indexes on ${table} in ${Math.round(performance.now() - startedAt)}ms (${builtIndexCount}/${deferredIndexes.length}).\n`,
     );
-  }
+  });
+
   if (hydrate) {
     const renames = [];
     for (const table of transferTables) {

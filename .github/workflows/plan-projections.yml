@@ -81,16 +81,10 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile --prod
 
       - name: Configure read-only production access
         env:
@@ -131,8 +125,7 @@ jobs:
 
       - name: Finish cosmetic push without WCA resolution
         if: steps.semantic.outputs.required != 'true' && inputs.refresh_export != true && inputs.force_rebuild != true
-        run: |
-          echo "No semantic projection inputs changed; the WCA export was not resolved." >> "$GITHUB_STEP_SUMMARY"
+        run: echo "No semantic projection inputs changed; the WCA export was not resolved." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Resolve latest WCA export
         id: wca
@@ -154,7 +147,6 @@ jobs:
         run: echo "${{ github.token }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Calculate desired artifact fingerprints
-        id: desired
         if: steps.wca.outputs.value != ''
         env:
           EXPORT_VALUE: ${{ steps.wca.outputs.value }}
@@ -171,33 +163,39 @@ jobs:
           if [ -n "$selected_groups" ]; then args+=("--groups=$selected_groups"); fi
           node scripts/projection-release-plan.mjs "${args[@]}" > /tmp/desired-plan.json
 
-      - name: Resolve and validate exact GHCR group artifacts
+      - name: Resolve exact GHCR group descriptors
         id: registry
         if: steps.wca.outputs.value != ''
         env:
           BYPASS_CACHE: ${{ inputs.bypass_artifact_cache }}
           EXPORT_VALUE: ${{ steps.wca.outputs.value }}
         run: |
+          set -euo pipefail
           printf '{}\n' > /tmp/available-artifacts.json
           if [ "$BYPASS_CACHE" != true ]; then
             owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
             while IFS= read -r group; do
               fingerprint=$(jq -r --arg group "$group" '.groups[$group].artifactFingerprint' /tmp/desired-plan.json)
               repository="ghcr.io/${owner}/wcarankings-projection-${group}"
-              destination="/tmp/registry/${group}"
-              mkdir -p "$destination"
               candidates="$fingerprint"
               repair_tags=$(oras repo tags "$repository" 2>/dev/null \
                 | grep -E "^${fingerprint}-repair-[0-9]+-[0-9]+$" \
                 | sort -t- -k3,3nr -k4,4nr || true)
               if [ -n "$repair_tags" ]; then candidates=$(printf '%s\n%s\n' "$repair_tags" "$candidates"); fi
               for tag in $candidates; do
-                find "$destination" -mindepth 1 -delete
                 ref="${repository}:${tag}"
-                if ! oras pull "$ref" -o "$destination"; then continue; fi
-                if node scripts/projection-release-artifact.mjs verify \
-                  --directory="$destination" --groups="$group" --export-id="$EXPORT_VALUE" \
-                  --fingerprints-file=/tmp/desired-plan.json; then
+                manifest=$(oras manifest fetch "$ref" 2>/dev/null) || continue
+                if jq -e \
+                  --arg group "$group" \
+                  --arg export "$EXPORT_VALUE" \
+                  --arg fingerprint "$fingerprint" \
+                  '.annotations["io.wcarankings.group"] == $group
+                   and .annotations["io.wcarankings.export-id"] == $export
+                   and .annotations["io.wcarankings.artifact-fingerprint"] == $fingerprint
+                   and .annotations["io.wcarankings.format-version"] == "4"
+                   and ([.layers[].mediaType] | index("application/vnd.cuberanks.projection.tables.v1+gzip") != null)
+                   and ([.layers[].mediaType] | index("application/vnd.cuberanks.projection.transfer.v4+json") != null)' \
+                  <<<"$manifest" >/dev/null; then
                   digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
                   jq --arg group "$group" --arg fingerprint "$fingerprint" \
                     --arg ref "$ref" --arg digest "$digest" \
@@ -206,7 +204,7 @@ jobs:
                   mv /tmp/available-artifacts.next /tmp/available-artifacts.json
                   break
                 else
-                  echo "::warning::Quarantining corrupt projection artifact $ref"
+                  echo "::warning::Ignoring projection artifact with invalid OCI metadata: $ref"
                   jq --arg group "$group" --arg fingerprint "$fingerprint" --arg ref "$ref" \
                     '.[$group] = {valid:false, artifactFingerprint:$fingerprint, ref:$ref}' \
                     /tmp/available-artifacts.json > /tmp/available-artifacts.next

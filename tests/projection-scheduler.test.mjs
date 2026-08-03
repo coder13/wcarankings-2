@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
   DEFAULT_PROJECTION_NAMES,
   COMPATIBILITY_PROJECTION_TASKS,
   COMPATIBILITY_TABLE_TASK_COUNT,
+  PROJECTION_REGISTRY,
   createTableProgress,
   projectionBuildPlan,
   projectionConcurrency,
   projectionNamesForRefresh,
+  renameCompatibilitySql,
   runDependencyAwareTasks,
 } from "../scripts/mysql-schema.mjs";
 
@@ -184,16 +187,31 @@ test("a full schema refresh keeps the default semantic projections when selectio
   assert.deepEqual(projectionNamesForRefresh([]), []);
 });
 
-test("weekly deltas and record streaks stay disabled in compatibility refreshes", () => {
-  const helpers = COMPATIBILITY_PROJECTION_TASKS.filter(({ name }) =>
-    name.startsWith("compatibility-weekly-rank-deltas") || name.startsWith("compatibility-record-streaks"));
-  assert.equal(helpers.length, 0);
+test("result-fact consumers never start from raw WCA tables alone", () => {
+  for (const name of ["sum-of-ranks", "person-competition-rankings"]) {
+    const projection = PROJECTION_REGISTRY.find((candidate) => candidate.name === name);
+    assert.ok(projection, `${name} is registered`);
+    assert.deepEqual(projection.dependencies, ["result-facts"]);
+  }
+  for (const name of [
+    "compatibility-ranking-entries-single-source",
+    "compatibility-ranking-entries-average-source",
+  ]) {
+    const task = COMPATIBILITY_PROJECTION_TASKS.find((candidate) => candidate.name === name);
+    assert.ok(task, `${name} is registered`);
+    assert.deepEqual(task.dependencies, ["projection:result-facts"]);
+  }
+});
+
+test("compatibility build omits disabled weekly helper tables", () => {
+  assert.equal(COMPATIBILITY_PROJECTION_TASKS.some(({ name, table }) =>
+    /weekly-rank-deltas|record-streaks/.test(name) || /weekly_rank_deltas|record_streaks/.test(table ?? "")), false);
   const source = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
     name === "compatibility-ranking-entries-single-source");
-  assert.deepEqual(source.dependencies, []);
+  assert.deepEqual(source.dependencies, ["projection:result-facts"]);
   const averageSource = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
     name === "compatibility-ranking-entries-average-source");
-  assert.deepEqual(averageSource.dependencies, []);
+  assert.deepEqual(averageSource.dependencies, ["projection:result-facts"]);
   assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 5);
   const progress = createTableProgress(COMPATIBILITY_TABLE_TASK_COUNT);
   let lastProgress;
@@ -203,10 +221,8 @@ test("weekly deltas and record streaks stay disabled in compatibility refreshes"
   assert.equal(lastProgress, "[5/5]");
 });
 
-test("compatibility source views run without disabled helper tables", async () => {
-  const names = new Set([
-    "compatibility-ranking-entries-single-source",
-  ]);
+test("compatibility source views wait for result facts", async () => {
+  const names = new Set(["compatibility-ranking-entries-single-source"]);
   const events = [];
   const tasks = COMPATIBILITY_PROJECTION_TASKS
     .filter(({ name }) => names.has(name))
@@ -222,8 +238,28 @@ test("compatibility source views run without disabled helper tables", async () =
   await runDependencyAwareTasks(tasks, {
     createConnection: async () => fakeConnection(events.length + 1, []),
     concurrency: 2,
+    satisfiedDependencies: ["projection:result-facts"],
   });
 
-  const sourceStart = events.indexOf("start:compatibility-ranking-entries-single-source");
-  assert.ok(sourceStart >= 0);
+  assert.deepEqual(events, [
+    "start:compatibility-ranking-entries-single-source",
+    "finish:compatibility-ranking-entries-single-source",
+  ]);
+});
+
+test("compatibility SQL uses the matching staged result facts table", async () => {
+  const source = await readFile(new URL("../sql/ranking-projections/ranking_entries_single_source.sql", import.meta.url), "utf8");
+  const sql = renameCompatibilitySql(source, {
+    bestSingle: "wca_best_single_staging",
+    bestAverage: "wca_best_average_staging",
+    entriesSources: {
+      single: "ranking_entries_single_source_staging",
+      average: "ranking_entries_average_source_staging",
+    },
+    resultEntriesSource: "result_entries_single_source_staging",
+    resultFacts: "result_facts_staging",
+  });
+
+  assert.match(sql, /FROM result_facts_staging r/);
+  assert.doesNotMatch(sql, /FROM result_facts r/);
 });

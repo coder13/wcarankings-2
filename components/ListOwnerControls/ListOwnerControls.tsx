@@ -93,6 +93,8 @@ export function ListOwnerControls({
       list?: { publicId: string; slug: string };
     };
     if (response.ok && body.list?.publicId) {
+      setBusy(false);
+      setSettingsOpen(false);
       router.push(listPath({
         publicId: body.list.publicId,
         systemAlias: null,
@@ -110,7 +112,7 @@ export function ListOwnerControls({
         onClick={() => setSettingsOpen((open) => !open)}
         aria-label="List settings"
       >
-        ⋮
+        <span className="listOwnerMenuIcon" aria-hidden="true" />
       </button>
       {settingsOpen && (
         <div className="listSettingsMenu" role="menu">

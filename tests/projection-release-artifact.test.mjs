@@ -12,16 +12,16 @@ async function fixture({ raw = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "projection-artifact-"));
   const tables = [
     "ranking_entries_single_transfer", "ranking_entries_average_transfer",
-    "weekly_rank_deltas_single_transfer", "weekly_rank_deltas_average_transfer",
-    "record_streaks_single_transfer", "record_streaks_average_transfer",
     "ranking_counts_transfer", "result_entries_single_transfer", "result_counts_transfer",
     "projection_transfer_manifest_compatibility", "projection_transfer_indexes_compatibility",
   ];
-  await writeFile(join(directory, "compatibility-projection-transfer.sql.gz"), "archive");
+  await writeFile(join(directory, "compatibility-projection-transfer.tar.gz"), "archive");
   await writeFile(join(directory, "compatibility-projection-transfer.json"), JSON.stringify({
     group: "compatibility",
     exportDate: "2026-07-30 00:00:23 UTC",
     tables,
+    format: "mariadb-tab-v1",
+    archiveFile: "compatibility-projection-transfer.tar.gz",
   }));
   if (raw) await writeFile(join(directory, "wca-export.sql.zip"), "raw-archive");
   const created = await createProjectionReleaseManifest({
@@ -36,7 +36,7 @@ async function fixture({ raw = false } = {}) {
     sourceSha: "abc123",
     sourceTree: "def456",
     compatibility: {
-      artifactFormatVersion: 3,
+      artifactFormatVersion: 4,
       datasetSchemaVersion: 1,
     },
     rawFile: raw ? "wca-export.sql.zip" : undefined,
@@ -86,14 +86,12 @@ test("checksums a bundled raw export as part of the exact generation", async () 
 
 test("rejects transfer metadata from a different WCA export", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projection-artifact-"));
-  await writeFile(join(directory, "compatibility-projection-transfer.sql.gz"), "archive");
+  await writeFile(join(directory, "compatibility-projection-transfer.tar.gz"), "archive");
   await writeFile(join(directory, "compatibility-projection-transfer.json"), JSON.stringify({
     group: "compatibility",
     exportDate: "2026-07-29 00:00:23 UTC",
     tables: [
       "ranking_entries_single_transfer", "ranking_entries_average_transfer",
-      "weekly_rank_deltas_single_transfer", "weekly_rank_deltas_average_transfer",
-      "record_streaks_single_transfer", "record_streaks_average_transfer",
       "ranking_counts_transfer", "result_entries_single_transfer", "result_counts_transfer",
       "projection_transfer_manifest_compatibility", "projection_transfer_indexes_compatibility",
     ],
@@ -108,7 +106,7 @@ test("rejects transfer metadata from a different WCA export", async () => {
         artifactFingerprint: "artifact",
       } } },
       compatibility: {
-        artifactFormatVersion: 3,
+        artifactFormatVersion: 4,
         datasetSchemaVersion: 1,
       },
     }),
@@ -129,7 +127,7 @@ test("rejects an artifact built from an unexpected source commit", async () => {
 
 test("rejects a projection archive changed after manifest creation", async () => {
   const { directory, created } = await fixture();
-  await writeFile(join(directory, "compatibility-projection-transfer.sql.gz"), "tampered");
+  await writeFile(join(directory, "compatibility-projection-transfer.tar.gz"), "tampered");
   await assert.rejects(
     verifyProjectionReleaseManifest({
       directory,

@@ -19,9 +19,10 @@ const [
   projectionRelease,
   planner,
   builder,
+  groupBuilder,
   serverBuild,
   serverDeploy,
-  projectionDeploy,
+  projectionDeployWorkflow,
   pullRequest,
   prProjectionRelease,
   flywayHistoryRepair,
@@ -30,6 +31,7 @@ const [
   workflow("projection-release.yml"),
   workflow("plan-projections.yml"),
   workflow("build-projections.yml"),
+  workflow("build-projection-group.yml"),
   workflow("build-server.yml"),
   workflow("deploy-server.yml"),
   workflow("deploy-projections.yml"),
@@ -37,6 +39,12 @@ const [
   workflow("pr-projection-release.yml"),
   readFile(new URL("../scripts/prepare-flyway-history.mjs", import.meta.url), "utf8"),
 ]);
+
+const projectionDeploymentScript = await readFile(
+  new URL("../scripts/run-projection-deployment.sh", import.meta.url),
+  "utf8",
+);
+const projectionDeploy = projectionDeployWorkflow + "\n" + projectionDeploymentScript;
 
 function serverCooldownFunctions() {
   const start = serverDeploy.indexOf("            read_database_cpu() {");
@@ -48,11 +56,11 @@ function serverCooldownFunctions() {
 }
 
 function projectionCooldownFunctions() {
-  const start = projectionDeploy.indexOf("            read_database_cpu() {");
-  const end = projectionDeploy.indexOf("            (\n              exec 8>/srv/wcarankings/production-mutation.lock", start);
+  const start = projectionDeploymentScript.indexOf("  read_database_cpu() {");
+  const end = projectionDeploymentScript.indexOf("  (\n    exec 8>/srv/wcarankings/production-mutation.lock", start);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start, end).split("\n")
-    .map((line) => line.replace(/^ {12}/, ""))
+  return projectionDeploymentScript.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {2}/, ""))
     .join("\n");
 }
 
@@ -66,39 +74,37 @@ function imageTransferRequiredFunction() {
 }
 
 function projectionExportNormalizerFunction() {
-  const start = projectionDeploy.indexOf("          normalize_export_identity() {");
-  const end = projectionDeploy.indexOf("          normalized_build_export=", start);
+  const start = projectionDeploymentScript.indexOf("normalize_export_identity() {");
+  const end = projectionDeploymentScript.indexOf("normalized_build_export=", start);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start, end).split("\n")
-    .map((line) => line.replace(/^ {10}/, ""))
-    .join("\n");
+  return projectionDeploymentScript.slice(start, end);
 }
 
 function projectionResetCandidateFunction() {
-  const start = projectionDeploy.indexOf("            reset_candidate() {");
-  const end = projectionDeploy.indexOf("\n            }\n\n            case \"$phase\"", start);
+  const start = projectionDeploymentScript.indexOf("  reset_candidate() {");
+  const end = projectionDeploymentScript.indexOf("\n  }\n\n  case \"$phase\"", start);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start, end + "\n            }".length).split("\n")
-    .map((line) => line.replace(/^ {12}/, ""))
+  return projectionDeploymentScript.slice(start, end + "\n  }".length).split("\n")
+    .map((line) => line.replace(/^ {2}/, ""))
     .join("\n");
 }
 
 function projectionComposeWrappers() {
-  const start = projectionDeploy.indexOf("            dc() {");
-  const end = projectionDeploy.indexOf("            candidate=", start);
+  const start = projectionDeploymentScript.indexOf("  dc() {");
+  const end = projectionDeploymentScript.indexOf("  candidate=", start);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start, end).split("\n")
-    .map((line) => line.replace(/^ {12}/, ""))
+  return projectionDeploymentScript.slice(start, end).split("\n")
+    .map((line) => line.replace(/^ {2}/, ""))
     .join("\n");
 }
 
 function projectionActivationRemoteScript() {
-  const marker = "             FAILURE_INJECTION_POINT='$FAILURE_INJECTION_POINT' sh -s\" <<'REMOTE'\n";
-  const start = projectionDeploy.indexOf(marker);
-  const end = projectionDeploy.indexOf("\n          REMOTE", start + marker.length);
+  const marker = "   FAILURE_INJECTION_POINT='$FAILURE_INJECTION_POINT' sh -s\" <<'REMOTE'\n";
+  const start = projectionDeploymentScript.indexOf(marker);
+  const end = projectionDeploymentScript.indexOf("\nREMOTE", start + marker.length);
   assert.ok(start >= 0 && end > start);
-  return projectionDeploy.slice(start + marker.length, end).split("\n")
-    .map((line) => line.replace(/^ {12}/, ""))
+  return projectionDeploymentScript.slice(start + marker.length, end).split("\n")
+    .map((line) => line.replace(/^ {2}/, ""))
     .join("\n");
 }
 
@@ -305,6 +311,7 @@ printf 'result baseline=%s delta=%s ceiling=%s\\n' "$DATABASE_CPU_BASELINE" "$DA
 test("server and projection releases have independent triggers and queues", () => {
   assert.match(serverRelease, /push:[\s\S]*branches: \[main\]/);
   assert.match(projectionRelease, /push:[\s\S]*schedule:[\s\S]*workflow_dispatch:/);
+  assert.match(projectionRelease, /cron: "30 0 \* \* \*"/);
   assert.match(serverRelease, /production-server-release/);
   assert.match(projectionRelease, /production-projection-release/);
   assert.match(serverRelease, /cancel-in-progress: false/);
@@ -327,9 +334,11 @@ test("incremental planning classifies active, cached, build, and hydrate groups"
   assert.match(planner, /available_artifacts/);
   assert.match(planner, /build_groups/);
   assert.match(planner, /hydrate_groups/);
-  assert.match(planner, /Quarantining corrupt projection artifact/);
-  assert.match(projectionRelease, /supersession:/);
-  assert.match(projectionRelease, /ref: main/);
+  assert.match(planner, /Ignoring projection artifact with invalid OCI metadata/);
+  assert.match(planner, /oras manifest fetch/);
+  assert.doesNotMatch(planner, /oras pull/);
+  assert.match(projectionRelease, /check-projection-supersession\.yml/);
+  assert.match(projectionRelease, /needs\.supersession\.outputs\.safe == 'true'/);
 });
 
 test("labeled PR projection builds run the scroll benchmark and publish a reusable repair artifact", () => {
@@ -339,19 +348,20 @@ test("labeled PR projection builds run the scroll benchmark and publish a reusab
   assert.match(prProjectionRelease, /bypass_artifact_cache: true/);
   assert.match(prProjectionRelease, /run_benchmark: true/);
   assert.match(builder, /run_benchmark:/);
+  assert.match(builder, /benchmark:/);
   assert.match(builder, /docker build --tag wcarankings-app:projection-benchmark/);
   assert.match(builder, /DATABASE_STATEMENT_TIMEOUT_MS=60000/);
   assert.match(builder, /docker compose up --detach app/);
   assert.match(builder, /benchmark:ranking-scroll/);
   assert.match(builder, /ranking-scroll-benchmark-\$\{\{ github\.run_id \}\}/);
-  assert.match(builder, /inputs\.run_benchmark.*repair-\$\{GITHUB_RUN_ID\}/s);
+  assert.match(builder, /Import generated projection groups/);
 });
 
 test("main projection releases carry exact cached artifacts into the deploy bundle", () => {
   assert.match(projectionRelease, /available_artifacts: \$\{\{ needs\.plan\.outputs\.available_artifacts \}\}/);
   assert.match(builder, /AVAILABLE_ARTIFACTS: \$\{\{ inputs\.available_artifacts \}\}/);
   assert.match(planner, /- Cached: \$\(jq -r '\.cachedGroups/);
-  assert.match(projectionRelease, /needs\.supersession\.outputs\.fingerprints == needs\.plan\.outputs\.fingerprints/);
+  assert.match(projectionRelease, /needs\.supersession\.outputs\.safe == 'true'/);
 });
 
 test("projection deployment accepts and smoke-tests every capability group", async () => {
@@ -363,26 +373,20 @@ test("projection deployment accepts and smoke-tests every capability group", asy
   assert.match(projectionDeploy, /person-competition-rankings,\*\) retry_endpoint "\/api\/rankings\/people\/competitions\?start=0&limit=1"/);
 });
 
-test("group artifacts use GHCR and cached dependencies hydrate before a two-worker build", () => {
-  assert.match(builder, /oras pull "\$\{repository\}@\$\{digest\}"/);
-  assert.match(builder, /oras push "\$ref"/);
-  const publishStart = builder.indexOf("      - name: Publish newly built group artifacts to GHCR");
-  const publishEnd = builder.indexOf("      - name: Compose exact production release bundle", publishStart);
-  assert.ok(publishStart >= 0 && publishEnd > publishStart);
-  const publish = builder.slice(publishStart, publishEnd);
-  assert.match(publish, /pushd "\$directory" >\/dev\/null/);
-  assert.match(publish, /"projection-release\.json:application\/vnd\.cuberanks\.projection\.manifest\.v3\+json"/);
-  assert.match(publish, /"\$archive:application\/vnd\.cuberanks\.projection\.sql\+gzip"/);
-  assert.match(publish, /"\$metadata:application\/vnd\.cuberanks\.projection\.transfer\+json"/);
-  assert.match(publish, /popd >\/dev\/null/);
-  const orasPush = publish.match(/oras push "\$ref"[\s\S]*?popd >\/dev\/null/);
-  assert.ok(orasPush, "the artifact publish must run from the artifact directory");
-  assert.doesNotMatch(orasPush[0], /"\$directory\//);
+test("group artifacts use GHCR and cached dependencies hydrate before isolated builds", () => {
+  assert.match(builder, /projection-build-matrix\.mjs --wave=1/);
+  assert.match(builder, /projection-build-matrix\.mjs --wave=2/);
+  assert.match(builder, /strategy:[\s\S]*matrix:/);
+  assert.match(groupBuilder, /oras pull "\$\{repository\}@\$\{digest\}"/);
+  assert.match(groupBuilder, /oras push "\$ref"/);
+  assert.match(groupBuilder, /application\/vnd\.cuberanks\.projection\.tables\.v1\+gzip/);
+  assert.match(groupBuilder, /import-projection-transfer\.mjs/);
+  assert.match(groupBuilder, /publish-projection-transfer\.mjs --hydrate/);
+  assert.match(groupBuilder, /--satisfied-groups="\$HYDRATE_GROUPS"/);
+  assert.match(groupBuilder, /WCA_PROJECTION_BUILD_CONCURRENCY=2/);
+  assert.match(groupBuilder, /repair-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/);
+  assert.match(builder, /path: \/tmp\/projection-release\/projection-release\.json/);
   assert.doesNotMatch(builder, /projection-release-group-/);
-  assert.match(builder, /publish-projection-transfer\.mjs --hydrate/);
-  assert.match(builder, /--satisfied-groups="\$HYDRATE_GROUPS"/);
-  assert.match(builder, /WCA_PROJECTION_BUILD_CONCURRENCY=2/);
-  assert.match(builder, /repair-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/);
 });
 
 test("component images are independently identified and production requires PR validation", () => {
@@ -407,7 +411,7 @@ test("component images are independently identified and production requires PR v
 });
 
 test("Node dependency consumers use the pinned pnpm lockfile", () => {
-  for (const nodeWorkflow of [pullRequest, planner, builder]) {
+  for (const nodeWorkflow of [pullRequest, groupBuilder]) {
     assert.match(nodeWorkflow, /pnpm\/action-setup@v4/);
     assert.match(nodeWorkflow, /cache: pnpm/);
     assert.match(nodeWorkflow, /pnpm install --frozen-lockfile/);
@@ -420,31 +424,39 @@ test("Node dependency consumers use the pinned pnpm lockfile", () => {
   }
 });
 
+test("raw export downloads use the writable runner cache directory", () => {
+  const rawExport = builder.slice(builder.indexOf("  raw-export:"), builder.indexOf("  matrix:"));
+  assert.match(rawExport, /WCA_EXPORT_CACHE_DIR: \/tmp\/wca-export-cache/);
+});
+
 test("candidate staging is monitored and the activation lock stays short", () => {
-  const importIndex = projectionDeploy.indexOf("during_projection_import");
-  const lockIndex = projectionDeploy.indexOf("projection-activation.lock");
+  const importIndex = projectionDeploymentScript.indexOf("during_projection_import");
+  const lockIndex = projectionDeploymentScript.indexOf("projection-activation.lock");
   assert.ok(importIndex >= 0 && lockIndex > importIndex);
-  assert.match(projectionDeploy, /--max-time 2/);
-  assert.match(projectionDeploy, /while sleep 5/);
-  assert.match(projectionDeploy, /failures.*-ge 3/);
-  const monitorTrapIndex = projectionDeploy.indexOf("trap terminate_deployment TERM INT HUP");
-  const heartbeatIndex = projectionDeploy.indexOf("Ranking generation deployment is still running");
+  assert.match(projectionDeploymentScript, /--max-time 2/);
+  assert.match(projectionDeploymentScript, /while sleep 5/);
+  assert.match(projectionDeploymentScript, /failures.*-ge 3/);
+  const monitorTrapIndex = projectionDeploymentScript.indexOf("trap terminate_deployment TERM INT HUP");
+  const heartbeatIndex = projectionDeploymentScript.indexOf("Ranking generation deployment is still running");
   assert.ok(monitorTrapIndex >= 0 && heartbeatIndex > monitorTrapIndex);
-  assert.match(projectionDeploy, /stop_background_jobs\(\)[\s\S]*?kill "\$heartbeat_pid"[\s\S]*?wait "\$heartbeat_pid"[\s\S]*?kill "\$monitor_pid"[\s\S]*?wait "\$monitor_pid"/);
-  assert.match(projectionDeploy, /rollback_on_failure\(\)[\s\S]*?trap - EXIT TERM INT HUP[\s\S]*?stop_background_jobs/);
-  assert.match(projectionDeploy, /chunk-projection-dump\.mjs \\\n\s+--import --rows-per-insert=1000/);
-  assert.match(projectionDeploy, /candidate_work_label="wcarankings\.projection-artifact=\$\{ARTIFACT_ID\}"/);
-  assert.match(projectionDeploy, /candidate_work_pid=\$1[\s\S]*?wait "\$candidate_work_pid"/);
-  assert.match(projectionDeploy, /docker ps -q --filter "label=\$\{candidate_work_label\}"/);
-  assert.match(projectionDeploy, /docker kill "\$container_id"/);
-  assert.match(projectionDeploy, /terminate_deployment\(\)[\s\S]*?stop_candidate_work[\s\S]*?exit 143/);
-  assert.match(projectionDeploy, /"rolledBack":true/);
-  assert.match(projectionDeploy, /production-mutation\.lock/);
+  assert.match(projectionDeploymentScript, /stop_background_jobs\(\)[\s\S]*?kill "\$heartbeat_pid"[\s\S]*?wait "\$heartbeat_pid"[\s\S]*?kill "\$monitor_pid"[\s\S]*?wait "\$monitor_pid"/);
+  assert.match(projectionDeploymentScript, /rollback_on_failure\(\)[\s\S]*?trap - EXIT TERM INT HUP[\s\S]*?stop_background_jobs/);
+  assert.match(projectionDeploymentScript, /import-projection-transfer\.mjs/);
+  assert.match(projectionDeploymentScript, /--concurrency=2/);
+  assert.match(projectionDeploymentScript, /WCA_PROJECTION_INDEX_CONCURRENCY=2/);
+  assert.doesNotMatch(projectionDeploymentScript, /chunk-projection-dump\.mjs/);
+  assert.match(projectionDeploymentScript, /candidate_work_label="wcarankings\.projection-artifact=\$\{ARTIFACT_ID\}"/);
+  assert.match(projectionDeploymentScript, /candidate_work_pid=\$1[\s\S]*?wait "\$candidate_work_pid"/);
+  assert.match(projectionDeploymentScript, /docker ps -q --filter "label=\$\{candidate_work_label\}"/);
+  assert.match(projectionDeploymentScript, /docker kill "\$container_id"/);
+  assert.match(projectionDeploymentScript, /terminate_deployment\(\)[\s\S]*?stop_candidate_work[\s\S]*?exit 143/);
+  assert.match(projectionDeploymentScript, /"rolledBack":true/);
+  assert.match(projectionDeploymentScript, /production-mutation\.lock/);
   assert.match(serverDeploy, /server-release\.lock/);
   assert.match(serverDeploy, /production-mutation\.lock/);
-  assert.match(projectionDeploy, /wait_for_database_cooldown/);
+  assert.match(projectionDeploymentScript, /wait_for_database_cooldown/);
   assert.match(serverDeploy, /wait_for_database_cooldown/);
-  for (const workflow of [serverDeploy, projectionDeploy]) {
+  for (const workflow of [serverDeploy, projectionDeploymentScript]) {
     assert.match(workflow, /measure_database_cpu_baseline/);
     assert.match(workflow, /timeout 5 docker stats --no-stream/);
     assert.match(workflow, /Timed out reading MariaDB CPU usage/);
@@ -458,10 +470,10 @@ test("candidate staging is monitored and the activation lock stays short", () =>
     assert.match(workflow, /Threads_running/);
     assert.doesNotMatch(workflow, /cpu < 50|cool below 50%/);
   }
-  assert.match(projectionDeploy, /verify-active/);
-  assert.match(projectionDeploy, /normalizeExportDate/);
-  assert.match(projectionDeploy, /normalized_build_export.*!=.*normalized_production_export/);
-  assert.doesNotMatch(projectionDeploy, /if \[ "\$WCA_EXPORT_VALUE" != "\$PRODUCTION_WCA_EXPORT_VALUE" \]/);
+  assert.match(projectionDeploymentScript, /verify-active/);
+  assert.match(projectionDeploymentScript, /normalizeExportDate/);
+  assert.match(projectionDeploymentScript, /normalized_build_export.*!=.*normalized_production_export/);
+  assert.doesNotMatch(projectionDeploymentScript, /if \[ "\$WCA_EXPORT_VALUE" != "\$PRODUCTION_WCA_EXPORT_VALUE" \]/);
   assert.match(serverDeploy, /flyway_schema_history_results/);
   const bootstrapIndex = serverDeploy.indexOf("activate-ranking-generation.mjs bootstrap");
   const mutationLockIndex = serverDeploy.lastIndexOf("production-mutation.lock", bootstrapIndex);
@@ -476,7 +488,7 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.ok(serverCooldownIndex > lastFlywayIndex && bootstrapIndex > serverCooldownIndex);
   assert.ok(migrationConditionalEndIndex >= 0 && bootstrapIndex > migrationConditionalEndIndex);
   assert.ok(serverSwitchIndex > bootstrapIndex);
-  assert.match(projectionDeploy, /flyway_schema_history_results/);
+  assert.match(projectionDeploymentScript, /flyway_schema_history_results/);
   assert.match(serverDeploy, /wcarankings-data-tools:artifact-\*\) continue/);
   assert.match(
     serverDeploy,
@@ -504,27 +516,27 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(serverDeploy, /recover_approved_config/);
   assert.match(serverDeploy, /PREVIOUS_COMPOSE_CHECKSUM/);
   assert.match(serverDeploy, /FLYWAY_IMAGE_CHANGED.*\|\|.*DATA_TOOLS_IMAGE_CHANGED/);
-  assert.match(projectionDeploy, /compose_base=.*\.projection-compose-/);
-  const projectionFirstMutationIndex = projectionDeploy.indexOf("dc run --rm data-tools /app/scripts/prepare-flyway-history.mjs");
-  const projectionImportIndex = projectionDeploy.indexOf("publish-projection-transfer.mjs");
-  const projectionResetIndex = projectionDeploy.indexOf("reset_candidate() {");
-  const projectionBaselineIndex = projectionDeploy.lastIndexOf("load_or_measure_database_cpu_baseline", projectionFirstMutationIndex);
-  const projectionMutationLockIndex = projectionDeploy.lastIndexOf("production-mutation.lock", projectionBaselineIndex);
-  const projectionCooldownIndex = projectionDeploy.lastIndexOf("wait_for_database_cooldown");
+  assert.match(projectionDeploymentScript, /compose_base=.*\.projection-compose-/);
+  const projectionFirstMutationIndex = projectionDeploymentScript.indexOf("dc run --rm data-tools /app/scripts/prepare-flyway-history.mjs");
+  const projectionImportIndex = projectionDeploymentScript.indexOf("publish-projection-transfer.mjs");
+  const projectionResetIndex = projectionDeploymentScript.indexOf("reset_candidate() {");
+  const projectionBaselineIndex = projectionDeploymentScript.lastIndexOf("load_or_measure_database_cpu_baseline", projectionFirstMutationIndex);
+  const projectionMutationLockIndex = projectionDeploymentScript.lastIndexOf("production-mutation.lock", projectionBaselineIndex);
+  const projectionCooldownIndex = projectionDeploymentScript.lastIndexOf("wait_for_database_cooldown");
   assert.ok(projectionMutationLockIndex >= 0 && projectionBaselineIndex > projectionMutationLockIndex);
   assert.ok(projectionBaselineIndex < projectionFirstMutationIndex);
   assert.ok(projectionFirstMutationIndex < projectionResetIndex && projectionResetIndex < projectionImportIndex);
   assert.ok(projectionCooldownIndex > projectionImportIndex && lockIndex > projectionCooldownIndex);
-  assert.match(projectionDeploy, /projection-deploy-\$\{ARTIFACT_ID\}\.baseline/);
-  assert.match(projectionDeploy, /baseline_tmp=.*\.tmp\.\$\$/);
-  assert.match(projectionDeploy, /mv "\$baseline_tmp" "\$baseline_file"/);
-  assert.equal([...projectionDeploy.matchAll(/^\s+load_or_measure_database_cpu_baseline$/gm)].length, 1);
-  assert.equal([...projectionDeploy.matchAll(/^\s+load_persisted_database_cpu_baseline$/gm)].length, 2);
-  assert.equal([...projectionDeploy.matchAll(/mv "\$baseline_tmp" "\$baseline_file"/g)].length, 1);
-  const projectionPersistedLoadIndex = projectionDeploy.indexOf("load_persisted_database_cpu_baseline", projectionFirstMutationIndex);
+  assert.match(projectionDeploymentScript, /projection-deploy-\$\{ARTIFACT_ID\}\.baseline/);
+  assert.match(projectionDeploymentScript, /baseline_tmp=.*\.tmp\.\$\$/);
+  assert.match(projectionDeploymentScript, /mv "\$baseline_tmp" "\$baseline_file"/);
+  assert.equal([...projectionDeploymentScript.matchAll(/^\s+load_or_measure_database_cpu_baseline$/gm)].length, 1);
+  assert.equal([...projectionDeploymentScript.matchAll(/^\s+load_persisted_database_cpu_baseline$/gm)].length, 2);
+  assert.equal([...projectionDeploymentScript.matchAll(/mv "\$baseline_tmp" "\$baseline_file"/g)].length, 1);
+  const projectionPersistedLoadIndex = projectionDeploymentScript.indexOf("load_persisted_database_cpu_baseline", projectionFirstMutationIndex);
   assert.ok(projectionPersistedLoadIndex > projectionFirstMutationIndex);
-  assert.match(projectionDeploy, /no longer matches this release; marking it superseded/);
-  assert.doesNotMatch(projectionDeploy, /stale; rebuilding its candidate/);
+  assert.match(projectionDeploymentScript, /no longer matches this release; marking it superseded/);
+  assert.doesNotMatch(projectionDeploymentScript, /stale; rebuilding its candidate/);
   const composeBackup = serverDeploy.indexOf("cp /srv/wcarankings/docker-compose.yml");
   const composeChange = serverDeploy.indexOf('if [ "$COMPOSE_CONFIG_CHANGED" = true ]');
   const caddyBackup = serverDeploy.indexOf("cp /srv/wcarankings/ops/Caddyfile");
@@ -576,16 +588,22 @@ test("projection deployment protects its remote heredoc from non-input compose c
   assert.equal(streamResult.status, 0, streamResult.stderr);
   assert.equal(streamResult.stdout, "intentional-stream-payload\n");
 
-  assert.match(projectionDeploy, /dc\(\) \{\n\s+docker compose .* "\$@" <\/dev\/null/);
-  assert.match(projectionDeploy, /dc_with_stdin\(\) \{\n\s+docker compose .* "\$@"\n/);
-  assert.equal((projectionDeploy.match(/dc_with_stdin (?:run|exec)/g) || []).length, 4);
-  assert.match(projectionDeploy, /dc_with_stdin run --rm -T data-tools[\s\S]*?verify-active[\s\S]*?< "\$release_file"/);
+  assert.match(projectionDeploymentScript, /dc\(\) \{\n\s+docker compose .* "\$@" <\/dev\/null/);
+  assert.match(projectionDeploymentScript, /dc_with_stdin\(\) \{\n\s+docker compose .* "\$@"\n/);
+  assert.equal((projectionDeploymentScript.match(/dc_with_stdin (?:run|exec)/g) || []).length, 3);
+  assert.match(projectionDeploymentScript, /dc_with_stdin run --rm -T data-tools[\s\S]*?verify-active[\s\S]*?< "\$release_file"/);
   assert.match(
-    projectionDeploy,
+    projectionDeploymentScript,
     /dc_with_stdin run --rm -T --label "\$candidate_work_label" \\\n\s+--entrypoint sh[\s\S]*?< "\/tmp\/wcarankings-\$\{ARTIFACT_ID\}-raw\.sql\.zip"/,
   );
-  assert.match(projectionDeploy, /gzip -dc[\s\S]*?\| dc_with_stdin run --rm -T[\s\S]*?chunk-projection-dump\.mjs/);
-  assert.match(projectionDeploy, /--manifest=-\s*\\\n\s*< "\$release_file"/);
+  assert.match(projectionDeploymentScript, /tar -xzf "\$archive" -C "\$transfer_directory"/);
+  assert.ok(projectionDeploymentScript.includes('-v "$transfer_directory:/projection-transfer:ro"'));
+  assert.match(projectionDeploymentScript, /import-projection-transfer\.mjs[\s\S]*?--metadata=\/projection-transfer\.json/);
+  assert.match(projectionDeploymentScript, /Stage exact generation directly from GHCR/);
+  assert.match(projectionDeploymentScript, /oras pull "\$ref"/);
+  assert.match(projectionDeploymentScript, /docker --config "\$auth_directory" pull "\$DATA_TOOLS_IMAGE"/);
+  assert.doesNotMatch(projectionDeploymentScript, /docker save/);
+  assert.match(projectionDeploymentScript, /--manifest=-\s*\\\n\s*< "\$release_file"/);
 });
 
 test("server image transfer selection repairs missing unchanged tags", () => {

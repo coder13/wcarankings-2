@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import type { PatchRankingsFilters } from "./useRankingsFilters";
-import type { useRankingWindow } from "./useRankingWindow";
-import type { useRankingViewport } from "./useRankingViewport";
-import type { useRankingNavigationSession } from "./useRankingNavigationSession";
-import type { useRankingSearchNavigation } from "./useRankingSearchNavigation";
 import type { RankingCommands } from "./useRankingCommands";
 import type { useRankingsSearch } from "./useRankingsSearch";
+import type { PatchRankingsFilters } from "./useRankingsState";
 import type { useVimNavigation } from "./useVimNavigation";
 
 export function useExplorerKeyboardShortcuts({
@@ -15,11 +11,15 @@ export function useExplorerKeyboardShortcuts({
   vim,
   patchFilters,
   commands,
+  goToTop,
+  goToEnd,
 }: {
   search: ReturnType<typeof useRankingsSearch>;
   vim: ReturnType<typeof useVimNavigation>;
   patchFilters: PatchRankingsFilters;
   commands: RankingCommands;
+  goToTop: () => void;
+  goToEnd: () => void;
 }) {
   const {
     open,
@@ -48,6 +48,26 @@ export function useExplorerKeyboardShortcuts({
       const isEditable =
         target instanceof Element &&
         target.matches("input, textarea, select, [contenteditable='true']");
+
+      const toTop =
+        (event.metaKey && !event.ctrlKey && event.key === "ArrowUp") ||
+        (event.ctrlKey && !event.metaKey && event.key === "Home");
+      const toBottom =
+        (event.metaKey && !event.ctrlKey && event.key === "ArrowDown") ||
+        (event.ctrlKey && !event.metaKey && event.key === "End");
+      if (
+        !isEditable &&
+        !event.altKey &&
+        !event.shiftKey &&
+        (toTop || toBottom)
+      ) {
+        event.preventDefault();
+        if (!event.repeat) {
+          if (toTop) goToTop();
+          else goToEnd();
+        }
+        return;
+      }
 
       if ((event.ctrlKey || event.metaKey) && key === "f") {
         event.preventDefault();
@@ -105,6 +125,8 @@ export function useExplorerKeyboardShortcuts({
     close,
     cycle,
     focusSearch,
+    goToEnd,
+    goToTop,
     mode,
     open,
     patchFilters,
@@ -116,79 +138,5 @@ export function useExplorerKeyboardShortcuts({
     setCommand,
     setMode,
     setOpen,
-  ]);
-}
-
-export function useCancelRankingNavigationOnInput({
-  viewport,
-  searchNavigation,
-  windowController,
-  navigationSession,
-}: {
-  viewport: Pick<ReturnType<typeof useRankingViewport>, "scrollStateRef">;
-  searchNavigation: Pick<
-    ReturnType<typeof useRankingSearchNavigation>,
-    "cancelMotion"
-  >;
-  windowController: Pick<
-    ReturnType<typeof useRankingWindow>,
-    "actions"
-  >;
-  navigationSession: ReturnType<typeof useRankingNavigationSession>;
-}) {
-  const { scrollStateRef } = viewport;
-  const { cancelMotion: cancelSearchMotion } = searchNavigation;
-  const { patch: patchWindow } = windowController.actions;
-  const { finishPagerNavigation } = navigationSession.actions;
-  const {
-    navigationEpochRef,
-    navigationTargetRankRef,
-    pendingNavigationAppendRef,
-    pendingNavigationRebaseRef,
-    preserveListDuringLoadRef,
-  } = navigationSession.refs;
-  useEffect(() => {
-    const cancelOnUserInput = () => {
-      if (
-        !scrollStateRef.current.active &&
-        !scrollStateRef.current.programmatic &&
-        !preserveListDuringLoadRef.current
-      ) return;
-
-      navigationEpochRef.current += 1;
-      cancelSearchMotion();
-      navigationTargetRankRef.current = null;
-      pendingNavigationAppendRef.current = false;
-      preserveListDuringLoadRef.current = false;
-      patchWindow({
-        loading: false,
-        preserveListDuringLoad: false,
-      });
-      const rebase = pendingNavigationRebaseRef.current;
-      pendingNavigationRebaseRef.current = null;
-      if (rebase) rebase();
-      else finishPagerNavigation();
-    };
-
-    window.addEventListener("wheel", cancelOnUserInput, { passive: true });
-    window.addEventListener("touchstart", cancelOnUserInput, { passive: true });
-    window.addEventListener("pointerdown", cancelOnUserInput, {
-      passive: true,
-    });
-    return () => {
-      window.removeEventListener("wheel", cancelOnUserInput);
-      window.removeEventListener("touchstart", cancelOnUserInput);
-      window.removeEventListener("pointerdown", cancelOnUserInput);
-    };
-  }, [
-    cancelSearchMotion,
-    finishPagerNavigation,
-    navigationEpochRef,
-    navigationTargetRankRef,
-    patchWindow,
-    pendingNavigationAppendRef,
-    pendingNavigationRebaseRef,
-    preserveListDuringLoadRef,
-    scrollStateRef,
   ]);
 }

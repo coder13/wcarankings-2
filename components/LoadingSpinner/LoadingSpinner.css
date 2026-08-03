@@ -1,0 +1,41 @@
+.LoadingSpinner {
+  display: inline-grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--text-muted);
+  opacity: 1 !important;
+  place-items: center;
+}
+
+.LoadingSpinner-icon {
+  width: 100%;
+  height: 100%;
+  animation: LoadingSpinner-spin 700ms linear infinite;
+}
+
+.LoadingSpinner-track,
+.LoadingSpinner-arc {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+}
+
+.LoadingSpinner-track {
+  opacity: 0.2;
+}
+
+.LoadingSpinner-arc {
+  stroke-linecap: round;
+}
+
+@keyframes LoadingSpinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .LoadingSpinner-icon {
+    animation: none;
+  }
+}

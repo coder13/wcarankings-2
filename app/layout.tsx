@@ -4,7 +4,6 @@ import { AuthSessionRefresh } from "@/components/AuthSessionRefresh";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics/GoogleAnalytics";
 import { MotionPreferences } from "@/components/MotionPreferences/MotionPreferences";
 import { ProjectionFeatureSwitchProvider } from "@/components/ProjectionFeatureSwitchProvider";
-import { PwaRegistration } from "@/components/PwaRegistration/PwaRegistration";
 import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 import { AppProviders } from "./AppProviders";
 import "./globals.css";
@@ -88,7 +87,6 @@ export default async function RootLayout({
           <ProjectionFeatureSwitchProvider featureSwitch={featureSwitch}>
             <AuthSessionRefresh />
             <GoogleAnalytics />
-            <PwaRegistration />
             {children}
           </ProjectionFeatureSwitchProvider>
           </AppProviders>

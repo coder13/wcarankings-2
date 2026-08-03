@@ -3,127 +3,112 @@ WITH historical AS (
   SELECT
     r.event_id,
     r.person_id,
-    COALESCE(p.name, r.person_id) AS person_name,
     COALESCE(r.person_country_id, '') AS country_id,
-    COALESCE(country.name, r.person_country_id, '') AS country_name,
-    COALESCE(country.iso2, '') AS country_iso2,
-    COALESCE(country.continent_id, '') AS continent_id,
-    CASE WHEN p.gender IN ('m', 'f') THEN p.gender ELSE 'o' END AS gender,
+    r.person_continent_id AS continent_id,
     r.average AS best,
-    COALESCE(r.competition_id, '') AS competition_id,
-    COALESCE(comp.name, r.competition_id, '') AS competition_name,
-    COALESCE(r.regional_average_record, '') AS regional_record,
+    r.competition_id,
+    r.regional_average_record AS regional_record,
     ROW_NUMBER() OVER (
       PARTITION BY r.event_id, r.person_id, COALESCE(r.person_country_id, '')
-      ORDER BY r.average, r.id
+      ORDER BY r.average, r.result_id
     ) AS country_person_position,
     ROW_NUMBER() OVER (
-      PARTITION BY r.event_id, r.person_id, COALESCE(country.continent_id, '')
-      ORDER BY r.average, r.id
+      PARTITION BY r.event_id, r.person_id, r.person_continent_id
+      ORDER BY r.average, r.result_id
     ) AS continent_person_position
-  FROM results r
-  LEFT JOIN persons p ON p.wca_id = r.person_id AND p.sub_id = 1
-  LEFT JOIN countries country ON country.id = r.person_country_id
-  LEFT JOIN competitions comp ON comp.id = r.competition_id
+  FROM result_facts r
   WHERE r.average > 0
 ), country_rows AS (
   SELECT
-    event_id, person_id, person_name, country_id, country_name, country_iso2,
-    continent_id, gender, best, competition_id, competition_name,
-    0 AS world_rank,
-    0 AS continent_rank,
-    RANK() OVER (PARTITION BY event_id, country_id ORDER BY best) AS country_rank,
-    0 AS world_sub_rank,
-    0 AS continent_sub_rank,
+    historical.event_id, historical.person_id,
+    COALESCE(person.name, historical.person_id) AS person_name,
+    historical.country_id,
+    COALESCE(country.name, historical.country_id, '') AS country_name,
+    COALESCE(country.iso2, '') AS country_iso2,
+    historical.continent_id, historical.best,
+    historical.competition_id,
+    COALESCE(comp.name, historical.competition_id, '') AS competition_name,
+    0 AS world_rank, 0 AS continent_rank,
+    RANK() OVER (PARTITION BY historical.event_id, historical.country_id ORDER BY historical.best) AS country_rank,
+    0 AS world_sub_rank, 0 AS continent_sub_rank,
     ROW_NUMBER() OVER (
-      PARTITION BY event_id, country_id
-      ORDER BY best, person_name, person_id
+      PARTITION BY historical.event_id, historical.country_id
+      ORDER BY historical.best, COALESCE(person.name, historical.person_id), historical.person_id
     ) AS country_sub_rank,
-    CASE WHEN regional_record = 'WR' THEN 1 ELSE 0 END AS is_world_record,
-    CASE WHEN regional_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') THEN 1 ELSE 0 END AS is_continent_record,
-    CASE WHEN regional_record = 'NR' THEN 1 ELSE 0 END AS is_country_record
+    historical.regional_record = 'WR' AS is_world_record,
+    historical.regional_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
+    historical.regional_record = 'NR' AS is_country_record
   FROM historical
-  WHERE country_person_position = 1
+  LEFT JOIN persons person ON person.wca_id = historical.person_id AND person.sub_id = 1
+  LEFT JOIN countries country ON country.id = historical.country_id
+  LEFT JOIN competitions comp ON comp.id = historical.competition_id
+  WHERE historical.country_person_position = 1
 ), continent_rows AS (
   SELECT
-    event_id, person_id, person_name, country_id, country_name, country_iso2,
-    continent_id, gender, best, competition_id, competition_name,
+    historical.event_id, historical.person_id,
+    COALESCE(person.name, historical.person_id) AS person_name,
+    historical.country_id,
+    COALESCE(country.name, historical.country_id, '') AS country_name,
+    COALESCE(country.iso2, '') AS country_iso2,
+    historical.continent_id, historical.best,
+    historical.competition_id,
+    COALESCE(comp.name, historical.competition_id, '') AS competition_name,
     0 AS world_rank,
-    RANK() OVER (PARTITION BY event_id, continent_id ORDER BY best) AS continent_rank,
-    0 AS country_rank,
-    0 AS world_sub_rank,
+    RANK() OVER (PARTITION BY historical.event_id, historical.continent_id ORDER BY historical.best) AS continent_rank,
+    0 AS country_rank, 0 AS world_sub_rank,
     ROW_NUMBER() OVER (
-      PARTITION BY event_id, continent_id
-      ORDER BY best, person_name, person_id
+      PARTITION BY historical.event_id, historical.continent_id
+      ORDER BY historical.best, COALESCE(person.name, historical.person_id), historical.person_id
     ) AS continent_sub_rank,
     0 AS country_sub_rank,
-    CASE WHEN regional_record = 'WR' THEN 1 ELSE 0 END AS is_world_record,
-    CASE WHEN regional_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') THEN 1 ELSE 0 END AS is_continent_record,
-    CASE WHEN regional_record = 'NR' THEN 1 ELSE 0 END AS is_country_record
+    historical.regional_record = 'WR' AS is_world_record,
+    historical.regional_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
+    historical.regional_record = 'NR' AS is_country_record
   FROM historical
-  WHERE continent_person_position = 1
+  LEFT JOIN persons person ON person.wca_id = historical.person_id AND person.sub_id = 1
+  LEFT JOIN countries country ON country.id = historical.country_id
+  LEFT JOIN competitions comp ON comp.id = historical.competition_id
+  WHERE historical.continent_person_position = 1
 ), world_rows AS (
   SELECT
-    r.event_id,
-    r.person_id,
-    COALESCE(p.name, r.person_id) AS person_name,
-    COALESCE(p.country_id, '') AS country_id,
-    COALESCE(country.name, p.country_id, '') AS country_name,
+    ranking.event_id, ranking.person_id,
+    COALESCE(person.name, ranking.person_id) AS person_name,
+    COALESCE(person.country_id, '') AS country_id,
+    COALESCE(country.name, person.country_id, '') AS country_name,
     COALESCE(country.iso2, '') AS country_iso2,
     COALESCE(country.continent_id, '') AS continent_id,
-    CASE WHEN p.gender IN ('m', 'f') THEN p.gender ELSE 'o' END AS gender,
-    r.best,
-    COALESCE(best.competition_id, '') AS competition_id,
+    ranking.best, COALESCE(best.competition_id, '') AS competition_id,
     COALESCE(comp.name, '') AS competition_name,
-    r.world_rank,
-    0 AS continent_rank,
-    0 AS country_rank,
-    SUM(CASE WHEN r.world_rank > 0 THEN 1 ELSE 0 END) OVER (
-      PARTITION BY r.event_id
-      ORDER BY r.world_rank, COALESCE(p.name, r.person_id), r.person_id
+    ranking.world_rank, 0 AS continent_rank, 0 AS country_rank,
+    SUM(ranking.world_rank > 0) OVER (
+      PARTITION BY ranking.event_id
+      ORDER BY ranking.world_rank, COALESCE(person.name, ranking.person_id), ranking.person_id
       ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS world_sub_rank,
-    0 AS continent_sub_rank,
-    0 AS country_sub_rank,
-    CASE WHEN r.world_rank = 1 THEN 1 ELSE 0 END AS is_world_record,
-    CASE WHEN r.continent_rank = 1 THEN 1 ELSE 0 END AS is_continent_record,
-    CASE WHEN r.country_rank = 1 THEN 1 ELSE 0 END AS is_country_record
-  FROM ranks_average r
-  LEFT JOIN persons p ON p.wca_id = r.person_id AND p.sub_id = 1
-  LEFT JOIN countries country ON country.id = p.country_id
-  LEFT JOIN wca_best_average best ON best.person_id = r.person_id AND best.event_id = r.event_id
+    0 AS continent_sub_rank, 0 AS country_sub_rank,
+    ranking.world_rank = 1 AS is_world_record,
+    ranking.continent_rank = 1 AS is_continent_record,
+    ranking.country_rank = 1 AS is_country_record
+  FROM ranks_average ranking
+  LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
+  LEFT JOIN countries country ON country.id = person.country_id
+  LEFT JOIN wca_best_average best ON best.person_id = ranking.person_id AND best.event_id = ranking.event_id
   LEFT JOIN competitions comp ON comp.id = best.competition_id
 )
-SELECT world_rows.event_id, world_rows.person_id, world_rows.person_name, world_rows.country_id, world_rows.country_name, world_rows.country_iso2,
-  world_rows.continent_id, world_rows.gender, world_rows.best, world_rows.competition_id, world_rows.competition_name,
-  world_rows.is_world_record, world_rows.is_continent_record, world_rows.is_country_record,
-  world_rows.world_rank, world_rows.continent_rank, world_rows.country_rank,
-  world_sub_rank, continent_sub_rank, country_sub_rank,
-  CAST(NULL AS SIGNED) AS world_rank_delta, CAST(NULL AS CHAR(10)) AS world_rank_delta_state,
-  CAST(NULL AS SIGNED) AS continent_rank_delta, CAST(NULL AS CHAR(10)) AS continent_rank_delta_state,
-  CAST(NULL AS SIGNED) AS country_rank_delta, CAST(NULL AS CHAR(10)) AS country_rank_delta_state,
-  CAST(NULL AS SIGNED) AS record_streak_weeks
+SELECT event_id, person_id, person_name, country_id, country_name, country_iso2,
+  continent_id, best, competition_id, competition_name,
+  is_world_record, is_continent_record, is_country_record,
+  world_rank, continent_rank, country_rank, world_sub_rank, continent_sub_rank, country_sub_rank
 FROM world_rows
 UNION ALL
-SELECT country_rows.event_id, country_rows.person_id, country_rows.person_name, country_rows.country_id, country_rows.country_name, country_rows.country_iso2,
-  country_rows.continent_id, country_rows.gender, country_rows.best, country_rows.competition_id, country_rows.competition_name,
-  country_rows.is_world_record, country_rows.is_continent_record, country_rows.is_country_record,
-  country_rows.world_rank, country_rows.continent_rank, country_rows.country_rank,
-  world_sub_rank, continent_sub_rank, country_sub_rank,
-  CAST(NULL AS SIGNED) AS world_rank_delta, CAST(NULL AS CHAR(10)) AS world_rank_delta_state,
-  CAST(NULL AS SIGNED) AS continent_rank_delta, CAST(NULL AS CHAR(10)) AS continent_rank_delta_state,
-  CAST(NULL AS SIGNED) AS country_rank_delta, CAST(NULL AS CHAR(10)) AS country_rank_delta_state,
-  CAST(NULL AS SIGNED) AS record_streak_weeks
+SELECT event_id, person_id, person_name, country_id, country_name, country_iso2,
+  continent_id, best, competition_id, competition_name,
+  is_world_record, is_continent_record, is_country_record,
+  world_rank, continent_rank, country_rank, world_sub_rank, continent_sub_rank, country_sub_rank
 FROM country_rows
 UNION ALL
-SELECT continent_rows.event_id, continent_rows.person_id, continent_rows.person_name, continent_rows.country_id, continent_rows.country_name, continent_rows.country_iso2,
-  continent_rows.continent_id, continent_rows.gender, continent_rows.best, continent_rows.competition_id, continent_rows.competition_name,
-  continent_rows.is_world_record, continent_rows.is_continent_record, continent_rows.is_country_record,
-  continent_rows.world_rank, continent_rows.continent_rank, continent_rows.country_rank,
-  world_sub_rank, continent_sub_rank, country_sub_rank,
-  CAST(NULL AS SIGNED) AS world_rank_delta, CAST(NULL AS CHAR(10)) AS world_rank_delta_state,
-  CAST(NULL AS SIGNED) AS continent_rank_delta, CAST(NULL AS CHAR(10)) AS continent_rank_delta_state,
-  CAST(NULL AS SIGNED) AS country_rank_delta, CAST(NULL AS CHAR(10)) AS country_rank_delta_state,
-  CAST(NULL AS SIGNED) AS record_streak_weeks
-FROM continent_rows
-;
+SELECT event_id, person_id, person_name, country_id, country_name, country_iso2,
+  continent_id, best, competition_id, competition_name,
+  is_world_record, is_continent_record, is_country_record,
+  world_rank, continent_rank, country_rank, world_sub_rank, continent_sub_rank, country_sub_rank
+FROM continent_rows;

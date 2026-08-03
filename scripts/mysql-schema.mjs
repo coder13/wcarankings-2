@@ -115,7 +115,7 @@ async function executeTableStatements(connection, sql, phases = [], { tableProgr
 const projectionDefinitions = [
   {
     name: "sum-of-ranks",
-    dependencies: [],
+    dependencies: ["result-facts"],
     files: ["person_sum_of_ranks_scores.sql"],
     tables: ["person_sum_of_ranks_scores"],
     enabledByDefault: true,
@@ -184,7 +184,7 @@ const projectionDefinitions = [
   },
   {
     name: "person-competition-rankings",
-    dependencies: ["raw-wca"],
+    dependencies: ["result-facts"],
     files: ["person_competition_rankings.sql"],
     tables: [
       "person_competition_counts",
@@ -224,8 +224,8 @@ export const RETIRED_PROJECTION_TABLES = [
 ];
 
 export const COMPATIBILITY_PROJECTION_TASKS = [
-  { name: "compatibility-ranking-entries-single-source", dependencies: [], estimatedDurationMs: 0 },
-  { name: "compatibility-ranking-entries-average-source", dependencies: [], estimatedDurationMs: 0 },
+  { name: "compatibility-ranking-entries-single-source", dependencies: ["projection:result-facts"], estimatedDurationMs: 0 },
+  { name: "compatibility-ranking-entries-average-source", dependencies: ["projection:result-facts"], estimatedDurationMs: 0 },
   { name: "compatibility-result-entries-single-source", dependencies: ["raw-wca"], estimatedDurationMs: 0 },
   { name: "compatibility-ranking-entries-single", dependencies: ["compatibility-ranking-entries-single-source"], table: "ranking_entries_single", estimatedDurationMs: 120_000 },
   { name: "compatibility-ranking-entries-average", dependencies: ["compatibility-ranking-entries-average-source"], table: "ranking_entries_average", estimatedDurationMs: 120_000 },
@@ -541,32 +541,24 @@ async function buildCompatibilityTable(connection, table, source, indexFile, tab
   }, { tableProgress, tableName: table });
 }
 
-function renameCompatibilitySql(sql, {
+export function renameCompatibilitySql(sql, {
   bestSingle,
   bestAverage,
   entriesSources,
   resultEntriesSource,
-  projectionSuffix,
+  resultFacts,
 }) {
   return sql
     .replaceAll("wca_best_single", bestSingle)
     .replaceAll("wca_best_average", bestAverage)
     .replaceAll("ranking_entries_single_source", entriesSources.single)
     .replaceAll("ranking_entries_average_source", entriesSources.average)
-    .replaceAll("result_entries_single_source", resultEntriesSource);
+    .replaceAll("result_entries_single_source", resultEntriesSource)
+    .replaceAll("result_facts", resultFacts);
 }
 
 async function createCompatibilitySource(connection, file, names) {
   await connection.query(renameCompatibilitySql(await projectionSql(file), names));
-}
-
-async function buildCompatibilityHelperTable(connection, file, names, tableProgress) {
-  await executeTableStatements(
-    connection,
-    renameCompatibilitySql(await projectionSql(file), names),
-    [],
-    { tableProgress },
-  );
 }
 
 function compatibilityProjectionTasks({
@@ -578,7 +570,7 @@ function compatibilityProjectionTasks({
   resultEntriesSource,
   bestSingle,
   bestAverage,
-  projectionSuffix,
+  resultFacts,
   tableProgress,
 }) {
   const names = {
@@ -586,7 +578,7 @@ function compatibilityProjectionTasks({
     bestAverage,
     entriesSources,
     resultEntriesSource,
-    projectionSuffix,
+    resultFacts,
   };
   const runners = {
     "compatibility-ranking-entries-single-source": (connection) => createCompatibilitySource(
@@ -760,6 +752,7 @@ export async function refreshMysqlSchema(
   const countsTable = `ranking_counts${projectionSuffix}`;
   const bestSingle = `wca_best_single${projectionSuffix}`;
   const bestAverage = `wca_best_average${projectionSuffix}`;
+  const resultFacts = `result_facts${projectionSuffix}`;
   const entriesSources = {
     single: `ranking_entries_single_source${projectionSuffix}`,
     average: `ranking_entries_average_source${projectionSuffix}`,
@@ -791,6 +784,7 @@ export async function refreshMysqlSchema(
       bestAverage,
       entriesSources,
       resultEntriesSource,
+      resultFacts,
       projectionSuffix,
     };
     // These are small raw-table views. The expensive helper tables and the
@@ -826,7 +820,7 @@ export async function refreshMysqlSchema(
       resultEntriesSource,
       bestSingle,
       bestAverage,
-      projectionSuffix,
+      resultFacts,
       tableProgress,
     }) : [];
   await runDependencyAwareTasks([

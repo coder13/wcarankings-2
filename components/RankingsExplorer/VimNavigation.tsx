@@ -10,7 +10,7 @@ export function RankingsAppShell({
 }: {
   children: ReactNode;
 }) {
-  const { interactions: { search }, vim } = useRankingsExplorer();
+  const { search, vim } = useRankingsExplorer();
   const { mode } = vim.state;
   const { query, regexSearch } = search.state;
 
@@ -26,7 +26,7 @@ export function RankingsAppShell({
 }
 
 export function VimNavigationOverlay() {
-  const { interactions: { search }, vim } = useRankingsExplorer();
+  const { search, vim } = useRankingsExplorer();
   const { mode, command, helpOpen } = vim.state;
   const { query, regexSearch, loading, pending, activeMatch, matches, index } =
     search.state;

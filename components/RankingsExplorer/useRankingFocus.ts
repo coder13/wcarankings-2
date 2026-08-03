@@ -1,223 +1,196 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  type MutableRefObject,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWcaProfile } from "../Auth/useWcaProfile";
-import type { ExplorerSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
-import type { RankingDataSource } from "./useRankingDataSource";
-import type { useRankingsUrlState } from "./useRankingsUrlState";
-import type { useRankingWindow } from "./useRankingWindow";
-import type { RegionSelection } from "./types";
+import type { RankingsFilterState } from "./rankingsUrl";
+import type { RankingsApi } from "./useRankingsApi";
+import type { RankingsState } from "./useRankingsState";
+import type { RankingEntry } from "./types";
+import type { useVirtualRankings } from "./useVirtualRankings";
 
-type FocusFilters = {
-  subject: ExplorerSubject;
-  eventId: string;
-  rankingType: "single" | "average";
-  regionSelection: RegionSelection;
-};
+type FocusRankings = Pick<
+  ReturnType<typeof useVirtualRankings>,
+  | "expandedIndex"
+  | "toggleExpanded"
+  | "expandIndex"
+  | "jumpToIndex"
+  | "loading"
+>;
 
-type FocusControllers = {
-  locateRanking: RankingDataSource["requests"]["locateRanking"];
-  patch: ReturnType<typeof useRankingWindow>["actions"]["patch"];
-  resetToRank: (
-    rank: number,
-    animate?: boolean,
-    focusedPersonId?: string | null,
-  ) => void;
-};
-
-type FocusUrl = {
-  state: Pick<
-    ReturnType<typeof useRankingsUrlState>["state"],
-    "focusMe" | "wcaId"
-  >;
-  write: ReturnType<typeof useRankingsUrlState>["write"];
-};
+function focusRequestKey(
+  datasetKey: string,
+  personId: string,
+  focusMe: boolean,
+) {
+  return [datasetKey, personId, focusMe ? "me" : ""].join(":");
+}
 
 export function useRankingFocus({
   filters,
-  controllers,
+  api,
+  rankings,
   url,
-  pendingFocusNoticeRef,
 }: {
-  filters: FocusFilters;
-  controllers: FocusControllers;
-  url: FocusUrl;
-  pendingFocusNoticeRef: MutableRefObject<string>;
+  filters: RankingsFilterState;
+  api: RankingsApi;
+  rankings: FocusRankings;
+  url: RankingsState["url"];
 }) {
-  const {
-    subject,
-    eventId,
-    rankingType,
-    regionSelection,
-  } = filters;
-  const { locateRanking, patch, resetToRank } = controllers;
-  const { state: urlState, write: writeUrl } = url;
-  const focusResolutionEpochRef = useRef(0);
-  const focusedWcaIdRef = useRef("");
+  const [ui, setUi] = useState({
+    highlightedPersonId: "",
+    notice: "",
+    error: "",
+  });
+  const requestEpochRef = useRef(0);
   const lastFocusRequestRef = useRef("");
   const profileQuery = useWcaProfile(
-    subject === "people" && urlState.focusMe,
+    filters.subject === "people" && url.state.focusMe,
   );
 
+  const clear = useCallback(() => {
+    if (rankings.expandedIndex !== null) {
+      rankings.toggleExpanded(rankings.expandedIndex);
+    }
+    setUi((current) => ({
+      ...current,
+      highlightedPersonId: "",
+      notice: "",
+    }));
+    if (url.state.wcaId || url.state.focusMe) {
+      url.write({ wcaId: "", focusMe: false });
+    }
+  }, [rankings, url]);
+
+  const jumpToEntry = useCallback((entry: RankingEntry) => {
+    setUi((current) => ({
+      ...current,
+      error: "",
+      highlightedPersonId: entry.personId,
+    }));
+    rankings.jumpToIndex(entry.subRank - 1);
+  }, [rankings]);
+
+  const clearHighlight = useCallback(() => {
+    setUi((current) => ({ ...current, highlightedPersonId: "" }));
+  }, []);
+
   const focusWcaId = useCallback((wcaId: string, animate = true) => {
-    if (subject !== "people") return;
-    const resolutionEpoch = focusResolutionEpochRef.current + 1;
-    focusResolutionEpochRef.current = resolutionEpoch;
-    patch({ error: "" });
-    void locateRanking(wcaId)
+    if (filters.subject !== "people") return;
+    const requestEpoch = requestEpochRef.current + 1;
+    requestEpochRef.current = requestEpoch;
+    void api.locate(wcaId)
       .then(({ located }) => {
-        if (resolutionEpoch !== focusResolutionEpochRef.current) return;
+        if (requestEpoch !== requestEpochRef.current) return;
         if (!located) {
-          const notice =
-            "That person is not ranked for the selected event or filters.";
-          patch({ focusedExpandedPersonId: "" });
-          pendingFocusNoticeRef.current = notice;
-          patch({ focusNotice: notice });
-          resetToRank(1, false);
+          setUi((current) => ({
+            ...current,
+            highlightedPersonId: "",
+            notice: "That person is not ranked for the selected event or filters.",
+          }));
+          rankings.jumpToIndex(0, false);
           return;
         }
-        pendingFocusNoticeRef.current = "";
-        patch({
-          focusNotice: "",
-          focusedExpandedPersonId: located.personId,
-        });
-        resetToRank(located.subRank, animate, located.personId);
+        const targetIndex = Math.max(0, located.subRank - 1);
+        setUi((current) => ({
+          ...current,
+          highlightedPersonId: located.personId,
+          notice: "",
+        }));
+        rankings.expandIndex(targetIndex);
+        rankings.jumpToIndex(targetIndex, animate);
       })
       .catch((error: unknown) => {
-        if (resolutionEpoch !== focusResolutionEpochRef.current) return;
-        patch({
+        if (requestEpoch !== requestEpochRef.current) return;
+        setUi((current) => ({
+          ...current,
           error: error instanceof Error
             ? error.message
             : "Could not find this person in the rankings.",
-        });
+        }));
       });
-  }, [
-    locateRanking,
-    patch,
-    pendingFocusNoticeRef,
-    resetToRank,
-    subject,
-  ]);
+  }, [api, filters.subject, rankings]);
 
   const focusMyRanking = useCallback((wcaId: string) => {
-    focusedWcaIdRef.current = wcaId;
-    patch({ focusedExpandedPersonId: wcaId });
-    writeUrl({ focusMe: true, wcaId: "" });
-    lastFocusRequestRef.current = [
-      eventId,
-      rankingType,
-      regionSelection.scope,
-      regionSelection.regionId,
-      "",
-      "me",
-    ].join(":");
+    url.write({ focusMe: true, wcaId: "" });
     focusWcaId(wcaId);
-  }, [eventId, focusWcaId, patch, rankingType, regionSelection, writeUrl]);
+  }, [focusWcaId, url]);
 
   const updateFocusedPerson = useCallback((personId: string | null) => {
+    setUi((current) => ({
+      ...current,
+      highlightedPersonId: personId ?? "",
+      notice: "",
+    }));
     if (personId) {
-      lastFocusRequestRef.current = [
-        eventId,
-        rankingType,
-        regionSelection.scope,
-        regionSelection.regionId,
+      lastFocusRequestRef.current = focusRequestKey(
+        api.datasetKey,
         personId,
-        "",
-      ].join(":");
-      focusedWcaIdRef.current = personId;
-      patch({
-        highlightedPersonId: personId,
-        focusedExpandedPersonId: personId,
-      });
-      writeUrl({ wcaId: personId, focusMe: false });
-      return;
+        false,
+      );
     }
-    focusedWcaIdRef.current = "";
-    pendingFocusNoticeRef.current = "";
-    patch({
-      highlightedPersonId: "",
-      focusedExpandedPersonId: "",
-      focusNotice: "",
-    });
-    writeUrl({ wcaId: "", focusMe: false });
-  }, [eventId, patch, pendingFocusNoticeRef, rankingType, regionSelection, writeUrl]);
+    url.write({ wcaId: personId ?? "", focusMe: false });
+  }, [api.datasetKey, url]);
 
   useEffect(() => {
-    if (subject !== "people") return;
-    const explicitWcaId = urlState.wcaId;
-    const focusMe = urlState.focusMe;
-    const requestKey = [
-      eventId,
-      rankingType,
-      regionSelection.scope,
-      regionSelection.regionId,
-      explicitWcaId ?? "",
-      focusMe ? "me" : "",
-    ].join(":");
+    if (filters.subject !== "people" || rankings.loading) return;
+    const requestKey = focusRequestKey(
+      api.datasetKey,
+      url.state.wcaId,
+      url.state.focusMe,
+    );
     if (
-      (!explicitWcaId && !focusMe) ||
+      (!url.state.wcaId && !url.state.focusMe) ||
       lastFocusRequestRef.current === requestKey
     ) return;
-
-    if (explicitWcaId) {
+    if (url.state.wcaId) {
       lastFocusRequestRef.current = requestKey;
-      focusedWcaIdRef.current = explicitWcaId;
-      patch({ focusedExpandedPersonId: explicitWcaId });
-      queueMicrotask(() => {
-        if (lastFocusRequestRef.current === requestKey) {
-          focusWcaId(explicitWcaId, false);
-        }
-      });
+      focusWcaId(url.state.wcaId, false);
       return;
     }
-    if (focusedWcaIdRef.current) {
-      lastFocusRequestRef.current = requestKey;
-      const wcaId = focusedWcaIdRef.current;
-      patch({ focusedExpandedPersonId: wcaId });
-      queueMicrotask(() => {
-        if (lastFocusRequestRef.current === requestKey) {
-          focusWcaId(wcaId, false);
-        }
-      });
-      return;
-    }
-
     if (profileQuery.isPending) return;
     lastFocusRequestRef.current = requestKey;
     const profile = profileQuery.data?.profile;
-    if (!profile) {
-      patch({
-        error: profileQuery.error instanceof Error
-          ? profileQuery.error.message
-          : "Sign in with WCA to jump to your ranking.",
-      });
-      return;
-    }
-    focusedWcaIdRef.current = profile.wcaId;
-    patch({ focusedExpandedPersonId: profile.wcaId });
-    focusWcaId(profile.wcaId, false);
+    if (profile) focusWcaId(profile.wcaId, false);
   }, [
-    eventId,
+    api.datasetKey,
+    filters.subject,
     focusWcaId,
-    patch,
     profileQuery.data,
-    profileQuery.error,
     profileQuery.isPending,
-    rankingType,
-    regionSelection,
-    subject,
-    urlState.focusMe,
-    urlState.wcaId,
+    rankings.loading,
+    url.state.focusMe,
+    url.state.wcaId,
   ]);
 
-  return useMemo(
-    () => ({ focusMyRanking, updateFocusedPerson }),
-    [focusMyRanking, updateFocusedPerson],
-  );
+  let profileError = "";
+  if (
+    url.state.focusMe &&
+    !profileQuery.isPending &&
+    !profileQuery.data?.profile
+  ) {
+    profileError = profileQuery.error instanceof Error
+      ? profileQuery.error.message
+      : "Sign in with WCA to jump to your ranking.";
+  }
+
+  return useMemo(() => ({
+    highlightedPersonId: ui.highlightedPersonId,
+    notice: ui.notice,
+    error: ui.error || profileError,
+    clear,
+    clearHighlight,
+    jumpToEntry,
+    focusMyRanking,
+    updateFocusedPerson,
+  }), [
+    clear,
+    clearHighlight,
+    focusMyRanking,
+    jumpToEntry,
+    profileError,
+    ui,
+    updateFocusedPerson,
+  ]);
 }
+
+export type RankingFocus = ReturnType<typeof useRankingFocus>;

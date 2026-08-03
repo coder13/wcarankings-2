@@ -4,8 +4,11 @@ import { useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { RankingsRail } from "@/components/RankingsRail/RankingsRail";
-import { parseListMemberIds } from "@/lib/helpers/lists/list-member-ids";
 import { flagEmoji } from "@/lib/wca";
+import {
+  highlightedPersonForBuffer,
+  resolveListAddSubmission,
+} from "./list-add-submission";
 import { personInitials, type ListPerson } from "./shared";
 import { usePersonSearchStream } from "./usePersonSearchStream";
 
@@ -108,25 +111,27 @@ export function ListAddPeopleRail({
     router.refresh();
   };
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    if (!value.trim()) {
+  const submitCurrentValue = () => {
+    const action = resolveListAddSubmission(value, entries, activeIndex);
+    if (action.type === "commit-buffer") {
       void commit();
-      return;
-    }
-    const ids = parseListMemberIds(value);
-    if (
-      ids.length > 1 ||
-      /^\d{4}[A-Za-z0-9]{4}\d{2}$/.test(value.trim())
-    ) {
+    } else if (action.type === "commit-person-ids") {
       void commit([
         ...selected,
-        ...ids.map((personId) => ({ personId, name: personId, avatarUrl: null })),
+        ...action.personIds.map((personId) => ({
+          personId,
+          name: personId,
+          avatarUrl: null,
+        })),
       ]);
-      return;
+    } else if (action.type === "select-person") {
+      select([action.person]);
     }
-    const person = entries[activeIndex];
-    if (person) void commit([...selected, person]);
+  };
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    submitCurrentValue();
   };
 
   const resetSearch = () => {
@@ -195,9 +200,15 @@ export function ListAddPeopleRail({
               setSearchOpen(true);
             }}
             onKeyDown={(event) => {
-              if (event.key === "Tab" && entries[activeIndex]) {
+              const highlightedPerson = highlightedPersonForBuffer(entries, activeIndex);
+              if (event.key === "Enter") {
                 event.preventDefault();
-                select([entries[activeIndex]]);
+                submitCurrentValue();
+                return;
+              }
+              if (event.key === "Tab" && highlightedPerson) {
+                event.preventDefault();
+                select([highlightedPerson]);
                 return;
               }
               if (event.key === "Backspace" && !value && selected.length) {

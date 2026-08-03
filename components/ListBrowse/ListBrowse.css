@@ -78,3 +78,10 @@
 .listBrowseCount { flex: 0 0 auto; color: var(--text-subtle); white-space: nowrap; }
 .listBrowseEmpty { padding: 2rem 1.25rem; color: var(--text-subtle); text-align: center; }
 .listBrowsePager { display: flex; justify-content: center; padding: 1.25rem 0; }
+.listBrowseSkeleton { display: grid; gap: 1px; background: var(--border-subtle); }
+.listBrowseSkeleton li { display: flex; min-height: 65px; align-items: center; justify-content: space-between; padding: .75rem 1.25rem; background: var(--surface); }
+.listBrowseSkeleton li:nth-child(even) { background: color-mix(in srgb, var(--primary) 8%, var(--surface)); }
+.listBrowseSkeleton span { display: block; height: 1rem; border-radius: .3rem; background: color-mix(in srgb, var(--text-strong) 10%, transparent); animation: listBrowseShimmer 1.25s ease-in-out infinite alternate; }
+.listBrowseSkeleton span:first-child { width: min(12rem, 45%); }
+.listBrowseSkeleton span:last-child { width: 4.5rem; }
+@keyframes listBrowseShimmer { from { opacity: .45; } to { opacity: .8; } }

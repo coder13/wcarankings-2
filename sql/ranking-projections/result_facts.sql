@@ -26,6 +26,8 @@ ALTER TABLE result_facts
   ADD PRIMARY KEY (result_id),
   ADD INDEX idx_result_facts_person_event_date (person_id, event_id, competition_start_date, result_id),
   ADD INDEX idx_result_facts_competition_event (competition_id, event_id, result_id),
+  ADD INDEX idx_result_facts_year_single (competition_year, event_id, person_id, person_country_id, best, result_id),
+  ADD INDEX idx_result_facts_year_average (competition_year, event_id, person_id, person_country_id, average, result_id),
   ADD INDEX idx_result_facts_single_ranking_cover (
     event_id, best, competition_start_date, competition_id, person_id,
     result_id, round_type_id, person_country_id, person_continent_id

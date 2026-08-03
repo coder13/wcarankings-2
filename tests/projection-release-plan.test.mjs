@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
   projectionFingerprints,
@@ -11,52 +10,45 @@ import {
   semanticProjectionFingerprints,
 } from "../scripts/projection-release-plan.mjs";
 
-const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
-const exportId = "2026-07-30 00:00:23 UTC";
+const repositoryRoot = join(import.meta.dirname, "..");
+const exportId = "2026-07-30T00:00:30Z";
 
 function productionState(fingerprints) {
   return {
-    semanticFingerprints: Object.fromEntries(Object.entries(fingerprints.groups)
-      .map(([name, group]) => [name, group.semanticFingerprint])),
-    artifactFingerprints: Object.fromEntries(Object.entries(fingerprints.groups)
-      .map(([name, group]) => [name, group.artifactFingerprint])),
+    exportId,
+    semanticFingerprints: Object.fromEntries(
+      Object.entries(fingerprints.groups).map(([name, group]) => [name, group.semanticFingerprint]),
+    ),
+    artifactFingerprints: Object.fromEntries(
+      Object.entries(fingerprints.groups).map(([name, group]) => [name, group.artifactFingerprint]),
+    ),
   };
 }
 
 function availableArtifacts(fingerprints, names = Object.keys(fingerprints.groups)) {
-  return Object.fromEntries(names.map((name) => [name, {
-    valid: true,
-    artifactFingerprint: fingerprints.groups[name].artifactFingerprint,
-    digest: `sha256:${name}`,
-  }]));
+  return Object.fromEntries(names.map((name) => [
+    name,
+    {
+      valid: true,
+      artifactFingerprint: fingerprints.groups[name].artifactFingerprint,
+      ref: `ghcr.io/coder13/wcarankings-projection-${name}:test`,
+      digest: `sha256:${"a".repeat(64)}`,
+    },
+  ]));
 }
 
-async function copySemanticInputs(destination, semantics) {
+async function copySemanticInputs(targetRoot, semantics) {
   for (const group of Object.values(semantics.groups)) {
-    for (const path of group.inputs) {
-      const target = join(destination, path);
+    for (const relativePath of group.inputs) {
+      const source = join(repositoryRoot, relativePath);
+      const target = join(targetRoot, relativePath);
       await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, await readFile(join(repositoryRoot, path)));
+      await cp(source, target);
     }
   }
 }
 
-test("separates source-only semantic fingerprints from export artifacts", async () => {
-  const semantics = await semanticProjectionFingerprints({ repositoryRoot });
-  const first = await projectionFingerprints({ exportId, repositoryRoot, semanticFingerprints: semantics });
-  const second = await projectionFingerprints({ exportId, repositoryRoot, semanticFingerprints: semantics });
-  assert.deepEqual(first, second);
-  assert.ok(semantics.groups["result-facts"].inputs.includes("sql/ranking-projections/result_facts.sql"));
-  assert.ok(!semantics.groups["sum-of-ranks"].inputs.includes("migrations/mysql/app/V13__person_ranking_lookup.sql"));
-  assert.ok(!semantics.groups["result-facts"].inputs.includes("package-lock.json"));
-  assert.ok(!semantics.groups["result-facts"].inputs.includes("docker-compose.yml"));
-  assert.equal(
-    first.groups["result-rankings"].dependencies["result-facts"],
-    first.groups["result-facts"].artifactFingerprint,
-  );
-});
-
-test("a cosmetic change finishes semantic planning without an export", async () => {
+test("unchanged projection semantics do not resolve or build a release", async () => {
   const desired = await projectionFingerprints({ exportId, repositoryRoot });
   const plan = await projectionSemanticPlan({
     productionState: productionState(desired),
@@ -96,12 +88,14 @@ test("a result-facts semantic change selects only its downstream closure", async
   });
   assert.deepEqual(plan.changedGroups, [
     "result-facts",
+    "compatibility",
     "result-rankings",
+    "person-competition-rankings",
     "city-rankings",
+    "sum-of-ranks",
     "yearly-person-rankings",
   ]);
   assert.ok(!plan.changedGroups.includes("competition-rankings"));
-  assert.ok(!plan.changedGroups.includes("sum-of-ranks"));
 });
 
 test("an exact same-export artifact is restored without SQL execution", async () => {
@@ -150,8 +144,13 @@ test("a corrupt exact artifact is quarantined and rebuilt", async () => {
         valid: false,
         artifactFingerprint: desired.groups.compatibility.artifactFingerprint,
       },
+      "result-facts": {
+        valid: true,
+        artifactFingerprint: desired.groups["result-facts"].artifactFingerprint,
+      },
     },
     repositoryRoot,
   });
   assert.deepEqual(plan.buildGroups, ["compatibility"]);
+  assert.deepEqual(plan.hydrateGroups, ["result-facts"]);
 });

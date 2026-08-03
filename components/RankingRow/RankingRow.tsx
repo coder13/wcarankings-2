@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RANKING_ENTRY_ENHANCEMENTS_ENABLED } from "@/lib/ranking-entry-enhancements";
 import { formatWcaResult, flagEmoji, RECORD_BADGE_LABELS } from "@/lib/wca";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { formatRankingNumber, type RankingEntry } from "../RankingsExplorer/types";
@@ -9,6 +10,7 @@ type RankingRowDisplay = {
   eventId: string;
   rankingType: "single" | "average";
   animationIndex: number;
+  alternate?: boolean;
   searchMatched?: boolean;
   highlighted?: boolean;
   rankIsDuplicate?: boolean;
@@ -27,7 +29,8 @@ type RankingRowInteraction = {
 type RankingRowDetails = {
   expanded?: boolean;
   closing?: boolean;
-  skipAccordionAnimation?: boolean;
+  height?: number;
+  progress?: number;
   eventDetails?: PersonEventDetails | null;
   detailsError?: string;
   onPrefetchDetails?: (entry: RankingEntry) => void;
@@ -50,11 +53,13 @@ export function RankingRow({
     eventId,
     rankingType,
     animationIndex,
+    alternate = false,
     searchMatched = false,
     highlighted = false,
     rankIsDuplicate = false,
     hideIdentityId = false,
   } = display;
+  const resultContext = entry.competitionName || entry.resultSubtitle;
   const {
     rowIndex,
     onNavigate,
@@ -66,7 +71,8 @@ export function RankingRow({
   const {
     expanded = false,
     closing = false,
-    skipAccordionAnimation = false,
+    height = 0,
+    progress = 0,
     eventDetails,
     onPrefetchDetails,
     onCancelPrefetchDetails,
@@ -87,29 +93,37 @@ export function RankingRow({
   }, []);
   const style = {
     "--t-animation-delay": `${animationIndex * 10}ms`,
-    minHeight: "65.45px",
+    minHeight: "65px",
   } as CSSProperties;
   const rank = entry.rank;
   const name = entry.personName;
   const id = entry.personId;
   const countryName = entry.countryName || "Country unavailable";
   const recordBadge = entry.recordBadges[0];
-  const recordStreakWeeks = entry.recordStreakWeeks && entry.recordStreakWeeks > 0
+  const recordStreakWeeks = RANKING_ENTRY_ENHANCEMENTS_ENABLED && entry.recordStreakWeeks && entry.recordStreakWeeks > 0
     ? entry.recordStreakWeeks
     : null;
   const recordBadgeLabel = recordBadge
     ? `${RECORD_BADGE_LABELS[recordBadge]}${recordStreakWeeks ? `, unbeaten for ${recordStreakWeeks} competition weeks` : ""}`
     : null;
-  const rankDeltaLabel = entry.rankDeltaState === "new"
-    ? "new ranking"
-    : entry.rankDelta && entry.rankDelta > 0
-      ? `up ${Math.abs(entry.rankDelta)} places`
-      : entry.rankDelta && entry.rankDelta < 0
-        ? `down ${Math.abs(entry.rankDelta)} places`
-        : null;
-  const rankDeltaIcon = entry.rankDeltaState === "new"
-    ? "New"
-    : entry.rankDelta && entry.rankDelta > 0 ? "↑" : entry.rankDelta && entry.rankDelta < 0 ? "↓" : null;
+  let rankDeltaLabel: string | null = null;
+  let rankDeltaIcon: string | null = null;
+  let rankDeltaClass = "";
+  if (RANKING_ENTRY_ENHANCEMENTS_ENABLED) {
+    if (entry.rankDeltaState === "new") {
+      rankDeltaLabel = "new ranking";
+      rankDeltaIcon = "New";
+      rankDeltaClass = "new";
+    } else if (entry.rankDelta && entry.rankDelta > 0) {
+      rankDeltaLabel = `up ${Math.abs(entry.rankDelta)} places`;
+      rankDeltaIcon = "↑";
+      rankDeltaClass = "up";
+    } else if (entry.rankDelta && entry.rankDelta < 0) {
+      rankDeltaLabel = `down ${Math.abs(entry.rankDelta)} places`;
+      rankDeltaIcon = "↓";
+      rankDeltaClass = "down";
+    }
+  }
   const formattedResult = entry.formattedValue ??
     formatWcaResult(eventId, entry.best, rankingType);
   const inferredProfileHref = /^\d{4}[A-Z]{4}\d{2}$/.test(id) ? `/person/${id}` : "";
@@ -139,6 +153,7 @@ export function RankingRow({
       className="listItem"
       data-person-id={entry.personId}
       data-row-index={rowIndex}
+      data-global-index={rowIndex}
       style={style}
       tabIndex={0}
       aria-label={`Rank ${formatRankingNumber(rank)}: ${name}, ${formattedResult}${rankDeltaLabel ? `, ${rankDeltaLabel}` : ""}`}
@@ -159,7 +174,7 @@ export function RankingRow({
       }}
     >
       <div
-          className={`row${animationIndex % 2 === 1 ? " row--alternate" : ""}${
+          className={`row${alternate ? " row--alternate" : ""}${
           searchMatched ? " row--searchResult" : ""
         }${
           highlighted ? " row--searchMatch" : ""
@@ -208,7 +223,7 @@ export function RankingRow({
           <span className={`rank${rankIsDuplicate ? " rank--duplicate" : ""}`}>
             {formatRankingNumber(rank)}
             {rankDeltaIcon && rankDeltaLabel && (
-              <span className={`rankDelta rankDelta--${entry.rankDeltaState === "new" ? "new" : entry.rankDelta! > 0 ? "up" : "down"}`} aria-label={rankDeltaLabel} title={rankDeltaLabel}>
+              <span className={`rankDelta rankDelta--${rankDeltaClass}`} aria-label={rankDeltaLabel} title={rankDeltaLabel}>
                 <span aria-hidden="true">{rankDeltaIcon}</span>{entry.rankDeltaState === "new" ? null : Math.abs(entry.rankDelta ?? 0)}
               </span>
             )}
@@ -242,9 +257,9 @@ export function RankingRow({
                 {formattedResult}
               </span>
             </span>
-            {(entry.resultSubtitle ?? entry.competitionName) && (
-              <span className="competitionName" title={entry.resultSubtitle ?? entry.competitionName}>
-                {entry.resultSubtitle ?? entry.competitionName}
+            {resultContext && (
+              <span className="competitionName" title={resultContext}>
+                {resultContext}
               </span>
             )}
           </span>
@@ -253,7 +268,8 @@ export function RankingRow({
           state={{
             visible: accordionVisible,
             closing,
-            skipAnimation: skipAccordionAnimation,
+            height,
+            progress,
             error: detailsError,
           }}
           data={{
