@@ -298,6 +298,7 @@ jobs:
             "$MYSQL_DATABASE" < tests/fixtures/visual-smoke.sql
           docker compose run --rm data-tools /app/scripts/backfill-result-entries.mjs
           docker compose run --rm data-tools /app/scripts/refresh-rankings.mjs
+          docker compose run --rm data-tools /app/scripts/refresh-system-lists.mjs
           docker compose run --rm data-tools /app/scripts/activate-ranking-generation.mjs bootstrap
           docker compose run --rm data-tools /app/scripts/activate-ranking-generation.mjs bootstrap \
             | grep -q '"bootstrapped":false'
@@ -342,6 +343,10 @@ jobs:
 
       - name: Run visual smoke test
         run: pnpm exec playwright test --config=playwright.visual-smoke.config.mjs
+
+      - name: Dump app logs after visual smoke failure
+        if: failure()
+        run: docker compose logs app
 
       - name: Upload visual smoke-test artifact
         if: always()
