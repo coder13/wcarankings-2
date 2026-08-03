@@ -14,7 +14,16 @@ type FocusRankings = Pick<
   | "toggleExpanded"
   | "expandIndex"
   | "jumpToIndex"
+  | "loading"
 >;
+
+function focusRequestKey(
+  datasetKey: string,
+  personId: string,
+  focusMe: boolean,
+) {
+  return [datasetKey, personId, focusMe ? "me" : ""].join(":");
+}
 
 export function useRankingFocus({
   filters,
@@ -107,30 +116,28 @@ export function useRankingFocus({
   }, [focusWcaId, url]);
 
   const updateFocusedPerson = useCallback((personId: string | null) => {
-    if (!personId) {
-      setUi((current) => ({
-        ...current,
-        highlightedPersonId: "",
-        notice: "",
-      }));
-      url.write({ wcaId: "", focusMe: false });
-      return;
-    }
     setUi((current) => ({
       ...current,
-      highlightedPersonId: personId,
+      highlightedPersonId: personId ?? "",
       notice: "",
     }));
-    url.write({ wcaId: personId, focusMe: false });
-  }, [url]);
+    if (personId) {
+      lastFocusRequestRef.current = focusRequestKey(
+        api.datasetKey,
+        personId,
+        false,
+      );
+    }
+    url.write({ wcaId: personId ?? "", focusMe: false });
+  }, [api.datasetKey, url]);
 
   useEffect(() => {
-    if (filters.subject !== "people") return;
-    const requestKey = [
+    if (filters.subject !== "people" || rankings.loading) return;
+    const requestKey = focusRequestKey(
       api.datasetKey,
       url.state.wcaId,
-      url.state.focusMe ? "me" : "",
-    ].join(":");
+      url.state.focusMe,
+    );
     if (
       (!url.state.wcaId && !url.state.focusMe) ||
       lastFocusRequestRef.current === requestKey
@@ -150,6 +157,7 @@ export function useRankingFocus({
     focusWcaId,
     profileQuery.data,
     profileQuery.isPending,
+    rankings.loading,
     url.state.focusMe,
     url.state.wcaId,
   ]);
