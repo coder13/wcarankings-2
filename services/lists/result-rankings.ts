@@ -268,7 +268,7 @@ export async function loadSavedListResultRankings(list: ListSummary, params: URL
   const target = { targetKey: `list:${list.id}`, membershipVersion: list.membershipVersion, list };
   if (cacheable) {
     const cached = await loadCachedResults(target, input);
-    if (cached) return { data: cached, diagnostics: { timings: { queueMs: 0, statementMs: 0 }, queryCount: 2, returnedRows: cached.entries.length, cacheOutcome: "hit" as const } };
+    if (cached) return { data: cached, diagnostics: { timings: { queueMs: 0, statementMs: 0 }, queryCount: 2, returnedRows: cached.entries.length, cacheOutcome: "hit" as const, cacheLayer: "list-ranking" as const } };
     if (!input.membershipVersion && !input.rankingsDataVersion) {
       void raiseListRankingRebuildPriority(list, "result", filterKey).catch(() => undefined);
     }
@@ -282,6 +282,7 @@ export async function loadSavedListResultRankings(list: ListSummary, params: URL
       queryCount: 1,
       returnedRows: diagnostics.rows.length,
       cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
+      cacheLayer: "list-ranking" as const,
     },
   };
 }
@@ -295,7 +296,7 @@ export async function loadDynamicListResultRankings(personIds: string[], params:
   const target = cacheable ? await ensureDynamicListRankingTarget(personIds, "result", filterKey) : null;
   if (cacheable && target) {
     const cached = await loadCachedResults(target, input);
-    if (cached) return { data: cached, diagnostics: { timings: { queueMs: 0, statementMs: 0 }, queryCount: 2, returnedRows: cached.entries.length, cacheOutcome: "hit" as const } };
+    if (cached) return { data: cached, diagnostics: { timings: { queueMs: 0, statementMs: 0 }, queryCount: 2, returnedRows: cached.entries.length, cacheOutcome: "hit" as const, cacheLayer: "list-ranking" as const } };
   }
   const direct = await loadDirectResults({ targetKey: target?.targetKey ?? "", membershipVersion: 1, personIds }, input);
   const { diagnostics, ...data } = direct;
@@ -306,6 +307,7 @@ export async function loadDynamicListResultRankings(personIds: string[], params:
       queryCount: 1,
       returnedRows: diagnostics.rows.length,
       cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
+      cacheLayer: "list-ranking" as const,
     },
   };
 }

@@ -21,6 +21,8 @@ async function buildProjectionResponse(
   const totalMs = performance.now() - startedAt;
   const { queueMs, statementMs } = loaded.diagnostics.timings;
   const cacheOutcome = loaded.diagnostics.cacheOutcome ?? "bypass";
+  const memoryCache = loaded.diagnostics.cacheLayer === "memory" ? cacheOutcome : "bypass";
+  const listRankingCache = loaded.diagnostics.cacheLayer === "list-ranking" ? cacheOutcome : "bypass";
   console.info(
     JSON.stringify({
       operation,
@@ -43,6 +45,8 @@ async function buildProjectionResponse(
         "Server-Timing": `db-queue;dur=${queueMs.toFixed(1)}, db;dur=${statementMs.toFixed(1)}, total;dur=${totalMs.toFixed(1)}`,
         "X-Rankings-Data-Version": enveloped.dataVersion,
         "X-Rankings-Cache": cacheOutcome,
+        "X-Rankings-Memory-Cache": memoryCache,
+        "X-List-Ranking-Cache": listRankingCache,
       },
     },
   );

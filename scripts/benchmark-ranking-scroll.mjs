@@ -70,6 +70,13 @@ function percentile(values, fraction) {
   return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * fraction) - 1)] ?? 0;
 }
 
+function countValues(values) {
+  return Object.fromEntries(values.reduce((counts, value) => {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+    return counts;
+  }, new Map()));
+}
+
 function scenarioUrl(scenario, page, pageSize) {
   const params = new URLSearchParams({
     eventId: "333",
@@ -138,7 +145,8 @@ async function fetchList(scenario, page, config) {
     lastRank: entries.at(-1)?.rank ?? null,
     firstSubRank: entries[0]?.subRank ?? null,
     lastSubRank: entries.at(-1)?.subRank ?? null,
-    cache: response?.headers.get("x-rankings-cache") ?? "none",
+    memoryCache: response?.headers.get("x-rankings-memory-cache") ?? "none",
+    listRankingCache: response?.headers.get("x-list-ranking-cache") ?? "none",
     dataVersion: response?.headers.get("x-rankings-data-version") ?? "none",
     ...parseServerTiming(response?.headers.get("server-timing")),
     error,
@@ -149,7 +157,8 @@ async function fetchList(scenario, page, config) {
       + ` latency=${result.elapsedMs.toFixed(1)}ms rows=${result.rows}`
       + ` ranks=${result.firstRank ?? "-"}-${result.lastRank ?? "-"}`
       + ` subRanks=${result.firstSubRank ?? "-"}-${result.lastSubRank ?? "-"}`
-      + ` total=${result.total} cache=${result.cache}`
+      + ` total=${result.total}`
+      + ` memoryCache=${result.memoryCache} listRankingCache=${result.listRankingCache}`
       + (result.timing_db !== undefined ? ` db=${result.timing_db.toFixed(1)}ms` : "")
       + (result.error ? ` error=${result.error}` : ""),
   );
@@ -236,7 +245,7 @@ const scenarios = [
 ];
 
 const report = {
-  reportVersion: 3,
+  reportVersion: 4,
   runId,
   label: label || null,
   generatedAt: new Date().toISOString(),
@@ -326,6 +335,8 @@ for (const scenario of scenarios) {
     firstPageMs: scenarioResults[0]?.elapsedMs ?? null,
     lastPageMs: scenarioResults.at(-1)?.elapsedMs ?? null,
     totalRows: scenarioResults.reduce((sum, result) => sum + result.rows, 0),
+    memoryCacheCounts: countValues(scenarioResults.map((result) => result.memoryCache)),
+    listRankingCacheCounts: countValues(scenarioResults.map((result) => result.listRankingCache)),
   };
   allResults.push(summary);
   Object.assign(reportScenario, summary, { status: failures ? "failed" : "complete" });

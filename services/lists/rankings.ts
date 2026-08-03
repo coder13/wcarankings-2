@@ -299,6 +299,7 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
           membershipVersion: list.membershipVersion,
         },
         ...cached,
+        cacheOutcome: "hit" as const,
       };
     }
     if (!input.membershipVersion && !input.rankingsDataVersion) {
@@ -333,6 +334,7 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
     ...rankings,
     cacheMembershipVersion: cacheable ? list.membershipVersion : undefined,
     cacheDataVersion: fallbackDataVersion,
+    cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
   };
 }
 
@@ -345,6 +347,7 @@ export async function loadDynamicListRankings(personIds: string[], searchParams:
       nextStart: null,
       total: 0,
       exportDate: metadata.exportDate,
+      cacheOutcome: "bypass" as const,
     };
   }
   const input = parseListRankingInput(searchParams);
@@ -355,11 +358,11 @@ export async function loadDynamicListRankings(personIds: string[], searchParams:
     const target = await ensureDynamicListRankingTarget(personIds, "person", filterKey);
     if (target) {
       const cached = await loadCachedTargetRankings(target.targetKey, target.membershipVersion, input);
-      if (cached) return cached;
+      if (cached) return { ...cached, cacheOutcome: "hit" as const };
     }
   }
   const placeholders = personIds.map(() => "?").join(",");
-  return loadScopedRankings(
+  const rankings = await loadScopedRankings(
     {
       from: (source) => `${source} AS ranking`,
       conditions: [`ranking.person_id IN (${placeholders})`],
@@ -367,4 +370,5 @@ export async function loadDynamicListRankings(personIds: string[], searchParams:
     },
     searchParams,
   );
+  return { ...rankings, cacheOutcome: cacheable ? "miss" as const : "bypass" as const };
 }

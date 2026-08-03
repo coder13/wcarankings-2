@@ -127,6 +127,7 @@ export async function loadResultRankings(
           ? { timings: { queueMs: 0, statementMs: 0 }, queryCount: 0, returnedRows: 0 }
           : {}),
         cacheOutcome: cached.outcome,
+        cacheLayer: "memory" as const,
       },
     };
   }
@@ -295,6 +296,7 @@ export async function loadResultRankings(
       queryCount,
       returnedRows: peopleReturnedRows + rows.rows.length + (counts?.rows.length ?? 0),
       cacheOutcome: "bypass" as const,
+      cacheLayer: "memory" as const,
     },
   };
 }

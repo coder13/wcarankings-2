@@ -815,7 +815,7 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
     throw new ApiInputError("year is only available for person event rankings.");
   if (input.eventId === "SOR" || input.eventId === "sor-kinch") {
     const result = await queryMysql(input);
-    return { ...result, cacheOutcome: "bypass" as const, dataVersion: null };
+    return { ...result, cacheOutcome: "bypass" as const, cacheLayer: "memory" as const, dataVersion: null };
   }
   const metadata = await getCurrentRankingsMetadata();
   if (input.year !== null && !metadata.availableYears.includes(input.year))
@@ -834,6 +834,7 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
       ...result,
       data: { ...result.data, availableYears: metadata.availableYears },
       cacheOutcome: "bypass" as const,
+      cacheLayer: "memory" as const,
       dataVersion: null,
     };
   }
@@ -883,6 +884,7 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
     data: slicePersonWindow(cached.value.data, input, windowStart),
     timings: cached.outcome === "hit" ? { queueMs: 0, statementMs: 0 } : cached.value.timings,
     cacheOutcome: cached.outcome,
+    cacheLayer: "memory" as const,
     dataVersion: metadata.fetchedAt,
   };
 }
