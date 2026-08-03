@@ -1,7 +1,30 @@
-import { RankingsPage } from "@/app/RankingsPage";
+import {
+  getRankingsPageMetadata,
+  RankingsPage,
+  type RankingsSearchParams,
+} from "@/app/RankingsPage";
 
 export const dynamic = "force-dynamic";
 
-export default function ResultsPage() {
-  return <RankingsPage requiresResultRankings />;
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<RankingsSearchParams>;
+}) {
+  return getRankingsPageMetadata({
+    searchParams,
+    subject: "results",
+    competitionRanking: "best-result",
+    cityRanking: "fastest-single",
+    year: null,
+    personCompetitionRanking: false,
+  });
+}
+
+export default function ResultsPage({
+  searchParams,
+}: {
+  searchParams: Promise<RankingsSearchParams>;
+}) {
+  return <RankingsPage searchParams={searchParams} requiresResultRankings />;
 }
