@@ -22,8 +22,6 @@ WHERE attempt.value > 0;
 
 ALTER TABLE solve_facts
   ADD PRIMARY KEY (result_id, attempt_number),
-  ADD INDEX idx_solve_facts_common (gender, event_id, solve_value, result_id, attempt_number),
-  ADD INDEX idx_solve_facts_person (person_id, event_id, solve_value, result_id, attempt_number),
   ADD INDEX idx_solve_facts_country_year (
     gender, event_id, country_id, competition_start_date, solve_value,
     competition_id, result_id, attempt_number
