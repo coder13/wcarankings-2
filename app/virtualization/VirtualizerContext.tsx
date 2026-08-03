@@ -10,6 +10,7 @@ import {
   createContext,
   use,
   useCallback,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -250,6 +251,19 @@ export function VirtualRankingsProvider({ children }: { children: ReactNode }) {
     },
     [scrollAnimation],
   );
+
+  useEffect(() => {
+    const jumpToBoundary = (event: KeyboardEvent) => {
+      if (!event.metaKey) return;
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+
+      event.preventDefault();
+      jumpToIndex(event.key === "ArrowUp" ? 0 : TOTAL_ROWS - 1);
+    };
+
+    window.addEventListener("keydown", jumpToBoundary);
+    return () => window.removeEventListener("keydown", jumpToBoundary);
+  }, [jumpToIndex]);
 
   const items = useVirtualRankingItems(
     virtualizer.getVirtualItems(),
