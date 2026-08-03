@@ -376,6 +376,8 @@ test("projection deployment accepts and smoke-tests every capability group", asy
 test("group artifacts use GHCR and cached dependencies hydrate before isolated builds", () => {
   assert.match(builder, /projection-build-matrix\.mjs --wave=1/);
   assert.match(builder, /projection-build-matrix\.mjs --wave=2/);
+  assert.match(builder, /projection-build-matrix\.mjs --wave=3/);
+  assert.match(builder, /wave-three:/);
   assert.match(builder, /strategy:[\s\S]*matrix:/);
   assert.match(groupBuilder, /oras pull "\$\{repository\}@\$\{digest\}"/);
   assert.match(groupBuilder, /oras push "\$ref"/);

@@ -2,35 +2,42 @@ import { groupDependencyClosure, projectionGroup } from "./projection-groups.mjs
 
 const selected = (process.env.BUILD_GROUPS || "").split(",").filter(Boolean);
 const wave = Number(process.argv.find((value) => value.startsWith("--wave="))?.slice(7) || 1);
-if (![1, 2].includes(wave)) throw new Error("--wave must be 1 or 2");
+if (!Number.isInteger(wave) || wave < 1) throw new Error("--wave must be a positive integer");
 const selectedSet = new Set(selected);
 
-function builtDependencies(name) {
-  return groupDependencyClosure([name], { includeSelected: false })
-    .map((group) => group.name)
-    .filter((dependency) => selectedSet.has(dependency));
-}
-
 const entries = selected.map((name) => {
-  projectionGroup(name);
+  const group = projectionGroup(name);
   const dependencies = groupDependencyClosure([name], { includeSelected: false })
     .map((group) => group.name);
   return {
     group: name,
     hydrateGroups: dependencies.join(","),
-    builtDependencies: builtDependencies(name),
+    builtDependencies: group.dependencies.filter((dependency) => selectedSet.has(dependency)),
   };
 });
-const waveOneNames = new Set(
-  entries.filter(({ builtDependencies: dependencies }) => dependencies.length === 0)
-    .map(({ group }) => group),
-);
-const waveTwo = entries.filter(({ builtDependencies: dependencies }) => dependencies.length > 0);
-for (const entry of waveTwo) {
-  if (entry.builtDependencies.some((dependency) => !waveOneNames.has(dependency))) {
-    throw new Error(`Projection dependency graph requires more than two build waves for ${entry.group}`);
-  }
+
+const levels = new Map();
+const visiting = new Set();
+function buildLevel(name) {
+  if (levels.has(name)) return levels.get(name);
+  if (visiting.has(name)) throw new Error(`Projection dependency graph has a cycle at ${name}`);
+  visiting.add(name);
+  const entry = entries.find(({ group }) => group === name);
+  const level = entry?.builtDependencies.length
+    ? Math.max(...entry.builtDependencies.map(buildLevel)) + 1
+    : 1;
+  visiting.delete(name);
+  levels.set(name, level);
+  return level;
 }
-const include = (wave === 1 ? entries.filter(({ group }) => waveOneNames.has(group)) : waveTwo)
+
+for (const { group } of entries) buildLevel(group);
+const maxWave = Math.max(0, ...levels.values());
+if (maxWave > 3) {
+  throw new Error(`Projection dependency graph requires more than three build waves for wave ${maxWave}`);
+}
+
+const include = entries
+  .filter(({ group }) => levels.get(group) === wave)
   .map(({ group, hydrateGroups }) => ({ group, hydrate_groups: hydrateGroups }));
 process.stdout.write(`${JSON.stringify({ include })}\n`);

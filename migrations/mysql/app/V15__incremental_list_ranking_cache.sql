@@ -61,13 +61,25 @@ ALTER TABLE list_ranking_cache_scopes
 ALTER TABLE list_ranking_cache_entries
   ADD COLUMN result_id BIGINT UNSIGNED NULL AFTER result_type;
 
-UPDATE list_ranking_cache_entries entry
-JOIN person_event_rankings ranking
-  ON ranking.event_id = CONVERT(entry.event_id USING utf8mb4)
- AND ranking.result_type = CONVERT(entry.result_type USING utf8mb4)
- AND ranking.person_id = CONVERT(entry.person_id USING utf8mb4)
-SET entry.result_id = ranking.result_id
-WHERE entry.result_id IS NULL;
+SET @person_ranking_backfill_sql = IF(
+  EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND table_name = 'person_event_rankings'
+  ),
+  'UPDATE list_ranking_cache_entries entry
+   JOIN person_event_rankings ranking
+     ON ranking.event_id = CONVERT(entry.event_id USING utf8mb4)
+    AND ranking.result_type = CONVERT(entry.result_type USING utf8mb4)
+    AND ranking.person_id = CONVERT(entry.person_id USING utf8mb4)
+   SET entry.result_id = ranking.result_id
+   WHERE entry.result_id IS NULL',
+  'SELECT 1'
+);
+PREPARE person_ranking_backfill FROM @person_ranking_backfill_sql;
+EXECUTE person_ranking_backfill;
+DEALLOCATE PREPARE person_ranking_backfill;
 
 ALTER TABLE list_ranking_rebuild_jobs
   ADD COLUMN target_key VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' AFTER list_id;
