@@ -36,7 +36,39 @@
 }
 
 .controls {
+  display: flex;
   flex: none;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--text);
+}
+
+.delayControl {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.delayControl input {
+  width: 5rem;
+  height: 2rem;
+  padding-inline: 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  outline: 2px solid transparent;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 150ms ease,
+    outline-color 150ms ease;
+}
+
+.delayControl input:focus-visible {
+  border-color: var(--primary);
+  outline-color: color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .debugInfo {
@@ -53,4 +85,19 @@
   max-width: 1000px;
   margin-inline: auto;
   overflow-anchor: none;
+}
+
+@media (max-width: 760px) {
+  .headerContent {
+    gap: 0.5rem;
+  }
+
+  .debugInfo {
+    display: none;
+  }
+
+  .controls {
+    width: 100%;
+    justify-content: space-between;
+  }
 }

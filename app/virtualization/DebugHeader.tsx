@@ -1,23 +1,74 @@
 "use client";
 
-import { MOCK_RANKING_COUNT } from "@/components/VirtualizationPlayground/mockRankings";
-import { OVERSCAN, useVirtualizerContext } from "./VirtualizerContext";
+import { useMockApiControls } from "./RankingsApiContext";
+import {
+  OVERSCAN_ROWS,
+  TOTAL_ROWS,
+  WINDOW_ROWS,
+  useVirtualizerContext,
+} from "./VirtualizerContext";
 import styles from "./VirtualizationPlayground.module.css";
 
 export function DebugHeader() {
-  const { items, totalHeight, scrollOffset } = useVirtualizerContext();
+  const {
+    averageDelayMs,
+    varianceMs,
+    setAverageDelayMs,
+    setVarianceMs,
+  } = useMockApiControls();
+  const { items, totalHeight, scrollOffset, baseIndex } =
+    useVirtualizerContext();
   const firstVirtualItem = items[0];
   const lastVirtualItem = items.at(-1);
   const debugInfo = firstVirtualItem && lastVirtualItem
-    ? `Rows ${(firstVirtualItem.index + 1).toLocaleString()}–${(
-        lastVirtualItem.index + 1
-      ).toLocaleString()} · ${items.length} mounted · ${scrollOffset.toLocaleString()}px / ${totalHeight.toLocaleString()}px`
-    : `Measuring ${MOCK_RANKING_COUNT.toLocaleString()} rows · overscan ${OVERSCAN}`;
+    ? `Rows ${(firstVirtualItem.globalIndex + 1).toLocaleString()}–${(
+        lastVirtualItem.globalIndex + 1
+      ).toLocaleString()} · base ${(baseIndex + 1).toLocaleString()} · ${WINDOW_ROWS.toLocaleString()} window · ${items.length} mounted · ${scrollOffset.toLocaleString()}px / ${totalHeight.toLocaleString()}px`
+    : `Measuring ${TOTAL_ROWS.toLocaleString()} rows · ${WINDOW_ROWS.toLocaleString()}-row window · overscan ${OVERSCAN_ROWS}`;
+  const minimumDelayMs = Math.max(0, averageDelayMs - varianceMs);
+  const maximumDelayMs = averageDelayMs + varianceMs;
 
   return (
     <header className={styles.header}>
       <div className={styles.headerContent}>
-        <span className={styles.controls}>controls here</span>
+        <div
+          className={styles.controls}
+          title={`Mock requests take ${minimumDelayMs}–${maximumDelayMs}ms`}
+        >
+          <label className={styles.delayControl}>
+            <input
+              aria-label="Average API delay in milliseconds"
+              inputMode="numeric"
+              min="0"
+              onChange={(event) =>
+                setAverageDelayMs(
+                  Math.max(0, event.currentTarget.valueAsNumber || 0),
+                )
+              }
+              step="50"
+              type="number"
+              value={averageDelayMs}
+            />
+            <span>ms</span>
+          </label>
+          <span>+/-</span>
+          <label className={styles.delayControl}>
+            <input
+              aria-label="API delay variance in milliseconds"
+              inputMode="numeric"
+              min="0"
+              onChange={(event) =>
+                setVarianceMs(
+                  Math.max(0, event.currentTarget.valueAsNumber || 0),
+                )
+              }
+              step="50"
+              type="number"
+              value={varianceMs}
+            />
+            <span>ms</span>
+          </label>
+        </div>
         <output className={styles.debugInfo} title={debugInfo}>
           {debugInfo}
         </output>

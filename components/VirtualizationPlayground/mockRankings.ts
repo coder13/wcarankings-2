@@ -1,6 +1,3 @@
-export const MOCK_RANKING_COUNT = 100_000;
-export const MOCK_RANKING_ROW_HEIGHT = 65.45;
-
 const names = [
   "Teodor Zajder",
   "Xuanyi Geng (耿暄一)",
@@ -121,6 +118,7 @@ export function getMockRanking(index: number) {
   const centiseconds = 276 + Math.round((index * 162) / 99);
 
   return {
+    index,
     number,
     name: names[index % names.length],
     result: formatCentiseconds(centiseconds),
