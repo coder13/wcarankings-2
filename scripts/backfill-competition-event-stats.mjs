@@ -3,24 +3,14 @@ import {
   buildRegisteredProjections,
   promoteRegisteredProjections,
 } from "./mysql-schema.mjs";
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
+import { databaseOptions } from "./lib/database.mjs";
+import { hasArgument } from "./lib/cli.mjs";
 
 const projectionNames = ["competition-event-stats"];
 const connection = await mysql.createConnection(databaseOptions());
 
 try {
-  const force = process.argv.includes("--force");
+  const force = hasArgument("force");
   const [existing] = await connection.query(
     `SELECT table_name
      FROM information_schema.tables

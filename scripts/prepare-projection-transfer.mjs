@@ -1,26 +1,18 @@
 import mysql from "mysql2/promise";
 import { DEPLOYMENT_PROJECTION_GROUPS, dropManagedObject } from "./mysql-schema.mjs";
+import { argumentValue } from "./lib/cli.mjs";
+import { databaseOptions } from "./lib/database.mjs";
+import { projectionIndexesForGroup } from "./lib/projection-indexes.mjs";
 
-const groupName = process.argv.find((value) => value.startsWith("--group="))?.slice("--group=".length);
+const groupName = argumentValue("group");
 const group = DEPLOYMENT_PROJECTION_GROUPS.find(({ name }) => name === groupName);
 if (!group) throw new Error(`Unknown deployment projection group: ${groupName || "(missing)"}.`);
 const manifestTable = `projection_transfer_manifest_${group.name.replaceAll("-", "_")}`;
 const indexesTable = `projection_transfer_indexes_${group.name.replaceAll("-", "_")}`;
 
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
-
 const connection = await mysql.createConnection(databaseOptions());
 try {
+  const desiredIndexes = await projectionIndexesForGroup(group);
   const [metadata] = await connection.query(
     "SELECT value FROM export_metadata WHERE `key` = 'export_date' LIMIT 1",
   );
@@ -60,37 +52,40 @@ try {
   for (const table of group.tables) {
     const transfer = `${table}_transfer`;
     const [indexRows] = await connection.query(`SHOW INDEX FROM \`${transfer}\``);
-    const indexes = new Map();
+    const existingIndexes = new Map();
     for (const row of indexRows) {
       if (row.Key_name === "PRIMARY") continue;
-      const index = indexes.get(row.Key_name) ?? {
+      const index = existingIndexes.get(row.Key_name) ?? {
         name: row.Key_name,
-        unique: Number(row.Non_unique) === 0,
-        columns: [],
       };
-      const prefix = row.Sub_part ? `(${Number(row.Sub_part)})` : "";
-      const direction = row.Collation === "D" ? " DESC" : "";
-      index.columns.push({
-        sequence: Number(row.Seq_in_index),
-        sql: `\`${row.Column_name}\`${prefix}${direction}`,
-      });
-      indexes.set(row.Key_name, index);
+      existingIndexes.set(row.Key_name, index);
     }
 
-    for (const index of indexes.values()) {
-      index.columns.sort((left, right) => left.sequence - right.sequence);
-      const indexSql = `ADD ${index.unique ? "UNIQUE " : ""}INDEX \`${index.name}\` (${index.columns.map(({ sql }) => sql).join(", ")})`;
+    const tableIndexes = desiredIndexes.filter((index) => index.table === table);
+    const desiredNames = new Set(tableIndexes.map(({ name }) => name));
+    const unexpected = [...existingIndexes.keys()].filter((name) => !desiredNames.has(name));
+    if (unexpected.length > 0) {
+      throw new Error(`Undeclared projection indexes on ${table}: ${unexpected.join(", ")}`);
+    }
+    if (existingIndexes.size > 0) {
+      const missing = tableIndexes.filter(({ name }) => !existingIndexes.has(name));
+      if (missing.length > 0) {
+        throw new Error(`Partially built projection indexes on ${table}: ${missing.map(({ name }) => name).join(", ")}`);
+      }
+    }
+
+    for (const index of tableIndexes) {
       await connection.query(
         `INSERT INTO \`${indexesTable}\`
           (table_name, index_name, index_sql)
          VALUES (?, ?, ?)`,
-        [transfer, index.name, indexSql],
+        [transfer, index.name, index.sql],
       );
       deferredIndexCount += 1;
     }
-    if (indexes.size > 0) {
+    if (existingIndexes.size > 0) {
       await connection.query(
-        `ALTER TABLE \`${transfer}\` ${[...indexes.values()].map(({ name }) => `DROP INDEX \`${name}\``).join(", ")}`,
+        `ALTER TABLE \`${transfer}\` ${[...existingIndexes.keys()].map((name) => `DROP INDEX \`${name}\``).join(", ")}`,
       );
     }
   }

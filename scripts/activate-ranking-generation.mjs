@@ -6,7 +6,9 @@ import {
   PROJECTION_CAPABILITIES,
   PROJECTION_ARTIFACT_FORMAT_VERSION,
 } from "./projection-groups.mjs";
-import { normalizeExportDate } from "./projection-transfer-date.mjs";
+import { normalizeExportDate } from "./lib/projection-transfer-date.mjs";
+import { argumentValue } from "./lib/cli.mjs";
+import { databaseOptions } from "./lib/database.mjs";
 
 export const WCA_RAW_TABLES = [
   "persons",
@@ -27,24 +29,6 @@ export const WCA_RAW_TABLES = [
 
 const LOCK_NAME = "wcarankings-ranking-generation";
 
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
-}
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
-
 function identifier(value, label) {
   if (!/^[a-z][a-z0-9_]{0,63}$/.test(value || "")) {
     throw new Error(`${label} is not a safe MariaDB identifier`);
@@ -63,6 +47,13 @@ function groupTables(groups) {
     throw new Error("The release contains an unknown projection group");
   }
   return [...new Set(definitions.flatMap(({ tables }) => tables))];
+}
+
+function groupRetiredTables(groups) {
+  const selected = new Set(groups);
+  return [...new Set(DEPLOYMENT_PROJECTION_GROUPS
+    .filter(({ name }) => selected.has(name))
+    .flatMap(({ retiredTables = [] }) => retiredTables))];
 }
 
 export function capabilitiesFromTables(tables) {
@@ -334,6 +325,8 @@ export async function activateGeneration({
     }
 
     const tables = activationTables(manifest);
+    const retiredTables = groupRetiredTables(Object.keys(manifest.groups || {}))
+      .filter((table) => !tables.includes(table));
     const [candidateTables, productionTables, previousTablesPresent] = await Promise.all([
       tableNames(connection, candidateSchema),
       tableNames(connection, productionSchema),
@@ -343,11 +336,15 @@ export async function activateGeneration({
     if (missing.length > 0) {
       throw new Error(`Candidate generation is missing tables: ${missing.join(", ")}`);
     }
-    const occupied = tables.filter((table) => previousTablesPresent.has(table));
+    const occupied = [...tables, ...retiredTables]
+      .filter((table) => previousTablesPresent.has(table));
     if (occupied.length > 0) {
       throw new Error(`Previous-generation schema is not empty: ${occupied.join(", ")}`);
     }
-    const previousTables = tables.filter((table) => productionTables.has(table));
+    const previousTables = [
+      ...tables.filter((table) => productionTables.has(table)),
+      ...retiredTables.filter((table) => productionTables.has(table)),
+    ];
 
     await connection.query(
       `DELETE FROM ${qualified(candidateSchema, "ranking_generation_state")} WHERE id = 1`,
@@ -389,6 +386,13 @@ export async function activateGeneration({
         `${qualified(candidateSchema, table)} TO ${qualified(productionSchema, table)}`,
       );
     }
+    for (const table of retiredTables) {
+      if (productionTables.has(table)) {
+        renames.push(
+          `${qualified(productionSchema, table)} TO ${qualified(previousSchema, table)}`,
+        );
+      }
+    }
     await connection.query(`RENAME TABLE ${renames.join(", ")}`);
     inject("after_atomic_table_rename", failurePoint);
     return {
@@ -420,6 +424,8 @@ export async function rollbackGeneration({
       throw new Error(`Candidate schema cannot receive rollback tables: ${occupied.join(", ")}`);
     }
     const previous = new Set(current.previousTables);
+    const retired = current.previousTables.filter((table) =>
+      !current.activationTables.includes(table));
     const renames = [];
     for (const table of current.activationTables) {
       renames.push(
@@ -430,6 +436,11 @@ export async function rollbackGeneration({
           `${qualified(`${candidateSchema}_previous`, table)} TO ${qualified(productionSchema, table)}`,
         );
       }
+    }
+    for (const table of retired) {
+      renames.push(
+        `${qualified(`${candidateSchema}_previous`, table)} TO ${qualified(productionSchema, table)}`,
+      );
     }
     await connection.query(`RENAME TABLE ${renames.join(", ")}`);
     return { rolledBack: true };

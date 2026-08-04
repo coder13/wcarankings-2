@@ -1,6 +1,10 @@
 import { query } from "@/db";
 import type { RankingType, RegionScope } from "@/lib/wca";
-import { RANKINGS_CACHE_REFRESH_MS, rankingsPageCache } from "@/services/rankings/cache";
+import {
+  RANKINGS_CACHE_REFRESH_MS,
+  rankingsPageCache,
+  rankingsWindowCache,
+} from "@/services/rankings/cache";
 import { countKey, yearCountKey } from "@/services/rankings/helpers";
 import {
   rankingCountsQuery,
@@ -98,6 +102,7 @@ export async function refreshRankingsMetadata() {
           const next = await loadSnapshot();
           snapshot = next;
           rankingsPageCache.clear();
+          rankingsWindowCache.clear();
           readiness = null;
         }
         return snapshot;
@@ -154,6 +159,7 @@ export async function assertRankingsReady() {
         "continent_rank",
         "continent_sub_rank",
         "country_id",
+        "gender",
         "country_rank",
         "country_sub_rank",
       ];
@@ -161,6 +167,9 @@ export async function assertRankingsReady() {
         "idx_ranking_entries_world",
         "idx_ranking_entries_continent",
         "idx_ranking_entries_country",
+        "idx_ranking_entries_gender_world_best",
+        "idx_ranking_entries_gender_continent_best",
+        "idx_ranking_entries_gender_country_best",
       ];
       const [tableRows, columnRows, indexRows] = await Promise.all([
         query<{ name: string }>(requiredRankingTablesQuery(tables), tables),

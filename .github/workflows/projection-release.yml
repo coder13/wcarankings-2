@@ -49,7 +49,7 @@ jobs:
     secrets: inherit
 
   images:
-    if: needs.plan.outputs.required == 'true'
+    if: inputs.dry_run != true && needs.plan.outputs.required == 'true'
     needs: plan
     uses: ./.github/workflows/build-server.yml
     with:

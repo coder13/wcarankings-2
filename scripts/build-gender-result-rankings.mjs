@@ -1,16 +1,5 @@
 import mysql from "mysql2/promise";
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
+import { databaseOptions } from "./lib/database.mjs";
 
 const connection = await mysql.createConnection(databaseOptions());
 const tables = [

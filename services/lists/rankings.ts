@@ -1,62 +1,22 @@
 import { query } from "@/db";
-import { raiseListRankingRebuildPriority } from "@/lib/list-ranking-cache";
+import {
+  ensureDynamicListRankingTarget,
+  isListRankingCacheable,
+  listRankingFilterKey,
+  raiseListRankingRebuildPriority,
+} from "@/lib/list-ranking-cache";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import {
   getRecordBadges,
-  isEventId,
-  isRankingType,
-  normalizeGenderFilters,
-  parseRegionQuery,
-  type GenderFilter,
-  type RankingType,
 } from "@/lib/wca";
+import { parseListRankingInput } from "@/services/lists/input";
 import type { ListRankingRow, ListSummary, ScopedRankingSource } from "@/services/lists/types";
-import { listRankingsQuery } from "@/services/lists/queries";
 
-function rankingTable(type: RankingType) {
-  return type === "average" ? "ranking_entries_average" : "ranking_entries_single";
-}
-
-export function parseListRankingInput(searchParams: URLSearchParams) {
-  const rawEventId = searchParams.get("eventId") ?? searchParams.get("event");
-  const eventId = isEventId(rawEventId) ? rawEventId : "333";
-  const rawType = searchParams.get("result") ?? searchParams.get("type");
-  let type: RankingType = "single";
-  if (eventId !== "333mbf" && isRankingType(rawType)) type = rawType;
-  const rawStart = Number(searchParams.get("start"));
-  const start = Number.isFinite(rawStart) ? Math.max(0, Math.floor(rawStart)) : 0;
-  const pageLimit = Math.max(1, Math.min(100, Math.floor(Number(searchParams.get("limit")) || 50)));
-  const search = (searchParams.get("search") ?? "").trim().slice(0, 80);
-  const locate = (searchParams.get("locate") ?? "").trim().toUpperCase();
-  const searchLimit = Math.max(
-    1,
-    Math.min(500, Math.floor(Number(searchParams.get("searchLimit")) || 50)),
-  );
-  const limit = search && !locate ? searchLimit : pageLimit;
-  const region = parseRegionQuery(searchParams.get("region"));
-  const gender = normalizeGenderFilters(
-    searchParams
-      .getAll("gender")
-      .flatMap((value) => value.split(","))
-      .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
-  );
-  const requestedMembershipVersion = Number(searchParams.get("membershipVersion"));
-  const requestedDataVersion = (searchParams.get("rankingsDataVersion") ?? "").slice(0, 64);
-  return {
-    eventId,
-    type,
-    start,
-    limit,
-    search,
-    locate,
-    region,
-    gender,
-    membershipVersion:
-      Number.isSafeInteger(requestedMembershipVersion) && requestedMembershipVersion > 0
-        ? requestedMembershipVersion
-        : null,
-    rankingsDataVersion: requestedDataVersion || null,
-  };
+function isMissingRankingProjection(error: unknown) {
+  const databaseError = error as { code?: string; message?: string };
+  return databaseError.code === "ER_NO_SUCH_TABLE" &&
+    (databaseError.message?.includes("person_event_rankings") ||
+      databaseError.message?.includes("result_facts"));
 }
 
 async function loadScopedRankings(
@@ -65,12 +25,18 @@ async function loadScopedRankings(
   minimumPageLimit = 0,
 ) {
   const input = parseListRankingInput(searchParams);
-  const source = rankingTable(input.type);
+  const source = "person_event_rankings";
   let rankingColumn = "world_rank";
   if (input.region.scope === "continent") rankingColumn = "continent_rank";
   if (input.region.scope === "country") rankingColumn = "country_rank";
-  const scopedConditions = [...scopedSource.conditions, `ranking.${rankingColumn} > 0`];
-  const scopedValues = [...scopedSource.values];
+  const scopedConditions = [
+    "ranking.event_id = ?",
+    ...scopedSource.conditions,
+    "ranking.result_type = ?",
+    `ranking.${rankingColumn} > 0`,
+  ];
+  const scopedValues = [input.eventId, ...scopedSource.values];
+  scopedValues.push(input.type);
   if (input.region.scope === "continent") {
     scopedConditions.push("ranking.continent_id = ?");
     scopedValues.push(input.region.regionId);
@@ -79,10 +45,8 @@ async function loadScopedRankings(
     scopedValues.push(input.region.regionId);
   }
   if (input.gender.length) {
-    scopedConditions.push(
-      `(${input.gender.map(() => "(? = 'o' AND (person_gender.gender = 'o' OR person_gender.gender IS NULL)) OR person_gender.gender = ?").join(" OR ")})`,
-    );
-    scopedValues.push(...input.gender.flatMap((gender) => [gender, gender]));
+    scopedConditions.push(`ranking.gender IN (${input.gender.map(() => "?").join(",")})`);
+    scopedValues.push(...input.gender);
   }
   const conditions = ["sub_rank > ?"];
   const values: unknown[] = [input.start];
@@ -96,12 +60,42 @@ async function loadScopedRankings(
   const effectiveLimit = Math.max(input.limit, minimumPageLimit);
   values.push(input.locate ? 1 : effectiveLimit + 1);
 
+  const rankingColumns = input.gender.length
+    ? `RANK() OVER (ORDER BY ranking.result_value) AS rank,
+       ROW_NUMBER() OVER (ORDER BY ranking.result_value, ranking.person_id) AS sub_rank`
+    : `ranking.${rankingColumn} AS rank, ranking.${rankingColumn.replace("rank", "position")} AS sub_rank`;
   const result = await query<ListRankingRow>(
-    listRankingsQuery({ source: scopedSource.from(source), scopedConditions, conditions }),
-    [input.eventId, ...scopedValues, ...values],
+    `WITH scoped_rankings AS (
+       SELECT ${rankingColumns}, COUNT(*) OVER () AS total,
+         ranking.person_id, COALESCE(person.name, CONVERT(ranking.person_id USING utf8mb4)) AS person_name,
+         ranking.result_id, ranking.result_value AS best,
+         ranking.country_id, ranking.continent_id
+       FROM ${scopedSource.from(source)}
+       LEFT JOIN persons person
+         ON person.wca_id = CONVERT(ranking.person_id USING utf8mb4)
+        AND person.sub_id = 1
+       WHERE ${scopedConditions.join(" AND ")}
+     ), page AS (
+       SELECT * FROM scoped_rankings WHERE ${conditions.join(" AND ")}
+       ORDER BY sub_rank LIMIT ?
+     )
+     SELECT page.rank, page.sub_rank, page.total, page.person_id,
+       page.person_name, page.country_id,
+       COALESCE(country.name, CONVERT(page.country_id USING utf8mb4)) AS country_name,
+       COALESCE(country.iso2, '') AS country_iso2, page.continent_id, page.best,
+       facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name,
+       IF(facts.${input.type === "average" ? "regional_average_record" : "regional_single_record"} = 'WR', 1, 0) AS is_world_record,
+       IF(facts.${input.type === "average" ? "regional_average_record" : "regional_single_record"} IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR'), 1, 0) AS is_continent_record,
+       IF(facts.${input.type === "average" ? "regional_average_record" : "regional_single_record"} = 'NR', 1, 0) AS is_country_record
+     FROM page
+     JOIN result_facts facts ON facts.result_id = page.result_id
+     LEFT JOIN countries country ON country.id = CONVERT(page.country_id USING utf8mb4)
+     LEFT JOIN competitions competition ON competition.id = facts.competition_id
+     ORDER BY page.sub_rank`,
+    [...scopedValues, ...values],
   );
 
-  const selectedRows = result.rows.slice(0, input.locate ? 1 : effectiveLimit);
+  const selectedRows = result.rows.slice(0, input.locate ? 1 : input.limit);
   const total = Number(result.rows[0]?.total ?? 0);
   const metadata = await getCurrentRankingsMetadata();
   return {
@@ -124,18 +118,19 @@ async function loadScopedRankings(
         continentId: row.continent_id,
       }),
     })),
-    hasMore: !input.locate && result.rows.length > effectiveLimit,
+    hasMore: !input.locate && result.rows.length > input.limit,
     nextStart:
-      !input.locate && result.rows.length > effectiveLimit
-        ? input.start + effectiveLimit
+      !input.locate && result.rows.length > input.limit
+        ? input.start + input.limit
         : null,
     total,
     exportDate: metadata.exportDate,
   };
 }
 
-async function loadCachedListRankings(
-  list: ListSummary,
+async function loadCachedTargetRankings(
+  targetKey: string,
+  membershipVersion: number,
   input: ReturnType<typeof parseListRankingInput>,
 ) {
   const metadata = await getCurrentRankingsMetadata();
@@ -144,46 +139,70 @@ async function loadCachedListRankings(
   );
   const currentDataVersion = dataVersion.rows[0]?.value;
   const rankingsDataVersion = input.rankingsDataVersion ?? currentDataVersion;
-  const membershipVersion = input.membershipVersion ?? list.membershipVersion;
+  const effectiveMembershipVersion = input.membershipVersion ?? membershipVersion;
+  const filterKey = listRankingFilterKey({
+    scope: input.region.scope,
+    regionId: input.region.regionId,
+    genders: input.gender,
+  });
   if (!rankingsDataVersion) return null;
-  const source = rankingTable(input.type);
+  const recordColumn = input.type === "average" ? "regional_average_record" : "regional_single_record";
   const cache = await query<ListRankingRow>(
     `SELECT entry.list_rank AS rank, entry.list_position AS sub_rank,
-        scope.total_count AS total, entry.person_id, ranking.person_name,
-        ranking.country_id, ranking.country_name, ranking.country_iso2,
-        ranking.continent_id, entry.score AS best, ranking.competition_id,
-        ranking.competition_name, ranking.is_world_record,
-        ranking.is_continent_record, ranking.is_country_record
+        scope.total_count AS total, entry.person_id, person.name AS person_name,
+        person.country_id, country.name AS country_name, country.iso2 AS country_iso2,
+        country.continent_id, entry.score AS best, facts.competition_id,
+        competition.name AS competition_name,
+        IF(facts.${recordColumn} = 'WR', 1, 0) AS is_world_record,
+        IF(facts.${recordColumn} = 'CR', 1, 0) AS is_continent_record,
+        IF(facts.${recordColumn} = 'NR', 1, 0) AS is_country_record
       FROM list_ranking_cache_versions version
-      JOIN list_ranking_cache_scopes scope
+      JOIN list_person_ranking_cache_scopes scope
         ON scope.cache_version_id = version.id
        AND scope.event_id = ? AND scope.result_type = ?
-      JOIN list_ranking_cache_entries entry
+      JOIN list_person_ranking_cache_entries entry
         ON entry.cache_version_id = version.id
        AND entry.event_id = scope.event_id AND entry.result_type = scope.result_type
-      JOIN ${source} ranking
-        ON ranking.event_id = entry.event_id AND ranking.person_id = entry.person_id
-      WHERE version.list_id = ? AND version.membership_version = ?
-        AND version.rankings_data_version = ? AND version.status = 'ready'
+      JOIN person_event_rankings ranking
+        ON ranking.event_id = CONVERT(entry.event_id USING utf8mb4)
+       AND ranking.result_type = CONVERT(entry.result_type USING utf8mb4)
+       AND ranking.person_id = CONVERT(entry.person_id USING utf8mb4)
+       AND ranking.result_id = entry.result_id
+      JOIN persons person ON person.wca_id = CONVERT(entry.person_id USING utf8mb4) AND person.sub_id = 1
+      LEFT JOIN countries country ON country.id = person.country_id
+      LEFT JOIN result_facts facts ON facts.result_id = entry.result_id
+      LEFT JOIN competitions competition ON competition.id = facts.competition_id
+      WHERE version.target_key = ? AND version.grain = 'person' AND version.filter_key = ?
+        AND version.membership_version = ?
+        AND version.rankings_data_version = ? AND version.status IN ('building', 'ready')
+        AND scope.completed_count > ?
         AND entry.list_position > ?
-      ORDER BY entry.list_position LIMIT ?`,
+      ORDER BY version.status = 'ready' DESC, version.id DESC, entry.list_position LIMIT ?`,
     [
       input.eventId,
       input.type,
-      list.id,
-      membershipVersion,
+      targetKey,
+      filterKey,
+      effectiveMembershipVersion,
       rankingsDataVersion,
+      input.start,
       input.start,
       input.limit + 1,
     ],
-    { rankingStatementTimeout: true },
   );
   if (!cache.rows.length) {
     const exists = await query<{ id: number }>(
-      `SELECT id FROM list_ranking_cache_versions
-       WHERE list_id = ? AND membership_version = ?
-         AND rankings_data_version = ? AND status = 'ready' LIMIT 1`,
-      [list.id, membershipVersion, rankingsDataVersion],
+      `SELECT version.id
+       FROM list_ranking_cache_versions version
+       JOIN list_person_ranking_cache_scopes scope
+         ON scope.cache_version_id = version.id
+        AND scope.event_id = ? AND scope.result_type = ?
+       WHERE version.target_key = ? AND version.grain = 'person' AND version.filter_key = ?
+         AND version.membership_version = ?
+         AND version.rankings_data_version = ? AND version.status IN ('building', 'ready')
+         AND scope.completed_count > ?
+       LIMIT 1`,
+      [input.eventId, input.type, targetKey, filterKey, effectiveMembershipVersion, rankingsDataVersion, input.start],
     );
     if (!exists.rows.length) return null;
   }
@@ -213,67 +232,103 @@ async function loadCachedListRankings(
     nextStart: cache.rows.length > input.limit ? input.start + input.limit : null,
     total,
     exportDate: metadata.exportDate,
-    cacheMembershipVersion: membershipVersion,
+    cacheMembershipVersion: effectiveMembershipVersion,
     cacheDataVersion: rankingsDataVersion,
   };
 }
 
+async function loadCachedListRankings(
+  list: ListSummary,
+  input: ReturnType<typeof parseListRankingInput>,
+) {
+  return loadCachedTargetRankings(`list:${list.id}`, list.membershipVersion, input);
+}
+
 export async function loadListRankings(list: ListSummary, searchParams: URLSearchParams) {
-  const input = parseListRankingInput(searchParams);
-  const isDefaultScope =
-    input.region.scope === "world" &&
-    input.gender.length === 0 &&
-    !input.search &&
-    !input.locate;
-  if (isDefaultScope) {
-    const cached = await loadCachedListRankings(list, input);
-    if (cached) {
-      return {
-        list: {
-          publicId: list.publicId,
-          systemAlias: list.systemAlias,
-          name: list.name,
-          kind: list.kind,
-          memberCount: list.memberCount,
-          membershipVersion: list.membershipVersion,
-        },
-        ...cached,
-      };
+  try {
+    const input = parseListRankingInput(searchParams);
+    const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
+    const cacheable = !input.search && !input.locate && isListRankingCacheable("person", input.type, filter);
+    const filterKey = listRankingFilterKey(filter);
+    if (cacheable) {
+      const cached = await loadCachedListRankings(list, input);
+      if (cached) {
+        return {
+          list: {
+            publicId: list.publicId,
+            systemAlias: list.systemAlias,
+            name: list.name,
+            kind: list.kind,
+            memberCount: list.memberCount,
+            membershipVersion: list.membershipVersion,
+          },
+          ...cached,
+          cacheOutcome: "hit" as const,
+        };
+      }
+      if (!input.membershipVersion && !input.rankingsDataVersion) {
+        void raiseListRankingRebuildPriority(list, "person", filterKey).catch(() => undefined);
+      }
     }
-    if (!input.membershipVersion && !input.rankingsDataVersion) {
-      void raiseListRankingRebuildPriority(list).catch(() => undefined);
-    }
-  }
-  const rankings = await loadScopedRankings(
-    {
-      from: (source) => `list_members AS member
+    const rankings = await loadScopedRankings(
+      {
+        from: (source) => `list_members AS member
        JOIN ${source} AS ranking
-         ON ranking.person_id = member.person_id
-        AND ranking.event_id = ?`,
-      conditions: ["member.list_id = ?"],
-      values: [list.id],
-    },
-    searchParams,
-    isDefaultScope ? 100 : 0,
-  );
-  const fallbackDataVersion = isDefaultScope
-    ? (await query<{ value: string }>(
-      "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
-    )).rows[0]?.value ?? null
-    : null;
-  return {
-    list: {
-      publicId: list.publicId,
-      systemAlias: list.systemAlias,
-      name: list.name,
-      kind: list.kind,
-      memberCount: list.memberCount,
-      membershipVersion: list.membershipVersion,
-    },
-    ...rankings,
-    cacheMembershipVersion: isDefaultScope ? list.membershipVersion : undefined,
-    cacheDataVersion: fallbackDataVersion,
-  };
+         ON ranking.person_id = CONVERT(member.person_id USING utf8mb4)`,
+        conditions: ["member.list_id = ?"],
+        values: [list.id],
+      },
+      searchParams,
+      cacheable ? 100 : 0,
+    );
+    const fallbackDataVersion = cacheable
+      ? (await query<{ value: string }>(
+        "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
+      )).rows[0]?.value ?? null
+      : null;
+    return {
+      list: {
+        publicId: list.publicId,
+        systemAlias: list.systemAlias,
+        name: list.name,
+        kind: list.kind,
+        memberCount: list.memberCount,
+        membershipVersion: list.membershipVersion,
+      },
+      ...rankings,
+      cacheMembershipVersion: cacheable ? list.membershipVersion : undefined,
+      cacheDataVersion: fallbackDataVersion,
+      cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
+    };
+  } catch (error) {
+    if (!isMissingRankingProjection(error)) {
+      const databaseError = error as { code?: string; message?: string };
+      console.error("[list rankings] failed to load rankings", {
+        code: databaseError.code,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    const metadata = await getCurrentRankingsMetadata();
+    return {
+      list: {
+        publicId: list.publicId,
+        systemAlias: list.systemAlias,
+        name: list.name,
+        kind: list.kind,
+        memberCount: list.memberCount,
+        membershipVersion: list.membershipVersion,
+      },
+      entries: [],
+      hasMore: false,
+      nextStart: null,
+      total: 0,
+      exportDate: metadata.exportDate,
+      cacheMembershipVersion: undefined,
+      cacheDataVersion: undefined,
+      cacheOutcome: "bypass" as const,
+    };
+  }
 }
 
 export async function loadDynamicListRankings(personIds: string[], searchParams: URLSearchParams) {
@@ -285,15 +340,28 @@ export async function loadDynamicListRankings(personIds: string[], searchParams:
       nextStart: null,
       total: 0,
       exportDate: metadata.exportDate,
+      cacheOutcome: "bypass" as const,
     };
   }
+  const input = parseListRankingInput(searchParams);
+  const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
+  const cacheable = !input.search && !input.locate && isListRankingCacheable("person", input.type, filter);
+  const filterKey = listRankingFilterKey(filter);
+  if (cacheable) {
+    const target = await ensureDynamicListRankingTarget(personIds, "person", filterKey);
+    if (target) {
+      const cached = await loadCachedTargetRankings(target.targetKey, target.membershipVersion, input);
+      if (cached) return { ...cached, cacheOutcome: "hit" as const };
+    }
+  }
   const placeholders = personIds.map(() => "?").join(",");
-  return loadScopedRankings(
+  const rankings = await loadScopedRankings(
     {
       from: (source) => `${source} AS ranking`,
-      conditions: ["ranking.event_id = ?", `ranking.person_id IN (${placeholders})`],
+      conditions: [`ranking.person_id IN (${placeholders})`],
       values: [...personIds],
     },
     searchParams,
   );
+  return { ...rankings, cacheOutcome: cacheable ? "miss" as const : "bypass" as const };
 }

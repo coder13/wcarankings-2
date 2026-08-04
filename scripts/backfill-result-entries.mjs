@@ -1,20 +1,10 @@
 import mysql from "mysql2/promise";
 import { PUBLISHED_PROJECTION_TABLES, promoteProjectionTables, refreshMysqlSchema } from "./mysql-schema.mjs";
+import { databaseOptions } from "./lib/database.mjs";
+import { hasArgument } from "./lib/cli.mjs";
 
-const force = process.argv.includes("--force");
+const force = hasArgument("force");
 const TABLES = PUBLISHED_PROJECTION_TABLES;
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 async function projectionExists(connection) {
   const [rows] = await connection.query(

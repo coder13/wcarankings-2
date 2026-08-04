@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   primaryNameToken,
   SYSTEM_LIST_DEFINITIONS,
-} from "../scripts/system-list-definitions.mjs";
+} from "../scripts/lib/system-list-definitions.mjs";
 import { boardMemberIds, roleMemberIds } from "../scripts/refresh-board-list.mjs";
 
 test("system list aliases are stable and unique", () => {

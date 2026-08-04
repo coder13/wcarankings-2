@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export const SERVER_COMPONENT_PATHS = {
@@ -25,7 +25,7 @@ export function componentFingerprint(paths, { repositoryRoot = process.cwd() } =
   const files = execFileSync("git", ["ls-files", "-z", "--", ...paths], {
     cwd: repositoryRoot,
   }).toString().split("\0").filter(Boolean).sort();
-  const checksums = files.map((file) =>
+  const checksums = files.filter((file) => existsSync(new URL(file, pathToFileURL(`${repositoryRoot}/`)))).map((file) =>
     `${sha256(readFileSync(new URL(file, pathToFileURL(`${repositoryRoot}/`))))}  ${file}\n`,
   ).join("");
   return sha256(checksums);

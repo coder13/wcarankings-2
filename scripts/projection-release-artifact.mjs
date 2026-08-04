@@ -7,7 +7,8 @@ import {
   PROJECTION_ARTIFACT_FORMAT_VERSION,
   projectionGroup,
 } from "./projection-groups.mjs";
-import { normalizeExportDate } from "./projection-transfer-date.mjs";
+import { normalizeExportDate } from "./lib/projection-transfer-date.mjs";
+import { argumentValue, listArgument } from "./lib/cli.mjs";
 
 export const PROJECTION_RELEASE_MANIFEST = "projection-release.json";
 
@@ -201,16 +202,10 @@ export async function verifyProjectionReleaseManifest({
   return { manifest, manifestSha256: actualSha256 };
 }
 
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
-}
-
 async function cli() {
   const command = process.argv[2];
   const directory = resolve(argumentValue("directory") || ".");
-  const groups = argumentValue("groups").split(",").map((group) => group.trim()).filter(Boolean);
+  const groups = listArgument("groups");
   if (command === "create") {
     const fingerprints = JSON.parse(await readFile(argumentValue("fingerprints-file"), "utf8"));
     const compatibility = JSON.parse(await readFile(argumentValue("compatibility-file"), "utf8"));

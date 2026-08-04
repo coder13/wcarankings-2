@@ -41,7 +41,7 @@ node scripts/projection-release-coordinate.mjs verify \
   --source-sha="$EXPECTED_SOURCE_SHA"
 normalize_export_identity() {
   node --input-type=module --eval '
-    import { normalizeExportDate } from "./scripts/projection-transfer-date.mjs";
+    import { normalizeExportDate } from "./scripts/lib/projection-transfer-date.mjs";
     const normalized = normalizeExportDate(process.argv[1]);
     if (!normalized) {
       console.error(`Invalid projection export identity: ${process.argv[1]}`);
@@ -395,7 +395,8 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
       mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="
         CREATE TABLE IF NOT EXISTS result_attempts (
           result_id BIGINT NOT NULL,
-          attempt_number INT NOT NULL
+          attempt_number INT NOT NULL,
+          value INT NOT NULL
         );
       "
     '
@@ -491,7 +492,8 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
         mariadb --user=root --password="$MARIADB_ROOT_PASSWORD" "$CANDIDATE_SCHEMA" --execute="
           CREATE TABLE IF NOT EXISTS result_attempts (
             result_id BIGINT NOT NULL,
-            attempt_number INT NOT NULL
+            attempt_number INT NOT NULL,
+            value INT NOT NULL
           );
         "
       '
@@ -682,7 +684,11 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
     *,yearly-person-rankings,*) retry_endpoint "/api/rankings?eventId=333&result=single&year=2024&start=0&limit=1&paged=1" ;;
   esac
   case ",$PROJECTION_GROUPS," in
-    *,sum-of-ranks,*) retry_endpoint "/api/rankings?eventId=SOR&result=single&start=0&limit=10" ;;
+    *,sum-of-ranks,*)
+      retry_endpoint "/api/rankings?eventId=SOR&result=single&start=0&paged=1"
+      retry_endpoint "/api/rankings?eventId=SOR&result=average&start=0&paged=1"
+      retry_endpoint "/api/rankings?eventId=sor-kinch&start=0&paged=1"
+      ;;
   esac
   case ",$PROJECTION_GROUPS," in
     *,competition-rankings,*) retry_endpoint "/api/rankings/competitions?ranking=competitor-count&start=0&limit=10" ;;

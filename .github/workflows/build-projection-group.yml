@@ -1,4 +1,4 @@
-name: Build Projection Group
+name: Build Projection Groups
 
 on:
   workflow_call:
@@ -12,7 +12,7 @@ on:
       export_value:
         required: true
         type: string
-      group:
+      groups:
         required: true
         type: string
       hydrate_groups:
@@ -26,6 +26,15 @@ on:
         required: false
         default: "{}"
         type: string
+      run_benchmark:
+        description: Run the ranking scroll benchmark against the generated database.
+        required: false
+        default: false
+        type: boolean
+    outputs:
+      benchmark_status:
+        description: Exit status from the optional ranking scroll benchmark.
+        value: ${{ jobs.build.outputs.benchmark_status }}
 
 permissions:
   contents: read
@@ -34,14 +43,17 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      benchmark_status: ${{ steps.benchmark.outputs.status }}
     env:
       MYSQL_DATABASE: wcarankings
       MYSQL_USER: wcarankings
       MYSQL_PASSWORD: projection-build
       MYSQL_ROOT_PASSWORD: projection-build-root
       DATABASE_URL: mysql://wcarankings:projection-build@127.0.0.1:13307/wcarankings
+      COMPOSE_FILE: docker-compose.yml:docker-compose.projection-ci.yml
       WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
-      GROUP: ${{ inputs.group }}
+      GROUPS: ${{ inputs.groups }}
       HYDRATE_GROUPS: ${{ inputs.hydrate_groups }}
 
     steps:
@@ -58,11 +70,18 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Install MariaDB client
+        run: |
+          command -v mariadb >/dev/null || {
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends mariadb-client
+          }
+
       - run: pnpm install --frozen-lockfile --prod
 
       - uses: oras-project/setup-oras@v1
 
-      - name: Authenticate immutable projection storage
+      - name: Sign In to GHCR
         run: echo "${{ github.token }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Restore WCA SQL export
@@ -72,14 +91,14 @@ jobs:
           key: wca-sql-export-${{ inputs.export_date }}
           fail-on-cache-miss: true
 
-      - name: Start isolated projection database
+      - name: Start Temporary Projection Database
         run: |
           set -euo pipefail
           docker compose up -d db
           until docker compose exec -T db mariadb-admin ping -h 127.0.0.1 \
             -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --silent; do sleep 2; done
           docker compose exec -T db mariadb --user="$MYSQL_USER" --password="$MYSQL_PASSWORD" \
-            "$MYSQL_DATABASE" --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL)"
+            "$MYSQL_DATABASE" --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL, value INT NOT NULL)"
           docker compose run --rm flyway migrate
           docker compose run --rm -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
             -e FLYWAY_TABLE=flyway_schema_history_results flyway migrate
@@ -87,7 +106,7 @@ jobs:
             --sql-path="/tmp/wca-export-cache/wca-export-${{ inputs.export_date }}.sql.zip" \
             --canonical-export-date="${{ inputs.export_value }}"
 
-      - name: Restore immutable dependency groups
+      - name: Download Dependency Artifacts
         if: inputs.hydrate_groups != ''
         env:
           AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}
@@ -128,58 +147,161 @@ jobs:
               --expected-export-date="${{ inputs.export_value }}"
           done
 
-      - name: Build projection group
+      - name: Build projection tables
+        run: |
+          set -euo pipefail
+          node scripts/projection-build-plan.mjs --groups="$GROUPS" \
+            --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
+          defer_indexes=1
+          if [ '${{ inputs.run_benchmark }}' = true ]; then defer_indexes=0; fi
+          WCA_DEFER_PROJECTION_INDEXES="$defer_indexes" \
+            WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/build-projection-groups.mjs \
+            --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
+            --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
+            --include-compatibility="$(jq -r '.includeCompatibility' /tmp/build-plan.json)"
+
+      - name: Run ranking scroll benchmark
+        if: inputs.run_benchmark == true
+        id: benchmark
+        env:
+          BENCHMARK_REPORT_DIR: benchmark-reports
+          DATABASE_STATEMENT_TIMEOUT_MS: 60000
+          DEPLOYED_MAIN_SHA: ${{ inputs.ref }}
+        run: |
+          set +e
+          benchmark_status=0
+          docker build --tag wcarankings-app:projection-benchmark .
+          if [ "$?" -ne 0 ]; then
+            benchmark_status=1
+          else
+            docker tag wcarankings-app:projection-benchmark wcarankings-app:latest
+            if [ "$?" -ne 0 ]; then benchmark_status=1; fi
+          fi
+
+          if [ "$benchmark_status" -eq 0 ]; then
+            DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@db:3306/$MYSQL_DATABASE" \
+              DATABASE_STATEMENT_TIMEOUT_MS=60000 \
+              DEPLOYED_MAIN_SHA="$DEPLOYED_MAIN_SHA" \
+              docker compose up --detach app
+            if [ "$?" -ne 0 ]; then benchmark_status=1; fi
+          fi
+
+          if [ "$benchmark_status" -eq 0 ]; then
+            healthy=false
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error http://127.0.0.1:3000/api/health/live >/dev/null; then
+                healthy=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$healthy" != true ]; then
+              docker compose logs app
+              benchmark_status=1
+            fi
+          fi
+
+          if [ "$benchmark_status" -eq 0 ]; then
+            for suite in persons results competitions cities; do
+              pnpm run "benchmark:ranking-scroll:$suite" -- \
+                --target=http://127.0.0.1:3000 \
+                --report-dir="$BENCHMARK_REPORT_DIR" \
+                --label=projection-build
+              if [ "$?" -ne 0 ]; then benchmark_status=1; fi
+            done
+          fi
+
+          docker compose stop app >/dev/null 2>&1 || true
+          echo "status=$benchmark_status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload ranking scroll benchmark report
+        if: always() && inputs.run_benchmark == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ranking-scroll-benchmark-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmark-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Package projection bundles
         env:
           FINGERPRINTS: ${{ inputs.fingerprints }}
           AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}
         run: |
           set -euo pipefail
-          node scripts/projection-build-plan.mjs --groups="$GROUP" \
-            --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
-          WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/build-projection-groups.mjs \
-            --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
-            --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
-            --include-compatibility="$(jq -r '.includeCompatibility' /tmp/build-plan.json)"
-
-          directory="/tmp/built/${GROUP}"
-          mkdir -p "$directory"
-          prefix="$GROUP"
-          if [ "$GROUP" = yearly-person-rankings ]; then prefix=yearly; fi
-          metadata="$directory/${prefix}-projection-transfer.json"
-          archive="$directory/${prefix}-projection-transfer.tar.gz"
-          node scripts/prepare-projection-transfer.mjs --group="$GROUP" > "$metadata"
-          node scripts/export-projection-transfer.mjs --metadata="$metadata" --output="$archive"
-
           printf '{"groups":%s}\n' "$FINGERPRINTS" > /tmp/fingerprints.json
-          node scripts/projection-release-artifact.mjs create --directory="$directory" \
-            --export-id="${{ inputs.export_value }}" --export-date="${{ inputs.export_date }}" \
-            --groups="$GROUP" --fingerprints-file=/tmp/fingerprints.json \
-            --compatibility-file=release-compatibility.json --source-sha="${{ inputs.ref }}"
-
           owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
-          fingerprint=$(jq -r --arg group "$GROUP" '.groups[$group].artifactFingerprint' /tmp/fingerprints.json)
-          corrupt=$(jq -r --arg group "$GROUP" '.[$group].valid == false' <<<"$AVAILABLE_ARTIFACTS")
-          tag="$fingerprint"
-          if [ "$corrupt" = true ]; then tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
-          ref="ghcr.io/${owner}/wcarankings-projection-${GROUP}:${tag}"
-          pushd "$directory" >/dev/null
-          oras push "$ref" \
-            --artifact-type application/vnd.cuberanks.projection.group.v4 \
-            --annotation "io.wcarankings.group=$GROUP" \
-            --annotation "io.wcarankings.export-id=${{ inputs.export_value }}" \
-            --annotation "io.wcarankings.artifact-fingerprint=$fingerprint" \
-            --annotation "io.wcarankings.format-version=4" \
-            "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json" \
-            "$archive:application/vnd.cuberanks.projection.tables.v1+gzip" \
-            "$metadata:application/vnd.cuberanks.projection.transfer.v4+json"
-          popd >/dev/null
-          digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
-          {
-            echo "### Projection group"
-            echo "- Group: $GROUP"
-            echo "- Digest: $digest"
-            echo "- Dependencies hydrated: ${HYDRATE_GROUPS:-none}"
-          } >> "$GITHUB_STEP_SUMMARY"
+          for group in $(printf '%s' "$GROUPS" | tr ',' ' '); do
+            directory="/tmp/built/${group}"
+            mkdir -p "$directory"
+            prefix="$group"
+            if [ "$group" = yearly-person-rankings ]; then prefix=yearly; fi
+            metadata="$directory/${prefix}-projection-transfer.json"
+            archive="$directory/${prefix}-projection-transfer.tar.gz"
+            node scripts/prepare-projection-transfer.mjs --group="$group" > "$metadata"
+            node scripts/export-projection-transfer.mjs --metadata="$metadata" --output="$archive"
+
+            node scripts/projection-release-artifact.mjs create --directory="$directory" \
+              --export-id="${{ inputs.export_value }}" --export-date="${{ inputs.export_date }}" \
+              --groups="$group" --fingerprints-file=/tmp/fingerprints.json \
+              --compatibility-file=release-compatibility.json --source-sha="${{ inputs.ref }}"
+
+            fingerprint=$(jq -r --arg group "$group" '.groups[$group].artifactFingerprint' /tmp/fingerprints.json)
+            corrupt=$(jq -r --arg group "$group" '.[$group].valid == false' <<<"$AVAILABLE_ARTIFACTS")
+            tag="$fingerprint"
+            if [ "$corrupt" = true ]; then tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
+            ref="ghcr.io/${owner}/wcarankings-projection-${group}:${tag}"
+            archive_name=$(basename "$archive")
+            metadata_name=$(basename "$metadata")
+            pushd "$directory" >/dev/null
+            push_args=(
+              "$ref"
+              --artifact-type application/vnd.cuberanks.projection.group.v4
+              --annotation "io.wcarankings.group=$group"
+              --annotation "io.wcarankings.export-id=${{ inputs.export_value }}"
+              --annotation "io.wcarankings.artifact-fingerprint=$fingerprint"
+              --annotation "io.wcarankings.format-version=4"
+              "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json"
+              "$archive_name:application/vnd.cuberanks.projection.tables.v1+gzip"
+              "$metadata_name:application/vnd.cuberanks.projection.transfer.v4+json"
+            )
+            pushed=false
+            for attempt in 1 2 3 4; do
+              if oras push "${push_args[@]}"; then
+                pushed=true
+                break
+              fi
+              if [ "$attempt" -lt 4 ]; then
+                delay=$((attempt * 30))
+                echo "oras push failed for $group; retrying in ${delay}s (attempt $((attempt + 1))/4)…"
+                sleep "$delay"
+              fi
+            done
+            if [ "$pushed" != true ]; then
+              echo "oras push failed for $group after 4 attempts" >&2
+              exit 1
+            fi
+            popd >/dev/null
+            digest=""
+            for attempt in 1 2 3 4; do
+              if digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest'); then
+                break
+              fi
+              if [ "$attempt" -lt 4 ]; then
+                delay=$((attempt * 30))
+                echo "oras manifest fetch failed for $group; retrying in ${delay}s (attempt $((attempt + 1))/4)…"
+                sleep "$delay"
+              fi
+            done
+            test -n "$digest"
+            {
+              echo "### Projection group"
+              echo "- Group: $group"
+              echo "- Digest: $digest"
+              echo "- Dependencies hydrated: ${HYDRATE_GROUPS:-none}"
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
 
       - name: Clean isolated database
         if: always()

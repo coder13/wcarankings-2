@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseListRankingInput } from "@/services/lists/rankings";
+import { parseListRankingInput } from "@/services/lists/input";
 
 test("normalizes list ranking query parameters", () => {
   const input = parseListRankingInput(

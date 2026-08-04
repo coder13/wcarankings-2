@@ -160,9 +160,9 @@ bulk transfer before index construction, and the 22 deferred indexes took about
 125.6s; every other table's indexes together took about 45s.
 
 The cache is therefore the main steady-state optimization. The five
-`result_entries_single` secondary indexes had no runtime readers. They were removed after this
-benchmark, leaving the compatibility table's primary key and eliminating its
-125-second deferred-index phase.
+`result_entries_single` secondary indexes had no runtime readers. They were
+removed after this benchmark, eliminating the 125-second deferred-index phase.
+The table and its unused count table are now retired entirely.
 
 The first cold run without those indexes built and dumped the generation in
 24m 15s, 42.9% faster than the 42m 27s indexed run. Production transfer and
@@ -172,9 +172,11 @@ indexes and about 43 seconds. The compressed artifact remained approximately
 432.3 MB because secondary indexes were already omitted from the logical dump;
 the improvement comes from avoiding their initial and production construction.
 
-The next transfer optimization target is the compatibility table's data build
-and replay cost, or a physical backup/restore format that avoids row-by-row
-logical replay.
+Daily group builds defer leaf secondary indexes and package their exact desired
+definitions in transfer metadata. Production constructs those indexes once,
+after bulk loading. Builder-side `result_facts` indexes remain because downstream
+groups depend on them. Benchmark builds retain all indexes and run before
+packaging so request measurements reflect the production schema.
 
 ## Ranking performance verification
 
@@ -208,10 +210,11 @@ The result-level single projection is paged with the same keyset pattern. Do not
 query or offset-scan the raw `results` table for the top-results page:
 
 ```sql
-SELECT result_id, world_rank, person_id, person_name, best, competition_id
-FROM result_entries_single
-WHERE event_id = '333' AND world_sub_rank > 5000
-ORDER BY world_sub_rank
+SELECT result_id, attempt_number, world_rank, person_id, result_value,
+       competition_id
+FROM result_rankings_single
+WHERE event_id = '333' AND world_position > 5000
+ORDER BY world_position
 LIMIT 50;
 ```
 

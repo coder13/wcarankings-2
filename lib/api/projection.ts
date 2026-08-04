@@ -25,6 +25,8 @@ export type ApiDiagnostics = {
   timings: QueryTimings;
   queryCount: number;
   returnedRows: number;
+  cacheOutcome?: "hit" | "miss" | "coalesced" | "bypass";
+  cacheLayer?: "memory" | "list-ranking";
 };
 
 type QueryParamGuard<T> = (value: string) => value is T;

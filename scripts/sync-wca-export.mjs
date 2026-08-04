@@ -12,38 +12,18 @@ import {
   refreshMysqlSchema,
 } from "./mysql-schema.mjs";
 import { refreshSystemLists } from "./refresh-system-lists.mjs";
-import { enqueueAllListRankingRebuilds } from "./list-ranking-jobs.mjs";
+import { enqueueAllListRankingRebuilds } from "./lib/list-ranking-jobs.mjs";
+import { argumentValue, hasArgument, listArgument } from "./lib/cli.mjs";
+import { databaseOptions } from "./lib/database.mjs";
 import { refreshBoardList, refreshDelegatesList } from "./refresh-board-list.mjs";
 
 const EXPORT_API = "https://www.worldcubeassociation.org/api/v0/export/public";
-const force = process.argv.includes("--force");
-const dryRun = process.argv.includes("--dry-run");
-const rawOnly = process.argv.includes("--raw-only");
+const force = hasArgument("force");
+const dryRun = hasArgument("dry-run");
+const rawOnly = hasArgument("raw-only");
 
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
-}
-
-const selectedProjectionNames = argumentValue("projection-names")
-  .split(",")
-  .map((name) => name.trim())
-  .filter(Boolean);
+const selectedProjectionNames = listArgument("projection-names");
 const canonicalExportDate = argumentValue("canonical-export-date") || process.env.CANONICAL_EXPORT_DATE || "";
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: process.env.DATABASE_NAME_OVERRIDE
-      || decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 async function getLatestExport() {
   const response = await fetch(EXPORT_API, { headers: { Accept: "application/json" } });
@@ -133,13 +113,8 @@ async function dropRankingViews() {
       "ranking_entries_source",
       "ranking_entries_single_source",
       "ranking_entries_average_source",
-      "result_entries_single_source",
       "wca_best_single",
       "wca_best_average",
-      "weekly_rank_deltas_single",
-      "weekly_rank_deltas_average",
-      "record_streaks_single",
-      "record_streaks_average",
     ]) {
       await dropManagedObject(connection, name);
     }
@@ -200,7 +175,8 @@ async function collectImportCounts() {
         (SELECT COUNT(*) FROM results) AS results,
         (SELECT COUNT(*) FROM ranking_entries_single_staging) +
           (SELECT COUNT(*) FROM ranking_entries_average_staging) AS rankings,
-        (SELECT COUNT(*) FROM result_entries_single_staging) AS result_entries,
+        (SELECT COUNT(*) FROM result_rankings_single_staging) +
+          (SELECT COUNT(*) FROM result_rankings_average_staging) AS result_entries,
         (SELECT COUNT(*) FROM (
           SELECT event_id FROM ranking_entries_single_staging
           UNION
@@ -212,7 +188,7 @@ async function collectImportCounts() {
           SELECT country_id FROM ranking_entries_average_staging WHERE country_id <> ''
         ) AS ranking_regions) AS regions,
         (SELECT COUNT(*) FROM ranking_counts_staging) AS aggregates,
-        (SELECT COUNT(*) FROM result_counts_staging) AS result_aggregates
+        (SELECT COUNT(*) FROM result_ranking_counts_staging) AS result_aggregates
     `);
     return {
       source_person_count: Number(coverage[0]?.people ?? 0),

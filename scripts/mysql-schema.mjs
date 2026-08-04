@@ -1,13 +1,23 @@
 import { readFile } from "node:fs/promises";
+import { cpus, freemem, loadavg, totalmem } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEPLOYMENT_PROJECTION_GROUPS } from "./projection-groups.mjs";
+import {
+  DEFERRED_PROJECTION_INDEX_TABLES,
+  DEPLOYMENT_PROJECTION_GROUPS,
+  RETIRED_PROJECTION_TABLES,
+} from "./projection-groups.mjs";
+import { deferSecondaryIndexes } from "./lib/projection-indexes.mjs";
 
-export { DEPLOYMENT_PROJECTION_GROUPS } from "./projection-groups.mjs";
+export {
+  DEPLOYMENT_PROJECTION_GROUPS,
+  RETIRED_PROJECTION_TABLES,
+} from "./projection-groups.mjs";
 
 const INDEXES = [
   ["persons", "idx_persons_wca_sub", "(`wca_id`, `sub_id`)", "wca_id,sub_id"],
   ["persons", "idx_persons_name", "(`name`)", "name"],
+  ["persons", "idx_persons_gender", "(`gender`, `sub_id`, `wca_id`)", "gender,sub_id,wca_id"],
   ["ranks_single", "idx_ranks_single_world", "(`event_id`, `world_rank`, `person_id`)", "event_id,world_rank,person_id"],
   ["ranks_single", "idx_ranks_single_continent", "(`event_id`, `continent_rank`, `person_id`)", "event_id,continent_rank,person_id"],
   ["ranks_single", "idx_ranks_single_country", "(`event_id`, `country_rank`, `person_id`)", "event_id,country_rank,person_id"],
@@ -21,6 +31,7 @@ const INDEXES = [
   ["results", "idx_results_average_event_best", "(`event_id`, `average`, `id`)", "event_id,average,id"],
   ["results", "idx_results_single_country_best", "(`event_id`, `person_country_id`, `best`, `id`)", "event_id,person_country_id,best,id"],
   ["results", "idx_results_average_country_best", "(`event_id`, `person_country_id`, `average`, `id`)", "event_id,person_country_id,average,id"],
+  ["results", "idx_results_competition_person", "(`competition_id`, `person_id`)", "competition_id,person_id"],
 ];
 
 const projectionDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "sql", "ranking-projections");
@@ -37,8 +48,57 @@ function elapsedMs(startedAt) {
   return Math.round(performance.now() - startedAt);
 }
 
+export function formatDuration(durationMs) {
+  const minutes = Math.floor(durationMs / 60_000);
+  const seconds = Math.floor((durationMs % 60_000) / 1_000);
+  const centiseconds = Math.floor((durationMs % 1_000) / 10);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
+}
+
 function writeBuildLog(message) {
   process.stdout.write(`[projection-build] ${message}\n`);
+}
+
+const BUILD_HEARTBEAT_INTERVAL_MS = 60_000;
+const RESOURCE_MONITOR_INTERVAL_MS = 5 * 60_000;
+
+function formatMiB(bytes) {
+  return `${(bytes / 1024 / 1024).toFixed(0)} MiB`;
+}
+
+export function formatResourceUsage({
+  load = loadavg(),
+  cpuCount = cpus().length,
+  totalMemory = totalmem(),
+  freeMemory = freemem(),
+  processMemory = process.memoryUsage(),
+} = {}) {
+  const usedMemory = Math.max(0, totalMemory - freeMemory);
+  const usedPercent = totalMemory > 0 ? (usedMemory / totalMemory * 100).toFixed(1) : "0.0";
+  const [oneMinute, fiveMinute, fifteenMinute] = load;
+  return [
+    `Resource usage: cpu_load=${oneMinute.toFixed(2)}/${fiveMinute.toFixed(2)}/${fifteenMinute.toFixed(2)}`,
+    `cpu_count=${cpuCount}`,
+    `system_memory=${formatMiB(usedMemory)}/${formatMiB(totalMemory)} (${usedPercent}%)`,
+    `process_rss=${formatMiB(processMemory.rss)}`,
+    `process_heap=${formatMiB(processMemory.heapUsed)}/${formatMiB(processMemory.heapTotal)}`,
+  ].join(" ");
+}
+
+export function startResourceMonitor(intervalMs = RESOURCE_MONITOR_INTERVAL_MS) {
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) return () => {};
+  const timer = setInterval(() => writeBuildLog(formatResourceUsage()), intervalMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
+
+export function startBuildHeartbeat(label, startedAt, intervalMs = BUILD_HEARTBEAT_INTERVAL_MS) {
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) return () => {};
+  const timer = setInterval(() => {
+    writeBuildLog(`Still building ${label} after ${formatDuration(elapsedMs(startedAt))}…`);
+  }, intervalMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
 }
 
 export function createTableProgress(total) {
@@ -51,17 +111,24 @@ export function createTableProgress(total) {
   };
 }
 
-export async function runTimedBuildStep(label, build, { tableProgress, tableName } = {}) {
+export async function runTimedBuildStep(label, build, {
+  tableProgress,
+  tableName,
+  heartbeatIntervalMs,
+} = {}) {
   const startedAt = performance.now();
   const progress = tableProgress && tableName ? `${tableProgress.start(tableName)} ` : "";
   writeBuildLog(`${progress}Starting ${label}…`);
+  const stopHeartbeat = startBuildHeartbeat(label, startedAt, heartbeatIntervalMs);
   try {
     const result = await build();
     const durationMs = elapsedMs(startedAt);
-    writeBuildLog(`Finished ${label} in ${durationMs}ms.`);
+    stopHeartbeat();
+    writeBuildLog(`Finished ${label} in ${formatDuration(durationMs)}.`);
     return { result, durationMs };
   } catch (error) {
-    writeBuildLog(`Failed ${label} after ${elapsedMs(startedAt)}ms.`);
+    stopHeartbeat();
+    writeBuildLog(`Failed ${label} after ${formatDuration(elapsedMs(startedAt))}.`);
     throw error;
   }
 }
@@ -72,19 +139,31 @@ function createdTableName(statement) {
   )?.[1];
 }
 
-async function executeTableStatements(connection, sql, phases = [], { tableProgress } = {}) {
+async function executeTableStatements(
+  connection,
+  sql,
+  phases = [],
+  { tableProgress, deferredIndexTables } = {},
+) {
   let activeTable;
   let activeTableStartedAt;
 
   function finishActiveTable() {
     if (!activeTable) return;
-    writeBuildLog(`Finished table ${activeTable} in ${elapsedMs(activeTableStartedAt)}ms.`);
+    writeBuildLog(`Finished table ${activeTable} in ${formatDuration(elapsedMs(activeTableStartedAt))}.`);
     activeTable = undefined;
     activeTableStartedAt = undefined;
   }
 
   try {
-    for (const statement of statements(sql)) {
+    for (const originalStatement of statements(sql)) {
+      const statement = deferredIndexTables
+        ? deferSecondaryIndexes(originalStatement, deferredIndexTables)
+        : originalStatement;
+      if (!statement) {
+        writeBuildLog("Deferred secondary indexes until candidate publication.");
+        continue;
+      }
       const table = createdTableName(statement);
       if (table) {
         finishActiveTable();
@@ -97,15 +176,16 @@ async function executeTableStatements(connection, sql, phases = [], { tableProgr
       const phase = statement.match(/^\s*-- phase:\s*([^\n]+)/)?.[1]?.trim();
       const startedAt = performance.now();
       await connection.query(statement);
-      if (phase) phases.push({
-        name: phase,
-        durationMs: elapsedMs(startedAt),
-      });
+      if (phase) {
+        const durationMs = elapsedMs(startedAt);
+        phases.push({ name: phase, durationMs });
+        writeBuildLog(`Finished phase ${phase} in ${formatDuration(durationMs)}.`);
+      }
     }
     finishActiveTable();
   } catch (error) {
     if (activeTable) {
-      writeBuildLog(`Failed table ${activeTable} after ${elapsedMs(activeTableStartedAt)}ms.`);
+      writeBuildLog(`Failed table ${activeTable} after ${formatDuration(elapsedMs(activeTableStartedAt))}.`);
     }
     throw error;
   }
@@ -142,7 +222,7 @@ const projectionDefinitions = [
     // country, competition, and historical record code at read time.
     enabledByDefault: true,
   },
-  { name: "person-event-rankings", dependencies: ["result-facts"], files: ["person_event_rankings.sql"], tables: ["person_event_rankings"] },
+  { name: "person-event-rankings", dependencies: ["result-facts"], files: ["person_event_rankings.sql"], tables: ["person_event_rankings"], enabledByDefault: true },
   {
     name: "person-year-rankings",
     dependencies: ["result-facts"],
@@ -153,20 +233,18 @@ const projectionDefinitions = [
   {
     name: "result-rankings",
     dependencies: ["result-facts"],
-    files: ["result_rankings_single.sql", "result_rankings_average.sql", "result_gender_rankings_single.sql", "result_gender_rankings_average.sql"],
-    tables: ["result_rankings_single", "result_rankings_average", "result_gender_rankings_single", "result_gender_rankings_average"],
+    files: ["solve_facts.sql", "result_rankings_single.sql", "result_rankings_average.sql", "solve_facts_cleanup.sql"],
+    tables: ["result_rankings_single", "result_rankings_average"],
     enabledByDefault: true,
   },
   {
     name: "result-ranking-counts",
     dependencies: ["result-rankings"],
-    files: ["result_ranking_counts.sql", "result_gender_ranking_counts.sql"],
-    tables: ["result_ranking_counts", "result_gender_ranking_counts"],
+    files: ["result_ranking_counts.sql"],
+    tables: ["result_ranking_counts"],
     enabledByDefault: true,
   },
-  { name: "person-ranking-counts", dependencies: ["person-event-rankings"], files: ["projection_counts.sql"], tables: ["person_ranking_counts"] },
-  { name: "person-metric-values", dependencies: ["person-event-rankings"], files: ["person_metric_values.sql"], tables: ["person_metric_values"] },
-  { name: "person-metric-scores", dependencies: ["person-metric-values"], files: ["person_metric_scores.sql"], tables: ["person_metric_scores", "person_metric_counts"] },
+  { name: "person-ranking-counts", dependencies: ["person-event-rankings"], files: ["projection_counts.sql"], tables: ["person_ranking_counts"], enabledByDefault: true },
   {
     name: "competition-stats",
     dependencies: [],
@@ -204,34 +282,20 @@ export const COMPATIBILITY_PROJECTION_TABLES = [
   "ranking_entries_single",
   "ranking_entries_average",
   "ranking_counts",
-  "result_entries_single",
-  "result_counts",
 ];
 export const PUBLISHED_PROJECTION_TABLES = [
   ...COMPATIBILITY_PROJECTION_TABLES,
   ...ACTIVE_SEMANTIC_PROJECTION_TABLES,
 ];
-export const RETIRED_PROJECTION_TABLES = [
-  "person_sum_of_ranks_event_values",
-];
-
 export const COMPATIBILITY_PROJECTION_TASKS = [
   { name: "compatibility-ranking-entries-single-source", dependencies: ["projection:result-facts"], estimatedDurationMs: 0 },
   { name: "compatibility-ranking-entries-average-source", dependencies: ["projection:result-facts"], estimatedDurationMs: 0 },
-  { name: "compatibility-result-entries-single-source", dependencies: ["raw-wca"], estimatedDurationMs: 0 },
   { name: "compatibility-ranking-entries-single", dependencies: ["compatibility-ranking-entries-single-source"], table: "ranking_entries_single", estimatedDurationMs: 120_000 },
   { name: "compatibility-ranking-entries-average", dependencies: ["compatibility-ranking-entries-average-source"], table: "ranking_entries_average", estimatedDurationMs: 120_000 },
-  { name: "compatibility-result-entries-single", dependencies: ["compatibility-result-entries-single-source"], table: "result_entries_single", estimatedDurationMs: 150_000 },
   {
     name: "compatibility-ranking-counts",
     dependencies: ["compatibility-ranking-entries-single", "compatibility-ranking-entries-average"],
     table: "ranking_counts",
-    estimatedDurationMs: 15_000,
-  },
-  {
-    name: "compatibility-result-counts",
-    dependencies: ["compatibility-result-entries-single"],
-    table: "result_counts",
     estimatedDurationMs: 15_000,
   },
 ];
@@ -254,12 +318,56 @@ const PROJECTION_DURATION_ESTIMATES_MS = {
   "result-rankings": 150_000,
   "result-ranking-counts": 15_000,
   "person-ranking-counts": 15_000,
-  "person-metric-values": 90_000,
-  "person-metric-scores": 45_000,
   "competition-stats": 30_000,
   "city-event-stats": 90_000,
   "entity-ranking-counts": 15_000,
 };
+
+const PERSON_YEAR_RANKING_PROJECTION = "person-year-rankings";
+
+// These are internal scheduler stages. The final stage keeps the registered
+// projection name as a completion barrier for dependants and artifact export.
+const PERSON_YEAR_RANKING_STAGE_DEFINITIONS = [
+  { stage: "prepare", dependencies: [], estimatedDurationMs: 0 },
+  {
+    stage: "cohorts",
+    dependencies: ["prepare"],
+    estimatedDurationMs: 1_000,
+    file: "person_year_ranking_cohorts.sql",
+  },
+  {
+    stage: "single",
+    dependencies: ["cohorts"],
+    estimatedDurationMs: 400_000,
+    file: "person_year_rankings_single.sql",
+  },
+  {
+    stage: "average",
+    dependencies: ["cohorts"],
+    estimatedDurationMs: 400_000,
+    file: "person_year_rankings_average.sql",
+  },
+  {
+    stage: "counts",
+    dependencies: ["single", "average"],
+    estimatedDurationMs: 15_000,
+    file: "person_year_ranking_counts.sql",
+  },
+  { stage: "complete", dependencies: ["counts"], estimatedDurationMs: 0 },
+];
+
+export function personYearRankingTaskPlan({ taskPrefix = "", projectionDependencies = ["result-facts"] } = {}) {
+  const taskName = (stage) => stage === "complete"
+    ? `${taskPrefix}${PERSON_YEAR_RANKING_PROJECTION}`
+    : `${taskPrefix}${PERSON_YEAR_RANKING_PROJECTION}:${stage}`;
+  return PERSON_YEAR_RANKING_STAGE_DEFINITIONS.map((definition) => ({
+    ...definition,
+    name: taskName(definition.stage),
+    dependencies: definition.stage === "prepare"
+      ? [...projectionDependencies]
+      : definition.dependencies.map(taskName),
+  }));
+}
 
 const LONG_TASK_THRESHOLD_MS = 60_000;
 
@@ -281,9 +389,17 @@ function projectionNames(sql, suffix) {
 
 async function buildSqlProjection(connection, definition, suffix, tableProgress) {
   const phases = [];
+  const deferredIndexTables = process.env.WCA_DEFER_PROJECTION_INDEXES === "1"
+    ? new Set(definition.tables
+        .filter((table) => DEFERRED_PROJECTION_INDEX_TABLES.has(table))
+        .map((table) => `${table}${suffix}`))
+    : undefined;
   for (const file of definition.files) {
     const sql = projectionNames(await projectionSql(file), suffix);
-    await executeTableStatements(connection, sql, phases, { tableProgress });
+    await executeTableStatements(connection, sql, phases, {
+      tableProgress,
+      deferredIndexTables,
+    });
   }
   return phases;
 }
@@ -372,18 +488,113 @@ function orderedProjections(selectedNames = DEFAULT_PROJECTION_NAMES, satisfiedN
 async function buildProjection(connection, projection, projectionSuffix, tableProgress) {
   const startedAt = performance.now();
   writeBuildLog(`Starting projection ${projection.name}…`);
+  const stopHeartbeat = startBuildHeartbeat(`projection ${projection.name}`, startedAt);
   try {
     for (const table of projection.tables) await dropManagedObject(connection, `${table}${projectionSuffix}`);
     const phases = await projection.build(connection, projectionSuffix, tableProgress);
     const rowCounts = await projection.validate(connection, projectionSuffix);
     const durationMs = elapsedMs(startedAt);
     const timing = { name: projection.name, durationMs, rowCounts, phases };
-    writeBuildLog(`Finished projection ${projection.name} in ${durationMs}ms (${JSON.stringify(rowCounts)}).`);
+    stopHeartbeat();
+    writeBuildLog(`Finished projection ${projection.name} in ${formatDuration(durationMs)} (${JSON.stringify(rowCounts)}).`);
     return timing;
   } catch (error) {
-    writeBuildLog(`Failed projection ${projection.name} after ${elapsedMs(startedAt)}ms.`);
+    stopHeartbeat();
+    writeBuildLog(`Failed projection ${projection.name} after ${formatDuration(elapsedMs(startedAt))}.`);
     throw error;
   }
+}
+
+function personYearRankingTasks(projection, {
+  projectionSuffix,
+  tableProgress,
+  taskPrefix = "",
+  projectionDependencies = projection.dependencies,
+}) {
+  const state = {
+    startedAt: undefined,
+    stopHeartbeat: undefined,
+    finished: false,
+    phases: new Map(),
+  };
+
+  function failBuild() {
+    if (state.finished || state.startedAt === undefined) return;
+    state.finished = true;
+    state.stopHeartbeat?.();
+    writeBuildLog(
+      `Failed projection ${projection.name} after ${formatDuration(elapsedMs(state.startedAt))}.`,
+    );
+  }
+
+  async function runStage(descriptor, connection) {
+    try {
+      if (descriptor.stage === "prepare") {
+        state.startedAt = performance.now();
+        writeBuildLog(`Starting projection ${projection.name}…`);
+        state.stopHeartbeat = startBuildHeartbeat(`projection ${projection.name}`, state.startedAt);
+        for (const table of projection.tables) {
+          await dropManagedObject(connection, `${table}${projectionSuffix}`);
+        }
+        return undefined;
+      }
+
+      if (descriptor.stage === "complete") {
+        const rowCounts = await projection.validate(connection, projectionSuffix);
+        const durationMs = elapsedMs(state.startedAt);
+        const phases = PERSON_YEAR_RANKING_STAGE_DEFINITIONS
+          .flatMap(({ stage }) => state.phases.get(stage) ?? []);
+        const timing = { name: projection.name, durationMs, rowCounts, phases };
+        state.finished = true;
+        state.stopHeartbeat?.();
+        writeBuildLog(
+          `Finished projection ${projection.name} in ${formatDuration(durationMs)} (${JSON.stringify(rowCounts)}).`,
+        );
+        return timing;
+      }
+
+      const phases = [];
+      state.phases.set(descriptor.stage, phases);
+      const sql = projectionNames(await projectionSql(descriptor.file), projectionSuffix);
+      await executeTableStatements(connection, sql, phases, { tableProgress });
+      return undefined;
+    } catch (error) {
+      failBuild();
+      throw error;
+    }
+  }
+
+  return personYearRankingTaskPlan({ taskPrefix, projectionDependencies }).map((descriptor) => ({
+    name: descriptor.name,
+    dependencies: descriptor.dependencies,
+    estimatedDurationMs: descriptor.estimatedDurationMs,
+    run: (connection) => runStage(descriptor, connection),
+  }));
+}
+
+function projectionSchedulerTasks(projections, {
+  projectionSuffix,
+  tableProgress,
+  taskPrefix = "",
+  dependencyName = (dependency) => dependency,
+}) {
+  return projections.flatMap((projection) => {
+    const dependencies = projection.dependencies.map(dependencyName);
+    if (projection.name === PERSON_YEAR_RANKING_PROJECTION) {
+      return personYearRankingTasks(projection, {
+        projectionSuffix,
+        tableProgress,
+        taskPrefix,
+        projectionDependencies: dependencies,
+      });
+    }
+    return [{
+      name: `${taskPrefix}${projection.name}`,
+      dependencies,
+      estimatedDurationMs: projectionDurationEstimate(projection.name),
+      run: (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
+    }];
+  });
 }
 
 export function projectionConcurrency(value) {
@@ -503,18 +714,22 @@ async function buildRegisteredProjectionsConcurrently(projections, {
   tableProgress,
   satisfiedProjectionNames = [],
 }) {
-  const tasks = projections.map((projection) => ({
-    name: projection.name,
-    dependencies: projection.dependencies,
-    estimatedDurationMs: projectionDurationEstimate(projection.name),
-    run: async (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
-  }));
-  return runDependencyAwareTasks(tasks, {
-    connection,
-    createConnection,
-    concurrency,
-    satisfiedDependencies: ["raw-wca", ...satisfiedProjectionNames],
+  const tasks = projectionSchedulerTasks(projections, {
+    projectionSuffix,
+    tableProgress,
   });
+  const stopResourceMonitor = startResourceMonitor();
+  try {
+    const results = await runDependencyAwareTasks(tasks, {
+      connection,
+      createConnection,
+      concurrency,
+      satisfiedDependencies: ["raw-wca", ...satisfiedProjectionNames],
+    });
+    return results.filter((result) => result !== undefined);
+  } finally {
+    stopResourceMonitor();
+  }
 }
 
 /*
@@ -522,22 +737,27 @@ async function buildRegisteredProjectionsConcurrently(projections, {
  * easy to compare with the historical serial implementation.
  */
 async function buildCompatibilityTable(connection, table, source, indexFile, tableProgress) {
-  await runTimedBuildStep(`table ${table}`, async () => {
+  await runTimedBuildStep(`table ${table} materialization`, async () => {
     await connection.query(`CREATE TABLE \`${table}\` AS SELECT * FROM \`${source}\``);
-    for (const statement of statements(await projectionSql(indexFile))) {
-      await connection.query(statement.replace(
-        /^ALTER TABLE (?:ranking_entries|result_entries_single)\b/,
-        `ALTER TABLE \`${table}\``,
-      ));
-    }
   }, { tableProgress, tableName: table });
+  if (process.env.WCA_DEFER_PROJECTION_INDEXES === "1") {
+    writeBuildLog(`Deferred secondary indexes for ${table} until candidate publication.`);
+  } else {
+    await runTimedBuildStep(`indexes for ${table}`, async () => {
+      for (const statement of statements(await projectionSql(indexFile))) {
+        await connection.query(statement.replace(
+          /^ALTER TABLE ranking_entries\b/,
+          `ALTER TABLE \`${table}\``,
+        ));
+      }
+    });
+  }
 }
 
 export function renameCompatibilitySql(sql, {
   bestSingle,
   bestAverage,
   entriesSources,
-  resultEntriesSource,
   resultFacts,
 }) {
   return sql
@@ -545,7 +765,6 @@ export function renameCompatibilitySql(sql, {
     .replaceAll("wca_best_average", bestAverage)
     .replaceAll("ranking_entries_single_source", entriesSources.single)
     .replaceAll("ranking_entries_average_source", entriesSources.average)
-    .replaceAll("result_entries_single_source", resultEntriesSource)
     .replaceAll("result_facts", resultFacts);
 }
 
@@ -557,9 +776,6 @@ function compatibilityProjectionTasks({
   entriesTables,
   entriesSources,
   countsTable,
-  resultEntriesTable,
-  resultCountsTable,
-  resultEntriesSource,
   bestSingle,
   bestAverage,
   resultFacts,
@@ -569,7 +785,6 @@ function compatibilityProjectionTasks({
     bestSingle,
     bestAverage,
     entriesSources,
-    resultEntriesSource,
     resultFacts,
   };
   const runners = {
@@ -579,17 +794,11 @@ function compatibilityProjectionTasks({
     "compatibility-ranking-entries-average-source": (connection) => createCompatibilitySource(
       connection, "ranking_entries_average_source.sql", names,
     ),
-    "compatibility-result-entries-single-source": (connection) => createCompatibilitySource(
-      connection, "result_entries_single_source.sql", names,
-    ),
     "compatibility-ranking-entries-single": (connection) => buildCompatibilityTable(
       connection, entriesTables.single, entriesSources.single, "ranking_entries_indexes.sql", tableProgress,
     ),
     "compatibility-ranking-entries-average": (connection) => buildCompatibilityTable(
       connection, entriesTables.average, entriesSources.average, "ranking_entries_indexes.sql", tableProgress,
-    ),
-    "compatibility-result-entries-single": (connection) => buildCompatibilityTable(
-      connection, resultEntriesTable, resultEntriesSource, "result_entries_single_indexes.sql", tableProgress,
     ),
     "compatibility-ranking-counts": async (connection) => executeTableStatements(
       connection,
@@ -597,14 +806,6 @@ function compatibilityProjectionTasks({
         .replaceAll("ranking_entries_single", entriesTables.single)
         .replaceAll("ranking_entries_average", entriesTables.average)
         .replaceAll("ranking_counts", countsTable),
-      [],
-      { tableProgress },
-    ),
-    "compatibility-result-counts": async (connection) => executeTableStatements(
-      connection,
-      (await projectionSql("result_counts.sql"))
-        .replaceAll("result_entries_single", resultEntriesTable)
-        .replaceAll("result_counts", resultCountsTable),
       [],
       { tableProgress },
     ),
@@ -749,28 +950,18 @@ export async function refreshMysqlSchema(
     single: `ranking_entries_single_source${projectionSuffix}`,
     average: `ranking_entries_average_source${projectionSuffix}`,
   };
-  const resultEntriesTable = `result_entries_single${projectionSuffix}`;
-  const resultCountsTable = `result_counts${projectionSuffix}`;
-  const resultEntriesSource = `result_entries_single_source${projectionSuffix}`;
 
   await ensureIndexes(connection, INDEXES);
 
   if (includeCompatibility) {
     for (const name of [
       countsTable,
-      resultCountsTable,
       entriesTables.single,
       entriesTables.average,
-      resultEntriesTable,
       entriesSources.single,
       entriesSources.average,
-      resultEntriesSource,
       bestSingle,
       bestAverage,
-      `weekly_rank_deltas_single${projectionSuffix}`,
-      `weekly_rank_deltas_average${projectionSuffix}`,
-      `record_streaks_single${projectionSuffix}`,
-      `record_streaks_average${projectionSuffix}`,
     ]) {
       await dropManagedObject(connection, name);
     }
@@ -779,7 +970,6 @@ export async function refreshMysqlSchema(
       bestSingle,
       bestAverage,
       entriesSources,
-      resultEntriesSource,
       resultFacts,
       projectionSuffix,
     };
@@ -800,84 +990,37 @@ export async function refreshMysqlSchema(
     (includeCompatibility ? COMPATIBILITY_TABLE_TASK_COUNT : 0)
       + await countProjectionTables(semanticProjections),
   );
-  const semanticTasks = semanticProjections.map((projection) => ({
-    name: `projection:${projection.name}`,
-    dependencies: projection.dependencies.map((dependency) =>
-      dependency === "raw-wca" ? dependency : `projection:${dependency}`),
-    estimatedDurationMs: projectionDurationEstimate(projection.name),
-    run: (worker) => buildProjection(worker, projection, projectionSuffix, tableProgress),
-  }));
+  const semanticTasks = projectionSchedulerTasks(semanticProjections, {
+    projectionSuffix,
+    tableProgress,
+    taskPrefix: "projection:",
+    dependencyName: (dependency) =>
+      dependency === "raw-wca" ? dependency : `projection:${dependency}`,
+  });
   const compatibilityTasks = includeCompatibility ? compatibilityProjectionTasks({
       entriesTables,
       entriesSources,
       countsTable,
-      resultEntriesTable,
-      resultCountsTable,
-      resultEntriesSource,
       bestSingle,
       bestAverage,
       resultFacts,
       tableProgress,
     }) : [];
-  await runDependencyAwareTasks([
-    ...compatibilityTasks,
-    ...semanticTasks,
-  ], {
-    connection,
-    createConnection,
-    concurrency: maxConcurrency,
-    satisfiedDependencies: [
-      "raw-wca",
-      ...satisfiedProjectionNames.map((name) => `projection:${name}`),
-    ],
-  });
-}
-
-export async function refreshResultEntriesSchema(connection, { projectionSuffix = "" } = {}) {
-  const resultEntriesTable = `result_entries_single${projectionSuffix}`;
-  const resultCountsTable = `result_counts${projectionSuffix}`;
-  const resultEntriesSource = `result_entries_single_source${projectionSuffix}`;
-
-  for (const name of [resultCountsTable, resultEntriesTable, resultEntriesSource]) {
-    await dropManagedObject(connection, name);
+  const stopResourceMonitor = startResourceMonitor();
+  try {
+    await runDependencyAwareTasks([
+      ...compatibilityTasks,
+      ...semanticTasks,
+    ], {
+      connection,
+      createConnection,
+      concurrency: maxConcurrency,
+      satisfiedDependencies: [
+        "raw-wca",
+        ...satisfiedProjectionNames.map((name) => `projection:${name}`),
+      ],
+    });
+  } finally {
+    stopResourceMonitor();
   }
-
-  await ensureIndexes(connection, INDEXES.filter(([, name]) => name === "idx_results_single_event_best"));
-
-  const source = await projectionSql("result_entries_single_source.sql");
-  await connection.query(source.replaceAll("result_entries_single_source", resultEntriesSource));
-  await runTimedBuildStep(`table ${resultEntriesTable}`, async () => {
-    await connection.query(`CREATE TABLE \`${resultEntriesTable}\` AS SELECT * FROM \`${resultEntriesSource}\``);
-    for (const statement of statements(await projectionSql("result_entries_single_indexes.sql"))) {
-      await connection.query(statement.replace(/^ALTER TABLE result_entries_single\b/, `ALTER TABLE \`${resultEntriesTable}\``));
-    }
-  });
-  await executeTableStatements(
-    connection,
-    (await projectionSql("result_counts.sql"))
-      .replaceAll("result_entries_single", resultEntriesTable)
-      .replaceAll("result_counts", resultCountsTable),
-  );
-}
-
-export async function promoteResultEntriesSchema(connection, { projectionSuffix = "_staging" } = {}) {
-  const projections = [
-    ["result_entries_single", `result_entries_single${projectionSuffix}`],
-    ["result_counts", `result_counts${projectionSuffix}`],
-  ];
-  const previousTables = projections.map(([published]) => `${published}_previous`);
-  for (const table of previousTables) await dropManagedObject(connection, table);
-
-  const renames = [];
-  const obsoleteTables = [];
-  for (const [published, staging] of projections) {
-    if (await tableExists(connection, published)) {
-      const previous = `${published}_previous`;
-      renames.push(`\`${published}\` TO \`${previous}\``);
-      obsoleteTables.push(`\`${previous}\``);
-    }
-    renames.push(`\`${staging}\` TO \`${published}\``);
-  }
-  await connection.query(`RENAME TABLE ${renames.join(", ")}`);
-  if (obsoleteTables.length > 0) await connection.query(`DROP TABLE ${obsoleteTables.join(", ")}`);
 }

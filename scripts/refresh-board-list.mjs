@@ -1,6 +1,8 @@
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
-import { enqueueListRankingRebuild } from "./list-ranking-jobs.mjs";
+import { enqueueListRankingRebuild } from "./lib/list-ranking-jobs.mjs";
+import { databaseOptions } from "./lib/database.mjs";
+import { hasArgument } from "./lib/cli.mjs";
 
 const ROLE_LISTS = {
   board: {
@@ -21,18 +23,6 @@ const ROLE_LISTS = {
   },
 };
 const WCA_ID_PATTERN = /^\d{4}[A-Z0-9]{4}\d{2}$/;
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 export function roleMemberIds(payload) {
   const roles = Array.isArray(payload) ? payload : payload?.user_roles ?? [];
@@ -156,7 +146,7 @@ export async function refreshDelegatesList(connection, fetchImpl = fetch) {
 
 async function main() {
   const connection = await mysql.createConnection(databaseOptions());
-  const refreshDelegates = process.argv.includes("--delegates");
+  const refreshDelegates = hasArgument("delegates");
   try {
     if (refreshDelegates) await refreshDelegatesList(connection);
     else await refreshBoardList(connection);

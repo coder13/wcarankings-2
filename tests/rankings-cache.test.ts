@@ -4,6 +4,7 @@ import {
   RANKINGS_CACHE_CAPACITY_333,
   RANKINGS_CACHE_CAPACITY_DEFAULT,
   RankingsPageCache,
+  RankingsWindowCache,
 } from "@/services/rankings/cache";
 
 const page = (
@@ -86,4 +87,44 @@ test("reports cache pressure and generation reset metrics", async () => {
   cache.clear();
   assert.equal(cache.snapshot().generationClears, 1);
   assert.equal(cache.snapshot().totals.entries, 0);
+});
+
+test("keeps explicitly primed ranking windows until the generation changes", async () => {
+  const cache = new RankingsWindowCache<{ value: number }>();
+  await cache.getWithStatus("SOR:world:1", async () => ({ value: 1 }), { pin: true });
+  for (let index = 0; index < 150; index += 1) {
+    await cache.getWithStatus(`lazy:${index}`, async () => ({ value: index }));
+  }
+
+  assert.equal(cache.has("SOR:world:1"), true);
+  const hit = await cache.getWithStatus("SOR:world:1", async () => ({ value: 2 }));
+  assert.equal(hit.outcome, "hit");
+  assert.equal(hit.value.value, 1);
+
+  cache.clear();
+  assert.equal(cache.has("SOR:world:1"), false);
+});
+
+test("coalesces lazy ranking windows and permits retry after failure", async () => {
+  const cache = new RankingsWindowCache<{ value: number }>();
+  let loads = 0;
+  const load = async () => {
+    loads += 1;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return { value: 7 };
+  };
+  const results = await Promise.all(
+    Array.from({ length: 20 }, () => cache.getWithStatus("gender:333:f", load)),
+  );
+  assert.equal(loads, 1);
+  assert.equal(results.filter(({ outcome }) => outcome === "coalesced").length, 19);
+
+  await assert.rejects(
+    cache.getWithStatus("year:333:2025", async () => {
+      throw new Error("nope");
+    }),
+  );
+  const retry = await cache.getWithStatus("year:333:2025", async () => ({ value: 8 }));
+  assert.equal(retry.outcome, "miss");
+  assert.equal(retry.value.value, 8);
 });

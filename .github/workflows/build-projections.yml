@@ -1,4 +1,4 @@
-name: Build Incremental Projection Artifacts
+name: Build Projection Artifacts
 
 on:
   workflow_call:
@@ -34,6 +34,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_benchmark:
+        description: Run the ranking scroll benchmark against the generated database.
+        required: false
+        default: false
+        type: boolean
     outputs:
       artifact_name:
         value: ${{ jobs.compose.outputs.artifact_name }}
@@ -52,6 +57,7 @@ permissions:
 
 jobs:
   raw-export:
+    name: Prepare Raw Export
     runs-on: ubuntu-latest
     env:
       WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
@@ -98,69 +104,29 @@ jobs:
           path: /tmp/wca-export-cache
           key: wca-sql-export-${{ inputs.export_date }}
 
-  matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      wave_one: ${{ steps.plan.outputs.wave_one }}
-      wave_two: ${{ steps.plan.outputs.wave_two }}
-      wave_two_required: ${{ steps.plan.outputs.wave_two_required }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref }}
-      - name: Plan isolated build waves
-        id: plan
-        env:
-          BUILD_GROUPS: ${{ inputs.build_groups }}
-        run: |
-          wave_one=$(node scripts/projection-build-matrix.mjs --wave=1)
-          wave_two=$(node scripts/projection-build-matrix.mjs --wave=2)
-          echo "wave_one=$wave_one" >> "$GITHUB_OUTPUT"
-          echo "wave_two=$wave_two" >> "$GITHUB_OUTPUT"
-          echo "wave_two_required=$(jq -r '.include | length > 0' <<<"$wave_two")" >> "$GITHUB_OUTPUT"
-
-  wave-one:
+  build:
+    name: Build Projection Groups
     if: inputs.build_groups != ''
-    needs: [matrix, raw-export]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix.outputs.wave_one) }}
+    needs: raw-export
     uses: ./.github/workflows/build-projection-group.yml
     with:
       ref: ${{ inputs.ref }}
       export_date: ${{ inputs.export_date }}
       export_value: ${{ inputs.export_value }}
-      group: ${{ matrix.group }}
-      hydrate_groups: ${{ matrix.hydrate_groups }}
+      groups: ${{ inputs.build_groups }}
+      hydrate_groups: ${{ inputs.hydrate_groups }}
       fingerprints: ${{ inputs.fingerprints }}
       available_artifacts: ${{ inputs.available_artifacts }}
-    secrets: inherit
-
-  wave-two:
-    if: needs.matrix.outputs.wave_two_required == 'true'
-    needs: [matrix, wave-one]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix.outputs.wave_two) }}
-    uses: ./.github/workflows/build-projection-group.yml
-    with:
-      ref: ${{ inputs.ref }}
-      export_date: ${{ inputs.export_date }}
-      export_value: ${{ inputs.export_value }}
-      group: ${{ matrix.group }}
-      hydrate_groups: ${{ matrix.hydrate_groups }}
-      fingerprints: ${{ inputs.fingerprints }}
-      available_artifacts: ${{ inputs.available_artifacts }}
+      run_benchmark: ${{ inputs.run_benchmark }}
     secrets: inherit
 
   compose:
+    name: Publish Projection Release
     if: >-
       always()
-      && needs.matrix.result == 'success'
       && needs.raw-export.result == 'success'
-      && (needs.wave-one.result == 'success' || needs.wave-one.result == 'skipped')
-      && (needs.wave-two.result == 'success' || needs.wave-two.result == 'skipped')
-    needs: [matrix, raw-export, wave-one, wave-two]
+      && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    needs: [raw-export, build]
     runs-on: ubuntu-latest
     outputs:
       artifact_name: ${{ steps.release.outputs.name }}
@@ -181,7 +147,7 @@ jobs:
 
       - uses: oras-project/setup-oras@v1
 
-      - name: Authenticate immutable projection storage
+      - name: Sign In to GHCR
         run: echo "${{ github.token }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Restore raw WCA export for release
@@ -192,7 +158,7 @@ jobs:
           key: wca-sql-export-${{ inputs.export_date }}
           fail-on-cache-miss: true
 
-      - name: Resolve exact group coordinates
+      - name: Find Exact Projection Artifact References
         env:
           RELEASE_GROUPS: ${{ inputs.release_groups }}
           BUILD_GROUPS: ${{ inputs.build_groups }}
@@ -225,7 +191,7 @@ jobs:
             mv /tmp/coordinates.next /tmp/coordinates.json
           done
 
-      - name: Publish raw export coordinate
+      - name: Publish Raw Export Artifact
         if: inputs.include_raw
         id: raw
         run: |
@@ -252,7 +218,7 @@ jobs:
             '{ref:$ref,digest:$digest,file:$file,bytes:$bytes,sha256:$sha256}' \
             > /tmp/raw-coordinate.json
 
-      - name: Compose lightweight release coordinate
+      - name: Create Projection Release File
         id: release
         env:
           RELEASE_GROUPS: ${{ inputs.release_groups }}
@@ -284,3 +250,23 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+
+  benchmark:
+    name: Measure Ranking Performance
+    if: >-
+      always()
+      && inputs.run_benchmark == true
+      && inputs.build_groups != ''
+      && needs.raw-export.result == 'success'
+      && needs.build.result == 'success'
+      && needs.compose.result == 'success'
+    needs: [raw-export, build, compose]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run ranking scroll benchmark
+        env:
+          BENCHMARK_STATUS: ${{ needs.build.outputs.benchmark_status }}
+        run: |
+          set -euo pipefail
+          echo "Integrated benchmark status: ${BENCHMARK_STATUS:-missing}"
+          test "${BENCHMARK_STATUS:-missing}" = 0

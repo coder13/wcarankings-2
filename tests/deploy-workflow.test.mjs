@@ -24,6 +24,7 @@ const [
   serverDeploy,
   projectionDeployWorkflow,
   pullRequest,
+  prProjectionRelease,
   flywayHistoryRepair,
 ] = await Promise.all([
   workflow("server-production.yml"),
@@ -35,6 +36,7 @@ const [
   workflow("deploy-server.yml"),
   workflow("deploy-projections.yml"),
   workflow("pull-request.yml"),
+  workflow("pr-projection-release.yml"),
   readFile(new URL("../scripts/prepare-flyway-history.mjs", import.meta.url), "utf8"),
 ]);
 
@@ -339,6 +341,38 @@ test("incremental planning classifies active, cached, build, and hydrate groups"
   assert.match(projectionRelease, /needs\.supersession\.outputs\.safe == 'true'/);
 });
 
+test("labeled PR projection builds run the scroll benchmark and publish a reusable repair artifact", () => {
+  assert.match(prProjectionRelease, /pull_request:\s*\n\s+types: \[labeled\]/);
+  assert.match(prProjectionRelease, /github\.event\.label\.name == 'build-projections'/);
+  assert.match(prProjectionRelease, /name: Build Projection Artifacts/);
+  assert.match(prProjectionRelease, /force_rebuild: true/);
+  assert.match(prProjectionRelease, /bypass_artifact_cache: true/);
+  assert.match(prProjectionRelease, /run_benchmark: true/);
+  assert.match(builder, /name: Build Projection Groups/);
+  assert.match(builder, /name: Publish Projection Release/);
+  assert.match(builder, /name: Find Exact Projection Artifact References/);
+  assert.match(builder, /run_benchmark:/);
+  assert.match(builder, /benchmark:/);
+  assert.match(builder, /needs: \[raw-export, build, compose\]/);
+  assert.match(builder, /needs\.build\.outputs\.benchmark_status/);
+  assert.match(groupBuilder, /docker build --tag wcarankings-app:projection-benchmark/);
+  assert.match(groupBuilder, /docker tag wcarankings-app:projection-benchmark wcarankings-app:latest/);
+  assert.match(groupBuilder, /DATABASE_STATEMENT_TIMEOUT_MS=60000/);
+  assert.match(groupBuilder, /docker compose up --detach app/);
+  assert.match(groupBuilder, /for suite in persons results competitions cities/);
+  assert.match(groupBuilder, /benchmark:ranking-scroll:\$suite/);
+  assert.match(groupBuilder, /ranking-scroll-benchmark-\$\{\{ github\.run_id \}\}/);
+  assert.doesNotMatch(builder, /Import generated projection groups/);
+  assert.match(groupBuilder, /Install MariaDB client/);
+});
+
+test("main projection releases carry exact cached artifacts into the deploy bundle", () => {
+  assert.match(projectionRelease, /available_artifacts: \$\{\{ needs\.plan\.outputs\.available_artifacts \}\}/);
+  assert.match(builder, /AVAILABLE_ARTIFACTS: \$\{\{ inputs\.available_artifacts \}\}/);
+  assert.match(planner, /- Cached: \$\(jq -r '\.cachedGroups/);
+  assert.match(projectionRelease, /needs\.supersession\.outputs\.safe == 'true'/);
+});
+
 test("projection deployment accepts and smoke-tests every capability group", async () => {
   const { DEPLOYMENT_PROJECTION_GROUPS } = await import(new URL("../scripts/projection-groups.mjs", import.meta.url));
 
@@ -348,13 +382,25 @@ test("projection deployment accepts and smoke-tests every capability group", asy
   assert.match(projectionDeploy, /person-competition-rankings,\*\) retry_endpoint "\/api\/rankings\/people\/competitions\?start=0&limit=1"/);
 });
 
-test("group artifacts use GHCR and cached dependencies hydrate before isolated builds", () => {
-  assert.match(builder, /projection-build-matrix\.mjs --wave=1/);
-  assert.match(builder, /projection-build-matrix\.mjs --wave=2/);
-  assert.match(builder, /strategy:[\s\S]*matrix:/);
+test("bundled group artifacts share one isolated build database", () => {
+  assert.match(builder, /build:\n\s+name: Build Projection Groups\n\s+if: inputs\.build_groups != ''/);
+  assert.match(builder, /uses: \.\/\.github\/workflows\/build-projection-group\.yml/);
+  assert.match(builder, /groups: \$\{\{ inputs\.build_groups \}\}/);
+  assert.doesNotMatch(builder, /projection-build-matrix\.mjs/);
+  assert.doesNotMatch(builder, /wave-one:|wave-two:|wave-three:/);
+  assert.match(groupBuilder, /groups:/);
+  assert.match(groupBuilder, /GROUPS: \$\{\{ inputs\.groups \}\}/);
+  assert.match(groupBuilder, /COMPOSE_FILE: docker-compose\.yml:docker-compose\.projection-ci\.yml/);
+  assert.match(groupBuilder, /--groups="\$GROUPS"/);
+  assert.match(groupBuilder, /for group in \$\(printf '%s' "\$GROUPS"/);
   assert.match(groupBuilder, /oras pull "\$\{repository\}@\$\{digest\}"/);
-  assert.match(groupBuilder, /oras push "\$ref"/);
+  assert.match(groupBuilder, /oras push "\$\{push_args\[@\]\}"/);
+  assert.match(groupBuilder, /for attempt in 1 2 3 4/);
+  assert.match(groupBuilder, /retrying in \$\{delay\}s/);
   assert.match(groupBuilder, /application\/vnd\.cuberanks\.projection\.tables\.v1\+gzip/);
+  assert.match(groupBuilder, /archive_name=\$\(basename "\$archive"\)/);
+  assert.match(groupBuilder, /metadata_name=\$\(basename "\$metadata"\)/);
+  assert.match(groupBuilder, /result_attempts \(result_id BIGINT NOT NULL, attempt_number INT NOT NULL, value INT NOT NULL\)/);
   assert.match(groupBuilder, /import-projection-transfer\.mjs/);
   assert.match(groupBuilder, /publish-projection-transfer\.mjs --hydrate/);
   assert.match(groupBuilder, /--satisfied-groups="\$HYDRATE_GROUPS"/);
@@ -381,6 +427,12 @@ test("component images are independently identified and production requires PR v
   assert.match(projectionRelease, /components: flyway,data-tools/);
   assert.match(pullRequest, /Restore unchanged component images/);
   assert.match(pullRequest, /Publish changed verified component images/);
+  assert.match(pullRequest, /name: Static Checks/);
+  assert.match(pullRequest, /name: Database and Application Validation/);
+  assert.match(pullRequest, /Run Visual Smoke Test/);
+  assert.match(pullRequest, /Run List Browser Tests/);
+  assert.match(pullRequest, /Show Database State After Browser Test Failure/);
+  assert.match(pullRequest, /playwright\.list-e2e\.config\.mjs/);
   assert.doesNotMatch(serverBuild, /APP_COMMIT_SHA=/);
   assert.match(serverDeploy, /DEPLOYED_MAIN_SHA='\$SOURCE_SHA'/);
 });
@@ -400,7 +452,7 @@ test("Node dependency consumers use the pinned pnpm lockfile", () => {
 });
 
 test("raw export downloads use the writable runner cache directory", () => {
-  const rawExport = builder.slice(builder.indexOf("  raw-export:"), builder.indexOf("  matrix:"));
+  const rawExport = builder.slice(builder.indexOf("  raw-export:"), builder.indexOf("  build:"));
   assert.match(rawExport, /WCA_EXPORT_CACHE_DIR: \/tmp\/wca-export-cache/);
 });
 
@@ -419,7 +471,6 @@ test("candidate staging is monitored and the activation lock stays short", () =>
   assert.match(projectionDeploymentScript, /import-projection-transfer\.mjs/);
   assert.match(projectionDeploymentScript, /--concurrency=2/);
   assert.match(projectionDeploymentScript, /WCA_PROJECTION_INDEX_CONCURRENCY=2/);
-  assert.doesNotMatch(projectionDeploymentScript, /chunk-projection-dump\.mjs/);
   assert.match(projectionDeploymentScript, /candidate_work_label="wcarankings\.projection-artifact=\$\{ARTIFACT_ID\}"/);
   assert.match(projectionDeploymentScript, /candidate_work_pid=\$1[\s\S]*?wait "\$candidate_work_pid"/);
   assert.match(projectionDeploymentScript, /docker ps -q --filter "label=\$\{candidate_work_label\}"/);
@@ -766,4 +817,7 @@ test("production staging remains sequential and activation is atomic", () => {
   assert.match(projectionDeploy, /publish-projection-transfer\.mjs[\s\S]*--prepare-only/);
   assert.match(projectionDeploy, /activate-ranking-generation\.mjs activate/);
   assert.match(projectionDeploy, /activate-ranking-generation\.mjs rollback/);
+  assert.match(projectionDeploy, /eventId=SOR&result=single&start=0&paged=1/);
+  assert.match(projectionDeploy, /eventId=SOR&result=average&start=0&paged=1/);
+  assert.match(projectionDeploy, /eventId=sor-kinch&start=0&paged=1/);
 });

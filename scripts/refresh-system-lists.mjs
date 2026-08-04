@@ -1,19 +1,8 @@
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
-import { SYSTEM_LIST_DEFINITIONS } from "./system-list-definitions.mjs";
-import { enqueueListRankingRebuild } from "./list-ranking-jobs.mjs";
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
+import { SYSTEM_LIST_DEFINITIONS } from "./lib/system-list-definitions.mjs";
+import { enqueueListRankingRebuild } from "./lib/list-ranking-jobs.mjs";
+import { databaseOptions } from "./lib/database.mjs";
 
 export async function refreshSystemLists(connection) {
   await connection.beginTransaction();

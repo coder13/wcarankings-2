@@ -33,7 +33,7 @@ function parseRankingsQuery(request: Request): RankingsQuery {
   const rawEventId = searchParams.get("eventId") ?? searchParams.get("event");
   const rawType = searchParams.get("result") ?? searchParams.get("type");
   const eventId = isRankingEventId(rawEventId) ? rawEventId : "333";
-  let type = "single";
+  let type: RankingType = "single";
   if (eventId !== "333mbf" && eventId !== "sor-kinch" && isRankingType(rawType)) {
     type = rawType;
   }
@@ -48,7 +48,9 @@ function parseRankingsQuery(request: Request): RankingsQuery {
 }
 
 function buildListRankingResponse(
-  rankings: Awaited<ReturnType<typeof loadListRankings>>,
+  rankings:
+    | Awaited<ReturnType<typeof loadListRankings>>
+    | Awaited<ReturnType<typeof loadDynamicListRankings>>,
   searchParams: URLSearchParams,
 ) {
   const inputStart = Number(searchParams.get("start")) || 0;
@@ -69,12 +71,14 @@ function buildListRankingResponse(
 async function fetchSavedListRankings(request: Request, input: RankingsQuery) {
   const [list, user] = await Promise.all([resolveList(input.listId), getAuthUser(request)]);
   assertCanViewList(list, user);
+  const rankings = await loadListRankings(list, input.searchParams);
   return {
     list,
     data: buildListRankingResponse(
-      await loadListRankings(list, input.searchParams),
+      rankings,
       input.searchParams,
     ),
+    cacheOutcome: rankings.cacheOutcome,
   };
 }
 
@@ -82,7 +86,7 @@ async function fetchDynamicListRankings(input: RankingsQuery) {
   const ids = parseDynamicListIds(input.searchParams.getAll("wca_ids"));
   const dynamicList = await resolveDynamicList(ids.personIds);
   const rankings = await loadDynamicListRankings(dynamicList.personIds, input.searchParams);
-  return { data: buildListRankingResponse(rankings, input.searchParams) };
+  return { data: buildListRankingResponse(rankings, input.searchParams), cacheOutcome: rankings.cacheOutcome };
 }
 
 async function fetchGlobalRankings(input: RankingsQuery, startedAt: number) {
@@ -127,6 +131,8 @@ function buildGlobalRankingsResponse(
       "Cache-Control": "public, max-age=60, s-maxage=3600",
       "Server-Timing": serverTiming,
       "X-Rankings-Cache": result.cacheOutcome,
+      "X-Rankings-Memory-Cache": result.cacheOutcome,
+      "X-List-Ranking-Cache": "bypass",
       "X-Rankings-Data-Version": result.dataVersion ?? "unknown",
     },
   });
@@ -181,14 +187,20 @@ export async function handleRankingsRequest(request: Request) {
           "Cache-Control":
             loaded.list.visibility === "public"
               ? "public, max-age=30, s-maxage=300, stale-while-revalidate=60"
-              : "private, no-store",
+            : "private, no-store",
+          "X-Rankings-Memory-Cache": "bypass",
+          "X-List-Ranking-Cache": loaded.cacheOutcome ?? "bypass",
         },
       });
     }
     if (input.hasDynamicList) {
       const loaded = await fetchDynamicListRankings(input);
       return buildApiJsonResponse(loaded.data, {
-        headers: { "Cache-Control": "public, max-age=30, s-maxage=300, stale-while-revalidate=60" },
+        headers: {
+          "Cache-Control": "public, max-age=30, s-maxage=300, stale-while-revalidate=60",
+          "X-Rankings-Memory-Cache": "bypass",
+          "X-List-Ranking-Cache": loaded.cacheOutcome ?? "bypass",
+        },
       });
     }
     return buildGlobalRankingsResponse(input, await fetchGlobalRankings(input, startedAt));

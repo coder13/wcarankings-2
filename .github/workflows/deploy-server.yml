@@ -489,7 +489,8 @@ jobs:
                 mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="
                   CREATE TABLE IF NOT EXISTS result_attempts (
                     result_id BIGINT NOT NULL,
-                    attempt_number INT NOT NULL
+                    attempt_number INT NOT NULL,
+                    value INT NOT NULL
                   );
                 "
               '
