@@ -51,6 +51,9 @@ export function componentFingerprint(
     .toString()
     .split("\0")
     .filter(Boolean)
+    .filter((file) =>
+      existsSync(new URL(file, pathToFileURL(`${repositoryRoot}/`))),
+    )
     .sort();
   const checksums = files
     .map(
