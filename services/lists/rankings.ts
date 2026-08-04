@@ -12,6 +12,13 @@ import {
 import { parseListRankingInput } from "@/services/lists/input";
 import type { ListRankingRow, ListSummary, ScopedRankingSource } from "@/services/lists/types";
 
+function isMissingRankingProjection(error: unknown) {
+  const databaseError = error as { code?: string; message?: string };
+  return databaseError.code === "ER_NO_SUCH_TABLE" &&
+    (databaseError.message?.includes("person_event_rankings") ||
+      databaseError.message?.includes("result_facts"));
+}
+
 async function loadScopedRankings(
   scopedSource: ScopedRankingSource,
   searchParams: URLSearchParams,
@@ -235,60 +242,83 @@ async function loadCachedListRankings(
 }
 
 export async function loadListRankings(list: ListSummary, searchParams: URLSearchParams) {
-  const input = parseListRankingInput(searchParams);
-  const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
-  const cacheable = !input.search && !input.locate && isListRankingCacheable("person", input.type, filter);
-  const filterKey = listRankingFilterKey(filter);
-  if (cacheable) {
-    const cached = await loadCachedListRankings(list, input);
-    if (cached) {
-      return {
-        list: {
-          publicId: list.publicId,
-          systemAlias: list.systemAlias,
-          name: list.name,
-          kind: list.kind,
-          memberCount: list.memberCount,
-          membershipVersion: list.membershipVersion,
-        },
-        ...cached,
-        cacheOutcome: "hit" as const,
-      };
+  try {
+    const input = parseListRankingInput(searchParams);
+    const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
+    const cacheable = !input.search && !input.locate && isListRankingCacheable("person", input.type, filter);
+    const filterKey = listRankingFilterKey(filter);
+    if (cacheable) {
+      const cached = await loadCachedListRankings(list, input);
+      if (cached) {
+        return {
+          list: {
+            publicId: list.publicId,
+            systemAlias: list.systemAlias,
+            name: list.name,
+            kind: list.kind,
+            memberCount: list.memberCount,
+            membershipVersion: list.membershipVersion,
+          },
+          ...cached,
+          cacheOutcome: "hit" as const,
+        };
+      }
+      if (!input.membershipVersion && !input.rankingsDataVersion) {
+        void raiseListRankingRebuildPriority(list, "person", filterKey).catch(() => undefined);
+      }
     }
-    if (!input.membershipVersion && !input.rankingsDataVersion) {
-      void raiseListRankingRebuildPriority(list, "person", filterKey).catch(() => undefined);
-    }
-  }
-  const rankings = await loadScopedRankings(
-    {
-      from: (source) => `list_members AS member
+    const rankings = await loadScopedRankings(
+      {
+        from: (source) => `list_members AS member
        JOIN ${source} AS ranking
          ON ranking.person_id = member.person_id`,
-      conditions: ["member.list_id = ?"],
-      values: [list.id],
-    },
-    searchParams,
-    cacheable ? 100 : 0,
-  );
-  const fallbackDataVersion = cacheable
-    ? (await query<{ value: string }>(
-      "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
-    )).rows[0]?.value ?? null
-    : null;
-  return {
-    list: {
-      publicId: list.publicId,
-      systemAlias: list.systemAlias,
-      name: list.name,
-      kind: list.kind,
-      memberCount: list.memberCount,
-      membershipVersion: list.membershipVersion,
-    },
-    ...rankings,
-    cacheMembershipVersion: cacheable ? list.membershipVersion : undefined,
-    cacheDataVersion: fallbackDataVersion,
-    cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
-  };
+        conditions: ["member.list_id = ?"],
+        values: [list.id],
+      },
+      searchParams,
+      cacheable ? 100 : 0,
+    );
+    const fallbackDataVersion = cacheable
+      ? (await query<{ value: string }>(
+        "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
+      )).rows[0]?.value ?? null
+      : null;
+    return {
+      list: {
+        publicId: list.publicId,
+        systemAlias: list.systemAlias,
+        name: list.name,
+        kind: list.kind,
+        memberCount: list.memberCount,
+        membershipVersion: list.membershipVersion,
+      },
+      ...rankings,
+      cacheMembershipVersion: cacheable ? list.membershipVersion : undefined,
+      cacheDataVersion: fallbackDataVersion,
+      cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
+    };
+  } catch (error) {
+    if (!isMissingRankingProjection(error)) throw error;
+    const metadata = await getCurrentRankingsMetadata();
+    return {
+      list: {
+        publicId: list.publicId,
+        systemAlias: list.systemAlias,
+        name: list.name,
+        kind: list.kind,
+        memberCount: list.memberCount,
+        membershipVersion: list.membershipVersion,
+      },
+      entries: [],
+      hasMore: false,
+      nextStart: null,
+      total: 0,
+      exportDate: metadata.exportDate,
+      cacheMembershipVersion: undefined,
+      cacheDataVersion: undefined,
+      cacheOutcome: "bypass" as const,
+    };
+  }
 }
 
 export async function loadDynamicListRankings(personIds: string[], searchParams: URLSearchParams) {

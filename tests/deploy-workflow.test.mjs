@@ -390,7 +390,9 @@ test("bundled group artifacts share one isolated build database", () => {
   assert.match(groupBuilder, /--groups="\$GROUPS"/);
   assert.match(groupBuilder, /for group in \$\(printf '%s' "\$GROUPS"/);
   assert.match(groupBuilder, /oras pull "\$\{repository\}@\$\{digest\}"/);
-  assert.match(groupBuilder, /oras push "\$ref"/);
+  assert.match(groupBuilder, /oras push "\$\{push_args\[@\]\}"/);
+  assert.match(groupBuilder, /for attempt in 1 2 3 4/);
+  assert.match(groupBuilder, /retrying in \$\{delay\}s/);
   assert.match(groupBuilder, /application\/vnd\.cuberanks\.projection\.tables\.v1\+gzip/);
   assert.match(groupBuilder, /archive_name=\$\(basename "\$archive"\)/);
   assert.match(groupBuilder, /metadata_name=\$\(basename "\$metadata"\)/);

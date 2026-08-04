@@ -255,17 +255,46 @@ jobs:
             archive_name=$(basename "$archive")
             metadata_name=$(basename "$metadata")
             pushd "$directory" >/dev/null
-            oras push "$ref" \
-              --artifact-type application/vnd.cuberanks.projection.group.v4 \
-              --annotation "io.wcarankings.group=$group" \
-              --annotation "io.wcarankings.export-id=${{ inputs.export_value }}" \
-              --annotation "io.wcarankings.artifact-fingerprint=$fingerprint" \
-              --annotation "io.wcarankings.format-version=4" \
-              "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json" \
-              "$archive_name:application/vnd.cuberanks.projection.tables.v1+gzip" \
+            push_args=(
+              "$ref"
+              --artifact-type application/vnd.cuberanks.projection.group.v4
+              --annotation "io.wcarankings.group=$group"
+              --annotation "io.wcarankings.export-id=${{ inputs.export_value }}"
+              --annotation "io.wcarankings.artifact-fingerprint=$fingerprint"
+              --annotation "io.wcarankings.format-version=4"
+              "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json"
+              "$archive_name:application/vnd.cuberanks.projection.tables.v1+gzip"
               "$metadata_name:application/vnd.cuberanks.projection.transfer.v4+json"
+            )
+            pushed=false
+            for attempt in 1 2 3 4; do
+              if oras push "${push_args[@]}"; then
+                pushed=true
+                break
+              fi
+              if [ "$attempt" -lt 4 ]; then
+                delay=$((attempt * 30))
+                echo "oras push failed for $group; retrying in ${delay}s (attempt $((attempt + 1))/4)…"
+                sleep "$delay"
+              fi
+            done
+            if [ "$pushed" != true ]; then
+              echo "oras push failed for $group after 4 attempts" >&2
+              exit 1
+            fi
             popd >/dev/null
-            digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
+            digest=""
+            for attempt in 1 2 3 4; do
+              if digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest'); then
+                break
+              fi
+              if [ "$attempt" -lt 4 ]; then
+                delay=$((attempt * 30))
+                echo "oras manifest fetch failed for $group; retrying in ${delay}s (attempt $((attempt + 1))/4)…"
+                sleep "$delay"
+              fi
+            done
+            test -n "$digest"
             {
               echo "### Projection group"
               echo "- Group: $group"
