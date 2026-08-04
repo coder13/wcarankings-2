@@ -2,12 +2,12 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: /visual-smoke\.spec\.mjs/,
+  testMatch: /(?:list-create-e2e|list-browse-e2e)\.spec\.mjs/,
   reporter: [
     ["list"],
     [
       "html",
-      { open: "never", outputFolder: "artifacts/visual-playwright-report" },
+      { open: "never", outputFolder: "artifacts/list-playwright-report" },
     ],
   ],
   use: {

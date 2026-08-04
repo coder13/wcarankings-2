@@ -427,6 +427,12 @@ test("component images are independently identified and production requires PR v
   assert.match(projectionRelease, /components: flyway,data-tools/);
   assert.match(pullRequest, /Restore unchanged component images/);
   assert.match(pullRequest, /Publish changed verified component images/);
+  assert.match(pullRequest, /name: Static Checks/);
+  assert.match(pullRequest, /name: Database and Application Validation/);
+  assert.match(pullRequest, /Run Visual Smoke Test/);
+  assert.match(pullRequest, /Run List Browser Tests/);
+  assert.match(pullRequest, /Show Database State After Browser Test Failure/);
+  assert.match(pullRequest, /playwright\.list-e2e\.config\.mjs/);
   assert.doesNotMatch(serverBuild, /APP_COMMIT_SHA=/);
   assert.match(serverDeploy, /DEPLOYED_MAIN_SHA='\$SOURCE_SHA'/);
 });

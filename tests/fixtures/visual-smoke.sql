@@ -83,7 +83,8 @@ VALUES
 INSERT INTO
   persons (wca_id, sub_id, name, country_id, gender)
 VALUES
-  ('2026TEST01', 1, 'Visual Test Cuber', 'USA', 'm');
+  ('2026TEST01', 1, 'Visual Test Cuber', 'USA', 'm'),
+  ('2026MAX01', 1, 'Max Test Cuber', 'USA', 'm');
 
 INSERT INTO
   formats (id, expected_solve_count)
@@ -136,7 +137,8 @@ INSERT INTO
     country_rank
   )
 VALUES
-  ('333', '2026TEST01', 1234, 1, 1, 1);
+  ('333', '2026TEST01', 1234, 1, 1, 1),
+  ('333', '2026MAX01', 2345, 2, 2, 2);
 
 INSERT INTO
   ranks_average (
@@ -148,7 +150,8 @@ INSERT INTO
     country_rank
   )
 VALUES
-  ('333', '2026TEST01', 1500, 1, 1, 1);
+  ('333', '2026TEST01', 1500, 1, 1, 1),
+  ('333', '2026MAX01', 2600, 2, 2, 2);
 
 INSERT INTO
   results (
@@ -178,6 +181,21 @@ VALUES
     'USA',
     'a',
     1,
+    'f',
+    '',
+    ''
+  ),
+  (
+    2,
+    '2026MAX01',
+    '333',
+    2345,
+    2600,
+    'VisualSmoke2026',
+    'Max Test Cuber',
+    'USA',
+    'a',
+    2,
     'f',
     '',
     ''
