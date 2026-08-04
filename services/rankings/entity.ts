@@ -11,7 +11,11 @@ import {
   parseScope,
 } from "@/lib/api/projection";
 
-import type { CompetitionRow, LatitudeRow, PodiumRow } from "@/services/rankings/types";
+import type {
+  CompetitionRow,
+  LatitudeRow,
+  PodiumRow,
+} from "@/services/rankings/types";
 import {
   competitionEntityCountQuery,
   competitionEntityRowsQuery,
@@ -29,20 +33,26 @@ export async function loadCompetitionRankings(params: URLSearchParams) {
   if (ranking === "fastest") return loadFastestCompetitions(params, limit);
   if (ranking === "podium") return loadPodiumRankings(params, limit);
   if (ranking === "latitude") return loadLatitudeRankings(params, limit);
-  if (ranking === "competitor-count") return loadCompetitorCountRankings(params, limit);
-  throw new ApiInputError("ranking must be fastest, podium, competitor-count, or latitude.");
+  if (ranking === "competitor-count")
+    return loadCompetitorCountRankings(params, limit);
+  throw new ApiInputError(
+    "ranking must be fastest, podium, competitor-count, or latitude.",
+  );
 }
 
-async function loadCompetitorCountRankings(params: URLSearchParams, limit: number) {
+async function loadCompetitorCountRankings(
+  params: URLSearchParams,
+  limit: number,
+) {
   const rawStart = params.get("start") ?? "0";
   const start = Number(rawStart);
   if (!Number.isInteger(start) || start < 0) {
     throw new ApiInputError("start must be a non-negative integer.");
   }
-  const rows = await query<LatitudeRow & { competitor_count: number }>(competitorCountRowsQuery(), [
-    start,
-    limit + 1,
-  ]);
+  const rows = await query<LatitudeRow & { competitor_count: number }>(
+    competitorCountRowsQuery(),
+    [start, limit + 1],
+  );
   const counts = await query<{ count: number }>(competitorCountTotalQuery());
   const pageRows = rows.rows.slice(0, limit);
   const last = pageRows.at(-1);
@@ -57,13 +67,16 @@ async function loadCompetitorCountRankings(params: URLSearchParams, limit: numbe
         countryName: row.country_name,
         countryIso2: row.country_iso2,
         best: Number(row.competitor_count),
-        formattedValue: new Intl.NumberFormat("en-US").format(Number(row.competitor_count)),
+        formattedValue: new Intl.NumberFormat("en-US").format(
+          Number(row.competitor_count),
+        ),
         competitionId: row.competition_id,
         competitionName: row.city_name,
         recordBadges: [],
       })),
       hasMore: rows.rows.length > limit,
-      nextPageStart: rows.rows.length > limit && last ? Number(last.position) + 1 : null,
+      nextPageStart:
+        rows.rows.length > limit && last ? Number(last.position) + 1 : null,
       previousPageStart: start > 0 ? Math.max(0, start - limit) : null,
       startPosition: Number(pageRows[0]?.position ?? start + 1) - 1,
       lastRank: pageRows.length ? Number(pageRows.at(-1)?.rank) : null,
@@ -90,20 +103,27 @@ async function loadLatitudeRankings(params: URLSearchParams, limit: number) {
   const prefix = hemisphere === "north" ? "northernmost" : "southernmost";
   const direction = hemisphere === "north" ? "DESC" : "ASC";
   const { scope, regionId } = parseScope(params);
-  const regionColumn = scope === "continent" ? "country.continent_id" : "competition.country_id";
+  const regionColumn =
+    scope === "continent" ? "country.continent_id" : "competition.country_id";
   const rows =
     scope === "world"
-      ? await query<LatitudeRow>(latitudeRowsQuery({ prefix, scoped: false }), [start, limit + 1])
+      ? await query<LatitudeRow>(latitudeRowsQuery({ prefix, scoped: false }), [
+          start,
+          limit + 1,
+        ])
       : await query<LatitudeRow>(
           latitudeRowsQuery({ prefix, direction, regionColumn, scoped: true }),
           [regionId, start, limit + 1],
         );
   const counts =
     scope === "world"
-      ? await query<{ count: number }>(latitudeCountQuery({ prefix, scoped: false }))
-      : await query<{ count: number }>(latitudeCountQuery({ prefix, regionColumn, scoped: true }), [
-          regionId,
-        ]);
+      ? await query<{ count: number }>(
+          latitudeCountQuery({ prefix, scoped: false }),
+        )
+      : await query<{ count: number }>(
+          latitudeCountQuery({ prefix, regionColumn, scoped: true }),
+          [regionId],
+        );
   const pageRows = rows.rows.slice(0, limit);
   const last = pageRows.at(-1);
   return {
@@ -126,7 +146,8 @@ async function loadLatitudeRankings(params: URLSearchParams, limit: number) {
         recordBadges: [],
       })),
       hasMore: rows.rows.length > limit,
-      nextPageStart: rows.rows.length > limit && last ? Number(last.position) + 1 : null,
+      nextPageStart:
+        rows.rows.length > limit && last ? Number(last.position) + 1 : null,
       previousPageStart: start > 0 ? Math.max(0, start - limit) : null,
       startPosition: Number(pageRows[0]?.position ?? start + 1) - 1,
       lastRank: pageRows.length ? Number(pageRows.at(-1)?.rank) : null,
@@ -153,11 +174,21 @@ async function loadFastestCompetitions(params: URLSearchParams, limit: number) {
   const rankColumn = `${valueColumn}_rank`;
   const positionColumn = `${valueColumn}_position`;
   const rows = await query<CompetitionRow>(
-    competitionEntityRowsQuery({ valueColumn, resultIdColumn, rankColumn, positionColumn }),
+    competitionEntityRowsQuery({
+      valueColumn,
+      resultIdColumn,
+      rankColumn,
+      positionColumn,
+    }),
     [eventId, start, limit + 1],
   );
   const counts = await query<{ count: number }>(
-    competitionEntityCountQuery({ valueColumn, resultIdColumn, rankColumn, positionColumn }),
+    competitionEntityCountQuery({
+      valueColumn,
+      resultIdColumn,
+      rankColumn,
+      positionColumn,
+    }),
     [eventId],
   );
   const pageRows = rows.rows.slice(0, limit);
@@ -177,7 +208,8 @@ async function loadFastestCompetitions(params: URLSearchParams, limit: number) {
         recordBadges: [],
       })),
       hasMore: rows.rows.length > limit,
-      nextPageStart: rows.rows.length > limit && last ? Number(last.position) + 1 : null,
+      nextPageStart:
+        rows.rows.length > limit && last ? Number(last.position) + 1 : null,
       previousPageStart: start > 0 ? Math.max(0, start - limit) : null,
       startPosition: Number(pageRows[0]?.position ?? start + 1) - 1,
       lastRank: pageRows.length ? Number(pageRows.at(-1)?.rank) : null,
@@ -191,27 +223,30 @@ async function loadFastestCompetitions(params: URLSearchParams, limit: number) {
   };
 }
 
-export async function loadPodiumRankings(params: URLSearchParams, limit = parseLimit(params)) {
+export async function loadPodiumRankings(
+  params: URLSearchParams,
+  limit = parseLimit(params),
+) {
   const eventId = parseEvent(params)!;
   if (eventId === "333mbf")
     throw new ApiInputError("Multi-Blind podium rankings are not supported.");
-  const resultType = ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average";
+  const resultType = ["333bf", "444bf", "555bf"].includes(eventId)
+    ? "single"
+    : "average";
   const positionColumn = "podium_position";
   const rawStart = params.get("start") ?? "0";
   const start = Number(rawStart);
   if (!Number.isInteger(start) || start < 0) {
     throw new ApiInputError("start must be a non-negative integer.");
   }
-  const rows = await query<PodiumRow>(podiumEntityRowsQuery({ positionColumn }), [
-    eventId,
-    start,
-    limit + 1,
-    eventId,
-    resultType,
-  ]);
-  const counts = await query<{ count: number }>(podiumEntityCountQuery({ positionColumn }), [
-    eventId,
-  ]);
+  const rows = await query<PodiumRow>(
+    podiumEntityRowsQuery({ positionColumn }),
+    [eventId, start, limit + 1, eventId, resultType],
+  );
+  const counts = await query<{ count: number }>(
+    podiumEntityCountQuery({ positionColumn }),
+    [eventId],
+  );
   const byCompetition = new Map<
     string,
     {
@@ -273,11 +308,14 @@ export async function loadPodiumRankings(params: URLSearchParams, limit = parseL
         countryIso2: entry.competition.country.iso2,
         best: entry.score,
         competitionId: entry.competition.id,
-        competitionName: entry.members.map((member) => member.person.name).join(" · "),
+        competitionName: entry.members
+          .map((member) => member.person.name)
+          .join(" · "),
         recordBadges: [],
       })),
       hasMore: byCompetition.size > limit,
-      nextPageStart: byCompetition.size > limit && last ? last.position + 1 : null,
+      nextPageStart:
+        byCompetition.size > limit && last ? last.position + 1 : null,
       previousPageStart: start > 0 ? Math.max(0, start - limit) : null,
       startPosition: Number(rows.rows[0]?.position ?? start + 1) - 1,
       lastRank: entries.length ? (entries.at(-1)?.rank ?? null) : null,
@@ -318,7 +356,8 @@ export async function loadCityRankings(params: URLSearchParams) {
       LEFT JOIN countries country ON country.id = stats.country_id
       WHERE stats.${valueColumn} IS NOT NULL${filters.sql}
     )`;
-  const rows = await query<CityRankingRow>(`
+  const rows = await query<CityRankingRow>(
+    `
     ${cityRankingSql}, page AS (
       SELECT * FROM ranked WHERE position > ? ORDER BY position LIMIT ?
     )
@@ -332,15 +371,24 @@ export async function loadCityRankings(params: URLSearchParams) {
     LEFT JOIN competitions competition ON competition.id = facts.competition_id
     LEFT JOIN countries country ON country.id = page.country_id
     ORDER BY page.position
-  `, [...filters.values, start, limit + 1]);
-  const counts = await query<{ count: number }>(`
+  `,
+    [...filters.values, start, limit + 1],
+  );
+  const counts = await query<{ count: number }>(
+    `
     ${cityRankingSql} SELECT COUNT(*) AS count FROM ranked
-  `, filters.values);
+  `,
+    filters.values,
+  );
   return cityPage(rows, counts, limit, start, (row) => ({
     personName: row.city_name,
     identitySubtitle: row.person_name,
     best: Number(row.result_value),
-    formattedValue: formatWcaResult(eventId, Number(row.result_value), resultType),
+    formattedValue: formatWcaResult(
+      eventId,
+      Number(row.result_value),
+      resultType,
+    ),
     competitionId: row.competition_id,
     competitionName: `${row.competition_name} · ${row.person_name}`,
   }));
@@ -383,12 +431,13 @@ function cityFilters(
   scope: "world" | "continent" | "country",
   regionId: string,
 ) {
-  const region = scope === "world"
-    ? { sql: "", values: [] as unknown[] }
-    : {
-        sql: ` AND country.${scope === "continent" ? "continent_id" : "id"} = ?`,
-        values: [regionId] as unknown[],
-      };
+  const region =
+    scope === "world"
+      ? { sql: "", values: [] as unknown[] }
+      : {
+          sql: ` AND country.${scope === "continent" ? "continent_id" : "id"} = ?`,
+          values: [regionId] as unknown[],
+        };
   return {
     sql: ` AND stats.event_id = ? AND stats.gender = ?${region.sql}`,
     values: [eventId, gender, ...region.values],
@@ -400,9 +449,16 @@ function cityPage(
   counts: Awaited<ReturnType<typeof query<{ count: number }>>>,
   limit: number,
   start: number,
-  entry: (row: CityRankingRow) => Pick<
+  entry: (
+    row: CityRankingRow,
+  ) => Pick<
     import("@/components/RankingsExplorer/types").RankingEntry,
-    "personName" | "identitySubtitle" | "best" | "formattedValue" | "competitionId" | "competitionName"
+    | "personName"
+    | "identitySubtitle"
+    | "best"
+    | "formattedValue"
+    | "competitionId"
+    | "competitionName"
   >,
 ) {
   const pageRows = rows.rows.slice(0, limit);
@@ -419,7 +475,8 @@ function cityPage(
         ...entry(row),
       })),
       hasMore: rows.rows.length > limit,
-      nextPageStart: rows.rows.length > limit && last ? Number(last.position) + 1 : null,
+      nextPageStart:
+        rows.rows.length > limit && last ? Number(last.position) + 1 : null,
       previousPageStart: start > 0 ? Math.max(0, start - limit) : null,
       startPosition: Number(pageRows[0]?.position ?? start + 1) - 1,
       lastRank: pageRows.length ? Number(pageRows.at(-1)?.rank) : null,
@@ -461,21 +518,29 @@ async function loadCityCountRankings(
       LEFT JOIN countries country ON country.id = stats.country_id
       WHERE stats.${statColumn} > 0${filters.sql}
     )`;
-  const rows = await query<CityRankingRow>(`
+  const rows = await query<CityRankingRow>(
+    `
     ${cityRankingSql}
     SELECT ranked.*, COALESCE(country.name, ranked.country_id) AS country_name,
       COALESCE(country.iso2, '') AS country_iso2
     FROM ranked LEFT JOIN countries country ON country.id = ranked.country_id
     WHERE ranked.position > ? ORDER BY ranked.position LIMIT ?
-  `, [...filters.values, start, limit + 1]);
-  const counts = await query<{ count: number }>(`
+  `,
+    [...filters.values, start, limit + 1],
+  );
+  const counts = await query<{ count: number }>(
+    `
     ${cityRankingSql} SELECT COUNT(*) AS count FROM ranked
-  `, filters.values);
+  `,
+    filters.values,
+  );
   return cityPage(rows, counts, limit, start, (row) => ({
     personName: row.city_name,
     identitySubtitle: statLabel,
     best: Number(row.stat_value),
-    formattedValue: new Intl.NumberFormat("en-US").format(Number(row.stat_value)),
+    formattedValue: new Intl.NumberFormat("en-US").format(
+      Number(row.stat_value),
+    ),
     competitionId: "",
     competitionName: "",
   }));

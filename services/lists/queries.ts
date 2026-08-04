@@ -1,4 +1,7 @@
-import type { ListLookupQueryInput, ListRankingQueryInput } from "@/services/lists/types";
+import type {
+  ListLookupQueryInput,
+  ListRankingQueryInput,
+} from "@/services/lists/types";
 import { sqlFragment } from "@/lib/helpers/database/sql";
 
 export const LIST_COLUMNS = `

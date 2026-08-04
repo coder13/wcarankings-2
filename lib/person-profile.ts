@@ -158,7 +158,8 @@ export function rankingHref({
 }) {
   const params = new URLSearchParams();
   if (eventId !== "333") params.set("eventId", eventId);
-  if (resultType !== "single" && eventId !== "333mbf") params.set("result", resultType);
+  if (resultType !== "single" && eventId !== "333mbf")
+    params.set("result", resultType);
   if (scope !== "world" && regionId) params.set("region", regionId);
   params.set("wcaId", wcaId);
   const query = params.toString();
@@ -179,12 +180,15 @@ export function metricHref({
   wcaId: string;
 }) {
   const params = new URLSearchParams({ eventId: metric, wcaId });
-  if (metric === "SOR" && resultType === "average") params.set("result", "average");
+  if (metric === "SOR" && resultType === "average")
+    params.set("result", "average");
   if (scope !== "world" && regionId) params.set("region", regionId);
   return `/?${params.toString()}`;
 }
 
-export async function loadPersonProfile(wcaId: string): Promise<PersonProfile | null> {
+export async function loadPersonProfile(
+  wcaId: string,
+): Promise<PersonProfile | null> {
   const normalized = normalizeProfileWcaId(wcaId);
   if (!normalized) return null;
 
@@ -268,34 +272,66 @@ export async function loadPersonProfile(wcaId: string): Promise<PersonProfile | 
     [normalized],
   );
 
-  const thumbPromise = fetchPersonThumbnailsFromWca(normalized, [normalized], 1, 1).catch(() => new Map<string, string | null>());
-  const [metadata, identity, personEventResults, rankingEntriesResults, metricValues, metricScores, thumbs] =
-    await Promise.all([metadataPromise, identityPromise, personEventResultsPromise, rankingEntriesResultsPromise, metricValuesPromise, metricScoresPromise, thumbPromise]);
+  const thumbPromise = fetchPersonThumbnailsFromWca(
+    normalized,
+    [normalized],
+    1,
+    1,
+  ).catch(() => new Map<string, string | null>());
+  const [
+    metadata,
+    identity,
+    personEventResults,
+    rankingEntriesResults,
+    metricValues,
+    metricScores,
+    thumbs,
+  ] = await Promise.all([
+    metadataPromise,
+    identityPromise,
+    personEventResultsPromise,
+    rankingEntriesResultsPromise,
+    metricValuesPromise,
+    metricScoresPromise,
+    thumbPromise,
+  ]);
   const person = identity.rows[0];
   if (!person) return null;
-  const resultRows = personEventResults.length ? personEventResults : rankingEntriesResults;
+  const resultRows = personEventResults.length
+    ? personEventResults
+    : rankingEntriesResults;
 
   const resultByKey = new Map(
-    resultRows.map((row) => [metricKey(row.result_type, row.event_id), {
-      resultType: row.result_type,
-      resultId: Number(row.result_id),
-      value: Number(row.result_value),
-      formatted: formatWcaResult(row.event_id, Number(row.result_value), row.result_type),
-      worldRank: Number(row.world_rank),
-      continentRank: Number(row.continent_rank),
-      countryRank: Number(row.country_rank),
-      competitionId: row.competition_id,
-      competitionName: row.competition_name,
-      competitionStartDate: row.competition_start_date,
-    } satisfies PersonProfileResult]),
+    resultRows.map((row) => [
+      metricKey(row.result_type, row.event_id),
+      {
+        resultType: row.result_type,
+        resultId: Number(row.result_id),
+        value: Number(row.result_value),
+        formatted: formatWcaResult(
+          row.event_id,
+          Number(row.result_value),
+          row.result_type,
+        ),
+        worldRank: Number(row.world_rank),
+        continentRank: Number(row.continent_rank),
+        countryRank: Number(row.country_rank),
+        competitionId: row.competition_id,
+        competitionName: row.competition_name,
+        competitionStartDate: row.competition_start_date,
+      } satisfies PersonProfileResult,
+    ]),
   );
   const metricByKey = new Map(
-    metricValues.map((row) => [metricKey(row.result_type, row.event_id), {
-      resultType: row.result_type,
-      eventId: row.event_id,
-      eventRank: Number(row.event_rank),
-      kinchValue: scoreNumber(row.kinch_value),
-    } satisfies PersonProfileMetricValue]),
+    metricValues.map((row) => [
+      metricKey(row.result_type, row.event_id),
+      {
+        resultType: row.result_type,
+        eventId: row.event_id,
+        eventRank: Number(row.event_rank),
+        kinchValue: scoreNumber(row.kinch_value),
+      } satisfies PersonProfileMetricValue,
+    ]),
   );
 
   return {
@@ -316,13 +352,15 @@ export async function loadPersonProfile(wcaId: string): Promise<PersonProfile | 
       eventName: event.name,
       eventShortName: event.shortName,
       single: resultByKey.get(metricKey("single", event.id)) ?? null,
-      average: event.id === "333mbf"
-        ? null
-        : resultByKey.get(metricKey("average", event.id)) ?? null,
+      average:
+        event.id === "333mbf"
+          ? null
+          : (resultByKey.get(metricKey("average", event.id)) ?? null),
       singleMetric: metricByKey.get(metricKey("single", event.id)) ?? null,
-      averageMetric: event.id === "333mbf"
-        ? null
-        : metricByKey.get(metricKey("average", event.id)) ?? null,
+      averageMetric:
+        event.id === "333mbf"
+          ? null
+          : (metricByKey.get(metricKey("average", event.id)) ?? null),
     })),
     metricScores: metricScores.map((row) => ({
       resultType: row.result_type,

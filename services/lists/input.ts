@@ -14,8 +14,13 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
   let type: RankingType = "single";
   if (eventId !== "333mbf" && isRankingType(rawType)) type = rawType;
   const rawStart = Number(searchParams.get("start"));
-  const start = Number.isFinite(rawStart) ? Math.max(0, Math.floor(rawStart)) : 0;
-  const pageLimit = Math.max(1, Math.min(100, Math.floor(Number(searchParams.get("limit")) || 50)));
+  const start = Number.isFinite(rawStart)
+    ? Math.max(0, Math.floor(rawStart))
+    : 0;
+  const pageLimit = Math.max(
+    1,
+    Math.min(100, Math.floor(Number(searchParams.get("limit")) || 50)),
+  );
   const search = (searchParams.get("search") ?? "").trim().slice(0, 80);
   const locate = (searchParams.get("locate") ?? "").trim().toUpperCase();
   const searchLimit = Math.max(
@@ -28,10 +33,17 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
     searchParams
       .getAll("gender")
       .flatMap((value) => value.split(","))
-      .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
+      .filter(
+        (value): value is GenderFilter =>
+          value === "m" || value === "f" || value === "o",
+      ),
   );
-  const requestedMembershipVersion = Number(searchParams.get("membershipVersion"));
-  const requestedDataVersion = (searchParams.get("rankingsDataVersion") ?? "").slice(0, 64);
+  const requestedMembershipVersion = Number(
+    searchParams.get("membershipVersion"),
+  );
+  const requestedDataVersion = (
+    searchParams.get("rankingsDataVersion") ?? ""
+  ).slice(0, 64);
   return {
     eventId,
     type,
@@ -42,7 +54,8 @@ export function parseListRankingInput(searchParams: URLSearchParams) {
     region,
     gender,
     membershipVersion:
-      Number.isSafeInteger(requestedMembershipVersion) && requestedMembershipVersion > 0
+      Number.isSafeInteger(requestedMembershipVersion) &&
+      requestedMembershipVersion > 0
         ? requestedMembershipVersion
         : null,
     rankingsDataVersion: requestedDataVersion || null,

@@ -22,7 +22,9 @@ export type RankingEntry = {
   recordStreakWeeks?: number | null;
 };
 
-export function rankingEntryKey(entry: Pick<RankingEntry, "entryKey" | "personId">) {
+export function rankingEntryKey(
+  entry: Pick<RankingEntry, "entryKey" | "personId">,
+) {
   return entry.entryKey ?? entry.personId;
 }
 

@@ -20,8 +20,11 @@ trap capture_failed_generation_diagnostics ERR
 [[ "$PRODUCTION_WCA_EXPORT_VALUE" =~ ^[0-9TZUTC:+.\ -]+$ ]]
 for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do
   case "$group" in
-    compatibility|result-facts|result-rankings|competition-rankings|person-competition-rankings|city-rankings|sum-of-ranks|yearly-person-rankings) ;;
-    *) echo "Unknown projection group: $group" >&2; exit 1 ;;
+    compatibility | result-facts | result-rankings | competition-rankings | person-competition-rankings | city-rankings | sum-of-ranks | yearly-person-rankings) ;;
+    *)
+      echo "Unknown projection group: $group" >&2
+      exit 1
+      ;;
   esac
 done
 gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}" \
@@ -30,7 +33,7 @@ jq -e \
   --arg name "$ARTIFACT_NAME" \
   --argjson run "$ARTIFACT_RUN_ID" \
   '.name == $name and .workflow_run.id == $run and .expired == false' \
-  /tmp/artifact-coordinate.json >/dev/null
+  /tmp/artifact-coordinate.json > /dev/null
 
 # Verify the lightweight release coordinate and compatibility contract.
 node scripts/projection-release-coordinate.mjs verify \
@@ -55,7 +58,7 @@ normalized_production_export=$(normalize_export_identity "$PRODUCTION_WCA_EXPORT
 echo "Projection export identity: build=$normalized_build_export; production=$normalized_production_export"
 if [ "$normalized_build_export" != "$normalized_production_export" ]; then
   echo "Projection artifact must include the raw export because the build and production exports differ." >&2
-  jq -e '.raw != null' "$PROJECTION_ARTIFACT_DIR/projection-release.json" >/dev/null
+  jq -e '.raw != null' "$PROJECTION_ARTIFACT_DIR/projection-release.json" > /dev/null
 fi
 artifact_format=$(jq -r '.compatibility.artifactFormatVersion // "missing"' \
   "$PROJECTION_ARTIFACT_DIR/projection-release.json")
@@ -78,13 +81,13 @@ scp -q -o BatchMode=yes docker-compose.yml \
   "$SERVER_USER@$SERVER_IP:/srv/wcarankings/.projection-compose-${ARTIFACT_ID}.yml"
 local_auth_directory=$(mktemp -d)
 cleanup_local_auth() {
-  docker --config "$local_auth_directory" logout ghcr.io >/dev/null 2>&1 || true
+  docker --config "$local_auth_directory" logout ghcr.io > /dev/null 2>&1 || true
   rm -rf "$local_auth_directory"
 }
 trap cleanup_local_auth EXIT
 printf '%s' "$GHCR_TOKEN" \
   | docker --config "$local_auth_directory" login ghcr.io \
-      --username "$GHCR_ACTOR" --password-stdin >/dev/null
+    --username "$GHCR_ACTOR" --password-stdin > /dev/null
 scp -q -o BatchMode=yes "$local_auth_directory/config.json" \
   "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json"
 ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
@@ -93,7 +96,7 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
    WCA_EXPORT_VALUE='$WCA_EXPORT_VALUE' \
    EXPECTED_SOURCE_SHA='$EXPECTED_SOURCE_SHA' \
    DATA_TOOLS_IMAGE='$DATA_TOOLS_IMAGE' \
-   FLYWAY_IMAGE='$FLYWAY_IMAGE' sh -s" <<'REMOTE'
+   FLYWAY_IMAGE='$FLYWAY_IMAGE' sh -s" << 'REMOTE'
   set -eu
   release_file="/tmp/wcarankings-${ARTIFACT_ID}-release.json"
   auth_directory=$(mktemp -d)
@@ -211,7 +214,7 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
    HAS_RAW='$has_raw' \
    DATA_TOOLS_IMAGE_REF='wcarankings-data-tools:artifact-${ARTIFACT_ID}' \
    FLYWAY_IMAGE_REF='wcarankings-flyway:artifact-${ARTIFACT_ID}' \
-   FAILURE_INJECTION_POINT='$FAILURE_INJECTION_POINT' sh -s" <<'REMOTE'
+   FAILURE_INJECTION_POINT='$FAILURE_INJECTION_POINT' sh -s" << 'REMOTE'
   set -eu
   cd /srv/wcarankings
   compose_base="/srv/wcarankings/.projection-compose-${ARTIFACT_ID}.yml"
@@ -749,7 +752,7 @@ fi
 
 # Refresh database-backed and externally sourced system lists after activation.
 ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-  "ARTIFACT_ID='$ARTIFACT_ID' sh -s" <<'REMOTE'
+  "ARTIFACT_ID='$ARTIFACT_ID' sh -s" << 'REMOTE'
   set -eu
   cd /srv/wcarankings
   compose_base="/srv/wcarankings/.projection-compose-${ARTIFACT_ID}.yml"
@@ -761,7 +764,7 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
     data-tools /app/scripts/refresh-system-lists.mjs
 REMOTE
 ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-  "ARTIFACT_ID='$ARTIFACT_ID' sh -s" <<'REMOTE'
+  "ARTIFACT_ID='$ARTIFACT_ID' sh -s" << 'REMOTE'
   set -eu
   cd /srv/wcarankings
   compose_base="/srv/wcarankings/.projection-compose-${ARTIFACT_ID}.yml"
@@ -773,7 +776,7 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
     data-tools /app/scripts/refresh-board-list.mjs
 REMOTE
 ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-  "ARTIFACT_ID='$ARTIFACT_ID' sh -s" <<'REMOTE'
+  "ARTIFACT_ID='$ARTIFACT_ID' sh -s" << 'REMOTE'
   set -eu
   cd /srv/wcarankings
   compose_base="/srv/wcarankings/.projection-compose-${ARTIFACT_ID}.yml"

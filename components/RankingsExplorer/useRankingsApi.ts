@@ -44,7 +44,8 @@ function rankingResource({
   if (subject !== "competitions") {
     return personCompetitionRanking ? "person-competition-count" : "people";
   }
-  if (competitionRanking === "latitude") return `latitude-${latitudeHemisphere}`;
+  if (competitionRanking === "latitude")
+    return `latitude-${latitudeHemisphere}`;
   if (competitionRanking === "competitor-count") return "competitor-count";
   return competitionRanking === "podiums" ? "podiums" : "competitions";
 }
@@ -58,41 +59,44 @@ export function useRankingsApi({
   source?: RankingSource;
   initialData?: InitialRankingData;
 }) {
-  const {
-    eventId,
-    rankingType,
-    regionSelection,
-    gender,
-    year,
-  } = filters;
+  const { eventId, rankingType, regionSelection, gender, year } = filters;
   const resource = rankingResource(filters);
-  const queryFilters = useMemo(() => ({
-    eventId,
-    rankingType,
-    regionSelection,
-    resource,
-    source,
-    gender,
-    year,
-  }), [eventId, gender, rankingType, regionSelection, resource, source, year]);
+  const queryFilters = useMemo(
+    () => ({
+      eventId,
+      rankingType,
+      regionSelection,
+      resource,
+      source,
+      gender,
+      year,
+    }),
+    [eventId, gender, rankingType, regionSelection, resource, source, year],
+  );
   seedSavedListVersionWindow(queryFilters, initialData);
 
   const datasetKey = JSON.stringify(rankingWindowQueryKey(queryFilters));
   const requests = useRankingsQueryApi(queryFilters);
-  const range = useMemo(() => ({
-    cacheKey: datasetKey,
-    fetchRange: (
-      request: { start: number; count: number },
-      signal: AbortSignal,
-    ) => requests.getRange(request.start, request.count, signal),
-  }), [datasetKey, requests]);
+  const range = useMemo(
+    () => ({
+      cacheKey: datasetKey,
+      fetchRange: (
+        request: { start: number; count: number },
+        signal: AbortSignal,
+      ) => requests.getRange(request.start, request.count, signal),
+    }),
+    [datasetKey, requests],
+  );
 
-  return useMemo(() => ({
-    datasetKey,
-    range,
-    search: requests.searchRankings,
-    locate: requests.locateRanking,
-  }), [datasetKey, range, requests]);
+  return useMemo(
+    () => ({
+      datasetKey,
+      range,
+      search: requests.searchRankings,
+      locate: requests.locateRanking,
+    }),
+    [datasetKey, range, requests],
+  );
 }
 
 export type RankingsApi = ReturnType<typeof useRankingsApi>;

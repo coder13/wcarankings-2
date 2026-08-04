@@ -2,7 +2,8 @@ export type RankingType = "single" | "average";
 export type GenderFilter = "m" | "f" | "o";
 export type GenderFilters = readonly GenderFilter[];
 export type RegionScope = "world" | "continent" | "country";
-export type RecordBadgeCode = "WR" | "AfR" | "AsR" | "ER" | "NaR" | "OcR" | "SaR" | "NR";
+export type RecordBadgeCode =
+  "WR" | "AfR" | "AsR" | "ER" | "NaR" | "OcR" | "SaR" | "NR";
 
 export const RECORD_BADGE_LABELS: Record<RecordBadgeCode, string> = {
   WR: "World Record",
@@ -92,7 +93,9 @@ export function isGenderFilter(value: string | null): value is GenderFilter {
 }
 
 export function normalizeGenderFilters(values: readonly GenderFilter[]) {
-  const normalized = (["m", "f", "o"] as const).filter((value) => values.includes(value));
+  const normalized = (["m", "f", "o"] as const).filter((value) =>
+    values.includes(value),
+  );
   return normalized.length === 3 ? [] : normalized;
 }
 
@@ -114,14 +117,19 @@ export function isRegionScope(value: string | null): value is RegionScope {
   return value === "world" || value === "continent" || value === "country";
 }
 
-export function parseRegionQuery(value: string | null): { scope: RegionScope; regionId: string } {
+export function parseRegionQuery(value: string | null): {
+  scope: RegionScope;
+  regionId: string;
+} {
   if (!value || value === "world") return { scope: "world", regionId: "" };
   return value.startsWith("_")
     ? { scope: "continent", regionId: value }
     : { scope: "country", regionId: value };
 }
 
-export function isEventId(value: string | null): value is (typeof WCA_EVENTS)[number]["id"] {
+export function isEventId(
+  value: string | null,
+): value is (typeof WCA_EVENTS)[number]["id"] {
   return WCA_EVENTS.some((event) => event.id === value);
 }
 
@@ -181,7 +189,9 @@ export function formatWcaResult(
 
 export function flagEmoji(iso2: string) {
   if (!/^[A-Z]{2}$/.test(iso2)) return "🌐";
-  return String.fromCodePoint(...[...iso2].map((char) => 127397 + char.charCodeAt(0)));
+  return String.fromCodePoint(
+    ...[...iso2].map((char) => 127397 + char.charCodeAt(0)),
+  );
 }
 
 const continentRecordCodes: Record<string, RecordBadgeCode> = {

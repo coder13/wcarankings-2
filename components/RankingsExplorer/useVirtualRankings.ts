@@ -1,7 +1,10 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useWindowVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
+import {
+  useWindowVirtualizer,
+  type VirtualItem,
+} from "@tanstack/react-virtual";
 import {
   useCallback,
   useEffect,
@@ -83,14 +86,16 @@ function staticVirtualItems(
     const localIndex = globalIndex - baseIndex;
     if (localIndex < 0 || localIndex >= WINDOW_ROWS) return [];
     const start = listOffset + localIndex * RANKING_ROW_HEIGHT;
-    return [{
-      index: localIndex,
-      key: globalIndex,
-      start,
-      end: start + RANKING_ROW_HEIGHT,
-      size: RANKING_ROW_HEIGHT,
-      lane: 0,
-    } satisfies VirtualItem];
+    return [
+      {
+        index: localIndex,
+        key: globalIndex,
+        start,
+        end: start + RANKING_ROW_HEIGHT,
+        size: RANKING_ROW_HEIGHT,
+        lane: 0,
+      } satisfies VirtualItem,
+    ];
   });
 }
 
@@ -118,9 +123,8 @@ export function useVirtualRankings({
   if (windowState.datasetKey !== datasetKey) {
     setWindowState({ datasetKey, baseIndex: 0 });
   }
-  const baseIndex = windowState.datasetKey === datasetKey
-    ? windowState.baseIndex
-    : 0;
+  const baseIndex =
+    windowState.datasetKey === datasetKey ? windowState.baseIndex : 0;
   const rangeStart =
     Math.floor(Math.max(0, baseIndex - 1) / RANGE_CACHE_BUCKET_ROWS) *
     RANGE_CACHE_BUCKET_ROWS;
@@ -136,26 +140,24 @@ export function useVirtualRankings({
     ] as const,
     queryFn: async ({ signal }) => ({
       datasetKey,
-      ...await api.fetchRange(
+      ...(await api.fetchRange(
         { start: rangeStart, count: rangeCount },
         signal,
-      ),
+      )),
     }),
     placeholderData: (previous) =>
-      previous?.datasetKey === datasetKey ? keepPreviousData(previous) : undefined,
+      previous?.datasetKey === datasetKey
+        ? keepPreviousData(previous)
+        : undefined,
     staleTime: Infinity,
     gcTime: RANGE_CACHE_TIME_MS,
   });
-  const range = rangeQuery.data?.datasetKey === datasetKey
-    ? rangeQuery.data
-    : null;
+  const range =
+    rangeQuery.data?.datasetKey === datasetKey ? rangeQuery.data : null;
   const total = range?.total ?? initialData?.total ?? 0;
   const windowCount = Math.min(WINDOW_ROWS, total);
   const maximumBaseIndex = Math.max(0, total - windowCount);
-  const edgeRows = Math.min(
-    RECENTER_EDGE_ROWS,
-    Math.floor(windowCount / 2),
-  );
+  const edgeRows = Math.min(RECENTER_EDGE_ROWS, Math.floor(windowCount / 2));
   const targetLocalIndex = Math.min(
     RECENTER_TARGET_ROW,
     Math.max(0, windowCount - edgeRows),
@@ -173,8 +175,7 @@ export function useVirtualRankings({
   });
   const virtualizer = useWindowVirtualizer({
     count: windowCount,
-    estimateSize: (localIndex) =>
-      expansion.rowSize(baseIndex + localIndex),
+    estimateSize: (localIndex) => expansion.rowSize(baseIndex + localIndex),
     getItemKey: (localIndex) => `${datasetKey}:${baseIndex + localIndex}`,
     overscan: OVERSCAN_ROWS,
     scrollMargin: listOffset,
@@ -196,13 +197,7 @@ export function useVirtualRankings({
     scrollAnimation.cancel();
     expansion.reset({ resizeRow: resizeGlobalRow });
     window.scrollTo({ top: 0, behavior: "auto" });
-  }, [
-    datasetKey,
-    expansion,
-    listOffset,
-    resizeGlobalRow,
-    scrollAnimation,
-  ]);
+  }, [datasetKey, expansion, listOffset, resizeGlobalRow, scrollAnimation]);
 
   const previousListOffsetRef = useRef(listOffset);
   useLayoutEffect(() => {
@@ -224,8 +219,7 @@ export function useVirtualRankings({
       const localIndex = globalIndex - baseIndex;
       const nearTop = localIndex <= edgeRows && baseIndex > 0;
       const nearBottom =
-        localIndex >= windowCount - edgeRows &&
-        baseIndex < maximumBaseIndex;
+        localIndex >= windowCount - edgeRows && baseIndex < maximumBaseIndex;
       if (!nearTop && !nearBottom) return;
 
       expansion.finish();
@@ -314,18 +308,19 @@ export function useVirtualRankings({
       const targetCenter =
         expansion.offsetForIndex(targetIndex) +
         expansion.rowSize(targetIndex) / 2;
-      let finalOffset = targetIndex === 0 && nextBaseIndex === 0
-        ? 0
-        : Math.min(
-            maximumScrollOffset,
-            Math.max(
-              listOffset,
-              listOffset +
-                targetCenter -
-                expansion.offsetForIndex(nextBaseIndex) -
-                window.innerHeight * JUMP_VIEWPORT_ANCHOR,
-            ),
-          );
+      let finalOffset =
+        targetIndex === 0 && nextBaseIndex === 0
+          ? 0
+          : Math.min(
+              maximumScrollOffset,
+              Math.max(
+                listOffset,
+                listOffset +
+                  targetCenter -
+                  expansion.offsetForIndex(nextBaseIndex) -
+                  window.innerHeight * JUMP_VIEWPORT_ANCHOR,
+              ),
+            );
       if (targetIndex === total - 1) {
         finalOffset = Math.max(
           finalOffset,
@@ -335,14 +330,17 @@ export function useVirtualRankings({
 
       if (!animate || direction === 0) {
         scrollAnimation.cancel();
-        flushSync(() => setWindowState({ datasetKey, baseIndex: nextBaseIndex }));
+        flushSync(() =>
+          setWindowState({ datasetKey, baseIndex: nextBaseIndex }),
+        );
         window.scrollTo({ top: finalOffset, behavior: "auto" });
         return;
       }
 
-      const availableAnimationRows = direction > 0
-        ? (finalOffset - listOffset) / RANKING_ROW_HEIGHT
-        : (maximumScrollOffset - finalOffset) / RANKING_ROW_HEIGHT;
+      const availableAnimationRows =
+        direction > 0
+          ? (finalOffset - listOffset) / RANKING_ROW_HEIGHT
+          : (maximumScrollOffset - finalOffset) / RANKING_ROW_HEIGHT;
       const animatedRows = Math.max(
         0,
         Math.min(
@@ -386,10 +384,7 @@ export function useVirtualRankings({
   );
   const items = rawItems.map((item) => {
     const globalIndex = baseIndex + item.index;
-    const expandedContentHeight = Math.max(
-      0,
-      item.size - RANKING_ROW_HEIGHT,
-    );
+    const expandedContentHeight = Math.max(0, item.size - RANKING_ROW_HEIGHT);
     const entry = rows[globalIndex] ?? null;
     return {
       ...item,
@@ -411,9 +406,13 @@ export function useVirtualRankings({
   const currentGlobalOffset =
     expansion.offsetForIndex(baseIndex) +
     Math.max(0, scrollOffset - listOffset);
-  const currentIndex = total > 0
-    ? Math.min(total - 1, Math.floor(expansion.indexAtOffset(currentGlobalOffset)))
-    : 0;
+  const currentIndex =
+    total > 0
+      ? Math.min(
+          total - 1,
+          Math.floor(expansion.indexAtOffset(currentGlobalOffset)),
+        )
+      : 0;
   const totalHeight = hydrated
     ? virtualizer.getTotalSize()
     : windowCount * RANKING_ROW_HEIGHT;
@@ -432,7 +431,8 @@ export function useVirtualRankings({
       loading: rangeQuery.isPending,
       error,
       exportDate: range?.exportDate ?? initialData?.exportDate ?? null,
-      availableYears: range?.availableYears ?? initialData?.availableYears ?? [],
+      availableYears:
+        range?.availableYears ?? initialData?.availableYears ?? [],
       offlineStale: range?.offlineStale ?? false,
       jumpAnimating: scrollAnimation.active,
       jumpToIndex,

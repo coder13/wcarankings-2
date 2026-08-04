@@ -27,7 +27,11 @@ export function generateListPublicId() {
 export function normalizeListPublicId(value: string) {
   const normalized = value.trim().toUpperCase();
   if (normalized.length !== LIST_PUBLIC_ID_LENGTH) return null;
-  if (![...normalized].every((character) => LIST_PUBLIC_ID_ALPHABET.includes(character))) {
+  if (
+    ![...normalized].every((character) =>
+      LIST_PUBLIC_ID_ALPHABET.includes(character),
+    )
+  ) {
     return null;
   }
   return normalized;

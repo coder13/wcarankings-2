@@ -145,9 +145,7 @@ function rankingTypeForSubject(
   if (subject !== "competitions" || competitionRanking !== "podiums") {
     return requested;
   }
-  return ["333bf", "444bf", "555bf"].includes(eventId)
-    ? "single"
-    : "average";
+  return ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average";
 }
 
 function yearFromUrl(pathname: string, params: URLSearchParams) {
@@ -168,7 +166,8 @@ function normalizeState(
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
   const cityRanking = cityRankingFromPathname(pathname);
-  const personCompetitionRanking = personCompetitionRankingFromPathname(pathname);
+  const personCompetitionRanking =
+    personCompetitionRankingFromPathname(pathname);
   const eventId = validEventForSubject(subject, state.eventId);
   const podiumEventId =
     subject === "competitions" &&
@@ -203,7 +202,8 @@ function normalizeState(
         ? state.latitudeHemisphere
         : "north",
     search,
-    regexSearch: state.regexSearch && Boolean(search) && isValidRegexPattern(search),
+    regexSearch:
+      state.regexSearch && Boolean(search) && isValidRegexPattern(search),
     wcaId: WCA_ID_PATTERN.test(wcaId) ? wcaId : "",
     focusMe: !WCA_ID_PATTERN.test(wcaId) && state.focusMe,
     kinchOrder:
@@ -222,9 +222,12 @@ export function parseRankingsUrl(
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
   const cityRanking = cityRankingFromPathname(pathname);
-  const personCompetitionRanking = personCompetitionRankingFromPathname(pathname);
+  const personCompetitionRanking =
+    personCompetitionRankingFromPathname(pathname);
   const rawRankingType = params.get("result");
-  const search = (params.get("search") ?? "").trim().slice(0, MAX_SEARCH_LENGTH);
+  const search = (params.get("search") ?? "")
+    .trim()
+    .slice(0, MAX_SEARCH_LENGTH);
 
   return normalizeState(pathname, {
     subject,
@@ -241,7 +244,8 @@ export function parseRankingsUrl(
           value === "m" || value === "f" || value === "o",
       ),
     ),
-    latitudeHemisphere: params.get("hemisphere") === "south" ? "south" : "north",
+    latitudeHemisphere:
+      params.get("hemisphere") === "south" ? "south" : "north",
     search,
     regexSearch: params.get("mode") === "vim",
     wcaId: params.get("wcaId") ?? "",
@@ -261,12 +265,14 @@ export function serializeRankingsUrl(
     (state.subject === "competitions" &&
       (state.competitionRanking === "latitude" ||
         state.competitionRanking === "competitor-count"));
-  if (!hidesEvent && state.eventId !== "333") params.set("eventId", state.eventId);
+  if (!hidesEvent && state.eventId !== "333")
+    params.set("eventId", state.eventId);
   if (
     !hidesEvent &&
     state.eventId !== "sor-kinch" &&
-    !(state.subject === "competitions" &&
-      state.competitionRanking === "podiums") &&
+    !(
+      state.subject === "competitions" && state.competitionRanking === "podiums"
+    ) &&
     state.rankingType !== "single"
   ) {
     params.set("result", state.rankingType);

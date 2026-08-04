@@ -46,7 +46,9 @@ export class RankingsPageCache<T extends object> {
     let pool = this.pools.get(eventId);
     if (!pool) {
       const capacity =
-        eventId === "333" ? RANKINGS_CACHE_CAPACITY_333 : RANKINGS_CACHE_CAPACITY_DEFAULT;
+        eventId === "333"
+          ? RANKINGS_CACHE_CAPACITY_333
+          : RANKINGS_CACHE_CAPACITY_DEFAULT;
       const nextPool: CachePool<T> = {
         cache: new LRUCache<string, T>({
           max: capacity,
@@ -85,7 +87,10 @@ export class RankingsPageCache<T extends object> {
   }
 
   async getWithStatus(key: RankingsPageKey, load: () => Promise<T>) {
-    const normalized = { ...key, startRank: Math.max(1, Math.floor(key.startRank)) };
+    const normalized = {
+      ...key,
+      startRank: Math.max(1, Math.floor(key.startRank)),
+    };
     const cacheKey = `${normalized.eventId}:${rankingPageKey(normalized)}`;
     const pool = this.pool(normalized.eventId);
     const cached = pool.cache.get(rankingPageKey(normalized));
@@ -184,11 +189,15 @@ export class RankingsPageCache<T extends object> {
   }
 }
 
-export const rankingsPageCache = new RankingsPageCache<Record<string, unknown>>();
+export const rankingsPageCache = new RankingsPageCache<
+  Record<string, unknown>
+>();
 
 /** Shared process-local windows used to serve adjacent 50-row pages from one 400-row query. */
 export class RankingsWindowCache<T extends object> {
-  private readonly cache = new LRUCache<string, T>({ max: RANKINGS_WINDOW_CACHE_CAPACITY });
+  private readonly cache = new LRUCache<string, T>({
+    max: RANKINGS_WINDOW_CACHE_CAPACITY,
+  });
   private readonly pinned = new Map<string, T>();
   private readonly pending = new Map<string, Promise<T>>();
 
@@ -202,11 +211,16 @@ export class RankingsWindowCache<T extends object> {
     return this.pinned.has(key) || this.cache.has(key);
   }
 
-  async getWithStatus(key: string, load: () => Promise<T>, { pin = false } = {}) {
+  async getWithStatus(
+    key: string,
+    load: () => Promise<T>,
+    { pin = false } = {},
+  ) {
     const cached = this.pinned.get(key) ?? this.cache.get(key);
     if (cached !== undefined) return { value: cached, outcome: "hit" as const };
     const inFlight = this.pending.get(key);
-    if (inFlight) return { value: await inFlight, outcome: "coalesced" as const };
+    if (inFlight)
+      return { value: await inFlight, outcome: "coalesced" as const };
     const request = load().then((value) => {
       if (pin) this.pinned.set(key, value);
       else this.cache.set(key, value);
@@ -221,7 +235,9 @@ export class RankingsWindowCache<T extends object> {
   }
 }
 
-export const rankingsWindowCache = new RankingsWindowCache<Record<string, unknown>>();
+export const rankingsWindowCache = new RankingsWindowCache<
+  Record<string, unknown>
+>();
 
 export function normalPageKey(input: RankingsPageKey) {
   return { ...input, startRank: Math.max(1, Math.floor(input.startRank)) };

@@ -37,9 +37,7 @@ export function nextEventPickerOptionIndex({
       : undefined;
   }
   if (key === "ArrowLeft") {
-    return currentIndex % EVENT_GRID_COLUMNS > 0
-      ? currentIndex - 1
-      : undefined;
+    return currentIndex % EVENT_GRID_COLUMNS > 0 ? currentIndex - 1 : undefined;
   }
   if (key === "ArrowUp") {
     const nextIndex = currentIndex - EVENT_GRID_COLUMNS;

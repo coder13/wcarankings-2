@@ -18,7 +18,9 @@ export async function loadPersonCompetitionRankings(params: URLSearchParams) {
   const { scope, regionId } = parseScope(params);
   const genders = parseGender(params);
   if (genders.length > 1) {
-    throw new ApiInputError("Competition rankings support one gender filter at a time.");
+    throw new ApiInputError(
+      "Competition rankings support one gender filter at a time.",
+    );
   }
   const gender = genders[0] ?? "all";
   const start = Number(params.get("start") ?? "0");
@@ -34,7 +36,11 @@ export async function loadPersonCompetitionRankings(params: URLSearchParams) {
       start,
       limit + 1,
     ]),
-    query<{ count: number }>(personCompetitionRankingCountQuery(), [scope, regionId, gender]),
+    query<{ count: number }>(personCompetitionRankingCountQuery(), [
+      scope,
+      regionId,
+      gender,
+    ]),
   ]);
   const pageRows = rows.rows.slice(0, limit);
   const last = pageRows.at(-1);
@@ -54,7 +60,8 @@ export async function loadPersonCompetitionRankings(params: URLSearchParams) {
         recordBadges: [],
       })),
       hasMore: rows.rows.length > limit,
-      nextPageStart: rows.rows.length > limit && last ? Number(last.position) + 1 : null,
+      nextPageStart:
+        rows.rows.length > limit && last ? Number(last.position) + 1 : null,
       previousPageStart: start > 1 ? Math.max(1, start - limit) : null,
       startPosition: Number(pageRows[0]?.position ?? start) - 1,
       lastRank: last ? Number(last.rank) : null,

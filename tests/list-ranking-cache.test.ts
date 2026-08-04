@@ -12,10 +12,15 @@ test("user list member capacity rejects create, bulk add, clone, and accepted-re
     [USER_LIST_MEMBER_LIMIT + 1, 0],
     [USER_LIST_MEMBER_LIMIT, 1],
   ]) {
-    assert.throws(() => assertListMemberCapacity("user", current, additions), /10,000/);
+    assert.throws(
+      () => assertListMemberCapacity("user", current, additions),
+      /10,000/,
+    );
   }
 });
 
 test("system lists are exempt from the user member cap", () => {
-  assert.doesNotThrow(() => assertListMemberCapacity("system", USER_LIST_MEMBER_LIMIT * 10, 1));
+  assert.doesNotThrow(() =>
+    assertListMemberCapacity("system", USER_LIST_MEMBER_LIMIT * 10, 1),
+  );
 });

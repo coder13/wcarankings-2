@@ -7,7 +7,7 @@ cleanup_transfer() {
   docker compose exec -T db mariadb \
     --user=root --password="$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" \
     --execute="DROP TABLE IF EXISTS bulk_transfer_alpha, bulk_transfer_beta;" \
-    >/dev/null 2>&1 || true
+    > /dev/null 2>&1 || true
   rm -rf "$transfer_root"
 }
 trap cleanup_transfer EXIT
@@ -29,7 +29,7 @@ docker compose exec -T db mariadb \
       (3, CONCAT('line', CHAR(10), 'value'), 7);
     INSERT INTO bulk_transfer_beta VALUES (1, 1), (2, 0);
   "
-cat > "$transfer_root/transfer.json" <<'JSON'
+cat > "$transfer_root/transfer.json" << 'JSON'
 {
   "group": "compatibility",
   "tables": ["bulk_transfer_alpha", "bulk_transfer_beta"]
@@ -46,14 +46,14 @@ tar -xzf "$transfer_root/transfer.tar.gz" -C "$transfer_root/files"
 chmod -R a+rX "$transfer_root"
 DATA_TOOLS_IMAGE_REF=wcarankings-data-tools:pull-request \
   docker compose run --rm -T \
-    -e DATABASE_NAME_OVERRIDE="$MYSQL_DATABASE" \
-    -e WCA_PROJECTION_IMPORT_CONCURRENCY=2 \
-    -v "$transfer_root/files:/projection-transfer:ro" \
-    -v "$transfer_root/transfer.json:/projection-transfer.json:ro" \
-    data-tools /app/scripts/import-projection-transfer.mjs \
-      --directory=/projection-transfer \
-      --metadata=/projection-transfer.json \
-      --concurrency=2
+  -e DATABASE_NAME_OVERRIDE="$MYSQL_DATABASE" \
+  -e WCA_PROJECTION_IMPORT_CONCURRENCY=2 \
+  -v "$transfer_root/files:/projection-transfer:ro" \
+  -v "$transfer_root/transfer.json:/projection-transfer.json:ro" \
+  data-tools /app/scripts/import-projection-transfer.mjs \
+  --directory=/projection-transfer \
+  --metadata=/projection-transfer.json \
+  --concurrency=2
 restored=$(docker compose exec -T db mariadb \
   --user="$MYSQL_USER" --password="$MYSQL_PASSWORD" "$MYSQL_DATABASE" \
   --batch --skip-column-names \

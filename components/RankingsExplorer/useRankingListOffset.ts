@@ -21,7 +21,9 @@ export function useRankingListOffset() {
       }
       if (!list) return;
       const nextOffset = list.getBoundingClientRect().top + window.scrollY;
-      setListOffset((current) => current === nextOffset ? current : nextOffset);
+      setListOffset((current) =>
+        current === nextOffset ? current : nextOffset,
+      );
     };
     const mutationObserver = new MutationObserver(measure);
     resizeObserver.observe(document.body);

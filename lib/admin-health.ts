@@ -5,11 +5,7 @@ import {
 } from "@/services/rankings/cache";
 
 export const capabilityTables = {
-  core: [
-    "ranking_entries_single",
-    "ranking_entries_average",
-    "ranking_counts",
-  ],
+  core: ["ranking_entries_single", "ranking_entries_average", "ranking_counts"],
   resultRankings: [
     "result_rankings_single",
     "result_rankings_average",

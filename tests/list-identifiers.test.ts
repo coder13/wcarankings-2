@@ -14,7 +14,9 @@ test("generates readable eight-character public list IDs", () => {
   assert.equal(ids.size, 100);
   for (const id of ids) {
     assert.equal(id.length, 8);
-    assert.ok([...id].every((character) => LIST_PUBLIC_ID_ALPHABET.includes(character)));
+    assert.ok(
+      [...id].every((character) => LIST_PUBLIC_ID_ALPHABET.includes(character)),
+    );
     assert.doesNotMatch(id, /[ILOU]/);
   }
 });

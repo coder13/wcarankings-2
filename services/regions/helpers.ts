@@ -15,9 +15,12 @@ export function isWcaCountry(value: unknown): value is WcaCountry {
 
 export function getWcaCountries() {
   if (!countriesRequest) {
-    countriesRequest = fetch("https://www.worldcubeassociation.org/api/v0/countries", {
-      signal: AbortSignal.timeout(5000),
-    })
+    countriesRequest = fetch(
+      "https://www.worldcubeassociation.org/api/v0/countries",
+      {
+        signal: AbortSignal.timeout(5000),
+      },
+    )
       .then(async (response) => {
         if (!response.ok) return [];
         const data = (await response.json()) as unknown;

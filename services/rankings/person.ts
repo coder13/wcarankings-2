@@ -10,7 +10,10 @@ import {
 } from "@/lib/api/projection";
 
 import type { PersonRankingRow } from "@/services/rankings/types";
-import { personRankingCountsQuery, personRankingsQuery } from "@/services/rankings/queries";
+import {
+  personRankingCountsQuery,
+  personRankingsQuery,
+} from "@/services/rankings/queries";
 
 export async function loadPersonRankings(params: URLSearchParams) {
   const eventId = parseEvent(params)!;
@@ -87,7 +90,10 @@ export async function loadPersonRankings(params: URLSearchParams) {
       page: {
         limit,
         hasMore: rows.rows.length > limit,
-        next: rows.rows.length > limit && !personId ? { start: start + limit } : null,
+        next:
+          rows.rows.length > limit && !personId
+            ? { start: start + limit }
+            : null,
       },
       total: personId ? pageRows.length : Number(counts.rows[0]?.count ?? 0),
     },

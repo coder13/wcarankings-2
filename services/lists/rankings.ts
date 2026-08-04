@@ -6,17 +6,21 @@ import {
   raiseListRankingRebuildPriority,
 } from "@/lib/list-ranking-cache";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
-import {
-  getRecordBadges,
-} from "@/lib/wca";
+import { getRecordBadges } from "@/lib/wca";
 import { parseListRankingInput } from "@/services/lists/input";
-import type { ListRankingRow, ListSummary, ScopedRankingSource } from "@/services/lists/types";
+import type {
+  ListRankingRow,
+  ListSummary,
+  ScopedRankingSource,
+} from "@/services/lists/types";
 
 function isMissingRankingProjection(error: unknown) {
   const databaseError = error as { code?: string; message?: string };
-  return databaseError.code === "ER_NO_SUCH_TABLE" &&
+  return (
+    databaseError.code === "ER_NO_SUCH_TABLE" &&
     (databaseError.message?.includes("person_event_rankings") ||
-      databaseError.message?.includes("result_facts"));
+      databaseError.message?.includes("result_facts"))
+  );
 }
 
 async function loadScopedRankings(
@@ -45,7 +49,9 @@ async function loadScopedRankings(
     scopedValues.push(input.region.regionId);
   }
   if (input.gender.length) {
-    scopedConditions.push(`ranking.gender IN (${input.gender.map(() => "?").join(",")})`);
+    scopedConditions.push(
+      `ranking.gender IN (${input.gender.map(() => "?").join(",")})`,
+    );
     scopedValues.push(...input.gender);
   }
   const conditions = ["sub_rank > ?"];
@@ -139,14 +145,18 @@ async function loadCachedTargetRankings(
   );
   const currentDataVersion = dataVersion.rows[0]?.value;
   const rankingsDataVersion = input.rankingsDataVersion ?? currentDataVersion;
-  const effectiveMembershipVersion = input.membershipVersion ?? membershipVersion;
+  const effectiveMembershipVersion =
+    input.membershipVersion ?? membershipVersion;
   const filterKey = listRankingFilterKey({
     scope: input.region.scope,
     regionId: input.region.regionId,
     genders: input.gender,
   });
   if (!rankingsDataVersion) return null;
-  const recordColumn = input.type === "average" ? "regional_average_record" : "regional_single_record";
+  const recordColumn =
+    input.type === "average"
+      ? "regional_average_record"
+      : "regional_single_record";
   const cache = await query<ListRankingRow>(
     `SELECT entry.list_rank AS rank, entry.list_position AS sub_rank,
         scope.total_count AS total, entry.person_id, person.name AS person_name,
@@ -202,7 +212,15 @@ async function loadCachedTargetRankings(
          AND version.rankings_data_version = ? AND version.status IN ('building', 'ready')
          AND scope.completed_count > ?
        LIMIT 1`,
-      [input.eventId, input.type, targetKey, filterKey, effectiveMembershipVersion, rankingsDataVersion, input.start],
+      [
+        input.eventId,
+        input.type,
+        targetKey,
+        filterKey,
+        effectiveMembershipVersion,
+        rankingsDataVersion,
+        input.start,
+      ],
     );
     if (!exists.rows.length) return null;
   }
@@ -229,7 +247,8 @@ async function loadCachedTargetRankings(
       }),
     })),
     hasMore: cache.rows.length > input.limit,
-    nextStart: cache.rows.length > input.limit ? input.start + input.limit : null,
+    nextStart:
+      cache.rows.length > input.limit ? input.start + input.limit : null,
     total,
     exportDate: metadata.exportDate,
     cacheMembershipVersion: effectiveMembershipVersion,
@@ -241,14 +260,28 @@ async function loadCachedListRankings(
   list: ListSummary,
   input: ReturnType<typeof parseListRankingInput>,
 ) {
-  return loadCachedTargetRankings(`list:${list.id}`, list.membershipVersion, input);
+  return loadCachedTargetRankings(
+    `list:${list.id}`,
+    list.membershipVersion,
+    input,
+  );
 }
 
-export async function loadListRankings(list: ListSummary, searchParams: URLSearchParams) {
+export async function loadListRankings(
+  list: ListSummary,
+  searchParams: URLSearchParams,
+) {
   try {
     const input = parseListRankingInput(searchParams);
-    const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
-    const cacheable = !input.search && !input.locate && isListRankingCacheable("person", input.type, filter);
+    const filter = {
+      scope: input.region.scope,
+      regionId: input.region.regionId,
+      genders: input.gender,
+    } as const;
+    const cacheable =
+      !input.search &&
+      !input.locate &&
+      isListRankingCacheable("person", input.type, filter);
     const filterKey = listRankingFilterKey(filter);
     if (cacheable) {
       const cached = await loadCachedListRankings(list, input);
@@ -267,7 +300,9 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
         };
       }
       if (!input.membershipVersion && !input.rankingsDataVersion) {
-        void raiseListRankingRebuildPriority(list, "person", filterKey).catch(() => undefined);
+        void raiseListRankingRebuildPriority(list, "person", filterKey).catch(
+          () => undefined,
+        );
       }
     }
     const rankings = await loadScopedRankings(
@@ -282,9 +317,11 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
       cacheable ? 100 : 0,
     );
     const fallbackDataVersion = cacheable
-      ? (await query<{ value: string }>(
-        "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
-      )).rows[0]?.value ?? null
+      ? ((
+          await query<{ value: string }>(
+            "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
+          )
+        ).rows[0]?.value ?? null)
       : null;
     return {
       list: {
@@ -298,7 +335,7 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
       ...rankings,
       cacheMembershipVersion: cacheable ? list.membershipVersion : undefined,
       cacheDataVersion: fallbackDataVersion,
-      cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
+      cacheOutcome: cacheable ? ("miss" as const) : ("bypass" as const),
     };
   } catch (error) {
     if (!isMissingRankingProjection(error)) {
@@ -331,7 +368,10 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
   }
 }
 
-export async function loadDynamicListRankings(personIds: string[], searchParams: URLSearchParams) {
+export async function loadDynamicListRankings(
+  personIds: string[],
+  searchParams: URLSearchParams,
+) {
   if (!personIds.length) {
     const metadata = await getCurrentRankingsMetadata();
     return {
@@ -344,13 +384,28 @@ export async function loadDynamicListRankings(personIds: string[], searchParams:
     };
   }
   const input = parseListRankingInput(searchParams);
-  const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
-  const cacheable = !input.search && !input.locate && isListRankingCacheable("person", input.type, filter);
+  const filter = {
+    scope: input.region.scope,
+    regionId: input.region.regionId,
+    genders: input.gender,
+  } as const;
+  const cacheable =
+    !input.search &&
+    !input.locate &&
+    isListRankingCacheable("person", input.type, filter);
   const filterKey = listRankingFilterKey(filter);
   if (cacheable) {
-    const target = await ensureDynamicListRankingTarget(personIds, "person", filterKey);
+    const target = await ensureDynamicListRankingTarget(
+      personIds,
+      "person",
+      filterKey,
+    );
     if (target) {
-      const cached = await loadCachedTargetRankings(target.targetKey, target.membershipVersion, input);
+      const cached = await loadCachedTargetRankings(
+        target.targetKey,
+        target.membershipVersion,
+        input,
+      );
       if (cached) return { ...cached, cacheOutcome: "hit" as const };
     }
   }
@@ -363,5 +418,8 @@ export async function loadDynamicListRankings(personIds: string[], searchParams:
     },
     searchParams,
   );
-  return { ...rankings, cacheOutcome: cacheable ? "miss" as const : "bypass" as const };
+  return {
+    ...rankings,
+    cacheOutcome: cacheable ? ("miss" as const) : ("bypass" as const),
+  };
 }

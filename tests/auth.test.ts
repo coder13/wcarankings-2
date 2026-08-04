@@ -44,7 +44,9 @@ test("uses the WCA staging example application only for local development", () =
   delete process.env.WCA_ORIGIN;
   process.env.NODE_ENV = "development";
   try {
-    const config = getWcaAuthConfig(new Request("http://localhost:3000/api/auth/wca"));
+    const config = getWcaAuthConfig(
+      new Request("http://localhost:3000/api/auth/wca"),
+    );
     assert.deepEqual(config, {
       clientId: "example-application-id",
       clientSecret: "example-secret",
@@ -63,7 +65,8 @@ test("uses the WCA staging example application only for local development", () =
     else process.env.NODE_ENV = previousNodeEnv;
     if (previousClientId === undefined) delete process.env.WCA_CLIENT_ID;
     else process.env.WCA_CLIENT_ID = previousClientId;
-    if (previousClientSecret === undefined) delete process.env.WCA_CLIENT_SECRET;
+    if (previousClientSecret === undefined)
+      delete process.env.WCA_CLIENT_SECRET;
     else process.env.WCA_CLIENT_SECRET = previousClientSecret;
     if (previousOrigin === undefined) delete process.env.WCA_ORIGIN;
     else process.env.WCA_ORIGIN = previousOrigin;
@@ -80,7 +83,9 @@ test("does not allow the WCA staging example configuration in production", () =>
   process.env.WCA_CLIENT_SECRET = "example-secret";
   process.env.WCA_ORIGIN = "https://staging.worldcubeassociation.org";
   try {
-    const config = getWcaAuthConfig(new Request("https://rankings.example.com/api/auth/wca"));
+    const config = getWcaAuthConfig(
+      new Request("https://rankings.example.com/api/auth/wca"),
+    );
     assert.equal(config.clientId, undefined);
     assert.equal(config.clientSecret, undefined);
     assert.equal(config.wcaOrigin, "https://www.worldcubeassociation.org");
@@ -89,7 +94,8 @@ test("does not allow the WCA staging example configuration in production", () =>
     else process.env.NODE_ENV = previousNodeEnv;
     if (previousClientId === undefined) delete process.env.WCA_CLIENT_ID;
     else process.env.WCA_CLIENT_ID = previousClientId;
-    if (previousClientSecret === undefined) delete process.env.WCA_CLIENT_SECRET;
+    if (previousClientSecret === undefined)
+      delete process.env.WCA_CLIENT_SECRET;
     else process.env.WCA_CLIENT_SECRET = previousClientSecret;
     if (previousOrigin === undefined) delete process.env.WCA_ORIGIN;
     else process.env.WCA_ORIGIN = previousOrigin;
@@ -105,27 +111,47 @@ test("uses the forwarded HTTPS protocol for callback URLs and cookies", () => {
 });
 
 test("returns to the current same-origin page after sign-out", () => {
-  const request = new Request("https://rankings.example.com/api/auth/wca/logout", {
-    headers: { referer: "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333" },
-  });
+  const request = new Request(
+    "https://rankings.example.com/api/auth/wca/logout",
+    {
+      headers: {
+        referer:
+          "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333",
+      },
+    },
+  );
   assert.equal(
     getLogoutDestination(request),
     "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333",
   );
-  const externalReferrer = new Request("https://rankings.example.com/api/auth/wca/logout", {
-    headers: { referer: "https://example.com/not-a-safe-return-url" },
-  });
-  assert.equal(getLogoutDestination(externalReferrer), "https://rankings.example.com");
+  const externalReferrer = new Request(
+    "https://rankings.example.com/api/auth/wca/logout",
+    {
+      headers: { referer: "https://example.com/not-a-safe-return-url" },
+    },
+  );
+  assert.equal(
+    getLogoutDestination(externalReferrer),
+    "https://rankings.example.com",
+  );
 });
 
 test("only uses a same-origin OAuth return destination", () => {
-  const request = new Request("https://rankings.example.com/api/auth/wca/callback");
+  const request = new Request(
+    "https://rankings.example.com/api/auth/wca/callback",
+  );
   assert.equal(
-    getSameOriginDestination(request, "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333"),
+    getSameOriginDestination(
+      request,
+      "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333",
+    ),
     "https://rankings.example.com/lists/7K3M9Q2D--friends?eventId=333",
   );
   assert.equal(
-    getSameOriginDestination(request, "https://example.com/not-a-safe-return-url"),
+    getSameOriginDestination(
+      request,
+      "https://example.com/not-a-safe-return-url",
+    ),
     "https://rankings.example.com",
   );
 });
@@ -134,14 +160,22 @@ test("stores the initiating page for the OAuth callback", async () => {
   const previousNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = "development";
   try {
-    const response = await startWcaAuth(new Request("http://localhost:3000/api/auth/wca", {
-      headers: { referer: "http://localhost:3000/lists/7K3M9Q2D--friends?eventId=333" },
-    }));
+    const response = await startWcaAuth(
+      new Request("http://localhost:3000/api/auth/wca", {
+        headers: {
+          referer: "http://localhost:3000/lists/7K3M9Q2D--friends?eventId=333",
+        },
+      }),
+    );
     assert.equal(response.status, 302);
     assert.ok(
-      response.headers.getSetCookie().some((cookie) =>
-        cookie.includes("wca_oauth_return_to=http%3A%2F%2Flocalhost%3A3000%2Flists%2F7K3M9Q2D--friends%3FeventId%3D333"),
-      ),
+      response.headers
+        .getSetCookie()
+        .some((cookie) =>
+          cookie.includes(
+            "wca_oauth_return_to=http%3A%2F%2Flocalhost%3A3000%2Flists%2F7K3M9Q2D--friends%3FeventId%3D333",
+          ),
+        ),
     );
   } finally {
     if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
@@ -160,5 +194,8 @@ test("prefers the WCA avatar thumbnail for the profile menu", () => {
       },
     },
   });
-  assert.equal(profile?.avatarUrl, "https://staging.worldcubeassociation.org/thumb.jpg");
+  assert.equal(
+    profile?.avatarUrl,
+    "https://staging.worldcubeassociation.org/thumb.jpg",
+  );
 });

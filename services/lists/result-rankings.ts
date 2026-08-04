@@ -20,7 +20,9 @@ type ResultListTarget = {
 };
 
 function resultSource(resultType: "single" | "average") {
-  return resultType === "average" ? "result_rankings_average" : "result_rankings_single";
+  return resultType === "average"
+    ? "result_rankings_average"
+    : "result_rankings_single";
 }
 
 function resultEntry(row: ResultRankingRow & { record_code?: string | null }) {
@@ -54,7 +56,8 @@ async function loadCachedResults(
   const dataVersionResult = await query<{ value: string }>(
     "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
   );
-  const rankingsDataVersion = input.rankingsDataVersion ?? dataVersionResult.rows[0]?.value;
+  const rankingsDataVersion =
+    input.rankingsDataVersion ?? dataVersionResult.rows[0]?.value;
   if (!rankingsDataVersion) return null;
   const filterKey = listRankingFilterKey({
     scope: input.region.scope,
@@ -65,9 +68,10 @@ async function loadCachedResults(
   const sourceGender = input.gender.length
     ? ` AND ranking.gender IN (${input.gender.map(() => "?").join(",")})`
     : "";
-  const sourceAttempt = input.type === "single"
-    ? " AND ranking.attempt_number = entry.attempt_number"
-    : "";
+  const sourceAttempt =
+    input.type === "single"
+      ? " AND ranking.attempt_number = entry.attempt_number"
+      : "";
   const cache = await query<ResultRankingRow & { total: number }>(
     `SELECT entry.result_id, NULLIF(entry.attempt_number, 0) AS attempt_number,
         entry.score AS result_value, entry.list_rank AS rank, entry.list_position AS position,
@@ -120,7 +124,15 @@ async function loadCachedResults(
          AND version.membership_version = ? AND version.rankings_data_version = ?
          AND version.status IN ('building', 'ready') AND scope.completed_count > ?
        LIMIT 1`,
-      [input.eventId, input.type, target.targetKey, filterKey, target.membershipVersion, rankingsDataVersion, input.start],
+      [
+        input.eventId,
+        input.type,
+        target.targetKey,
+        filterKey,
+        target.membershipVersion,
+        rankingsDataVersion,
+        input.start,
+      ],
     );
     if (!exists.rows.length) return null;
   }
@@ -129,8 +141,10 @@ async function loadCachedResults(
   return {
     entries: rows.map(resultEntry),
     hasMore: cache.rows.length > input.limit,
-    nextPageStart: cache.rows.length > input.limit ? input.start + input.limit : null,
-    previousPageStart: input.start > 0 ? Math.max(0, input.start - input.limit) : null,
+    nextPageStart:
+      cache.rows.length > input.limit ? input.start + input.limit : null,
+    previousPageStart:
+      input.start > 0 ? Math.max(0, input.start - input.limit) : null,
     startPosition: input.start,
     lastRank: rows.at(-1)?.rank == null ? null : Number(rows.at(-1)?.rank),
     total,
@@ -148,15 +162,21 @@ async function loadDirectResults(
   const joinValues: unknown[] = [];
   const joins: string[] = [];
   const source = `${resultSource(input.type)} source`;
-  const attemptNumber = input.type === "single" ? "source.attempt_number" : "NULL";
-  const competitionStartDate = input.type === "average"
-    ? "order_facts.competition_start_date"
-    : "source.competition_start_date";
+  const attemptNumber =
+    input.type === "single" ? "source.attempt_number" : "NULL";
+  const competitionStartDate =
+    input.type === "average"
+      ? "order_facts.competition_start_date"
+      : "source.competition_start_date";
   if (input.type === "average") {
-    joins.push("JOIN result_facts order_facts ON order_facts.result_id = source.result_id");
+    joins.push(
+      "JOIN result_facts order_facts ON order_facts.result_id = source.result_id",
+    );
   }
   if (target.list) {
-    joins.push("JOIN list_members member ON member.person_id = source.person_id AND member.list_id = ?");
+    joins.push(
+      "JOIN list_members member ON member.person_id = source.person_id AND member.list_id = ?",
+    );
     joinValues.push(target.list.id);
   } else {
     const ids = target.personIds ?? [];
@@ -172,7 +192,9 @@ async function loadDirectResults(
     values.push(input.region.regionId);
   }
   if (input.gender.length) {
-    conditions.push(`source.gender IN (${input.gender.map(() => "?").join(",")})`);
+    conditions.push(
+      `source.gender IN (${input.gender.map(() => "?").join(",")})`,
+    );
     values.push(...input.gender);
   }
   if (input.locate) {
@@ -182,7 +204,9 @@ async function loadDirectResults(
   if (input.search) {
     const people = await searchPersonIds(input.search, false, input.limit);
     if (!people.personIds.length) return emptyDirectResult();
-    conditions.push(`source.person_id IN (${people.personIds.map(() => "?").join(",")})`);
+    conditions.push(
+      `source.person_id IN (${people.personIds.map(() => "?").join(",")})`,
+    );
     values.push(...people.personIds);
   }
   const rows = await query<ResultRankingRow & { total_count?: number }>(
@@ -201,8 +225,10 @@ async function loadDirectResults(
   return {
     entries: pageRows.map(resultEntry),
     hasMore: rows.rows.length > input.limit,
-    nextPageStart: rows.rows.length > input.limit && last ? Number(last.position) + 1 : null,
-    previousPageStart: input.start > 0 ? Math.max(0, input.start - input.limit) : null,
+    nextPageStart:
+      rows.rows.length > input.limit && last ? Number(last.position) + 1 : null,
+    previousPageStart:
+      input.start > 0 ? Math.max(0, input.start - input.limit) : null,
     startPosition: input.start,
     lastRank: last ? Number(last.rank) : null,
     total: Number(rows.rows[0]?.total_count ?? 0),
@@ -212,8 +238,13 @@ async function loadDirectResults(
 
 function emptyResultData() {
   return {
-    entries: [], hasMore: false, nextPageStart: null, previousPageStart: null,
-    startPosition: 0, lastRank: null, total: 0,
+    entries: [],
+    hasMore: false,
+    nextPageStart: null,
+    previousPageStart: null,
+    startPosition: 0,
+    lastRank: null,
+    total: 0,
   };
 }
 
@@ -224,17 +255,43 @@ function emptyDirectResult() {
   };
 }
 
-export async function loadSavedListResultRankings(list: ListSummary, params: URLSearchParams) {
+export async function loadSavedListResultRankings(
+  list: ListSummary,
+  params: URLSearchParams,
+) {
   const input = parseListRankingInput(params);
-  const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
-  const cacheable = !input.search && !input.locate && isListRankingCacheable("result", input.type, filter);
+  const filter = {
+    scope: input.region.scope,
+    regionId: input.region.regionId,
+    genders: input.gender,
+  } as const;
+  const cacheable =
+    !input.search &&
+    !input.locate &&
+    isListRankingCacheable("result", input.type, filter);
   const filterKey = listRankingFilterKey(filter);
-  const target = { targetKey: `list:${list.id}`, membershipVersion: list.membershipVersion, list };
+  const target = {
+    targetKey: `list:${list.id}`,
+    membershipVersion: list.membershipVersion,
+    list,
+  };
   if (cacheable) {
     const cached = await loadCachedResults(target, input);
-    if (cached) return { data: cached, diagnostics: { timings: { queueMs: 0, statementMs: 0 }, queryCount: 2, returnedRows: cached.entries.length, cacheOutcome: "hit" as const, cacheLayer: "list-ranking" as const } };
+    if (cached)
+      return {
+        data: cached,
+        diagnostics: {
+          timings: { queueMs: 0, statementMs: 0 },
+          queryCount: 2,
+          returnedRows: cached.entries.length,
+          cacheOutcome: "hit" as const,
+          cacheLayer: "list-ranking" as const,
+        },
+      };
     if (!input.membershipVersion && !input.rankingsDataVersion) {
-      void raiseListRankingRebuildPriority(list, "result", filterKey).catch(() => undefined);
+      void raiseListRankingRebuildPriority(list, "result", filterKey).catch(
+        () => undefined,
+      );
     }
   }
   const direct = await loadDirectResults(target, input);
@@ -245,24 +302,58 @@ export async function loadSavedListResultRankings(list: ListSummary, params: URL
       timings: diagnostics.timings,
       queryCount: 1,
       returnedRows: diagnostics.rows.length,
-      cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
+      cacheOutcome: cacheable ? ("miss" as const) : ("bypass" as const),
       cacheLayer: "list-ranking" as const,
     },
   };
 }
 
-export async function loadDynamicListResultRankings(personIds: string[], params: URLSearchParams) {
+export async function loadDynamicListResultRankings(
+  personIds: string[],
+  params: URLSearchParams,
+) {
   const input = parseListRankingInput(params);
-  const filter = { scope: input.region.scope, regionId: input.region.regionId, genders: input.gender } as const;
-  const cacheable = !input.search && !input.locate && isListRankingCacheable("result", input.type, filter);
+  const filter = {
+    scope: input.region.scope,
+    regionId: input.region.regionId,
+    genders: input.gender,
+  } as const;
+  const cacheable =
+    !input.search &&
+    !input.locate &&
+    isListRankingCacheable("result", input.type, filter);
   const filterKey = listRankingFilterKey(filter);
-  if (!personIds.length) return { data: emptyResultData(), diagnostics: { timings: { queueMs: 0, statementMs: 0 }, queryCount: 0, returnedRows: 0, cacheOutcome: "bypass" as const } };
-  const target = cacheable ? await ensureDynamicListRankingTarget(personIds, "result", filterKey) : null;
+  if (!personIds.length)
+    return {
+      data: emptyResultData(),
+      diagnostics: {
+        timings: { queueMs: 0, statementMs: 0 },
+        queryCount: 0,
+        returnedRows: 0,
+        cacheOutcome: "bypass" as const,
+      },
+    };
+  const target = cacheable
+    ? await ensureDynamicListRankingTarget(personIds, "result", filterKey)
+    : null;
   if (cacheable && target) {
     const cached = await loadCachedResults(target, input);
-    if (cached) return { data: cached, diagnostics: { timings: { queueMs: 0, statementMs: 0 }, queryCount: 2, returnedRows: cached.entries.length, cacheOutcome: "hit" as const, cacheLayer: "list-ranking" as const } };
+    if (cached)
+      return {
+        data: cached,
+        diagnostics: {
+          timings: { queueMs: 0, statementMs: 0 },
+          queryCount: 2,
+          returnedRows: cached.entries.length,
+          cacheOutcome: "hit" as const,
+          cacheLayer: "list-ranking" as const,
+        },
+      };
   }
-  const direct = await loadDirectResults({ targetKey: target?.targetKey ?? "", membershipVersion: 1, personIds }, input);
+  const direct = await loadDirectResults(
+    { targetKey: target?.targetKey ?? "", membershipVersion: 1, personIds },
+    input,
+  );
   const { diagnostics, ...data } = direct;
   return {
     data,
@@ -270,7 +361,7 @@ export async function loadDynamicListResultRankings(personIds: string[], params:
       timings: diagnostics.timings,
       queryCount: 1,
       returnedRows: diagnostics.rows.length,
-      cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
+      cacheOutcome: cacheable ? ("miss" as const) : ("bypass" as const),
       cacheLayer: "list-ranking" as const,
     },
   };

@@ -21,25 +21,11 @@ export function useExplorerKeyboardShortcuts({
   goToTop: () => void;
   goToEnd: () => void;
 }) {
-  const {
-    open,
-    query,
-    regexSearch: regex,
-  } = search.state;
-  const {
-    cycle,
-    close,
-    reset,
-    setOpen,
-  } = search.actions;
-  const {
-    mode,
-  } = vim.state;
+  const { open, query, regexSearch: regex } = search.state;
+  const { cycle, close, reset, setOpen } = search.actions;
+  const { mode } = vim.state;
   const searchActive = search.state.regexSearch;
-  const {
-    setMode,
-    setCommand,
-  } = vim.actions;
+  const { setMode, setCommand } = vim.actions;
   const { focusSearch, openEventPicker } = commands;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

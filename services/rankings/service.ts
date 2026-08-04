@@ -10,7 +10,12 @@ import {
   RANKINGS_WINDOW_SIZE,
 } from "@/services/rankings/cache";
 import { searchPersonIds } from "@/services/people/service";
-import { addTimings, ApiInputError, parseGender, parseYear } from "@/lib/api/projection";
+import {
+  addTimings,
+  ApiInputError,
+  parseGender,
+  parseYear,
+} from "@/lib/api/projection";
 import {
   getRecordBadges,
   isRankingEventId,
@@ -55,13 +60,22 @@ import type { RankingsMetadata } from "@/services/rankings/types";
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const MAX_SEARCH_RESULTS = 500;
 
-function toRankingEntry(row: RankingRow, scope: QueryInput["scope"]): RankingEntry {
-  const rankDelta = scope === "continent"
-    ? row.continent_rank_delta
-    : scope === "country" ? row.country_rank_delta : row.world_rank_delta;
-  const rankDeltaState = scope === "continent"
-    ? row.continent_rank_delta_state
-    : scope === "country" ? row.country_rank_delta_state : row.world_rank_delta_state;
+function toRankingEntry(
+  row: RankingRow,
+  scope: QueryInput["scope"],
+): RankingEntry {
+  const rankDelta =
+    scope === "continent"
+      ? row.continent_rank_delta
+      : scope === "country"
+        ? row.country_rank_delta
+        : row.world_rank_delta;
+  const rankDeltaState =
+    scope === "continent"
+      ? row.continent_rank_delta_state
+      : scope === "country"
+        ? row.country_rank_delta_state
+        : row.world_rank_delta_state;
   return {
     rank: Number(row.rank),
     subRank: Number(row.sub_rank),
@@ -80,11 +94,13 @@ function toRankingEntry(row: RankingRow, scope: QueryInput["scope"]): RankingEnt
       isCountryRecord: Number(row.is_country_record) === 1,
       continentId: row.continent_id,
     }),
-    rankDelta: rankDelta === null || rankDelta === undefined ? null : Number(rankDelta),
+    rankDelta:
+      rankDelta === null || rankDelta === undefined ? null : Number(rankDelta),
     rankDeltaState: rankDeltaState ?? null,
-    recordStreakWeeks: row.record_streak_weeks === null || row.record_streak_weeks === undefined
-      ? null
-      : Number(row.record_streak_weeks),
+    recordStreakWeeks:
+      row.record_streak_weeks === null || row.record_streak_weeks === undefined
+        ? null
+        : Number(row.record_streak_weeks),
   };
 }
 
@@ -112,9 +128,16 @@ function normalPageResponse(
   filteredTotal?: number,
   pageSize = PAGE_SIZE,
 ) {
-  const total = filteredTotal ?? (
-    input.year === null
-      ? getRankingCount(metadata, input.eventId, input.type, input.scope, input.regionId)
+  const total =
+    filteredTotal ??
+    (input.year === null
+      ? getRankingCount(
+          metadata,
+          input.eventId,
+          input.type,
+          input.scope,
+          input.regionId,
+        )
       : getYearRankingCount(
           metadata,
           input.year,
@@ -122,8 +145,7 @@ function normalPageResponse(
           input.type,
           input.scope,
           input.regionId,
-        )
-  );
+        ));
   const entries = rows.map((row) => toRankingEntry(row, input.scope));
   const startPosition = Math.min(Math.max(0, input.startRank - 1), total);
   const hasMore = input.startRank + entries.length <= total;
@@ -132,7 +154,9 @@ function normalPageResponse(
     hasMore,
     nextPageStart: hasMore ? input.startRank + pageSize : null,
     previousPageStart:
-      input.startRank > 1 && total > 0 ? Math.max(1, input.startRank - pageSize) : null,
+      input.startRank > 1 && total > 0
+        ? Math.max(1, input.startRank - pageSize)
+        : null,
     startPosition,
     lastRank: entries.at(-1)?.subRank ?? null,
     total,
@@ -143,7 +167,9 @@ function normalPageResponse(
 
 function yearlyColumns(type: RankingType) {
   const recordColumn =
-    type === "average" ? "facts.regional_average_record" : "facts.regional_single_record";
+    type === "average"
+      ? "facts.regional_average_record"
+      : "facts.regional_single_record";
   return `ranking.public_rank AS rank, ranking.position AS sub_rank, ranking.person_id,
     COALESCE(person.name, ranking.person_id) AS person_name,
     COALESCE(country.id, '') AS country_id, COALESCE(country.name, country.id, '') AS country_name,
@@ -156,7 +182,12 @@ function yearlyColumns(type: RankingType) {
 }
 
 function yearlyFilters(input: QueryInput) {
-  const values: unknown[] = [input.year, input.eventId, input.scope, input.regionId];
+  const values: unknown[] = [
+    input.year,
+    input.eventId,
+    input.scope,
+    input.regionId,
+  ];
   const gender = genderCondition("person", input.gender);
   values.push(...gender.values);
   return {
@@ -196,7 +227,11 @@ async function queryGenderPage(input: QueryInput) {
     conditions.push("person_id = ?");
     values.push(input.locate);
   } else if (input.search) {
-    const people = await searchPersonIds(input.search, input.regexSearch, input.searchLimit);
+    const people = await searchPersonIds(
+      input.search,
+      input.regexSearch,
+      input.searchLimit,
+    );
     if (people.personIds.length === 0)
       return {
         data: {
@@ -210,7 +245,9 @@ async function queryGenderPage(input: QueryInput) {
         queryCount: 1,
         returnedRows: 0,
       };
-    conditions.push(`person_id IN (${people.personIds.map(() => "?").join(", ")})`);
+    conditions.push(
+      `person_id IN (${people.personIds.map(() => "?").join(", ")})`,
+    );
     values.push(...people.personIds);
   } else {
     conditions.push("filtered_position >= ? AND filtered_position < ?");
@@ -226,11 +263,17 @@ async function queryGenderPage(input: QueryInput) {
       source,
       baseConditions,
       conditions,
-      selectColumns: rankingColumns("filtered_rank", "filtered_position", enhancements),
+      selectColumns: rankingColumns(
+        "filtered_rank",
+        "filtered_position",
+        enhancements,
+      ),
     }),
     [...values, resultLimit],
   );
-  const entries = result.rows.slice(0, input.locate ? 1 : input.limit).map((row) => toRankingEntry(row, input.scope));
+  const entries = result.rows
+    .slice(0, input.locate ? 1 : input.limit)
+    .map((row) => toRankingEntry(row, input.scope));
   if (input.locate)
     return {
       data: { located: entries[0] ?? null },
@@ -243,8 +286,10 @@ async function queryGenderPage(input: QueryInput) {
     data: {
       entries,
       hasMore: result.rows.length > input.limit,
-      nextPageStart: result.rows.length > input.limit ? input.startRank + input.limit : null,
-      previousPageStart: input.startRank > 1 ? Math.max(1, input.startRank - input.limit) : null,
+      nextPageStart:
+        result.rows.length > input.limit ? input.startRank + input.limit : null,
+      previousPageStart:
+        input.startRank > 1 ? Math.max(1, input.startRank - input.limit) : null,
       total,
       exportDate: null,
       startPosition: input.startRank - 1,
@@ -257,15 +302,22 @@ async function queryGenderPage(input: QueryInput) {
 }
 
 async function queryGenderPersonPage(input: QueryInput) {
-  const positionColumn = input.scope === "continent"
-    ? "continent_position"
-    : input.scope === "country" ? "country_position" : "world_position";
-  const regionColumn = input.scope === "continent"
-    ? "continent_id"
-    : input.scope === "country" ? "country_id" : null;
-  const recordColumn = input.type === "average"
-    ? "facts.regional_average_record"
-    : "facts.regional_single_record";
+  const positionColumn =
+    input.scope === "continent"
+      ? "continent_position"
+      : input.scope === "country"
+        ? "country_position"
+        : "world_position";
+  const regionColumn =
+    input.scope === "continent"
+      ? "continent_id"
+      : input.scope === "country"
+        ? "country_id"
+        : null;
+  const recordColumn =
+    input.type === "average"
+      ? "facts.regional_average_record"
+      : "facts.regional_single_record";
   const filterValues: unknown[] = [input.eventId, input.type, ...input.gender];
   if (regionColumn) filterValues.push(input.regionId);
   const totalPromise = query<{ count: number }>(
@@ -283,12 +335,22 @@ async function queryGenderPersonPage(input: QueryInput) {
     pageValues,
   );
   const firstValue = result.rows[0]?.result_value;
-  const prefix = firstValue === undefined
-    ? { rows: [{ count: 0 }], timings: { queueMs: 0, statementMs: 0 } }
-    : await query<{ count: number }>(
-      genderPersonRankingPrefixCountQuery(input.gender.length, regionColumn),
-      [input.eventId, input.type, ...input.gender, firstValue, ...(regionColumn ? [input.regionId] : [])],
-    );
+  const prefix =
+    firstValue === undefined
+      ? { rows: [{ count: 0 }], timings: { queueMs: 0, statementMs: 0 } }
+      : await query<{ count: number }>(
+          genderPersonRankingPrefixCountQuery(
+            input.gender.length,
+            regionColumn,
+          ),
+          [
+            input.eventId,
+            input.type,
+            ...input.gender,
+            firstValue,
+            ...(regionColumn ? [input.regionId] : []),
+          ],
+        );
   const totalResult = await totalPromise;
   const total = Number(totalResult.rows[0]?.count ?? 0);
   const prefixCount = Number(prefix.rows[0]?.count ?? 0);
@@ -307,30 +369,44 @@ async function queryGenderPersonPage(input: QueryInput) {
       best: Number(row.result_value),
     } as unknown as RankingRow;
   });
-  const entries = rankedRows.slice(0, input.limit).map((row) => toRankingEntry(row, input.scope));
+  const entries = rankedRows
+    .slice(0, input.limit)
+    .map((row) => toRankingEntry(row, input.scope));
   return {
     data: {
       entries,
       hasMore: rankedRows.length > input.limit,
-      nextPageStart: rankedRows.length > input.limit ? input.startRank + input.limit : null,
-      previousPageStart: input.startRank > 1 ? Math.max(1, input.startRank - input.limit) : null,
+      nextPageStart:
+        rankedRows.length > input.limit ? input.startRank + input.limit : null,
+      previousPageStart:
+        input.startRank > 1 ? Math.max(1, input.startRank - input.limit) : null,
       total,
       exportDate: null,
       startPosition: input.startRank - 1,
       lastRank: entries.at(-1)?.subRank ?? null,
     },
-    timings: addTimings(addTimings(result.timings, prefix.timings), totalResult.timings),
+    timings: addTimings(
+      addTimings(result.timings, prefix.timings),
+      totalResult.timings,
+    ),
     queryCount: firstValue === undefined ? 2 : 3,
     returnedRows: result.rows.length + (firstValue === undefined ? 0 : 1) + 1,
   };
 }
 
-async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata, pageSize = PAGE_SIZE) {
+async function queryNormalPage(
+  input: QueryInput,
+  metadata: RankingsMetadata,
+  pageSize = PAGE_SIZE,
+) {
   if (input.year !== null) {
     const { conditions, values } = yearlyFilters(input);
     if (input.gender.length) {
       const result = await query<RankingRow & { total_count?: number }>(
-        filteredYearlyRankingPageQuery(yearlyRankingTable(input.type), conditions),
+        filteredYearlyRankingPageQuery(
+          yearlyRankingTable(input.type),
+          conditions,
+        ),
         [...values, input.startRank, input.startRank + pageSize],
       );
       return {
@@ -347,11 +423,21 @@ async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata, pa
       };
     }
     const result = await query<RankingRow>(
-      yearlyRankingPageQuery(yearlyRankingTable(input.type), yearlyColumns(input.type), conditions),
+      yearlyRankingPageQuery(
+        yearlyRankingTable(input.type),
+        yearlyColumns(input.type),
+        conditions,
+      ),
       [...values, input.startRank, input.startRank + pageSize],
     );
     return {
-      data: normalPageResponse(result.rows, input, metadata, undefined, pageSize),
+      data: normalPageResponse(
+        result.rows,
+        input,
+        metadata,
+        undefined,
+        pageSize,
+      ),
       timings: result.timings,
       queryCount: 1,
       returnedRows: result.rows.length,
@@ -361,7 +447,12 @@ async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata, pa
   const { rank, subRank, conditions, values } = filters(input);
   const pageValues = [...values, input.startRank, input.startRank + pageSize];
   const result = await query<RankingRow>(
-    rankingPageQuery(rankingTable(input.type), rankingColumns(rank, subRank, enhancements), conditions, subRank),
+    rankingPageQuery(
+      rankingTable(input.type),
+      rankingColumns(rank, subRank, enhancements),
+      conditions,
+      subRank,
+    ),
     pageValues,
   );
   return {
@@ -373,13 +464,16 @@ async function queryNormalPage(input: QueryInput, metadata: RankingsMetadata, pa
 }
 
 export async function queryMysql(input: QueryInput) {
-  if (input.eventId === "SOR" || input.eventId === "sor-kinch") return queryPersonMetric(input);
+  if (input.eventId === "SOR" || input.eventId === "sor-kinch")
+    return queryPersonMetric(input);
   if (input.gender.length && input.year === null) return queryGenderPage(input);
   const yearly = input.year !== null;
   const { rank, subRank, conditions, values } = yearly
     ? { rank: "public_rank", subRank: "position", ...yearlyFilters(input) }
     : filters(input);
-  const source = yearly ? yearlyRankingTable(input.type) : rankingTable(input.type);
+  const source = yearly
+    ? yearlyRankingTable(input.type)
+    : rankingTable(input.type);
   const selectColumns = yearly
     ? yearlyColumns(input.type)
     : rankingColumns(rank, subRank, await getRankingEntryEnhancements());
@@ -389,23 +483,39 @@ export async function queryMysql(input: QueryInput) {
   } else if (input.gender.length) {
     from = `FROM ${source} ranking JOIN persons gender_person ON gender_person.wca_id = ranking.person_id AND gender_person.sub_id = 1`;
   }
-  const predicate = yearly ? conditions.join(" AND ") : conditions.join(" AND ");
+  const predicate = yearly
+    ? conditions.join(" AND ")
+    : conditions.join(" AND ");
   const qualifiedSubRank = yearly ? `ranking.${subRank}` : subRank;
   const personColumn = yearly ? "ranking.person_id" : "ranking.person_id";
   if (input.locate) {
     const result = await query<RankingRow>(
-      rankingLocateQuery({ selectColumns, from, predicate, qualifiedSubRank, personColumn }),
+      rankingLocateQuery({
+        selectColumns,
+        from,
+        predicate,
+        qualifiedSubRank,
+        personColumn,
+      }),
       [...values, input.locate],
     );
     return {
-      data: { located: result.rows[0] ? toRankingEntry(result.rows[0], input.scope) : null },
+      data: {
+        located: result.rows[0]
+          ? toRankingEntry(result.rows[0], input.scope)
+          : null,
+      },
       timings: result.timings,
       queryCount: 1,
       returnedRows: result.rows.length,
     };
   }
   if (input.search) {
-    const people = await searchPersonIds(input.search, input.regexSearch, input.searchLimit);
+    const people = await searchPersonIds(
+      input.search,
+      input.regexSearch,
+      input.searchLimit,
+    );
     if (people.personIds.length === 0) {
       return {
         data: {
@@ -452,13 +562,28 @@ export async function queryMysql(input: QueryInput) {
     ? ` AND (${qualifiedSubRank} > ? OR (${qualifiedSubRank} = ? AND ${personColumn} > ?))`
     : ` AND ${qualifiedSubRank} >= ?`;
   const pageValues = input.cursorRank
-    ? [...values, input.cursorRank, input.cursorRank, input.cursorId, input.limit + 1]
+    ? [
+        ...values,
+        input.cursorRank,
+        input.cursorRank,
+        input.cursorId,
+        input.limit + 1,
+      ]
     : [...values, input.startRank, input.limit + 1];
   const result = await query<RankingRow>(
-    rankingCursorQuery({ selectColumns, from, predicate, qualifiedSubRank, personColumn, cursor }),
+    rankingCursorQuery({
+      selectColumns,
+      from,
+      predicate,
+      qualifiedSubRank,
+      personColumn,
+      cursor,
+    }),
     pageValues,
   );
-  const entries = result.rows.slice(0, input.limit).map((row) => toRankingEntry(row, input.scope));
+  const entries = result.rows
+    .slice(0, input.limit)
+    .map((row) => toRankingEntry(row, input.scope));
   return {
     data: {
       entries,
@@ -492,7 +617,8 @@ function personMetricEntry(row: PersonMetricRow): RankingEntry {
 
 async function queryPersonMetric(input: QueryInput) {
   const kinch = input.eventId === "sor-kinch";
-  const continentKinch = kinch && input.scope === "country" && input.kinchOrder === "continent";
+  const continentKinch =
+    kinch && input.scope === "country" && input.kinchOrder === "continent";
   const kinchPrefix = continentKinch ? "kinch_continent" : "kinch";
   const rankColumn = kinch ? `${kinchPrefix}_rank` : "rank";
   const positionColumn = kinch ? `${kinchPrefix}_position` : "position";
@@ -509,7 +635,8 @@ async function queryPersonMetric(input: QueryInput) {
     `score.${positionColumn} IS NOT NULL`,
   ];
   const gender = genderCondition("score", input.gender);
-  if (input.gender.length) return queryFilteredPersonMetric(input, kinch, gender);
+  if (input.gender.length)
+    return queryFilteredPersonMetric(input, kinch, gender);
   let peopleTimings = { queueMs: 0, statementMs: 0 };
   let peopleReturnedRows = 0;
 
@@ -517,7 +644,11 @@ async function queryPersonMetric(input: QueryInput) {
     conditions.push("score.person_id = ?");
     values.push(input.locate);
   } else if (input.search) {
-    const people = await searchPersonIds(input.search, input.regexSearch, input.searchLimit);
+    const people = await searchPersonIds(
+      input.search,
+      input.regexSearch,
+      input.searchLimit,
+    );
     peopleTimings = people.timings;
     peopleReturnedRows = people.returnedRows;
     if (people.personIds.length === 0) {
@@ -534,7 +665,9 @@ async function queryPersonMetric(input: QueryInput) {
         returnedRows: people.returnedRows,
       };
     }
-    conditions.push(`score.person_id IN (${people.personIds.map(() => "?").join(", ")})`);
+    conditions.push(
+      `score.person_id IN (${people.personIds.map(() => "?").join(", ")})`,
+    );
     values.push(...people.personIds);
   } else if (input.cursorRank) {
     conditions.push(
@@ -550,8 +683,20 @@ async function queryPersonMetric(input: QueryInput) {
   if (input.locate) limit = 1;
   else if (input.search) limit = input.searchLimit;
   const result = await query<PersonMetricRow>(
-    personMetricQuery({ rankColumn, positionColumn, scoreExpression, conditions }),
-    [input.scope, input.regionId, input.scope, input.regionId, ...values, limit],
+    personMetricQuery({
+      rankColumn,
+      positionColumn,
+      scoreExpression,
+      conditions,
+    }),
+    [
+      input.scope,
+      input.regionId,
+      input.scope,
+      input.regionId,
+      ...values,
+      limit,
+    ],
   );
   const timings = {
     queueMs: peopleTimings.queueMs + result.timings.queueMs,
@@ -583,17 +728,18 @@ async function queryPersonMetric(input: QueryInput) {
     };
   }
 
-  const end = await query<{ position: number }>(personMetricEndQuery(positionColumn), [
-    metricResultType,
-    input.scope,
-    input.regionId,
-  ]);
+  const end = await query<{ position: number }>(
+    personMetricEndQuery(positionColumn),
+    [metricResultType, input.scope, input.regionId],
+  );
   return {
     data: {
       entries,
       hasMore: result.rows.length > input.limit,
-      nextPageStart: result.rows.length > input.limit ? input.startRank + PAGE_SIZE : null,
-      previousPageStart: input.startRank > 1 ? Math.max(1, input.startRank - PAGE_SIZE) : null,
+      nextPageStart:
+        result.rows.length > input.limit ? input.startRank + PAGE_SIZE : null,
+      previousPageStart:
+        input.startRank > 1 ? Math.max(1, input.startRank - PAGE_SIZE) : null,
       startPosition: Math.max(0, input.startRank - 1),
       lastRank: entries.at(-1)?.subRank ?? null,
       total: Number(end.rows[0]?.position ?? 0),
@@ -613,15 +759,25 @@ async function queryFilteredPersonMetric(
   kinch: boolean,
   gender: ReturnType<typeof genderCondition>,
 ) {
-  const continentKinch = kinch && input.scope === "country" && input.kinchOrder === "continent";
+  const continentKinch =
+    kinch && input.scope === "country" && input.kinchOrder === "continent";
   const metricResultType = kinch ? "single" : input.type;
-  const kinchScoreColumn = continentKinch ? "kinch_continent_score" : "kinch_score";
+  const kinchScoreColumn = continentKinch
+    ? "kinch_continent_score"
+    : "kinch_score";
   const positionColumn = kinch
     ? `${continentKinch ? "kinch_continent" : "kinch"}_position`
     : "position";
-  const scoreOrder = kinch ? `score.${kinchScoreColumn} / 17.0 DESC` : "score.score ASC";
+  const scoreOrder = kinch
+    ? `score.${kinchScoreColumn} / 17.0 DESC`
+    : "score.score ASC";
   const scoreValue = kinch ? `score.${kinchScoreColumn} / 17.0` : "score.score";
-  const values: unknown[] = [metricResultType, input.scope, input.regionId, ...gender.values];
+  const values: unknown[] = [
+    metricResultType,
+    input.scope,
+    input.regionId,
+    ...gender.values,
+  ];
   const conditions = [
     "score.metric_version = 1",
     "score.event_set_version = 1",
@@ -641,7 +797,11 @@ async function queryFilteredPersonMetric(
     pageValues.push(input.locate);
   } else if (input.search) {
     search = true;
-    const people = await searchPersonIds(input.search, input.regexSearch, input.searchLimit);
+    const people = await searchPersonIds(
+      input.search,
+      input.regexSearch,
+      input.searchLimit,
+    );
     peopleTimings = people.timings;
     peopleReturnedRows = people.returnedRows;
     if (people.personIds.length === 0) {
@@ -660,7 +820,9 @@ async function queryFilteredPersonMetric(
         returnedRows: people.returnedRows,
       };
     }
-    pageConditions.push(`filtered.person_id IN (${people.personIds.map(() => "?").join(", ")})`);
+    pageConditions.push(
+      `filtered.person_id IN (${people.personIds.map(() => "?").join(", ")})`,
+    );
     pageValues.push(...people.personIds);
   } else if (input.cursorRank) {
     pageConditions.push(
@@ -675,8 +837,21 @@ async function queryFilteredPersonMetric(
   if (input.locate) limit = 1;
   else if (search) limit = input.searchLimit;
   const result = await query<FilteredPersonMetricRow>(
-    filteredPersonMetricQuery({ scoreValue, scoreOrder, conditions, pageConditions }),
-    [...values, ...pageValues, limit, input.scope, input.regionId, input.scope, input.regionId],
+    filteredPersonMetricQuery({
+      scoreValue,
+      scoreOrder,
+      conditions,
+      pageConditions,
+    }),
+    [
+      ...values,
+      ...pageValues,
+      limit,
+      input.scope,
+      input.regionId,
+      input.scope,
+      input.regionId,
+    ],
   );
   const timings = {
     queueMs: peopleTimings.queueMs + result.timings.queueMs,
@@ -711,8 +886,10 @@ async function queryFilteredPersonMetric(
     data: {
       entries,
       hasMore: rows.length > input.limit,
-      nextPageStart: rows.length > input.limit ? input.startRank + PAGE_SIZE : null,
-      previousPageStart: input.startRank > 1 ? Math.max(1, input.startRank - PAGE_SIZE) : null,
+      nextPageStart:
+        rows.length > input.limit ? input.startRank + PAGE_SIZE : null,
+      previousPageStart:
+        input.startRank > 1 ? Math.max(1, input.startRank - PAGE_SIZE) : null,
       startPosition: Math.max(0, input.startRank - 1),
       lastRank: entries.at(-1)?.subRank ?? null,
       total: Number(rows[0]?.total_count ?? 0),
@@ -725,19 +902,28 @@ async function queryFilteredPersonMetric(
 }
 
 function parseInput(searchParams: URLSearchParams): QueryInput {
-  const eventId = isRankingEventId(searchParams.get("eventId") ?? searchParams.get("event"))
+  const eventId = isRankingEventId(
+    searchParams.get("eventId") ?? searchParams.get("event"),
+  )
     ? (searchParams.get("eventId") ?? searchParams.get("event")!)
     : "333";
   const rawType = searchParams.get("result") ?? searchParams.get("type");
   let type: RankingType = "single";
-  if (eventId !== "333mbf" && eventId !== "sor-kinch" && isRankingType(rawType)) type = rawType;
+  if (eventId !== "333mbf" && eventId !== "sor-kinch" && isRankingType(rawType))
+    type = rawType;
   const { scope, regionId } = parseRegionQuery(searchParams.get("region"));
-  const kinchOrder = searchParams.get("kinch") === "continent" ? "continent" : "regional";
-  if (scope !== "world" && !regionId) throw new Error("Choose a region before loading rankings.");
+  const kinchOrder =
+    searchParams.get("kinch") === "continent" ? "continent" : "regional";
+  if (scope !== "world" && !regionId)
+    throw new Error("Choose a region before loading rankings.");
   const paged = searchParams.get("paged") === "1";
   const rawStart = Number(searchParams.get("start"));
   const startRank = paged
-    ? Math.floor(Math.max(0, Number.isFinite(rawStart) ? rawStart : 0) / PAGE_SIZE) * PAGE_SIZE + 1
+    ? Math.floor(
+        Math.max(0, Number.isFinite(rawStart) ? rawStart : 0) / PAGE_SIZE,
+      ) *
+        PAGE_SIZE +
+      1
     : Math.max(1, rawStart || 1);
   const search = (searchParams.get("search") ?? "").trim().slice(0, 80);
   const regexSearch = searchParams.get("mode") === "vim";
@@ -756,19 +942,29 @@ function parseInput(searchParams: URLSearchParams): QueryInput {
     cursorId: searchParams.get("cursorId") ?? "",
     limit: paged
       ? PAGE_SIZE
-      : Math.min(PAGE_SIZE, Math.max(20, Number(searchParams.get("limit")) || 80)),
+      : Math.min(
+          PAGE_SIZE,
+          Math.max(20, Number(searchParams.get("limit")) || 80),
+        ),
     locate: (searchParams.get("locate") ?? "").trim().toUpperCase(),
     search,
     regexSearch,
     searchLimit: Math.min(
       MAX_SEARCH_RESULTS,
-      Math.max(1, Number(searchParams.get("searchLimit")) || MAX_SEARCH_RESULTS),
+      Math.max(
+        1,
+        Number(searchParams.get("searchLimit")) || MAX_SEARCH_RESULTS,
+      ),
     ),
     paged,
   };
 }
 
-function personWindowKey(input: QueryInput, windowStart: number, dataVersion: string) {
+function personWindowKey(
+  input: QueryInput,
+  windowStart: number,
+  dataVersion: string,
+) {
   return JSON.stringify({
     dataVersion,
     eventId: input.eventId,
@@ -787,10 +983,12 @@ function isPersonMetric(input: QueryInput) {
 }
 
 function isPrimedPersonMetricWindow(input: QueryInput, windowStart: number) {
-  return isPersonMetric(input)
-    && input.scope === "world"
-    && input.gender.length === 0
-    && windowStart === 1;
+  return (
+    isPersonMetric(input) &&
+    input.scope === "world" &&
+    input.gender.length === 0 &&
+    windowStart === 1
+  );
 }
 
 function loadRankingWindow(input: QueryInput, metadata: RankingsMetadata) {
@@ -805,7 +1003,9 @@ function slicePersonWindow(
   input: QueryInput,
   windowStart: number,
 ) {
-  const windowEntries = Array.isArray(data.entries) ? data.entries as RankingEntry[] : [];
+  const windowEntries = Array.isArray(data.entries)
+    ? (data.entries as RankingEntry[])
+    : [];
   const offset = Math.max(0, input.startRank - windowStart);
   const entries = windowEntries.slice(offset, offset + input.limit);
   const total = Number(data.total ?? 0);
@@ -817,17 +1017,23 @@ function slicePersonWindow(
     hasMore,
     nextPageStart: hasMore ? input.startRank + input.limit : null,
     previousPageStart:
-      input.startRank > 1 && total > 0 ? Math.max(1, input.startRank - input.limit) : null,
+      input.startRank > 1 && total > 0
+        ? Math.max(1, input.startRank - input.limit)
+        : null,
     startPosition,
     lastRank: entries.at(-1)?.subRank ?? null,
     total,
   };
 }
 
-export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams) {
+export async function loadRankingsWithDiagnostics(
+  searchParams: URLSearchParams,
+) {
   const input = parseInput(searchParams);
   if (input.year !== null && isPersonMetric(input))
-    throw new ApiInputError("year is only available for person event rankings.");
+    throw new ApiInputError(
+      "year is only available for person event rankings.",
+    );
   const metadata = await getCurrentRankingsMetadata();
   if (input.year !== null && !metadata.availableYears.includes(input.year))
     throw new ApiInputError(`year ${input.year} is unavailable.`);
@@ -838,9 +1044,10 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
     !input.cursorRank &&
     !input.cursorId;
   if (!cacheable) {
-    const result = input.year !== null && input.gender.length
-      ? await queryNormalPage(input, metadata)
-      : await queryMysql(input);
+    const result =
+      input.year !== null && input.gender.length
+        ? await queryNormalPage(input, metadata)
+        : await queryMysql(input);
     return {
       ...result,
       data: { ...result.data, availableYears: metadata.availableYears },
@@ -850,7 +1057,9 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
     };
   }
   const windowStart =
-    Math.floor((input.startRank - 1) / RANKINGS_WINDOW_SIZE) * RANKINGS_WINDOW_SIZE + 1;
+    Math.floor((input.startRank - 1) / RANKINGS_WINDOW_SIZE) *
+      RANKINGS_WINDOW_SIZE +
+    1;
   const windowInput = {
     ...input,
     startRank: windowStart,
@@ -858,7 +1067,11 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
   };
   const cached = (await rankingsWindowCache.getWithStatus(
     personWindowKey(input, windowStart, metadata.fetchedAt),
-    async () => loadRankingWindow(windowInput, metadata) as unknown as Record<string, unknown>,
+    async () =>
+      loadRankingWindow(windowInput, metadata) as unknown as Record<
+        string,
+        unknown
+      >,
     { pin: isPrimedPersonMetricWindow(input, windowStart) },
   )) as {
     value: {
@@ -875,18 +1088,30 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
     input.startRank - windowStart >= RANKINGS_WINDOW_SIZE / 2 &&
     nextWindowStart <= windowTotal
   ) {
-    void rankingsWindowCache.getWithStatus(
-      personWindowKey(input, nextWindowStart, metadata.fetchedAt),
-      async () => {
-        const nextInput = { ...input, startRank: nextWindowStart, limit: RANKINGS_WINDOW_SIZE };
-        return loadRankingWindow(nextInput, metadata) as unknown as Record<string, unknown>;
-      },
-    ).catch((error) => console.warn("Ranking window prefetch failed", error));
+    void rankingsWindowCache
+      .getWithStatus(
+        personWindowKey(input, nextWindowStart, metadata.fetchedAt),
+        async () => {
+          const nextInput = {
+            ...input,
+            startRank: nextWindowStart,
+            limit: RANKINGS_WINDOW_SIZE,
+          };
+          return loadRankingWindow(nextInput, metadata) as unknown as Record<
+            string,
+            unknown
+          >;
+        },
+      )
+      .catch((error) => console.warn("Ranking window prefetch failed", error));
   }
   return {
     ...cached.value,
     data: slicePersonWindow(cached.value.data, input, windowStart),
-    timings: cached.outcome === "hit" ? { queueMs: 0, statementMs: 0 } : cached.value.timings,
+    timings:
+      cached.outcome === "hit"
+        ? { queueMs: 0, statementMs: 0 }
+        : cached.value.timings,
     cacheOutcome: cached.outcome,
     cacheLayer: "memory" as const,
     dataVersion: metadata.fetchedAt,

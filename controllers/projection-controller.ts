@@ -1,6 +1,10 @@
 import { DatabaseOverloadedError } from "@/db";
 import { buildApiJsonResponse } from "@/lib/api";
-import { ApiInputError, projectionEnvelope, type ApiDiagnostics } from "@/lib/api/projection";
+import {
+  ApiInputError,
+  projectionEnvelope,
+  type ApiDiagnostics,
+} from "@/lib/api/projection";
 
 type ProjectionResult = {
   data: Record<string, unknown>;
@@ -21,8 +25,10 @@ async function buildProjectionResponse(
   const totalMs = performance.now() - startedAt;
   const { queueMs, statementMs } = loaded.diagnostics.timings;
   const cacheOutcome = loaded.diagnostics.cacheOutcome ?? "bypass";
-  const memoryCache = loaded.diagnostics.cacheLayer === "memory" ? cacheOutcome : "bypass";
-  const listRankingCache = loaded.diagnostics.cacheLayer === "list-ranking" ? cacheOutcome : "bypass";
+  const memoryCache =
+    loaded.diagnostics.cacheLayer === "memory" ? cacheOutcome : "bypass";
+  const listRankingCache =
+    loaded.diagnostics.cacheLayer === "list-ranking" ? cacheOutcome : "bypass";
   console.info(
     JSON.stringify({
       operation,
@@ -37,7 +43,10 @@ async function buildProjectionResponse(
   return buildApiJsonResponse(
     {
       ...enveloped.data,
-      snapshot: { exportDate: enveloped.exportDate, dataVersion: enveloped.dataVersion },
+      snapshot: {
+        exportDate: enveloped.exportDate,
+        dataVersion: enveloped.dataVersion,
+      },
     },
     {
       headers: {
@@ -52,7 +61,11 @@ async function buildProjectionResponse(
   );
 }
 
-function buildProjectionErrorResponse(operation: string, startedAt: number, error: unknown) {
+function buildProjectionErrorResponse(
+  operation: string,
+  startedAt: number,
+  error: unknown,
+) {
   const inputError = error instanceof ApiInputError;
   const status = inputError ? 400 : 503;
   console.error(
@@ -69,7 +82,9 @@ function buildProjectionErrorResponse(operation: string, startedAt: number, erro
       status,
       headers: {
         "Cache-Control": "no-store",
-        ...(error instanceof DatabaseOverloadedError ? { "Retry-After": "1" } : {}),
+        ...(error instanceof DatabaseOverloadedError
+          ? { "Retry-After": "1" }
+          : {}),
       },
     },
   );

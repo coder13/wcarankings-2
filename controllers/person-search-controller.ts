@@ -1,13 +1,20 @@
 import { buildApiJsonResponse } from "@/lib/api";
-import { loadPersonSearch, loadPersonSearchParts } from "@/services/people/service";
+import {
+  loadPersonSearch,
+  loadPersonSearchParts,
+} from "@/services/people/service";
 import { handleProjectionRequest } from "@/controllers/projection-controller";
 
-function buildSearchEventStream(parts: Awaited<ReturnType<typeof loadPersonSearchParts>>) {
+function buildSearchEventStream(
+  parts: Awaited<ReturnType<typeof loadPersonSearchParts>>,
+) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: string, data: unknown) =>
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        controller.enqueue(
+          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+        );
       send("results", parts.payload);
       send("thumbs", await parts.thumbs);
       controller.close();

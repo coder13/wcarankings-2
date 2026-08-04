@@ -1,5 +1,8 @@
 import { query } from "@/db";
-import { UNAVAILABLE_PROJECTION_FEATURE_SWITCH, type ProjectionFeatureSwitch } from "@/lib/projection-feature-switch-types";
+import {
+  UNAVAILABLE_PROJECTION_FEATURE_SWITCH,
+  type ProjectionFeatureSwitch,
+} from "@/lib/projection-feature-switch-types";
 
 export { DEFAULT_PROJECTION_FEATURE_SWITCH } from "@/lib/projection-feature-switch-types";
 export type { ProjectionFeatureSwitch } from "@/lib/projection-feature-switch-types";
@@ -24,7 +27,10 @@ const PERSON_COMPETITION_RANKINGS_TABLES = [
   "person_competition_rankings",
   "person_competition_ranking_counts",
 ] as const;
-const CITY_EVENT_STATS_TABLES = ["city_event_stats", "entity_ranking_counts"] as const;
+const CITY_EVENT_STATS_TABLES = [
+  "city_event_stats",
+  "entity_ranking_counts",
+] as const;
 const SUM_OF_RANKS_TABLES = ["person_sum_of_ranks_scores"] as const;
 const YEARLY_TABLES = [
   "person_year_ranking_cohorts",
@@ -43,7 +49,10 @@ function allPresent(tables: Set<string>, required: readonly string[]) {
 
 export function featureSwitchFromTables(
   tables: Iterable<string>,
-  generation: Pick<ProjectionFeatureSwitch, "generationId" | "exportId"> = { generationId: null, exportId: null },
+  generation: Pick<ProjectionFeatureSwitch, "generationId" | "exportId"> = {
+    generationId: null,
+    exportId: null,
+  },
 ): ProjectionFeatureSwitch {
   const present = new Set(tables);
   return {
@@ -51,7 +60,10 @@ export function featureSwitchFromTables(
     core: allPresent(present, CORE_TABLES),
     resultRankings: allPresent(present, RESULT_RANKINGS_TABLES),
     competitionRankings: allPresent(present, COMPETITION_RANKINGS_TABLES),
-    personCompetitionRankings: allPresent(present, PERSON_COMPETITION_RANKINGS_TABLES),
+    personCompetitionRankings: allPresent(
+      present,
+      PERSON_COMPETITION_RANKINGS_TABLES,
+    ),
     cityEventStats: allPresent(present, CITY_EVENT_STATS_TABLES),
     sumOfRanks: allPresent(present, SUM_OF_RANKS_TABLES),
     yearlyPersonRankings: allPresent(present, YEARLY_TABLES),
@@ -68,17 +80,31 @@ async function loadProjectionFeatureSwitch() {
           FROM ranking_generation_state WHERE id = 1 LIMIT 1`);
     const row = state.rows[0];
     if (!row) return UNAVAILABLE_PROJECTION_FEATURE_SWITCH;
-    const capabilities = JSON.parse(row.capabilities_json) as Record<string, unknown>;
+    const capabilities = JSON.parse(row.capabilities_json) as Record<
+      string,
+      unknown
+    >;
     return {
       generationId: row.generation_id,
       exportId: row.export_id,
       core: capabilities.core === true || capabilities.core === 1,
-      resultRankings: capabilities.resultRankings === true || capabilities.resultRankings === 1,
-      competitionRankings: capabilities.competitionRankings === true || capabilities.competitionRankings === 1,
-      personCompetitionRankings: capabilities.personCompetitionRankings === true || capabilities.personCompetitionRankings === 1,
-      cityEventStats: capabilities.cityEventStats === true || capabilities.cityEventStats === 1,
-      sumOfRanks: capabilities.sumOfRanks === true || capabilities.sumOfRanks === 1,
-      yearlyPersonRankings: capabilities.yearlyPersonRankings === true || capabilities.yearlyPersonRankings === 1,
+      resultRankings:
+        capabilities.resultRankings === true ||
+        capabilities.resultRankings === 1,
+      competitionRankings:
+        capabilities.competitionRankings === true ||
+        capabilities.competitionRankings === 1,
+      personCompetitionRankings:
+        capabilities.personCompetitionRankings === true ||
+        capabilities.personCompetitionRankings === 1,
+      cityEventStats:
+        capabilities.cityEventStats === true ||
+        capabilities.cityEventStats === 1,
+      sumOfRanks:
+        capabilities.sumOfRanks === true || capabilities.sumOfRanks === 1,
+      yearlyPersonRankings:
+        capabilities.yearlyPersonRankings === true ||
+        capabilities.yearlyPersonRankings === 1,
     };
   } catch {
     // Do not advertise projection-backed routes when the capability snapshot
@@ -91,10 +117,14 @@ export async function getProjectionFeatureSwitch() {
   const now = Date.now();
   if (cached && cached.expiresAt > now) return cached.value;
   if (!loading) {
-    loading = loadProjectionFeatureSwitch().then((value) => {
-      cached = { value, expiresAt: Date.now() + CACHE_TTL_MS };
-      return value;
-    }).finally(() => { loading = null; });
+    loading = loadProjectionFeatureSwitch()
+      .then((value) => {
+        cached = { value, expiresAt: Date.now() + CACHE_TTL_MS };
+        return value;
+      })
+      .finally(() => {
+        loading = null;
+      });
   }
   return loading;
 }

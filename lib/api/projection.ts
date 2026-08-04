@@ -36,7 +36,10 @@ function getQueryParam(params: URLSearchParams, name: string) {
   return params.get(name);
 }
 
-function getQueryParamWithAliases(params: URLSearchParams, names: readonly string[]) {
+function getQueryParamWithAliases(
+  params: URLSearchParams,
+  names: readonly string[],
+) {
   for (const name of names) {
     const value = getQueryParam(params, name);
     if (value !== null) return value;
@@ -134,7 +137,11 @@ export function parseGender(params: URLSearchParams) {
   const unique = [...new Set(values)];
   return normalizeGenderFilters(
     unique.map((value) =>
-      validateQueryParam(value, isGenderFilterValue, "gender must contain only m, f, or o."),
+      validateQueryParam(
+        value,
+        isGenderFilterValue,
+        "gender must contain only m, f, or o.",
+      ),
     ),
   );
 }
@@ -165,7 +172,10 @@ export function parseEvent(params: URLSearchParams, { required = true } = {}) {
   return validateQueryParam(value, isEventId, "eventId is invalid.");
 }
 
-export function parseResultType(params: URLSearchParams, eventId?: string | null): RankingType {
+export function parseResultType(
+  params: URLSearchParams,
+  eventId?: string | null,
+): RankingType {
   const value = validateQueryParam(
     getQueryParamWithAliases(params, ["result", "type"]),
     isRankingType,
@@ -177,21 +187,43 @@ export function parseResultType(params: URLSearchParams, eventId?: string | null
   return value;
 }
 
-export function parseScope(params: URLSearchParams): { scope: RegionScope; regionId: string } {
+export function parseScope(params: URLSearchParams): {
+  scope: RegionScope;
+  regionId: string;
+} {
   return parseRegionQuery(getQueryParam(params, "region"));
 }
 
-export function parsePersonId(params: URLSearchParams, { required = false } = {}) {
-  const personId = (getQueryParam(params, "personId") ?? "").trim().toUpperCase();
+export function parsePersonId(
+  params: URLSearchParams,
+  { required = false } = {},
+) {
+  const personId = (getQueryParam(params, "personId") ?? "")
+    .trim()
+    .toUpperCase();
   if (!personId && !required) return "";
-  return validateQueryParam(personId, isWcaPersonId, "personId must be a valid WCA ID.");
+  return validateQueryParam(
+    personId,
+    isWcaPersonId,
+    "personId must be a valid WCA ID.",
+  );
 }
 
 export function optionalInteger(params: URLSearchParams, name: string) {
-  return parseIntegerQueryParam(params, name, null, isInteger, `${name} must be an integer.`);
+  return parseIntegerQueryParam(
+    params,
+    name,
+    null,
+    isInteger,
+    `${name} must be an integer.`,
+  );
 }
 
-export function optionalText(params: URLSearchParams, name: string, maxLength = 100) {
+export function optionalText(
+  params: URLSearchParams,
+  name: string,
+  maxLength = 100,
+) {
   return parseOptionalQueryParam(
     params,
     name,

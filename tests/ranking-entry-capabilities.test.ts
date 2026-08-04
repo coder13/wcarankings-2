@@ -4,7 +4,10 @@ import test from "node:test";
 import { RANKING_ENTRY_ENHANCEMENTS_ENABLED } from "@/lib/ranking-entry-enhancements";
 import { getRankingEntryEnhancements } from "@/services/rankings/capabilities";
 import { rankingColumns } from "@/services/rankings/helpers";
-import { genderRankingPageQuery, rankingPageQuery } from "@/services/rankings/queries";
+import {
+  genderRankingPageQuery,
+  rankingPageQuery,
+} from "@/services/rankings/queries";
 
 const enhancedColumns = [
   "world_rank_delta",
@@ -43,12 +46,14 @@ test("launch feature flag keeps ranking enhancements off", async () => {
 });
 
 test("ranking queries use null aliases even if a caller omits capability state", () => {
-  assertNoEnhancementColumnRead(rankingPageQuery(
-    "ranking_entries_average",
-    rankingColumns("world_rank", "world_sub_rank"),
-    ["event_id = ?"],
-    "world_sub_rank",
-  ));
+  assertNoEnhancementColumnRead(
+    rankingPageQuery(
+      "ranking_entries_average",
+      rankingColumns("world_rank", "world_sub_rank"),
+      ["event_id = ?"],
+      "world_sub_rank",
+    ),
+  );
 });
 
 test("gender-filtered rankings use the launch fallback", () => {
@@ -61,5 +66,4 @@ test("gender-filtered rankings use the launch fallback", () => {
   assert.match(legacy, /NULL AS world_rank_delta/);
   assert.match(legacy, /NULL AS record_streak_weeks/);
   assert.match(legacy, /total_count/);
-
 });

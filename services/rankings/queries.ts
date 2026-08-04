@@ -40,7 +40,9 @@ export function competitionEntityRowsQuery(input: CompetitionEntityQueryInput) {
   const positionColumn = escapeSqlIdentifier(input.positionColumn);
   return sqlFragment`WITH page AS (SELECT stats.competition_id, stats.start_date, stats.${valueColumn} AS result_value, stats.${resultIdColumn} AS result_id, stats.${rankColumn} AS rank, stats.${positionColumn} AS position FROM competition_event_stats stats WHERE stats.event_id = ? AND stats.${positionColumn} > ? ORDER BY stats.${positionColumn} LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2, result.person_id, COALESCE(person.name, result.person_id) AS person_name FROM page INNER JOIN results result ON result.id = page.result_id LEFT JOIN persons person ON person.wca_id = result.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position`;
 }
-export function competitionEntityCountQuery(input: CompetitionEntityQueryInput) {
+export function competitionEntityCountQuery(
+  input: CompetitionEntityQueryInput,
+) {
   return sqlFragment`SELECT COUNT(*) AS count FROM competition_event_stats WHERE event_id = ? AND ${escapeSqlIdentifier(input.positionColumn)} IS NOT NULL`;
 }
 export function podiumEntityRowsQuery(input: PodiumEntityQueryInput) {
@@ -76,11 +78,17 @@ export function requiredRankingTablesQuery(tables: string[]) {
   return sqlFragment`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")})`;
 }
 
-export function requiredRankingColumnsQuery(tables: string[], columns: string[]) {
+export function requiredRankingColumnsQuery(
+  tables: string[],
+  columns: string[],
+) {
   return sqlFragment`SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")}) AND column_name IN (${columns.map(() => "?").join(", ")})`;
 }
 
-export function requiredRankingIndexesQuery(tables: string[], indexes: string[]) {
+export function requiredRankingIndexesQuery(
+  tables: string[],
+  indexes: string[],
+) {
   return sqlFragment`SELECT table_name, index_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")}) AND index_name IN (${indexes.map(() => "?").join(", ")})`;
 }
 
@@ -220,8 +228,13 @@ export function genderPersonRankingRowsQuery({
   positionColumn: string;
   regionColumn: string | null;
 }) {
-  const genderPlaceholders = Array.from({ length: genderCount }, () => "?").join(", ");
-  const regionCondition = regionColumn ? ` AND ranking.${regionColumn} = ?` : "";
+  const genderPlaceholders = Array.from(
+    { length: genderCount },
+    () => "?",
+  ).join(", ");
+  const regionCondition = regionColumn
+    ? ` AND ranking.${regionColumn} = ?`
+    : "";
   return sqlFragment`WITH page AS (
       SELECT ranking.person_id, ranking.result_id, ranking.result_value,
         ranking.country_id, ranking.continent_id, ranking.world_rank,
@@ -250,8 +263,14 @@ export function genderPersonRankingRowsQuery({
     ORDER BY page.page_position, page.person_id`;
 }
 
-export function genderPersonRankingCountQuery(genderCount: number, regionColumn: string | null) {
-  const genderPlaceholders = Array.from({ length: genderCount }, () => "?").join(", ");
+export function genderPersonRankingCountQuery(
+  genderCount: number,
+  regionColumn: string | null,
+) {
+  const genderPlaceholders = Array.from(
+    { length: genderCount },
+    () => "?",
+  ).join(", ");
   return sqlFragment`SELECT COUNT(*) AS count
     FROM person_event_rankings ranking
     WHERE ranking.event_id = ? AND ranking.result_type = ?
@@ -262,7 +281,10 @@ export function genderPersonRankingPrefixCountQuery(
   genderCount: number,
   regionColumn: string | null,
 ) {
-  const genderPlaceholders = Array.from({ length: genderCount }, () => "?").join(", ");
+  const genderPlaceholders = Array.from(
+    { length: genderCount },
+    () => "?",
+  ).join(", ");
   return sqlFragment`SELECT COUNT(*) AS count
     FROM person_event_rankings ranking
     WHERE ranking.event_id = ? AND ranking.result_type = ?
@@ -270,7 +292,11 @@ export function genderPersonRankingPrefixCountQuery(
       AND ranking.result_value < ?${regionColumn ? ` AND ranking.${regionColumn} = ?` : ""}`;
 }
 
-export function yearlyRankingPageQuery(table: string, columns: string, conditions: string[]) {
+export function yearlyRankingPageQuery(
+  table: string,
+  columns: string,
+  conditions: string[],
+) {
   return sqlFragment`SELECT ${columns}
       FROM ${table} ranking
       LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
@@ -281,7 +307,10 @@ export function yearlyRankingPageQuery(table: string, columns: string, condition
       ORDER BY ranking.position`;
 }
 
-export function filteredYearlyRankingPageQuery(table: string, conditions: string[]) {
+export function filteredYearlyRankingPageQuery(
+  table: string,
+  conditions: string[],
+) {
   return sqlFragment`WITH candidates AS (
       SELECT ranking.person_id, ranking.result_id, ranking.result_value,
         COALESCE(person.name, ranking.person_id) AS person_name,
@@ -413,7 +442,9 @@ export function personMetricEndQuery(positionColumn: string) {
      LIMIT 1`;
 }
 
-export function filteredPersonMetricQuery(input: FilteredPersonMetricQueryInput) {
+export function filteredPersonMetricQuery(
+  input: FilteredPersonMetricQueryInput,
+) {
   return sqlFragment`WITH filtered AS (
        SELECT score.person_id, ${input.scoreValue} AS best,
          DENSE_RANK() OVER (ORDER BY ${input.scoreOrder}) AS filtered_rank,

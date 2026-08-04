@@ -6,7 +6,10 @@ export const ANALYTICS_NAVIGATION_EVENT = "wcarankings:navigation";
 const ANALYTICS_QUERY_PARAMETERS = ["eventId", "result", "region"] as const;
 const WCA_ID_PATTERN = /^\d{4}[A-Z0-9]{4}\d{2}$/i;
 
-type AnalyticsEventParameters = Record<string, boolean | number | string | undefined>;
+type AnalyticsEventParameters = Record<
+  string,
+  boolean | number | string | undefined
+>;
 
 type GoogleAnalyticsClient = {
   initialize: (
@@ -31,7 +34,8 @@ export function isGoogleAnalyticsEnabled(nodeEnvironment: string | undefined) {
 }
 
 export function getSafeAnalyticsPath(input: URL | string) {
-  const url = input instanceof URL ? input : new URL(input, "https://wcarankings.com");
+  const url =
+    input instanceof URL ? input : new URL(input, "https://wcarankings.com");
   const pathname = url.pathname
     .split("/")
     .map((segment) => (WCA_ID_PATTERN.test(segment) ? ":personId" : segment))
@@ -116,7 +120,10 @@ export function trackGoogleAnalyticsPageView(input: URL | string) {
   return googleAnalytics.pageView(input);
 }
 
-export function trackGoogleAnalyticsEvent(name: string, parameters?: AnalyticsEventParameters) {
+export function trackGoogleAnalyticsEvent(
+  name: string,
+  parameters?: AnalyticsEventParameters,
+) {
   return googleAnalytics.event(name, parameters);
 }
 

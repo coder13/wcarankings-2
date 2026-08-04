@@ -78,9 +78,11 @@ export function isPersonSearchReady(value: string) {
   const trimmed = value.trim();
   const looksLikeWcaId = /^\d/.test(trimmed);
   const readyWcaId = /^\d{4}[A-Za-z]{2}/.test(trimmed);
-  return trimmed.length >= 2 &&
+  return (
+    trimmed.length >= 2 &&
     !/[,\n]/.test(value) &&
-    (!looksLikeWcaId || readyWcaId);
+    (!looksLikeWcaId || readyWcaId)
+  );
 }
 
 function preloadThumbs(thumbs: Record<string, string | null>) {
@@ -94,47 +96,64 @@ function preloadThumbs(thumbs: Record<string, string | null>) {
 export function usePersonSearchStream(query: string, enabled: boolean) {
   const normalizedQuery = query.trim();
   const ready = enabled && isPersonSearchReady(query);
-  const [state, dispatch] = useReducer(reducer, normalizedQuery, emptySearchState);
-  const visibleState = state.query === normalizedQuery
-    ? state
-    : emptySearchState(normalizedQuery);
+  const [state, dispatch] = useReducer(
+    reducer,
+    normalizedQuery,
+    emptySearchState,
+  );
+  const visibleState =
+    state.query === normalizedQuery ? state : emptySearchState(normalizedQuery);
   const sourcesRef = useRef(new Set<EventSource>());
 
-  const openStream = useCallback((offset: number, append: boolean) => {
-    const source = new EventSource(
-      `/api/people/search?q=${encodeURIComponent(normalizedQuery)}` +
-        `&limit=${PAGE_SIZE}&offset=${offset}`,
-    );
-    sourcesRef.current.add(source);
-    source.addEventListener("results", (event) => {
-      const body = JSON.parse((event as MessageEvent).data) as {
-        data?: PersonSearchResponse;
+  const openStream = useCallback(
+    (offset: number, append: boolean) => {
+      const source = new EventSource(
+        `/api/people/search?q=${encodeURIComponent(normalizedQuery)}` +
+          `&limit=${PAGE_SIZE}&offset=${offset}`,
+      );
+      sourcesRef.current.add(source);
+      source.addEventListener("results", (event) => {
+        const body = JSON.parse((event as MessageEvent).data) as {
+          data?: PersonSearchResponse;
+        };
+        const response = body.data ?? { entries: [] };
+        dispatch(
+          append
+            ? { type: "append", query: normalizedQuery, offset, response }
+            : { type: "replace", query: normalizedQuery, response },
+        );
+      });
+      source.addEventListener("thumbs", (event) => {
+        const thumbs = JSON.parse((event as MessageEvent).data) as Record<
+          string,
+          string | null
+        >;
+        preloadThumbs(thumbs);
+        dispatch({ type: "thumbs", query: normalizedQuery, thumbs });
+        if (append) {
+          dispatch({
+            type: "loadingMore",
+            query: normalizedQuery,
+            value: false,
+          });
+        }
+        sourcesRef.current.delete(source);
+        source.close();
+      });
+      source.onerror = () => {
+        if (append) {
+          dispatch({
+            type: "loadingMore",
+            query: normalizedQuery,
+            value: false,
+          });
+        }
+        sourcesRef.current.delete(source);
+        source.close();
       };
-      const response = body.data ?? { entries: [] };
-      dispatch(append
-        ? { type: "append", query: normalizedQuery, offset, response }
-        : { type: "replace", query: normalizedQuery, response });
-    });
-    source.addEventListener("thumbs", (event) => {
-      const thumbs = JSON.parse(
-        (event as MessageEvent).data,
-      ) as Record<string, string | null>;
-      preloadThumbs(thumbs);
-      dispatch({ type: "thumbs", query: normalizedQuery, thumbs });
-      if (append) {
-        dispatch({ type: "loadingMore", query: normalizedQuery, value: false });
-      }
-      sourcesRef.current.delete(source);
-      source.close();
-    });
-    source.onerror = () => {
-      if (append) {
-        dispatch({ type: "loadingMore", query: normalizedQuery, value: false });
-      }
-      sourcesRef.current.delete(source);
-      source.close();
-    };
-  }, [normalizedQuery]);
+    },
+    [normalizedQuery],
+  );
 
   useEffect(() => {
     if (!ready) return;
@@ -152,7 +171,8 @@ export function usePersonSearchStream(query: string, enabled: boolean) {
       !visibleState.hasMore ||
       visibleState.loadingMore ||
       visibleState.entries.length < visibleState.offset + PAGE_SIZE
-    ) return;
+    )
+      return;
     dispatch({ type: "loadingMore", query: normalizedQuery, value: true });
     openStream(visibleState.offset + PAGE_SIZE, true);
   }, [normalizedQuery, openStream, ready, visibleState]);

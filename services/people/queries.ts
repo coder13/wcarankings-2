@@ -1,4 +1,7 @@
-import type { PersonIdSearchInput, PersonSearchDatabaseInput } from "@/services/people/types";
+import type {
+  PersonIdSearchInput,
+  PersonSearchDatabaseInput,
+} from "@/services/people/types";
 import { sqlFragment } from "@/lib/helpers/database/sql";
 
 export function personSearchRowsQuery(
@@ -31,7 +34,9 @@ export function personSearchRowsQuery(
 }
 
 export function personIdsQuery(input: PersonIdSearchInput) {
-  const nameCondition = input.regexSearch ? "name REGEXP ?" : "name LIKE ? ESCAPE '\\\\'";
+  const nameCondition = input.regexSearch
+    ? "name REGEXP ?"
+    : "name LIKE ? ESCAPE '\\\\'";
   return sqlFragment`SELECT wca_id FROM persons
      WHERE sub_id = 1
        AND (wca_id = ? OR ${nameCondition})

@@ -1,5 +1,10 @@
 import { query } from "@/db";
-import { formatWcaResult, isEventId, WCA_EVENTS, type RankingType } from "@/lib/wca";
+import {
+  formatWcaResult,
+  isEventId,
+  WCA_EVENTS,
+  type RankingType,
+} from "@/lib/wca";
 import { normalizeProfileWcaId } from "@/lib/person-profile";
 
 export type PersonEventAttempt = {
@@ -92,10 +97,16 @@ async function optionalRows<T extends Record<string, unknown>>(
 }
 
 function rankingTable(resultType: RankingType) {
-  return resultType === "average" ? "ranking_entries_average" : "ranking_entries_single";
+  return resultType === "average"
+    ? "ranking_entries_average"
+    : "ranking_entries_single";
 }
 
-async function loadRankContext(personId: string, eventId: string, resultType: RankingType) {
+async function loadRankContext(
+  personId: string,
+  eventId: string,
+  resultType: RankingType,
+) {
   const rows = await optionalRows<RankRow>(
     `SELECT best, world_rank, continent_rank, country_rank
      FROM ${rankingTable(resultType)}
@@ -110,22 +121,39 @@ function averageCountedAttemptNumbers(attempts: AttemptRow[]) {
   const values = attempts.filter((attempt) => attempt.value !== 0);
   const positive = values.filter((attempt) => attempt.value > 0);
   if (positive.length < 4) return new Set<number>();
-  const best = positive.reduce((current, attempt) => attempt.value < current.value ? attempt : current);
+  const best = positive.reduce((current, attempt) =>
+    attempt.value < current.value ? attempt : current,
+  );
   const worst = values.reduce((current, attempt) => {
     if (attempt.value < 0 && current.value > 0) return attempt;
-    if (attempt.value > 0 && current.value > 0 && attempt.value > current.value) return attempt;
+    if (attempt.value > 0 && current.value > 0 && attempt.value > current.value)
+      return attempt;
     return current;
   });
-  return new Set(values
-    .filter((attempt) => attempt.attempt_number !== best.attempt_number && attempt.attempt_number !== worst.attempt_number)
-    .map((attempt) => attempt.attempt_number));
+  return new Set(
+    values
+      .filter(
+        (attempt) =>
+          attempt.attempt_number !== best.attempt_number &&
+          attempt.attempt_number !== worst.attempt_number,
+      )
+      .map((attempt) => attempt.attempt_number),
+  );
 }
 
-function formatAttempts(rows: AttemptRow[], best: number, eventId: string, resultType: RankingType) {
+function formatAttempts(
+  rows: AttemptRow[],
+  best: number,
+  eventId: string,
+  resultType: RankingType,
+) {
   const values = rows.filter((attempt) => attempt.value !== 0);
-  const counted = resultType === "average"
-    ? averageCountedAttemptNumbers(values)
-    : new Set<number>([values.find((attempt) => attempt.value === best)?.attempt_number ?? 0]);
+  const counted =
+    resultType === "average"
+      ? averageCountedAttemptNumbers(values)
+      : new Set<number>([
+          values.find((attempt) => attempt.value === best)?.attempt_number ?? 0,
+        ]);
   return values.map((value, index) => ({
     index: value.attempt_number || index + 1,
     value: Number(value.value),
@@ -144,7 +172,11 @@ async function loadAttempts(resultId: number) {
   );
 }
 
-async function loadBestResult(personId: string, eventId: string, resultType: RankingType) {
+async function loadBestResult(
+  personId: string,
+  eventId: string,
+  resultType: RankingType,
+) {
   const valueColumn = resultType === "average" ? "average" : "best";
   const rows = await query<BestResultRow>(
     `SELECT result.id AS result_id, result.${valueColumn} AS value, result.competition_id,
@@ -176,11 +208,19 @@ async function loadBestResult(personId: string, eventId: string, resultType: Ran
     competitionName: row.competition_name,
     competitionDate: row.competition_date,
     roundTypeId: row.round_type_id,
-    attempts: formatAttempts(attemptRows, Number(row.value), eventId, resultType),
+    attempts: formatAttempts(
+      attemptRows,
+      Number(row.value),
+      eventId,
+      resultType,
+    ),
   } satisfies PersonEventBest;
 }
 
-export async function loadPersonEventDetails(personId: string, eventId: string) {
+export async function loadPersonEventDetails(
+  personId: string,
+  eventId: string,
+) {
   const normalizedPersonId = normalizeProfileWcaId(personId);
   if (!normalizedPersonId || !isEventId(eventId)) return null;
   const event = WCA_EVENTS.find((entry) => entry.id === eventId);
@@ -205,7 +245,9 @@ export async function loadPersonEventDetails(personId: string, eventId: string) 
   if (!person) return null;
   const [single, average] = await Promise.all([
     loadBestResult(normalizedPersonId, eventId, "single"),
-    eventId === "333mbf" ? Promise.resolve(null) : loadBestResult(normalizedPersonId, eventId, "average"),
+    eventId === "333mbf"
+      ? Promise.resolve(null)
+      : loadBestResult(normalizedPersonId, eventId, "average"),
   ]);
   return {
     person: {

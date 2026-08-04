@@ -71,11 +71,11 @@ export function useSingleExpandedVirtualRow({
     (requestedOffset: number) => {
       const offset = Math.max(0, requestedOffset);
       const expanding = expandingRef.current;
-      const expanded = expanding ?? (
-        expandedIndex === null
+      const expanded =
+        expanding ??
+        (expandedIndex === null
           ? null
-          : { index: expandedIndex, height: expandedExtraHeight }
-      );
+          : { index: expandedIndex, height: expandedExtraHeight });
       const collapsing = collapsingRef.current;
       let first = expanded;
       let second = collapsing;
@@ -93,8 +93,7 @@ export function useSingleExpandedVirtualRow({
       if (offset < firstStart) return offset / rowHeight;
       const firstEnd = firstStart + rowHeight + first.height;
       if (offset < firstEnd) {
-        return first.index +
-          (offset - firstStart) / (rowHeight + first.height);
+        return first.index + (offset - firstStart) / (rowHeight + first.height);
       }
       if (!second) {
         return Math.min(
@@ -110,8 +109,9 @@ export function useSingleExpandedVirtualRow({
       }
       const secondEnd = secondStart + rowHeight + second.height;
       if (offset < secondEnd) {
-        return second.index +
-          (offset - secondStart) / (rowHeight + second.height);
+        return (
+          second.index + (offset - secondStart) / (rowHeight + second.height)
+        );
       }
       return Math.min(
         totalRows,
@@ -122,20 +122,23 @@ export function useSingleExpandedVirtualRow({
   );
 
   const finish = useCallback(() => animationRef.current?.finish(), []);
-  const reset = useCallback((controls: RowTransitionControls) => {
-    animationRef.current?.stop();
-    const affected = [expandingRef.current, collapsingRef.current];
-    if (expandedIndex !== null) {
-      affected.push({ index: expandedIndex, height: expandedExtraHeight });
-    }
-    for (const row of affected) {
-      if (row) controls.resizeRow(row.index, rowHeight);
-    }
-    expandingRef.current = null;
-    collapsingRef.current = null;
-    animationRef.current = null;
-    setExpandedIndex(null);
-  }, [expandedExtraHeight, expandedIndex, rowHeight]);
+  const reset = useCallback(
+    (controls: RowTransitionControls) => {
+      animationRef.current?.stop();
+      const affected = [expandingRef.current, collapsingRef.current];
+      if (expandedIndex !== null) {
+        affected.push({ index: expandedIndex, height: expandedExtraHeight });
+      }
+      for (const row of affected) {
+        if (row) controls.resizeRow(row.index, rowHeight);
+      }
+      expandingRef.current = null;
+      collapsingRef.current = null;
+      animationRef.current = null;
+      setExpandedIndex(null);
+    },
+    [expandedExtraHeight, expandedIndex, rowHeight],
+  );
 
   const toggle = useCallback(
     (requestedIndex: number, controls: RowTransitionControls) => {
@@ -162,9 +165,10 @@ export function useSingleExpandedVirtualRow({
       let closingStartHeight = 0;
       if (expandedIndex !== null && expandedIndex !== nextExpandedIndex) {
         closingIndex = expandedIndex;
-        closingStartHeight = previousExpanding?.index === expandedIndex
-          ? previousExpanding.height
-          : expandedExtraHeight;
+        closingStartHeight =
+          previousExpanding?.index === expandedIndex
+            ? previousExpanding.height
+            : expandedExtraHeight;
       } else if (
         previousCollapsing &&
         previousCollapsing.index !== nextExpandedIndex
@@ -173,12 +177,14 @@ export function useSingleExpandedVirtualRow({
         closingStartHeight = previousCollapsing.height;
       }
 
-      const expanding = nextExpandedIndex === null
-        ? null
-        : { index: nextExpandedIndex, height: openingStartHeight };
-      const collapsing = closingIndex === null
-        ? null
-        : { index: closingIndex, height: closingStartHeight };
+      const expanding =
+        nextExpandedIndex === null
+          ? null
+          : { index: nextExpandedIndex, height: openingStartHeight };
+      const collapsing =
+        closingIndex === null
+          ? null
+          : { index: closingIndex, height: closingStartHeight };
 
       for (const staleRow of [previousExpanding, previousCollapsing]) {
         if (
@@ -266,6 +272,14 @@ export function useSingleExpandedVirtualRow({
       finish,
       reset,
     }),
-    [expandedIndex, finish, indexAtOffset, offsetForIndex, reset, rowSize, toggle],
+    [
+      expandedIndex,
+      finish,
+      indexAtOffset,
+      offsetForIndex,
+      reset,
+      rowSize,
+      toggle,
+    ],
   );
 }

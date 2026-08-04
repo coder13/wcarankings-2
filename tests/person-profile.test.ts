@@ -5,8 +5,14 @@ import test from "node:test";
 test("person profile route batches profile data from ranking projections", async () => {
   const [loader, page, row] = await Promise.all([
     readFile(new URL("../lib/person-profile.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/person/[wcaId]/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../components/RankingRow/RankingRow.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/person/[wcaId]/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../components/RankingRow/RankingRow.tsx", import.meta.url),
+      "utf8",
+    ),
   ]);
 
   assert.match(loader, /FROM person_event_rankings ranking/);
@@ -25,8 +31,17 @@ test("person profile route batches profile data from ranking projections", async
 
 test("person event details load average attempts from raw result attempts", async () => {
   const [loader, detailsPanel] = await Promise.all([
-    readFile(new URL("../lib/person-event-details.ts", import.meta.url), "utf8"),
-    readFile(new URL("../components/RankingRow/RankingDetailsPanel.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../lib/person-event-details.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../components/RankingRow/RankingDetailsPanel.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
 
   assert.match(loader, /FROM result_attempts/);

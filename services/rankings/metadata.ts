@@ -63,13 +63,19 @@ async function loadSnapshot() {
     ),
     yearCounts: new Map(
       yearCounts.rows.map((row) => [
-        yearCountKey(Number(row.year), row.event_id, row.ranking_type, row.scope, row.region_id),
+        yearCountKey(
+          Number(row.year),
+          row.event_id,
+          row.ranking_type,
+          row.scope,
+          row.region_id,
+        ),
         Number(row.count),
       ]),
     ),
-    availableYears: [...new Set(yearCounts.rows.map((row) => Number(row.year)))].sort(
-      (left, right) => right - left,
-    ),
+    availableYears: [
+      ...new Set(yearCounts.rows.map((row) => Number(row.year))),
+    ].sort((left, right) => right - left),
     yearProjectionAvailable: yearCounts.available,
   };
 }
@@ -97,8 +103,13 @@ export async function refreshRankingsMetadata() {
       refreshing = (async () => {
         const version = await query<{ value: string }>(rankingVersionQuery());
         const fetchedAt = version.rows[0]?.value;
-        if (!fetchedAt) throw new Error("Ranking metadata is missing fetched_at.");
-        if (!snapshot || fetchedAt !== snapshot.fetchedAt || !snapshot.yearProjectionAvailable) {
+        if (!fetchedAt)
+          throw new Error("Ranking metadata is missing fetched_at.");
+        if (
+          !snapshot ||
+          fetchedAt !== snapshot.fetchedAt ||
+          !snapshot.yearProjectionAvailable
+        ) {
           const next = await loadSnapshot();
           snapshot = next;
           rankingsPageCache.clear();
@@ -128,7 +139,8 @@ export function getRankingCount(
   regionId: string,
 ) {
   const count = metadata.counts.get(countKey(eventId, type, scope, regionId));
-  if (count === undefined) throw new Error("Ranking count metadata is missing for this cohort.");
+  if (count === undefined)
+    throw new Error("Ranking count metadata is missing for this cohort.");
   return count;
 }
 
@@ -140,7 +152,11 @@ export function getYearRankingCount(
   scope: RegionScope,
   regionId: string,
 ) {
-  return metadata.yearCounts.get(yearCountKey(year, eventId, type, scope, regionId)) ?? 0;
+  return (
+    metadata.yearCounts.get(
+      yearCountKey(year, eventId, type, scope, regionId),
+    ) ?? 0
+  );
 }
 
 export async function assertRankingsReady() {
@@ -187,12 +203,22 @@ export async function assertRankingsReady() {
           throw new Error(`Required projection ${table} is missing.`);
         for (const column of columns)
           if (
-            !columnRows.rows.some((row) => row.table_name === table && row.column_name === column)
+            !columnRows.rows.some(
+              (row) => row.table_name === table && row.column_name === column,
+            )
           )
-            throw new Error(`Required projection column ${table}.${column} is missing.`);
+            throw new Error(
+              `Required projection column ${table}.${column} is missing.`,
+            );
         for (const index of indexes)
-          if (!indexRows.rows.some((row) => row.table_name === table && row.index_name === index))
-            throw new Error(`Required projection index ${table}.${index} is missing.`);
+          if (
+            !indexRows.rows.some(
+              (row) => row.table_name === table && row.index_name === index,
+            )
+          )
+            throw new Error(
+              `Required projection index ${table}.${index} is missing.`,
+            );
       }
       await getRankingsMetadata();
     })().catch((error) => {

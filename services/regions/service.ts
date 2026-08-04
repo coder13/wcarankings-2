@@ -2,7 +2,11 @@ import { query } from "@/db";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
 import { getWcaCountries } from "@/services/regions/helpers";
 import { rankingRegionsQuery } from "@/services/regions/queries";
-import type { RankingRegionRow, RegionKind, RegionRecord } from "@/services/regions/types";
+import type {
+  RankingRegionRow,
+  RegionKind,
+  RegionRecord,
+} from "@/services/regions/types";
 
 const regionRequests = new Map<RegionKind, Promise<RegionRecord[]>>();
 

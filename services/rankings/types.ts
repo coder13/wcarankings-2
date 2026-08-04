@@ -59,7 +59,9 @@ export type PersonMetricRow = {
   best: number;
 };
 
-export type FilteredPersonMetricRow = PersonMetricRow & { total_count?: number };
+export type FilteredPersonMetricRow = PersonMetricRow & {
+  total_count?: number;
+};
 
 export type PersonRankingRow = {
   person_id: string;
@@ -249,8 +251,12 @@ export type RankingPageQueryInput = {
   personColumn: string;
 };
 
-export type RankingSearchQueryInput = RankingPageQueryInput & { personIds: string[] };
-export type RankingCursorQueryInput = RankingPageQueryInput & { cursor: string };
+export type RankingSearchQueryInput = RankingPageQueryInput & {
+  personIds: string[];
+};
+export type RankingCursorQueryInput = RankingPageQueryInput & {
+  cursor: string;
+};
 
 export type PersonMetricQueryInput = {
   rankColumn: string;
@@ -265,7 +271,11 @@ export type FilteredPersonMetricQueryInput = {
   conditions: string[];
   pageConditions: string[];
 };
-export type EntityCountQueryInput = { kind: string; eventId: string; resultType: string };
+export type EntityCountQueryInput = {
+  kind: string;
+  eventId: string;
+  resultType: string;
+};
 export type LatitudeQueryInput = {
   prefix: string;
   direction?: "ASC" | "DESC";

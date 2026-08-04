@@ -19,28 +19,53 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   if (params.has("list") || params.has("wca_ids")) {
     if (params.has("list") && params.has("wca_ids")) {
-      return new Response(JSON.stringify({ error: "Choose either a saved list or dynamic WCA IDs." }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Choose either a saved list or dynamic WCA IDs.",
+        }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+          },
+        },
+      );
     }
     try {
       if (params.has("list")) {
-        const [list, user] = await Promise.all([resolveList(params.get("list") ?? ""), getAuthUser(request)]);
+        const [list, user] = await Promise.all([
+          resolveList(params.get("list") ?? ""),
+          getAuthUser(request),
+        ]);
         assertCanViewList(list, user);
-        return handleProjectionRequest(request, "list-result-rankings", (listParams) =>
-          loadSavedListResultRankings(list, listParams));
+        return handleProjectionRequest(
+          request,
+          "list-result-rankings",
+          (listParams) => loadSavedListResultRankings(list, listParams),
+        );
       }
       const ids = parseDynamicListIds(params.getAll("wca_ids"));
       const dynamic = await resolveDynamicList(ids.personIds);
-      return handleProjectionRequest(request, "list-result-rankings", (listParams) =>
-        loadDynamicListResultRankings(dynamic.personIds, listParams));
+      return handleProjectionRequest(
+        request,
+        "list-result-rankings",
+        (listParams) =>
+          loadDynamicListResultRankings(dynamic.personIds, listParams),
+      );
     } catch (error) {
       if (error instanceof DynamicListInputError) {
-        return Response.json({ error: error.message }, { status: 400, headers: { "Cache-Control": "no-store" } });
+        return Response.json(
+          { error: error.message },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
+        );
       }
       return buildApiErrorResponse(error);
     }
   }
-  return handleProjectionRequest(request, "result-rankings", loadResultRankings);
+  return handleProjectionRequest(
+    request,
+    "result-rankings",
+    loadResultRankings,
+  );
 }

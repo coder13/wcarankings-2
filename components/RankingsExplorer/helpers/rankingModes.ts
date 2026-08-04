@@ -5,7 +5,8 @@ export const COMPETITION_RANKING_OPTIONS = [
   { value: "latitude", label: "Latitude" },
 ] as const;
 
-export type CompetitionRanking = (typeof COMPETITION_RANKING_OPTIONS)[number]["value"];
+export type CompetitionRanking =
+  (typeof COMPETITION_RANKING_OPTIONS)[number]["value"];
 
 export const CITY_RANKING_OPTIONS = [
   { value: "fastest-single", label: "Fastest single" },
