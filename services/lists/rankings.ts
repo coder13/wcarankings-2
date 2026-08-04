@@ -298,7 +298,14 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
       cacheOutcome: cacheable ? "miss" as const : "bypass" as const,
     };
   } catch (error) {
-    if (!isMissingRankingProjection(error)) throw error;
+    if (!isMissingRankingProjection(error)) {
+      const databaseError = error as { code?: string; message?: string };
+      console.error("[list rankings] failed to load rankings", {
+        code: databaseError.code,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
     const metadata = await getCurrentRankingsMetadata();
     return {
       list: {
