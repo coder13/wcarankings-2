@@ -3,14 +3,21 @@ const LONG_TASK_THRESHOLD_MS = 60_000;
 
 export async function runDependencyAwareTasks(
   tasks,
-  { connection, createConnection, concurrency = 1, satisfiedDependencies = [] } = {},
+  {
+    connection,
+    createConnection,
+    concurrency = 1,
+    satisfiedDependencies = [],
+  } = {},
 ) {
   const taskByName = new Map(tasks.map((task) => [task.name, task]));
   const initiallyCompleted = new Set(["raw-wca", ...satisfiedDependencies]);
   for (const task of tasks) {
     for (const dependency of task.dependencies) {
       if (!initiallyCompleted.has(dependency) && !taskByName.has(dependency)) {
-        throw new Error(`Unknown task dependency ${dependency} for ${task.name}`);
+        throw new Error(
+          `Unknown task dependency ${dependency} for ${task.name}`,
+        );
       }
     }
   }
@@ -21,9 +28,12 @@ export async function runDependencyAwareTasks(
     const pending = [...tasks];
     while (pending.length > 0) {
       const index = pending.findIndex((task) =>
-        task.dependencies.every((dependency) => completed.has(dependency)));
+        task.dependencies.every((dependency) => completed.has(dependency)),
+      );
       if (index < 0) {
-        throw new Error(`Task dependency cycle or missing dependency among: ${pending.map(({ name }) => name).join(", ")}`);
+        throw new Error(
+          `Task dependency cycle or missing dependency among: ${pending.map(({ name }) => name).join(", ")}`,
+        );
       }
       const [task] = pending.splice(index, 1);
       results.push(await task.run(connection));
@@ -59,15 +69,22 @@ export async function runDependencyAwareTasks(
   function nextReadyTask() {
     const ready = pending.filter(dependenciesComplete);
     if (ready.length === 0) return undefined;
-    const longTaskRunning = [...running.values()].some(({ task }) => isLongTask(task));
+    const longTaskRunning = [...running.values()].some(({ task }) =>
+      isLongTask(task),
+    );
     const shortReady = ready.filter((task) => !isLongTask(task));
-    const candidates = longTaskRunning && shortReady.length > 0 ? shortReady : ready;
+    const candidates =
+      longTaskRunning && shortReady.length > 0 ? shortReady : ready;
     return candidates.reduce((selected, task) => {
       if (!selected) return task;
       if (longTaskRunning && shortReady.length > 0) {
-        return task.estimatedDurationMs < selected.estimatedDurationMs ? task : selected;
+        return task.estimatedDurationMs < selected.estimatedDurationMs
+          ? task
+          : selected;
       }
-      return task.estimatedDurationMs > selected.estimatedDurationMs ? task : selected;
+      return task.estimatedDurationMs > selected.estimatedDurationMs
+        ? task
+        : selected;
     }, undefined);
   }
 
@@ -86,9 +103,13 @@ export async function runDependencyAwareTasks(
   while ((pending.length > 0 || running.size > 0) && !failure) {
     startReadyTasks();
     if (running.size === 0) {
-      throw new Error(`Task dependency cycle or missing dependency among: ${pending.map(({ name }) => name).join(", ")}`);
+      throw new Error(
+        `Task dependency cycle or missing dependency among: ${pending.map(({ name }) => name).join(", ")}`,
+      );
     }
-    const result = await Promise.race([...running.values()].map(({ promise }) => promise));
+    const result = await Promise.race(
+      [...running.values()].map(({ promise }) => promise),
+    );
     running.delete(result.task.name);
     if (result.error) {
       failure = result.error;
@@ -99,7 +120,9 @@ export async function runDependencyAwareTasks(
   }
 
   if (running.size > 0) {
-    await Promise.allSettled([...running.values()].map(({ promise }) => promise));
+    await Promise.allSettled(
+      [...running.values()].map(({ promise }) => promise),
+    );
   }
   if (failure) throw failure;
   return tasks.map(({ name }) => timings.get(name));

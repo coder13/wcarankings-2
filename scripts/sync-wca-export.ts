@@ -14,7 +14,10 @@ import {
 } from "../data-tools/projections/build.ts";
 import { refreshSystemLists } from "./refresh-system-lists.ts";
 import { enqueueAllListRankingRebuilds } from "./list-ranking-jobs.ts";
-import { refreshBoardList, refreshDelegatesList } from "./refresh-board-list.ts";
+import {
+  refreshBoardList,
+  refreshDelegatesList,
+} from "./refresh-board-list.ts";
 
 const EXPORT_API = "https://www.worldcubeassociation.org/api/v0/export/public";
 const force = process.argv.includes("--force");
@@ -31,7 +34,10 @@ const selectedProjectionNames = argumentValue("projection-names")
   .split(",")
   .map((name) => name.trim())
   .filter(Boolean);
-const canonicalExportDate = argumentValue("canonical-export-date") || process.env.CANONICAL_EXPORT_DATE || "";
+const canonicalExportDate =
+  argumentValue("canonical-export-date") ||
+  process.env.CANONICAL_EXPORT_DATE ||
+  "";
 
 function databaseOptions(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -41,52 +47,72 @@ function databaseOptions(connectionString = process.env.DATABASE_URL) {
     port: Number(url.port || 3306),
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
-    database: process.env.DATABASE_NAME_OVERRIDE
-      || decodeURIComponent(url.pathname.replace(/^\//, "")),
+    database:
+      process.env.DATABASE_NAME_OVERRIDE ||
+      decodeURIComponent(url.pathname.replace(/^\//, "")),
   };
 }
 
 async function getLatestExport() {
-  const response = await fetch(EXPORT_API, { headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`WCA export API returned ${response.status}.`);
+  const response = await fetch(EXPORT_API, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw new Error(`WCA export API returned ${response.status}.`);
   const payload = await response.json();
   const exportDate = payload.export_date ?? payload.exportDate;
   const sqlUrl = payload.sql_url ?? payload.sqlUrl;
-  const version = payload.export_format_version ?? payload.exportFormatVersion ?? "2";
-  if (!exportDate || !sqlUrl) throw new Error("The WCA export API response is missing export_date or sql_url.");
+  const version =
+    payload.export_format_version ?? payload.exportFormatVersion ?? "2";
+  if (!exportDate || !sqlUrl)
+    throw new Error(
+      "The WCA export API response is missing export_date or sql_url.",
+    );
   if (!String(version).startsWith("2")) {
-    throw new Error(`Unsupported WCA export major version: ${version}. Review the importer before continuing.`);
+    throw new Error(
+      `Unsupported WCA export major version: ${version}. Review the importer before continuing.`,
+    );
   }
   return { exportDate, sqlUrl, version };
 }
 
 async function getSuppliedExportMetadata(path) {
   const archive = await unzipper.Open.file(path);
-  const entry = archive.files.find((file) => basename(file.path).toLowerCase() === "metadata.json");
-  if (!entry) throw new Error("The supplied WCA SQL export is missing metadata.json.");
+  const entry = archive.files.find(
+    (file) => basename(file.path).toLowerCase() === "metadata.json",
+  );
+  if (!entry)
+    throw new Error("The supplied WCA SQL export is missing metadata.json.");
   const metadata = JSON.parse((await entry.buffer()).toString("utf8"));
   const exportDate = metadata.export_date ?? metadata.exportDate;
-  const version = metadata.export_format_version ?? metadata.exportFormatVersion ?? "2";
-  if (!exportDate) throw new Error("The supplied WCA SQL export metadata is missing export_date.");
+  const version =
+    metadata.export_format_version ?? metadata.exportFormatVersion ?? "2";
+  if (!exportDate)
+    throw new Error(
+      "The supplied WCA SQL export metadata is missing export_date.",
+    );
   return { exportDate, sqlUrl: "", version };
 }
 
 async function download(url, destination) {
   const response = await fetch(url, { redirect: "follow" });
-  if (!response.ok || !response.body) throw new Error(`Export download returned ${response.status}.`);
+  if (!response.ok || !response.body)
+    throw new Error(`Export download returned ${response.status}.`);
   const output = createWriteStream(destination);
   await pipeline(response.body, output);
 }
 
 async function getCachedExport(latest) {
-  const suppliedPath = argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH;
+  const suppliedPath =
+    argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH;
   if (suppliedPath) {
     await access(suppliedPath);
     process.stdout.write(`Using supplied WCA SQL export: ${suppliedPath}\n`);
     return suppliedPath;
   }
 
-  const cacheDirectory = process.env.WCA_EXPORT_CACHE_DIR || "/var/cache/wcarankings";
+  const cacheDirectory =
+    process.env.WCA_EXPORT_CACHE_DIR || "/var/cache/wcarankings";
   await mkdir(cacheDirectory, { recursive: true });
   const cacheDate = String(latest.exportDate).slice(0, 10);
   const cachePath = join(cacheDirectory, `wca-export-${cacheDate}.sql.zip`);
@@ -110,8 +136,12 @@ async function getCachedExport(latest) {
 }
 
 async function getCachedExportForToday() {
-  const cacheDirectory = process.env.WCA_EXPORT_CACHE_DIR || "/var/cache/wcarankings";
-  const cachePath = join(cacheDirectory, `wca-export-${new Date().toISOString().slice(0, 10)}.sql.zip`);
+  const cacheDirectory =
+    process.env.WCA_EXPORT_CACHE_DIR || "/var/cache/wcarankings";
+  const cachePath = join(
+    cacheDirectory,
+    `wca-export-${new Date().toISOString().slice(0, 10)}.sql.zip`,
+  );
   try {
     await access(cachePath);
     return cachePath;
@@ -121,8 +151,11 @@ async function getCachedExportForToday() {
 }
 
 function sqlEntry(archive) {
-  const entry = archive.files.find((file) => basename(file.path).toLowerCase() === "wca_export.sql");
-  if (!entry) throw new Error("Could not find WCA_export.sql in the WCA SQL export.");
+  const entry = archive.files.find(
+    (file) => basename(file.path).toLowerCase() === "wca_export.sql",
+  );
+  if (!entry)
+    throw new Error("Could not find WCA_export.sql in the WCA SQL export.");
   return entry;
 }
 
@@ -171,7 +204,10 @@ async function updateImportRun(id, fields) {
     if (entries.length === 0) return;
     const values = entries.map(([, value]) => value);
     const assignments = entries.map(([key]) => `\`${key}\` = ?`).join(", ");
-    await connection.query(`UPDATE import_runs SET ${assignments} WHERE id = ?`, [...values, id]);
+    await connection.query(
+      `UPDATE import_runs SET ${assignments} WHERE id = ?`,
+      [...values, id],
+    );
   } finally {
     await connection.end();
   }
@@ -184,7 +220,13 @@ async function createImportRun(latest, startedAt) {
       `INSERT INTO import_runs
         (export_date, export_format_version, export_url, status, started_at, fetch_started_at)
        VALUES (?, ?, ?, 'running', ?, ?)`,
-      [String(latest.exportDate).slice(0, 10), latest.version, latest.sqlUrl || null, startedAt, startedAt],
+      [
+        String(latest.exportDate).slice(0, 10),
+        latest.version,
+        latest.sqlUrl || null,
+        startedAt,
+        startedAt,
+      ],
     );
     return result.insertId;
   } finally {
@@ -241,10 +283,15 @@ async function tableExists(connection, name) {
 async function promoteRankings() {
   const connection = await mysql.createConnection(databaseOptions());
   try {
-    const hasLegacyProjection = await tableExists(connection, "ranking_entries");
+    const hasLegacyProjection = await tableExists(
+      connection,
+      "ranking_entries",
+    );
     if (hasLegacyProjection) {
       await dropManagedObject(connection, "ranking_entries_legacy_previous");
-      await connection.query("RENAME TABLE ranking_entries TO ranking_entries_legacy_previous");
+      await connection.query(
+        "RENAME TABLE ranking_entries TO ranking_entries_legacy_previous",
+      );
     }
     await promoteProjectionTables(connection);
     await dropManagedObject(connection, "ranking_entries_legacy_previous");
@@ -257,17 +304,25 @@ async function importSqlExport(zipPath) {
   const archive = await unzipper.Open.file(zipPath);
   const entry = sqlEntry(archive);
   const options = databaseOptions();
-  const child = spawn("mariadb", [
-    "--protocol=TCP",
-    "--host", options.host,
-    "--port", String(options.port),
-    "--user", options.user,
-    "--database", options.database,
-    "--binary-mode",
-  ], {
-    env: { ...process.env, MYSQL_PWD: options.password },
-    stdio: ["pipe", "ignore", "pipe"],
-  });
+  const child = spawn(
+    "mariadb",
+    [
+      "--protocol=TCP",
+      "--host",
+      options.host,
+      "--port",
+      String(options.port),
+      "--user",
+      options.user,
+      "--database",
+      options.database,
+      "--binary-mode",
+    ],
+    {
+      env: { ...process.env, MYSQL_PWD: options.password },
+      stdio: ["pipe", "ignore", "pipe"],
+    },
+  );
   child.stderr.on("data", (chunk) => process.stderr.write(chunk));
   const exit = new Promise((resolve, reject) => {
     child.once("error", reject);
@@ -275,13 +330,18 @@ async function importSqlExport(zipPath) {
   });
   await pipeline(entry.stream(), child.stdin);
   const result = await exit;
-  if (result.code !== 0) throw new Error(`MariaDB import failed with exit code ${result.code ?? result.signal}.`);
+  if (result.code !== 0)
+    throw new Error(
+      `MariaDB import failed with exit code ${result.code ?? result.signal}.`,
+    );
 }
 
 async function getImportedDate() {
   const connection = await mysql.createConnection(databaseOptions());
   try {
-    const [rows] = await connection.query("SELECT value FROM export_metadata WHERE `key` = 'export_date' LIMIT 1");
+    const [rows] = await connection.query(
+      "SELECT value FROM export_metadata WHERE `key` = 'export_date' LIMIT 1",
+    );
     return rows[0]?.value ?? null;
   } catch (error) {
     if (error?.code === "ER_NO_SUCH_TABLE") return null;
@@ -296,7 +356,14 @@ async function writeExportMetadata(latest) {
   try {
     await connection.query(
       "INSERT INTO export_metadata (`key`, `value`) VALUES (?, ?), (?, ?), (?, ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
-      ["export_date", String(latest.exportDate), "export_format_version", String(latest.version), "fetched_at", new Date().toISOString()],
+      [
+        "export_date",
+        String(latest.exportDate),
+        "export_format_version",
+        String(latest.version),
+        "fetched_at",
+        new Date().toISOString(),
+      ],
     );
   } finally {
     await connection.end();
@@ -308,7 +375,10 @@ async function refreshRankingsSchema() {
   try {
     await refreshMysqlSchema(connection, {
       projectionSuffix: "_staging",
-      projectionNames: selectedProjectionNames.length > 0 ? selectedProjectionNames : undefined,
+      projectionNames:
+        selectedProjectionNames.length > 0
+          ? selectedProjectionNames
+          : undefined,
       createConnection: () => mysql.createConnection(databaseOptions()),
     });
   } finally {
@@ -326,25 +396,34 @@ async function refreshRawPersonLookupIndex() {
 }
 
 async function main() {
-  if (dryRun && rawOnly) throw new Error("--dry-run and --raw-only cannot be used together.");
-  const suppliedPath = argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH;
+  if (dryRun && rawOnly)
+    throw new Error("--dry-run and --raw-only cannot be used together.");
+  const suppliedPath =
+    argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH;
   let latest;
   if (suppliedPath) {
     latest = await getSuppliedExportMetadata(suppliedPath);
   } else {
     const cachedPath = await getCachedExportForToday();
-    latest = cachedPath ? await getSuppliedExportMetadata(cachedPath) : await getLatestExport();
+    latest = cachedPath
+      ? await getSuppliedExportMetadata(cachedPath)
+      : await getLatestExport();
   }
-  if (canonicalExportDate) latest = { ...latest, exportDate: canonicalExportDate };
-  process.stdout.write(`Latest WCA export: ${latest.exportDate} (v${String(latest.version).replace(/^v/i, "")})\n`);
+  if (canonicalExportDate)
+    latest = { ...latest, exportDate: canonicalExportDate };
+  process.stdout.write(
+    `Latest WCA export: ${latest.exportDate} (v${String(latest.version).replace(/^v/i, "")})\n`,
+  );
 
   if (dryRun) {
     await getCachedExport(latest);
-    process.stdout.write("Dry run complete. The cached SQL export is available for import.\n");
+    process.stdout.write(
+      "Dry run complete. The cached SQL export is available for import.\n",
+    );
     return;
   }
 
-  if (!force && await getImportedDate() === String(latest.exportDate)) {
+  if (!force && (await getImportedDate()) === String(latest.exportDate)) {
     process.stdout.write("Database is already current. Nothing to do.\n");
     return;
   }
@@ -367,7 +446,9 @@ async function main() {
         completed_at: completedAt,
         duration_ms: elapsedMilliseconds(startedAt, completedAt),
       });
-      process.stdout.write(`WCA raw tables are current through ${latest.exportDate}; projection publication skipped by --raw-only.\n`);
+      process.stdout.write(
+        `WCA raw tables are current through ${latest.exportDate}; projection publication skipped by --raw-only.\n`,
+      );
       return;
     }
     const projectionBuildStartedAt = now();
@@ -383,12 +464,16 @@ async function main() {
     await updateImportRun(runId, {
       ...counts,
       projection_built_at: projectionBuiltAt,
-      projection_build_duration_ms: elapsedMilliseconds(projectionBuildStartedAt, projectionBuiltAt),
+      projection_build_duration_ms: elapsedMilliseconds(
+        projectionBuildStartedAt,
+        projectionBuiltAt,
+      ),
       projection_swap_status: "swapping",
     });
     await promoteRankings();
     await writeExportMetadata(latest);
-    const systemListConnection = await mysql.createConnection(databaseOptions());
+    const systemListConnection =
+      await mysql.createConnection(databaseOptions());
     try {
       await refreshSystemLists(systemListConnection);
       await refreshBoardList(systemListConnection);
@@ -404,7 +489,9 @@ async function main() {
       completed_at: completedAt,
       duration_ms: elapsedMilliseconds(startedAt, completedAt),
     });
-    process.stdout.write(`WCA rankings are current through ${latest.exportDate}.\n`);
+    process.stdout.write(
+      `WCA rankings are current through ${latest.exportDate}.\n`,
+    );
   } catch (error) {
     const completedAt = now();
     await updateImportRun(runId, {

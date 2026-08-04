@@ -1,6 +1,10 @@
 // @ts-nocheck
 import mysql from "mysql2/promise";
-import { PUBLISHED_PROJECTION_TABLES, promoteProjectionTables, refreshMysqlSchema } from "../data-tools/projections/build.ts";
+import {
+  PUBLISHED_PROJECTION_TABLES,
+  promoteProjectionTables,
+  refreshMysqlSchema,
+} from "../data-tools/projections/build.ts";
 
 const force = process.argv.includes("--force");
 const TABLES = PUBLISHED_PROJECTION_TABLES;
@@ -28,8 +32,10 @@ async function projectionExists(connection) {
 
 const connection = await mysql.createConnection(databaseOptions());
 try {
-  if (!force && await projectionExists(connection)) {
-    process.stdout.write("Projection generation is already present. Nothing to do.\n");
+  if (!force && (await projectionExists(connection))) {
+    process.stdout.write(
+      "Projection generation is already present. Nothing to do.\n",
+    );
   } else {
     process.stdout.write("Building a complete staged projection generation…\n");
     await refreshMysqlSchema(connection, { projectionSuffix: "_staging" });

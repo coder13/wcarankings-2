@@ -1,10 +1,20 @@
 // @ts-nocheck
 import mysql from "mysql2/promise";
-import { DEPLOYMENT_PROJECTION_GROUPS, dropManagedObject } from "../data-tools/projections/build.ts";
+import {
+  DEPLOYMENT_PROJECTION_GROUPS,
+  dropManagedObject,
+} from "../data-tools/projections/build.ts";
 
-const groupName = process.argv.find((value) => value.startsWith("--group="))?.slice("--group=".length);
-const group = DEPLOYMENT_PROJECTION_GROUPS.find(({ name }) => name === groupName);
-if (!group) throw new Error(`Unknown deployment projection group: ${groupName || "(missing)"}.`);
+const groupName = process.argv
+  .find((value) => value.startsWith("--group="))
+  ?.slice("--group=".length);
+const group = DEPLOYMENT_PROJECTION_GROUPS.find(
+  ({ name }) => name === groupName,
+);
+if (!group)
+  throw new Error(
+    `Unknown deployment projection group: ${groupName || "(missing)"}.`,
+  );
 const manifestTable = `projection_transfer_manifest_${group.name.replaceAll("-", "_")}`;
 const indexesTable = `projection_transfer_indexes_${group.name.replaceAll("-", "_")}`;
 
@@ -26,7 +36,8 @@ try {
     "SELECT value FROM export_metadata WHERE `key` = 'export_date' LIMIT 1",
   );
   const exportDate = metadata[0]?.value;
-  if (!exportDate) throw new Error("The projection source has no WCA export date.");
+  if (!exportDate)
+    throw new Error("The projection source has no WCA export date.");
 
   await dropManagedObject(connection, manifestTable);
   await connection.query(`
@@ -60,7 +71,9 @@ try {
   let deferredIndexCount = 0;
   for (const table of group.tables) {
     const transfer = `${table}_transfer`;
-    const [indexRows] = await connection.query(`SHOW INDEX FROM \`${transfer}\``);
+    const [indexRows] = await connection.query(
+      `SHOW INDEX FROM \`${transfer}\``,
+    );
     const indexes = new Map();
     for (const row of indexRows) {
       if (row.Key_name === "PRIMARY") continue;
@@ -96,16 +109,18 @@ try {
     }
   }
 
-  process.stdout.write(`${JSON.stringify({
-    group: group.name,
-    exportDate,
-    deferredIndexCount,
-    tables: [
-      ...group.tables.map((table) => `${table}_transfer`),
-      manifestTable,
-      indexesTable,
-    ],
-  })}\n`);
+  process.stdout.write(
+    `${JSON.stringify({
+      group: group.name,
+      exportDate,
+      deferredIndexCount,
+      tables: [
+        ...group.tables.map((table) => `${table}_transfer`),
+        manifestTable,
+        indexesTable,
+      ],
+    })}\n`,
+  );
 } finally {
   await connection.end();
 }

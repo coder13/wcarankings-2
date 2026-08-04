@@ -4,7 +4,10 @@ import {
   primaryNameToken,
   SYSTEM_LIST_DEFINITIONS,
 } from "../scripts/system-list-definitions.ts";
-import { boardMemberIds, roleMemberIds } from "../scripts/refresh-board-list.ts";
+import {
+  boardMemberIds,
+  roleMemberIds,
+} from "../scripts/refresh-board-list.ts";
 
 test("system list aliases are stable and unique", () => {
   assert.deepEqual(

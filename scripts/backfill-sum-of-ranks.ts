@@ -35,19 +35,21 @@ try {
     !existingNames.has("person_sum_of_ranks_event_values") &&
     !force
   ) {
-    process.stdout.write("Sum of Ranks projection is already present. Nothing to do.\n");
+    process.stdout.write(
+      "Sum of Ranks projection is already present. Nothing to do.\n",
+    );
     process.exitCode = 0;
   } else {
-  const projectionNames = ["sum-of-ranks"];
-  const timings = await buildRegisteredProjections(connection, {
-    projectionSuffix: "_staging",
-    projectionNames,
-  });
-  await promoteRegisteredProjections(connection, {
-    projectionSuffix: "_staging",
-    projectionNames,
-  });
-  process.stdout.write(`${JSON.stringify({ projections: timings })}\n`);
+    const projectionNames = ["sum-of-ranks"];
+    const timings = await buildRegisteredProjections(connection, {
+      projectionSuffix: "_staging",
+      projectionNames,
+    });
+    await promoteRegisteredProjections(connection, {
+      projectionSuffix: "_staging",
+      projectionNames,
+    });
+    process.stdout.write(`${JSON.stringify({ projections: timings })}\n`);
   }
 } finally {
   await connection.end();

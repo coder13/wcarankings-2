@@ -1,10 +1,26 @@
 // @ts-nocheck
 import { compatibilityProjectionTasks } from "./compatibility.ts";
-import { dropManagedObject, ensureIndexes, ensureWcaPersonLookupIndex, INDEXES, tableExists } from "./database.ts";
+import {
+  dropManagedObject,
+  ensureIndexes,
+  ensureWcaPersonLookupIndex,
+  INDEXES,
+  tableExists,
+} from "./database.ts";
 import { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } from "./jobs.ts";
-import { elapsedMs, createTableProgress, runTimedBuildStep, writeBuildLog } from "./progress.ts";
+import {
+  elapsedMs,
+  createTableProgress,
+  runTimedBuildStep,
+  writeBuildLog,
+} from "./progress.ts";
 import { runDependencyAwareTasks } from "./scheduler.ts";
-import { createdTables, executeTableStatements, projectionSql, statements } from "./sql.ts";
+import {
+  createdTables,
+  executeTableStatements,
+  projectionSql,
+  statements,
+} from "./sql.ts";
 
 export { DEPLOYMENT_PROJECTION_GROUPS } from "./jobs.ts";
 export { ensureWcaPersonLookupIndex, dropManagedObject } from "./database.ts";
@@ -13,22 +29,29 @@ export {
   COMPATIBILITY_TABLE_TASK_COUNT,
   renameCompatibilitySql,
 } from "./compatibility.ts";
-export { createTableProgress, elapsedMs, runTimedBuildStep, writeBuildLog } from "./progress.ts";
+export {
+  createTableProgress,
+  elapsedMs,
+  runTimedBuildStep,
+  writeBuildLog,
+} from "./progress.ts";
 export { runDependencyAwareTasks } from "./scheduler.ts";
 export { executeTableStatements, projectionSql, statements } from "./sql.ts";
 
-const projectionDefinitions = PROJECTION_JOBS
-  .filter((job) => job.kind !== "compatibility")
-  .map((job) => ({
-    name: job.id,
-    dependencies: [...job.dependencies],
-    files: [...job.sqlFiles],
-    tables: [...job.tables],
-    enabledByDefault: job.enabledByDefault,
-    estimatedDurationMs: job.estimatedDurationMs ?? 0,
-  }));
+const projectionDefinitions = PROJECTION_JOBS.filter(
+  (job) => job.kind !== "compatibility",
+).map((job) => ({
+  name: job.id,
+  dependencies: [...job.dependencies],
+  files: [...job.sqlFiles],
+  tables: [...job.tables],
+  enabledByDefault: job.enabledByDefault,
+  estimatedDurationMs: job.estimatedDurationMs ?? 0,
+}));
 
-export const SEMANTIC_PROJECTION_TABLES = projectionDefinitions.flatMap(({ tables }) => tables);
+export const SEMANTIC_PROJECTION_TABLES = projectionDefinitions.flatMap(
+  ({ tables }) => tables,
+);
 export const DEFAULT_PROJECTION_NAMES = projectionDefinitions
   .filter(({ enabledByDefault }) => enabledByDefault)
   .map(({ name }) => name);
@@ -50,23 +73,27 @@ export const PUBLISHED_PROJECTION_TABLES = [
   ...COMPATIBILITY_PROJECTION_TABLES,
   ...ACTIVE_SEMANTIC_PROJECTION_TABLES,
 ];
-export const RETIRED_PROJECTION_TABLES = [
-  "person_sum_of_ranks_event_values",
-];
+export const RETIRED_PROJECTION_TABLES = ["person_sum_of_ranks_event_values"];
 
 function projectionNames(sql, suffix) {
   return [...SEMANTIC_PROJECTION_TABLES, ...COMPATIBILITY_PROJECTION_TABLES]
     .sort((left, right) => right.length - left.length)
     .reduce(
-      (renamed, table) => renamed.replace(
-        new RegExp(`(?<![A-Za-z0-9_])${table}(?![A-Za-z0-9_])`, "g"),
-        `${table}${suffix}`,
-      ),
+      (renamed, table) =>
+        renamed.replace(
+          new RegExp(`(?<![A-Za-z0-9_])${table}(?![A-Za-z0-9_])`, "g"),
+          `${table}${suffix}`,
+        ),
       sql,
     );
 }
 
-async function buildSqlProjection(connection, definition, suffix, tableProgress) {
+async function buildSqlProjection(
+  connection,
+  definition,
+  suffix,
+  tableProgress,
+) {
   const phases = [];
   for (const file of definition.files) {
     const sql = projectionNames(await projectionSql(file), suffix);
@@ -78,7 +105,9 @@ async function buildSqlProjection(connection, definition, suffix, tableProgress)
 async function validateProjection(connection, definition, suffix) {
   const rowCounts = {};
   for (const table of definition.tables) {
-    const [rows] = await connection.query(`SELECT COUNT(*) AS count FROM \`${table}${suffix}\``);
+    const [rows] = await connection.query(
+      `SELECT COUNT(*) AS count FROM \`${table}${suffix}\``,
+    );
     rowCounts[table] = Number(rows[0]?.count ?? 0);
   }
   return rowCounts;
@@ -86,29 +115,36 @@ async function validateProjection(connection, definition, suffix) {
 
 export const PROJECTION_REGISTRY = projectionDefinitions.map((definition) => ({
   ...definition,
-  build: (connection, suffix, tableProgress) => buildSqlProjection(connection, definition, suffix, tableProgress),
-  validate: (connection, suffix) => validateProjection(connection, definition, suffix),
+  build: (connection, suffix, tableProgress) =>
+    buildSqlProjection(connection, definition, suffix, tableProgress),
+  validate: (connection, suffix) =>
+    validateProjection(connection, definition, suffix),
 }));
 
 export async function countProjectionTables(projections) {
   let total = 0;
   for (const projection of projections) {
     for (const file of projection.files) {
-      total += createdTables(projectionNames(await projectionSql(file), "")).length;
+      total += createdTables(
+        projectionNames(await projectionSql(file), ""),
+      ).length;
     }
   }
   return total;
 }
 
 function projectionDependencyClosure(selectedNames) {
-  const byName = new Map(projectionDefinitions.map((projection) => [projection.name, projection]));
+  const byName = new Map(
+    projectionDefinitions.map((projection) => [projection.name, projection]),
+  );
   const ordered = [];
   const visiting = new Set();
   const visited = new Set();
 
   function visit(name) {
     if (visited.has(name) || name === "raw-wca") return;
-    if (visiting.has(name)) throw new Error(`Projection dependency cycle at ${name}`);
+    if (visiting.has(name))
+      throw new Error(`Projection dependency cycle at ${name}`);
     const projection = byName.get(name);
     if (!projection) throw new Error(`Unknown projection dependency: ${name}`);
     visiting.add(name);
@@ -128,68 +164,107 @@ export function projectionBuildPlan(
 ) {
   const selected = new Set(groupNames);
   const satisfied = new Set(satisfiedGroupNames);
-  const groups = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) => selected.has(name));
-  const satisfiedGroups = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) => satisfied.has(name));
-  if (groups.length !== selected.size || satisfiedGroups.length !== satisfied.size) {
+  const groups = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) =>
+    selected.has(name),
+  );
+  const satisfiedGroups = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) =>
+    satisfied.has(name),
+  );
+  if (
+    groups.length !== selected.size ||
+    satisfiedGroups.length !== satisfied.size
+  ) {
     const known = new Set(DEPLOYMENT_PROJECTION_GROUPS.map(({ name }) => name));
-    const unknown = [...selected, ...satisfied].filter((name) => !known.has(name));
-    throw new Error(`Unknown deployment projection group: ${unknown.join(", ")}`);
+    const unknown = [...selected, ...satisfied].filter(
+      (name) => !known.has(name),
+    );
+    throw new Error(
+      `Unknown deployment projection group: ${unknown.join(", ")}`,
+    );
   }
   return {
     groups: groups.map(({ name }) => name),
-    projectionNames: [...new Set(groups.flatMap(({ projectionNames: names }) => names))],
-    satisfiedProjectionNames: [...new Set(
-      satisfiedGroups
-        .flatMap(({ projectionNames: names }) => names),
-    )],
+    projectionNames: [
+      ...new Set(groups.flatMap(({ projectionNames: names }) => names)),
+    ],
+    satisfiedProjectionNames: [
+      ...new Set(
+        satisfiedGroups.flatMap(({ projectionNames: names }) => names),
+      ),
+    ],
     includeCompatibility: groups.some(({ name }) => name === "compatibility"),
     tables: [...new Set(groups.flatMap(({ tables }) => tables))],
   };
 }
 
-function orderedProjections(selectedNames = DEFAULT_PROJECTION_NAMES, satisfiedNames = []) {
-  const byName = new Map(PROJECTION_REGISTRY.map((projection) => [projection.name, projection]));
+function orderedProjections(
+  selectedNames = DEFAULT_PROJECTION_NAMES,
+  satisfiedNames = [],
+) {
+  const byName = new Map(
+    PROJECTION_REGISTRY.map((projection) => [projection.name, projection]),
+  );
   const satisfied = new Set(satisfiedNames);
   return projectionDependencyClosure(selectedNames)
     .filter(({ name }) => !satisfied.has(name))
     .map(({ name }) => byName.get(name));
 }
 
-async function buildProjection(connection, projection, projectionSuffix, tableProgress) {
+async function buildProjection(
+  connection,
+  projection,
+  projectionSuffix,
+  tableProgress,
+) {
   const startedAt = performance.now();
   writeBuildLog(`Starting projection ${projection.name}…`);
   try {
-    for (const table of projection.tables) await dropManagedObject(connection, `${table}${projectionSuffix}`);
-    const phases = await projection.build(connection, projectionSuffix, tableProgress);
+    for (const table of projection.tables)
+      await dropManagedObject(connection, `${table}${projectionSuffix}`);
+    const phases = await projection.build(
+      connection,
+      projectionSuffix,
+      tableProgress,
+    );
     const rowCounts = await projection.validate(connection, projectionSuffix);
     const durationMs = elapsedMs(startedAt);
     const timing = { name: projection.name, durationMs, rowCounts, phases };
-    writeBuildLog(`Finished projection ${projection.name} in ${durationMs}ms (${JSON.stringify(rowCounts)}).`);
+    writeBuildLog(
+      `Finished projection ${projection.name} in ${durationMs}ms (${JSON.stringify(rowCounts)}).`,
+    );
     return timing;
   } catch (error) {
-    writeBuildLog(`Failed projection ${projection.name} after ${elapsedMs(startedAt)}ms.`);
+    writeBuildLog(
+      `Failed projection ${projection.name} after ${elapsedMs(startedAt)}ms.`,
+    );
     throw error;
   }
 }
 
 export function projectionConcurrency(value) {
-  const parsed = Number(value ?? process.env.WCA_PROJECTION_BUILD_CONCURRENCY ?? 2);
+  const parsed = Number(
+    value ?? process.env.WCA_PROJECTION_BUILD_CONCURRENCY ?? 2,
+  );
   return Number.isFinite(parsed) && parsed > 1 ? Math.floor(parsed) : 1;
 }
 
-async function buildRegisteredProjectionsConcurrently(projections, {
-  connection,
-  projectionSuffix,
-  createConnection,
-  concurrency,
-  tableProgress,
-  satisfiedProjectionNames = [],
-}) {
+async function buildRegisteredProjectionsConcurrently(
+  projections,
+  {
+    connection,
+    projectionSuffix,
+    createConnection,
+    concurrency,
+    tableProgress,
+    satisfiedProjectionNames = [],
+  },
+) {
   const tasks = projections.map((projection) => ({
     name: projection.name,
     dependencies: projection.dependencies,
     estimatedDurationMs: projection.estimatedDurationMs,
-    run: async (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
+    run: async (connection) =>
+      buildProjection(connection, projection, projectionSuffix, tableProgress),
   }));
   return runDependencyAwareTasks(tasks, {
     connection,
@@ -209,24 +284,34 @@ export async function buildRegisteredProjections(
     concurrency,
   } = {},
 ) {
-  const projections = orderedProjections(selectedNames, satisfiedProjectionNames);
-  const tableProgress = createTableProgress(await countProjectionTables(projections));
+  const projections = orderedProjections(
+    selectedNames,
+    satisfiedProjectionNames,
+  );
+  const tableProgress = createTableProgress(
+    await countProjectionTables(projections),
+  );
   const maxConcurrency = projectionConcurrency(concurrency);
   if (createConnection && maxConcurrency > 1 && projections.length > 1) {
-    writeBuildLog(`Building registered projections with concurrency ${maxConcurrency}.`);
+    writeBuildLog(
+      `Building registered projections with concurrency ${maxConcurrency}.`,
+    );
   }
   return buildRegisteredProjectionsConcurrently(projections, {
     connection,
     projectionSuffix,
-    createConnection: createConnection && maxConcurrency > 1 ? createConnection : undefined,
+    createConnection:
+      createConnection && maxConcurrency > 1 ? createConnection : undefined,
     concurrency: maxConcurrency,
     tableProgress,
     satisfiedProjectionNames,
   });
 }
 
-
-export async function promoteProjectionTables(connection, { projectionSuffix = "_staging", tables = PUBLISHED_PROJECTION_TABLES } = {}) {
+export async function promoteProjectionTables(
+  connection,
+  { projectionSuffix = "_staging", tables = PUBLISHED_PROJECTION_TABLES } = {},
+) {
   const renames = [];
   const obsolete = [];
   for (const published of tables) {
@@ -239,15 +324,22 @@ export async function promoteProjectionTables(connection, { projectionSuffix = "
     renames.push(`\`${published}${projectionSuffix}\` TO \`${published}\``);
   }
   await connection.query(`RENAME TABLE ${renames.join(", ")}`);
-  if (obsolete.length > 0) await connection.query(`DROP TABLE ${obsolete.join(", ")}`);
-  for (const retired of RETIRED_PROJECTION_TABLES) await dropManagedObject(connection, retired);
+  if (obsolete.length > 0)
+    await connection.query(`DROP TABLE ${obsolete.join(", ")}`);
+  for (const retired of RETIRED_PROJECTION_TABLES)
+    await dropManagedObject(connection, retired);
 }
 
 export async function promoteRegisteredProjections(
   connection,
-  { projectionSuffix = "_staging", projectionNames: selectedNames = DEFAULT_PROJECTION_NAMES } = {},
+  {
+    projectionSuffix = "_staging",
+    projectionNames: selectedNames = DEFAULT_PROJECTION_NAMES,
+  } = {},
 ) {
-  const tables = orderedProjections(selectedNames).flatMap(({ tables: projectionTables }) => projectionTables);
+  const tables = orderedProjections(selectedNames).flatMap(
+    ({ tables: projectionTables }) => projectionTables,
+  );
   const renames = [];
   const obsolete = [];
   for (const table of tables) {
@@ -259,9 +351,12 @@ export async function promoteRegisteredProjections(
     }
     renames.push(`\`${table}${projectionSuffix}\` TO \`${table}\``);
   }
-  if (renames.length > 0) await connection.query(`RENAME TABLE ${renames.join(", ")}`);
-  if (obsolete.length > 0) await connection.query(`DROP TABLE ${obsolete.join(", ")}`);
-  for (const retired of RETIRED_PROJECTION_TABLES) await dropManagedObject(connection, retired);
+  if (renames.length > 0)
+    await connection.query(`RENAME TABLE ${renames.join(", ")}`);
+  if (obsolete.length > 0)
+    await connection.query(`DROP TABLE ${obsolete.join(", ")}`);
+  for (const retired of RETIRED_PROJECTION_TABLES)
+    await dropManagedObject(connection, retired);
 }
 
 export async function refreshMysqlSchema(
@@ -335,32 +430,33 @@ export async function refreshMysqlSchema(
     satisfiedProjectionNames,
   );
   const tableProgress = createTableProgress(
-    (includeCompatibility ? COMPATIBILITY_TABLE_TASK_COUNT : 0)
-      + await countProjectionTables(semanticProjections),
+    (includeCompatibility ? COMPATIBILITY_TABLE_TASK_COUNT : 0) +
+      (await countProjectionTables(semanticProjections)),
   );
   const semanticTasks = semanticProjections.map((projection) => ({
     name: `projection:${projection.name}`,
     dependencies: projection.dependencies.map((dependency) =>
-      dependency === "raw-wca" ? dependency : `projection:${dependency}`),
+      dependency === "raw-wca" ? dependency : `projection:${dependency}`,
+    ),
     estimatedDurationMs: projection.estimatedDurationMs,
-    run: (worker) => buildProjection(worker, projection, projectionSuffix, tableProgress),
+    run: (worker) =>
+      buildProjection(worker, projection, projectionSuffix, tableProgress),
   }));
-  const compatibilityTasks = includeCompatibility ? compatibilityProjectionTasks({
-      entriesTables,
-      entriesSources,
-      countsTable,
-      resultEntriesTable,
-      resultCountsTable,
-      resultEntriesSource,
-      bestSingle,
-      bestAverage,
-      resultFacts,
-      tableProgress,
-    }) : [];
-  await runDependencyAwareTasks([
-    ...compatibilityTasks,
-    ...semanticTasks,
-  ], {
+  const compatibilityTasks = includeCompatibility
+    ? compatibilityProjectionTasks({
+        entriesTables,
+        entriesSources,
+        countsTable,
+        resultEntriesTable,
+        resultCountsTable,
+        resultEntriesSource,
+        bestSingle,
+        bestAverage,
+        resultFacts,
+        tableProgress,
+      })
+    : [];
+  await runDependencyAwareTasks([...compatibilityTasks, ...semanticTasks], {
     connection,
     createConnection,
     concurrency: maxConcurrency,
@@ -371,23 +467,44 @@ export async function refreshMysqlSchema(
   });
 }
 
-export async function refreshResultEntriesSchema(connection, { projectionSuffix = "" } = {}) {
+export async function refreshResultEntriesSchema(
+  connection,
+  { projectionSuffix = "" } = {},
+) {
   const resultEntriesTable = `result_entries_single${projectionSuffix}`;
   const resultCountsTable = `result_counts${projectionSuffix}`;
   const resultEntriesSource = `result_entries_single_source${projectionSuffix}`;
 
-  for (const name of [resultCountsTable, resultEntriesTable, resultEntriesSource]) {
+  for (const name of [
+    resultCountsTable,
+    resultEntriesTable,
+    resultEntriesSource,
+  ]) {
     await dropManagedObject(connection, name);
   }
 
-  await ensureIndexes(connection, INDEXES.filter(([, name]) => name === "idx_results_single_event_best"));
+  await ensureIndexes(
+    connection,
+    INDEXES.filter(([, name]) => name === "idx_results_single_event_best"),
+  );
 
   const source = await projectionSql("result_entries_single_source.sql");
-  await connection.query(source.replaceAll("result_entries_single_source", resultEntriesSource));
+  await connection.query(
+    source.replaceAll("result_entries_single_source", resultEntriesSource),
+  );
   await runTimedBuildStep(`table ${resultEntriesTable}`, async () => {
-    await connection.query(`CREATE TABLE \`${resultEntriesTable}\` AS SELECT * FROM \`${resultEntriesSource}\``);
-    for (const statement of statements(await projectionSql("result_entries_single_indexes.sql"))) {
-      await connection.query(statement.replace(/^ALTER TABLE result_entries_single\b/, `ALTER TABLE \`${resultEntriesTable}\``));
+    await connection.query(
+      `CREATE TABLE \`${resultEntriesTable}\` AS SELECT * FROM \`${resultEntriesSource}\``,
+    );
+    for (const statement of statements(
+      await projectionSql("result_entries_single_indexes.sql"),
+    )) {
+      await connection.query(
+        statement.replace(
+          /^ALTER TABLE result_entries_single\b/,
+          `ALTER TABLE \`${resultEntriesTable}\``,
+        ),
+      );
     }
   });
   await executeTableStatements(
@@ -398,13 +515,19 @@ export async function refreshResultEntriesSchema(connection, { projectionSuffix 
   );
 }
 
-export async function promoteResultEntriesSchema(connection, { projectionSuffix = "_staging" } = {}) {
+export async function promoteResultEntriesSchema(
+  connection,
+  { projectionSuffix = "_staging" } = {},
+) {
   const projections = [
     ["result_entries_single", `result_entries_single${projectionSuffix}`],
     ["result_counts", `result_counts${projectionSuffix}`],
   ];
-  const previousTables = projections.map(([published]) => `${published}_previous`);
-  for (const table of previousTables) await dropManagedObject(connection, table);
+  const previousTables = projections.map(
+    ([published]) => `${published}_previous`,
+  );
+  for (const table of previousTables)
+    await dropManagedObject(connection, table);
 
   const renames = [];
   const obsoleteTables = [];
@@ -417,5 +540,6 @@ export async function promoteResultEntriesSchema(connection, { projectionSuffix 
     renames.push(`\`${staging}\` TO \`${published}\``);
   }
   await connection.query(`RENAME TABLE ${renames.join(", ")}`);
-  if (obsoleteTables.length > 0) await connection.query(`DROP TABLE ${obsoleteTables.join(", ")}`);
+  if (obsoleteTables.length > 0)
+    await connection.query(`DROP TABLE ${obsoleteTables.join(", ")}`);
 }

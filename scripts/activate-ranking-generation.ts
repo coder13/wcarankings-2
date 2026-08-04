@@ -59,7 +59,9 @@ function qualified(schema, table) {
 
 function groupTables(groups) {
   const selected = new Set(groups);
-  const definitions = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) => selected.has(name));
+  const definitions = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) =>
+    selected.has(name),
+  );
   if (definitions.length !== selected.size) {
     throw new Error("The release contains an unknown projection group");
   }
@@ -75,21 +77,23 @@ export function capabilitiesFromTables(tables) {
     ]),
   );
   return Object.fromEntries(
-    Object.entries(PROJECTION_CAPABILITIES).map(([capability, requiredGroups]) => [
-      capability,
-      requiredGroups.every((group) => groups.get(group) === true),
-    ]),
+    Object.entries(PROJECTION_CAPABILITIES).map(
+      ([capability, requiredGroups]) => [
+        capability,
+        requiredGroups.every((group) => groups.get(group) === true),
+      ],
+    ),
   );
 }
 
 export function activationTables(manifest) {
   const groups = Object.keys(manifest?.groups || {});
-  if (groups.length === 0) throw new Error("The release contains no projection groups");
-  if (
-    manifest.raw
-    && groups.length !== DEPLOYMENT_PROJECTION_GROUPS.length
-  ) {
-    throw new Error("A raw WCA export can only activate with every projection group");
+  if (groups.length === 0)
+    throw new Error("The release contains no projection groups");
+  if (manifest.raw && groups.length !== DEPLOYMENT_PROJECTION_GROUPS.length) {
+    throw new Error(
+      "A raw WCA export can only activate with every projection group",
+    );
   }
   return [
     ...(manifest.raw ? [...WCA_RAW_TABLES, "export_metadata"] : []),
@@ -98,8 +102,14 @@ export function activationTables(manifest) {
   ];
 }
 
-export function mergedGenerationState({ activeState, manifest, artifactRunId, artifactId }) {
-  if (manifest?.version !== 3) throw new Error("A version 3 generation manifest is required");
+export function mergedGenerationState({
+  activeState,
+  manifest,
+  artifactRunId,
+  artifactId,
+}) {
+  if (manifest?.version !== 3)
+    throw new Error("A version 3 generation manifest is required");
   const semanticFingerprints = { ...activeState?.semanticFingerprints };
   const artifactFingerprints = { ...activeState?.artifactFingerprints };
   const artifactDigests = { ...activeState?.artifactDigests };
@@ -112,22 +122,28 @@ export function mergedGenerationState({ activeState, manifest, artifactRunId, ar
     artifactDigests[group] = release.artifactDigest ?? null;
   }
   const capabilities = { ...activeState?.capabilities };
-  for (const [capability, requiredGroups] of Object.entries(PROJECTION_CAPABILITIES)) {
+  for (const [capability, requiredGroups] of Object.entries(
+    PROJECTION_CAPABILITIES,
+  )) {
     if (requiredGroups.some((group) => manifest.groups?.[group])) {
-      capabilities[capability] = requiredGroups.every((group) => artifactFingerprints[group]);
+      capabilities[capability] = requiredGroups.every(
+        (group) => artifactFingerprints[group],
+      );
     }
   }
   const generationId = `${manifest.exportId}:${artifactRunId}:${artifactId}`;
   if (
-    !Number.isInteger(Number(manifest.compatibility?.artifactFormatVersion))
-    || !Number.isInteger(Number(manifest.compatibility?.datasetSchemaVersion))
+    !Number.isInteger(Number(manifest.compatibility?.artifactFormatVersion)) ||
+    !Number.isInteger(Number(manifest.compatibility?.datasetSchemaVersion))
   ) {
     throw new Error("Generation compatibility metadata is invalid");
   }
   return {
     generationId,
     exportId: String(manifest.exportId),
-    artifactFormatVersion: Number(manifest.compatibility?.artifactFormatVersion),
+    artifactFormatVersion: Number(
+      manifest.compatibility?.artifactFormatVersion,
+    ),
     datasetSchemaVersion: Number(manifest.compatibility?.datasetSchemaVersion),
     semanticFingerprints,
     artifactFingerprints,
@@ -139,19 +155,24 @@ export function mergedGenerationState({ activeState, manifest, artifactRunId, ar
   };
 }
 
-export function matchesActiveGeneration({ activeState: state, manifest, artifactRunId, artifactId }) {
+export function matchesActiveGeneration({
+  activeState: state,
+  manifest,
+  artifactRunId,
+  artifactId,
+}) {
   if (!state || !manifest) return false;
   if (
-    String(state.exportId) !== String(manifest.exportId)
-    || Number(state.artifactRunId) !== Number(artifactRunId)
-    || Number(state.artifactId) !== Number(artifactId)
+    String(state.exportId) !== String(manifest.exportId) ||
+    Number(state.artifactRunId) !== Number(artifactRunId) ||
+    Number(state.artifactId) !== Number(artifactId)
   ) {
     return false;
   }
   return Object.entries(manifest.groups || {}).every(
     ([group, release]) =>
-      state.semanticFingerprints?.[group] === release.semanticFingerprint
-      && state.artifactFingerprints?.[group] === release.artifactFingerprint,
+      state.semanticFingerprints?.[group] === release.semanticFingerprint &&
+      state.artifactFingerprints?.[group] === release.artifactFingerprint,
   );
 }
 
@@ -204,9 +225,13 @@ async function activeState(connection, schema) {
 }
 
 async function acquireLock(connection) {
-  const [rows] = await connection.query("SELECT GET_LOCK(?, 0) AS acquired", [LOCK_NAME]);
+  const [rows] = await connection.query("SELECT GET_LOCK(?, 0) AS acquired", [
+    LOCK_NAME,
+  ]);
   if (Number(rows[0]?.acquired) !== 1) {
-    throw new Error("The MariaDB ranking-generation activation lock is already held");
+    throw new Error(
+      "The MariaDB ranking-generation activation lock is already held",
+    );
   }
 }
 
@@ -214,7 +239,10 @@ async function releaseLock(connection) {
   await connection.query("SELECT RELEASE_LOCK(?)", [LOCK_NAME]);
 }
 
-export async function bootstrapGenerationState({ connection, productionSchema }) {
+export async function bootstrapGenerationState({
+  connection,
+  productionSchema,
+}) {
   identifier(productionSchema, "production schema");
   await acquireLock(connection);
   try {
@@ -224,7 +252,9 @@ export async function bootstrapGenerationState({ connection, productionSchema })
     const tables = await tableNames(connection, productionSchema);
     for (const required of ["ranking_generation_state", "export_metadata"]) {
       if (!tables.has(required)) {
-        throw new Error(`Cannot bootstrap projection state without ${required}`);
+        throw new Error(
+          `Cannot bootstrap projection state without ${required}`,
+        );
       }
     }
     const [exportRows] = await connection.query(
@@ -232,9 +262,13 @@ export async function bootstrapGenerationState({ connection, productionSchema })
          FROM ${qualified(productionSchema, "export_metadata")}
         WHERE \`key\` IN ('export_date', 'fetched_at')`,
     );
-    const exportMetadata = new Map(exportRows.map((row) => [row.key, row.value]));
+    const exportMetadata = new Map(
+      exportRows.map((row) => [row.key, row.value]),
+    );
     if (exportRows.length !== 2 || exportMetadata.size !== 2) {
-      throw new Error("Projection bootstrap requires one export_date and one fetched_at value");
+      throw new Error(
+        "Projection bootstrap requires one export_date and one fetched_at value",
+      );
     }
     const exportId = normalizeExportDate(exportMetadata.get("export_date"));
     if (!exportId) {
@@ -318,7 +352,10 @@ export async function activateGeneration({
           LIMIT 1`,
       );
       const productionExportId = exportRows[0]?.value;
-      if (normalizeExportDate(productionExportId) !== normalizeExportDate(manifest.exportId)) {
+      if (
+        normalizeExportDate(productionExportId) !==
+        normalizeExportDate(manifest.exportId)
+      ) {
         throw new Error(
           "A release without raw tables cannot change the active WCA export identity",
         );
@@ -335,20 +372,27 @@ export async function activateGeneration({
     }
 
     const tables = activationTables(manifest);
-    const [candidateTables, productionTables, previousTablesPresent] = await Promise.all([
-      tableNames(connection, candidateSchema),
-      tableNames(connection, productionSchema),
-      tableNames(connection, previousSchema),
-    ]);
+    const [candidateTables, productionTables, previousTablesPresent] =
+      await Promise.all([
+        tableNames(connection, candidateSchema),
+        tableNames(connection, productionSchema),
+        tableNames(connection, previousSchema),
+      ]);
     const missing = tables.filter((table) => !candidateTables.has(table));
     if (missing.length > 0) {
-      throw new Error(`Candidate generation is missing tables: ${missing.join(", ")}`);
+      throw new Error(
+        `Candidate generation is missing tables: ${missing.join(", ")}`,
+      );
     }
     const occupied = tables.filter((table) => previousTablesPresent.has(table));
     if (occupied.length > 0) {
-      throw new Error(`Previous-generation schema is not empty: ${occupied.join(", ")}`);
+      throw new Error(
+        `Previous-generation schema is not empty: ${occupied.join(", ")}`,
+      );
     }
-    const previousTables = tables.filter((table) => productionTables.has(table));
+    const previousTables = tables.filter((table) =>
+      productionTables.has(table),
+    );
 
     await connection.query(
       `DELETE FROM ${qualified(candidateSchema, "ranking_generation_state")} WHERE id = 1`,
@@ -413,12 +457,19 @@ export async function rollbackGeneration({
   try {
     const current = await activeState(connection, productionSchema);
     if (!current || Number(current.artifactId) !== Number(artifactId)) {
-      return { rolledBack: false, reason: "requested generation is not active" };
+      return {
+        rolledBack: false,
+        reason: "requested generation is not active",
+      };
     }
     const candidateTables = await tableNames(connection, candidateSchema);
-    const occupied = current.activationTables.filter((table) => candidateTables.has(table));
+    const occupied = current.activationTables.filter((table) =>
+      candidateTables.has(table),
+    );
     if (occupied.length > 0) {
-      throw new Error(`Candidate schema cannot receive rollback tables: ${occupied.join(", ")}`);
+      throw new Error(
+        `Candidate schema cannot receive rollback tables: ${occupied.join(", ")}`,
+      );
     }
     const previous = new Set(current.previousTables);
     const renames = [];
@@ -492,22 +543,33 @@ async function main() {
       return;
     }
     if (command === "state") {
-      process.stdout.write(`${JSON.stringify(await activeState(connection, productionSchema) || {})}\n`);
+      process.stdout.write(
+        `${JSON.stringify((await activeState(connection, productionSchema)) || {})}\n`,
+      );
       return;
     }
     if (command === "bootstrap") {
-      process.stdout.write(`${JSON.stringify(await bootstrapGenerationState({
-        connection,
-        productionSchema,
-      }))}\n`);
+      process.stdout.write(
+        `${JSON.stringify(
+          await bootstrapGenerationState({
+            connection,
+            productionSchema,
+          }),
+        )}\n`,
+      );
       return;
     }
-    throw new Error("Use activate-ranking-generation.mjs activate, verify-active, rollback, state, or bootstrap");
+    throw new Error(
+      "Use activate-ranking-generation.mjs activate, verify-active, rollback, state, or bootstrap",
+    );
   } finally {
     await connection.end();
   }
 }
 
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+if (
+  process.argv[1] &&
+  pathToFileURL(process.argv[1]).href === import.meta.url
+) {
   await main();
 }

@@ -13,7 +13,10 @@ if (!token || !zoneId) {
 }
 
 const rule = JSON.parse(
-  await readFile(new URL("../ops/cloudflare-cache-rule.json", import.meta.url), "utf8"),
+  await readFile(
+    new URL("../ops/cloudflare-cache-rule.json", import.meta.url),
+    "utf8",
+  ),
 );
 
 async function request(path, init = {}) {
@@ -27,7 +30,9 @@ async function request(path, init = {}) {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload?.success) {
-    const details = payload?.errors?.map((error) => error.message).join("; ") ?? response.statusText;
+    const details =
+      payload?.errors?.map((error) => error.message).join("; ") ??
+      response.statusText;
     const error = new Error(`Cloudflare API ${response.status}: ${details}`);
     error.status = response.status;
     throw error;
@@ -37,7 +42,9 @@ async function request(path, init = {}) {
 
 async function getEntryPoint() {
   try {
-    return await request(`/zones/${zoneId}/rulesets/phases/${phase}/entrypoint`);
+    return await request(
+      `/zones/${zoneId}/rulesets/phases/${phase}/entrypoint`,
+    );
   } catch (error) {
     if (error.status === 404) return null;
     throw error;
@@ -56,14 +63,21 @@ if (!entryPoint) {
       rules: [rule],
     }),
   });
-  console.log("Created the Cloudflare cache ruleset and public API cache rule.");
+  console.log(
+    "Created the Cloudflare cache ruleset and public API cache rule.",
+  );
 } else {
-  const existingRule = entryPoint.rules?.find((candidate) => candidate.ref === rule.ref);
+  const existingRule = entryPoint.rules?.find(
+    (candidate) => candidate.ref === rule.ref,
+  );
   if (existingRule) {
-    await request(`/zones/${zoneId}/rulesets/${entryPoint.id}/rules/${existingRule.id}`, {
-      method: "PATCH",
-      body: JSON.stringify(rule),
-    });
+    await request(
+      `/zones/${zoneId}/rulesets/${entryPoint.id}/rules/${existingRule.id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(rule),
+      },
+    );
     console.log("Updated the Cloudflare public API cache rule.");
   } else {
     await request(`/zones/${zoneId}/rulesets/${entryPoint.id}/rules`, {

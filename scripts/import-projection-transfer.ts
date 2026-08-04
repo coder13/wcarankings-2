@@ -5,7 +5,11 @@ import { resolve } from "node:path";
 
 function argumentValue(name) {
   const prefix = `--${name}=`;
-  return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length) || "";
+  return (
+    process.argv
+      .find((value) => value.startsWith(prefix))
+      ?.slice(prefix.length) || ""
+  );
 }
 
 function databaseOptions(connectionString = process.env.DATABASE_URL) {
@@ -16,8 +20,9 @@ function databaseOptions(connectionString = process.env.DATABASE_URL) {
     port: url.port || "3306",
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
-    database: process.env.DATABASE_NAME_OVERRIDE
-      || decodeURIComponent(url.pathname.replace(/^\//, "")),
+    database:
+      process.env.DATABASE_NAME_OVERRIDE ||
+      decodeURIComponent(url.pathname.replace(/^\//, "")),
   };
 }
 
@@ -43,7 +48,12 @@ function runMariaDb(options, { input, sql } = {}) {
     child.once("error", reject);
     child.once("close", (code, signal) => {
       if (code === 0) resolveRun();
-      else reject(new Error(`mariadb failed with ${signal ? `signal ${signal}` : `exit code ${code}`}.`));
+      else
+        reject(
+          new Error(
+            `mariadb failed with ${signal ? `signal ${signal}` : `exit code ${code}`}.`,
+          ),
+        );
     });
     if (input) child.stdin.end(input);
   });
@@ -58,37 +68,53 @@ async function runPool(items, concurrency, task) {
       await task(items[index], index);
     }
   }
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, worker),
+  );
 }
 
 const directory = resolve(argumentValue("directory"));
 const metadataPath = resolve(argumentValue("metadata"));
-const concurrency = Number(argumentValue("concurrency") || process.env.WCA_PROJECTION_IMPORT_CONCURRENCY || 2);
-if (!directory || !metadataPath) throw new Error("--directory and --metadata are required");
+const concurrency = Number(
+  argumentValue("concurrency") ||
+    process.env.WCA_PROJECTION_IMPORT_CONCURRENCY ||
+    2,
+);
+if (!directory || !metadataPath)
+  throw new Error("--directory and --metadata are required");
 if (!Number.isSafeInteger(concurrency) || concurrency < 1 || concurrency > 4) {
   throw new Error("Projection import concurrency must be between 1 and 4");
 }
 
 const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
 if (metadata.format !== "mariadb-tab-v1") {
-  throw new Error(`Unsupported projection transfer format: ${metadata.format || "missing"}`);
+  throw new Error(
+    `Unsupported projection transfer format: ${metadata.format || "missing"}`,
+  );
 }
 if (!Array.isArray(metadata.tables) || metadata.tables.length === 0) {
   throw new Error("Projection transfer metadata has no tables");
 }
 for (const table of metadata.tables) {
-  if (!/^[a-z0-9_]+$/.test(table)) throw new Error(`Unsafe transfer table: ${table}`);
+  if (!/^[a-z0-9_]+$/.test(table))
+    throw new Error(`Unsafe transfer table: ${table}`);
 }
 
 const options = databaseOptions();
 const schemas = await Promise.all(
-  metadata.tables.map((table) => readFile(resolve(directory, `${table}.sql`), "utf8")),
+  metadata.tables.map((table) =>
+    readFile(resolve(directory, `${table}.sql`), "utf8"),
+  ),
 );
-await runMariaDb(options, { input: `SET SESSION max_statement_time=0;\n${schemas.join("\n")}\n` });
+await runMariaDb(options, {
+  input: `SET SESSION max_statement_time=0;\n${schemas.join("\n")}\n`,
+});
 
 let completed = 0;
 await runPool(metadata.tables, concurrency, async (table) => {
-  const path = resolve(directory, `${table}.txt`).replaceAll("\\", "\\\\").replaceAll("'", "''");
+  const path = resolve(directory, `${table}.txt`)
+    .replaceAll("\\", "\\\\")
+    .replaceAll("'", "''");
   const startedAt = performance.now();
   await runMariaDb(options, {
     sql: `SET SESSION max_statement_time=0; LOAD DATA LOCAL INFILE '${path}' INTO TABLE \`${table}\` CHARACTER SET utf8mb4 FIELDS TERMINATED BY '\\t' ESCAPED BY '\\\\' LINES TERMINATED BY '\\n'`,

@@ -5,12 +5,13 @@ import { enqueueListRankingRebuild } from "./list-ranking-jobs.ts";
 
 const ROLE_LISTS = {
   board: {
-  key: "wca-board",
-  alias: "board",
-  version: 1,
-  name: "Board",
-  description: null,
-  rolesUrl: "https://www.worldcubeassociation.org/api/v0/user_roles?sort=name&isActive=true&groupType=board&per_page=100",
+    key: "wca-board",
+    alias: "board",
+    version: 1,
+    name: "Board",
+    description: null,
+    rolesUrl:
+      "https://www.worldcubeassociation.org/api/v0/user_roles?sort=name&isActive=true&groupType=board&per_page=100",
   },
   delegates: {
     key: "wca-delegates",
@@ -18,7 +19,8 @@ const ROLE_LISTS = {
     version: 1,
     name: "Delegates",
     description: null,
-    rolesUrl: "https://www.worldcubeassociation.org/api/v0/user_roles?sort=name&isActive=true&groupType=delegate_regions&isLead=false&per_page=1000",
+    rolesUrl:
+      "https://www.worldcubeassociation.org/api/v0/user_roles?sort=name&isActive=true&groupType=delegate_regions&isLead=false&per_page=1000",
   },
 };
 const WCA_ID_PATTERN = /^\d{4}[A-Z0-9]{4}\d{2}$/;
@@ -36,10 +38,18 @@ function databaseOptions(connectionString = process.env.DATABASE_URL) {
 }
 
 export function roleMemberIds(payload) {
-  const roles = Array.isArray(payload) ? payload : payload?.user_roles ?? [];
-  return [...new Set(roles
-    .map((role) => String(role?.user?.wca_id ?? "").trim().toUpperCase())
-    .filter((wcaId) => WCA_ID_PATTERN.test(wcaId)))];
+  const roles = Array.isArray(payload) ? payload : (payload?.user_roles ?? []);
+  return [
+    ...new Set(
+      roles
+        .map((role) =>
+          String(role?.user?.wca_id ?? "")
+            .trim()
+            .toUpperCase(),
+        )
+        .filter((wcaId) => WCA_ID_PATTERN.test(wcaId)),
+    ),
+  ];
 }
 
 async function fetchRoleMemberIds(roleList, fetchImpl = fetch) {
@@ -49,7 +59,10 @@ async function fetchRoleMemberIds(roleList, fetchImpl = fetch) {
       "User-Agent": "WCA-Rankings-Board-List-Refresh/1.0",
     },
   });
-  if (!response.ok) throw new Error(`WCA ${roleList.alias} roles API returned ${response.status}.`);
+  if (!response.ok)
+    throw new Error(
+      `WCA ${roleList.alias} roles API returned ${response.status}.`,
+    );
   return roleMemberIds(await response.json());
 }
 
@@ -82,40 +95,46 @@ async function refreshRoleList(connection, roleList, fetchImpl = fetch) {
       [roleList.key, roleList.alias],
     );
     const listId = listRows[0]?.id;
-    if (!listId) throw new Error(`${roleList.name} system list could not be created.`);
+    if (!listId)
+      throw new Error(`${roleList.name} system list could not be created.`);
     const memberPlaceholders = memberIds.map(() => "?").join(", ");
-    const [blockedRows] = memberIds.length > 0
-      ? await connection.query(
-        `SELECT wca_id AS person_id
+    const [blockedRows] =
+      memberIds.length > 0
+        ? await connection.query(
+            `SELECT wca_id AS person_id
          FROM app_users
          WHERE allow_list_inclusion = FALSE AND wca_id IN (${memberPlaceholders})
          UNION
          SELECT person_id
          FROM list_exclusions
          WHERE list_id = ? AND person_id IN (${memberPlaceholders})`,
-        [...memberIds, listId, ...memberIds],
-      )
-      : [[]];
+            [...memberIds, listId, ...memberIds],
+          )
+        : [[]];
     const blocked = new Set(blockedRows.map((row) => row.person_id));
-    const eligibleMemberIds = memberIds.filter((memberId) => !blocked.has(memberId));
+    const eligibleMemberIds = memberIds.filter(
+      (memberId) => !blocked.has(memberId),
+    );
     const placeholders = eligibleMemberIds.map(() => "?").join(", ");
-    const [removed] = eligibleMemberIds.length > 0
-      ? await connection.query(
-        `DELETE FROM list_members
+    const [removed] =
+      eligibleMemberIds.length > 0
+        ? await connection.query(
+            `DELETE FROM list_members
          WHERE list_id = ? AND source = 'system_rule' AND person_id NOT IN (${placeholders})`,
-        [listId, ...eligibleMemberIds],
-      )
-      : await connection.query(
-        "DELETE FROM list_members WHERE list_id = ? AND source = 'system_rule'",
-        [listId],
-      );
-    const [inserted] = eligibleMemberIds.length > 0
-      ? await connection.query(
-        `INSERT IGNORE INTO list_members (list_id, person_id, added_by_user_id, source)
+            [listId, ...eligibleMemberIds],
+          )
+        : await connection.query(
+            "DELETE FROM list_members WHERE list_id = ? AND source = 'system_rule'",
+            [listId],
+          );
+    const [inserted] =
+      eligibleMemberIds.length > 0
+        ? await connection.query(
+            `INSERT IGNORE INTO list_members (list_id, person_id, added_by_user_id, source)
          VALUES ${eligibleMemberIds.map(() => "(?, ?, NULL, 'system_rule')").join(", ")}`,
-        eligibleMemberIds.flatMap((memberId) => [listId, memberId]),
-      )
-      : [{ affectedRows: 0 }];
+            eligibleMemberIds.flatMap((memberId) => [listId, memberId]),
+          )
+        : [{ affectedRows: 0 }];
     const changed =
       removed.affectedRows > 0 ||
       inserted.affectedRows > 0 ||
@@ -129,11 +148,20 @@ async function refreshRoleList(connection, roleList, fetchImpl = fetch) {
            description = ?,
            updated_at = CURRENT_TIMESTAMP(6)
        WHERE id = ?`,
-      [listId, changed ? 1 : 0, roleList.version, roleList.name, roleList.description, listId],
+      [
+        listId,
+        changed ? 1 : 0,
+        roleList.version,
+        roleList.name,
+        roleList.description,
+        listId,
+      ],
     );
     if (changed) {
       await enqueueListRankingRebuild(connection, {
-        id: Number(listId), membershipVersion: Number(listRows[0].membership_version) + 1, kind: "system",
+        id: Number(listId),
+        membershipVersion: Number(listRows[0].membership_version) + 1,
+        kind: "system",
       });
     }
     await connection.commit();
@@ -164,7 +192,9 @@ async function main() {
   } finally {
     await connection.end();
   }
-  process.stdout.write(`${refreshDelegates ? "Delegates" : "Board"} list refreshed.\n`);
+  process.stdout.write(
+    `${refreshDelegates ? "Delegates" : "Board"} list refreshed.\n`,
+  );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

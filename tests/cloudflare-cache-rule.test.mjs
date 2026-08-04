@@ -20,7 +20,10 @@ test("keeps Cloudflare eligibility limited to public GET API resources", async (
   assert.equal(rule.action_parameters.cache, true);
   assert.equal(rule.action_parameters.edge_ttl.mode, "respect_origin");
   assert.equal(rule.action_parameters.browser_ttl.mode, "respect_origin");
-  assert.equal(rule.action_parameters.cache_key.ignore_query_strings_order, true);
+  assert.equal(
+    rule.action_parameters.cache_key.ignore_query_strings_order,
+    true,
+  );
 });
 
 test("synchronizer creates or updates only the managed Cloudflare cache rule", async () => {
@@ -35,5 +38,8 @@ test("synchronizer creates or updates only the managed Cloudflare cache rule", a
   assert.match(source, /rulesets\/phases\/\$\{phase\}\/entrypoint/);
   assert.match(source, /method: "PATCH"/);
   assert.match(source, /method: "POST"/);
-  assert.match(source, /CLOUDFLARE_API_TOKEN and CLOUDFLARE_ZONE_ID are required/);
+  assert.match(
+    source,
+    /CLOUDFLARE_API_TOKEN and CLOUDFLARE_ZONE_ID are required/,
+  );
 });

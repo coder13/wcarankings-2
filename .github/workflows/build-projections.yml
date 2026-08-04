@@ -57,13 +57,14 @@ jobs:
       WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
     steps:
       - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.3
         if: inputs.build_groups != '' || inputs.include_raw
         with:
           ref: ${{ inputs.ref }}
+
+      - uses: oven-sh/setup-bun@v2
+        if: inputs.build_groups != '' || inputs.include_raw
+        with:
+          bun-version: 1.3.3
 
       - name: Set up pnpm
         if: inputs.build_groups != '' || inputs.include_raw

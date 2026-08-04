@@ -47,7 +47,9 @@ try {
         ADD INDEX idx_gender_result_country (event_id, country_id, person_gender, result_value, result_id)
     `);
   }
-  process.stdout.write(JSON.stringify({ tables: tables.map(([target]) => target) }) + "\n");
+  process.stdout.write(
+    JSON.stringify({ tables: tables.map(([target]) => target) }) + "\n",
+  );
 } finally {
   await connection.end();
 }

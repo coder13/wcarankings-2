@@ -2,11 +2,19 @@
 export const LIST_RANKING_PRIORITY = { lazy: 1, active: 5, system: 10 };
 
 async function dataVersion(connection) {
-  const [rows] = await connection.query("SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1");
+  const [rows] = await connection.query(
+    "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
+  );
   return rows[0]?.value ?? null;
 }
 
-export async function enqueueListRankingRebuild(connection, list, priority = list.kind === "system" ? LIST_RANKING_PRIORITY.system : LIST_RANKING_PRIORITY.lazy) {
+export async function enqueueListRankingRebuild(
+  connection,
+  list,
+  priority = list.kind === "system"
+    ? LIST_RANKING_PRIORITY.system
+    : LIST_RANKING_PRIORITY.lazy,
+) {
   const version = await dataVersion(connection);
   if (!version) return;
   await connection.query(

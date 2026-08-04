@@ -17,24 +17,35 @@ function productionState(fingerprints) {
   return {
     exportId,
     semanticFingerprints: Object.fromEntries(
-      Object.entries(fingerprints.groups).map(([name, group]) => [name, group.semanticFingerprint]),
+      Object.entries(fingerprints.groups).map(([name, group]) => [
+        name,
+        group.semanticFingerprint,
+      ]),
     ),
     artifactFingerprints: Object.fromEntries(
-      Object.entries(fingerprints.groups).map(([name, group]) => [name, group.artifactFingerprint]),
+      Object.entries(fingerprints.groups).map(([name, group]) => [
+        name,
+        group.artifactFingerprint,
+      ]),
     ),
   };
 }
 
-function availableArtifacts(fingerprints, names = Object.keys(fingerprints.groups)) {
-  return Object.fromEntries(names.map((name) => [
-    name,
-    {
-      valid: true,
-      artifactFingerprint: fingerprints.groups[name].artifactFingerprint,
-      ref: `ghcr.io/coder13/wcarankings-projection-${name}:test`,
-      digest: `sha256:${"a".repeat(64)}`,
-    },
-  ]));
+function availableArtifacts(
+  fingerprints,
+  names = Object.keys(fingerprints.groups),
+) {
+  return Object.fromEntries(
+    names.map((name) => [
+      name,
+      {
+        valid: true,
+        artifactFingerprint: fingerprints.groups[name].artifactFingerprint,
+        ref: `ghcr.io/coder13/wcarankings-projection-${name}:test`,
+        digest: `sha256:${"a".repeat(64)}`,
+      },
+    ]),
+  );
 }
 
 async function copySemanticInputs(targetRoot, semantics) {
@@ -67,21 +78,35 @@ test("a new city group hydrates cached dependencies and builds only city-owned t
     exportId,
     productionExportId: exportId,
     productionState: state,
-    availableArtifacts: availableArtifacts(desired, ["result-facts", "competition-rankings"]),
+    availableArtifacts: availableArtifacts(desired, [
+      "result-facts",
+      "competition-rankings",
+    ]),
     repositoryRoot,
   });
   assert.deepEqual(plan.releaseGroups, ["city-rankings"]);
   assert.deepEqual(plan.buildGroups, ["city-rankings"]);
-  assert.deepEqual(plan.hydrateGroups, ["result-facts", "competition-rankings"]);
+  assert.deepEqual(plan.hydrateGroups, [
+    "result-facts",
+    "competition-rankings",
+  ]);
 });
 
 test("a result-facts semantic change selects only its downstream closure", async () => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "projection-plan-"));
-  const baselineSemantics = await semanticProjectionFingerprints({ repositoryRoot });
+  const baselineSemantics = await semanticProjectionFingerprints({
+    repositoryRoot,
+  });
   await copySemanticInputs(temporaryRoot, baselineSemantics);
   const baseline = await projectionFingerprints({ exportId, repositoryRoot });
-  const factsPath = join(temporaryRoot, "sql/ranking-projections/result_facts.sql");
-  await writeFile(factsPath, `${await readFile(factsPath, "utf8")}\n-- semantic test\n`);
+  const factsPath = join(
+    temporaryRoot,
+    "sql/ranking-projections/result_facts.sql",
+  );
+  await writeFile(
+    factsPath,
+    `${await readFile(factsPath, "utf8")}\n-- semantic test\n`,
+  );
   const plan = await projectionSemanticPlan({
     productionState: productionState(baseline),
     repositoryRoot: temporaryRoot,
@@ -125,8 +150,14 @@ test("a new export selects every group while reusing exact artifacts", async () 
     repositoryRoot,
   });
   assert.equal(plan.exportChanged, true);
-  assert.deepEqual([...plan.releaseGroups].sort(), Object.keys(desired.groups).sort());
-  assert.deepEqual([...plan.cachedGroups].sort(), Object.keys(desired.groups).sort());
+  assert.deepEqual(
+    [...plan.releaseGroups].sort(),
+    Object.keys(desired.groups).sort(),
+  );
+  assert.deepEqual(
+    [...plan.cachedGroups].sort(),
+    Object.keys(desired.groups).sort(),
+  );
   assert.deepEqual(plan.buildGroups, []);
 });
 
