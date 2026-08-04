@@ -144,7 +144,7 @@ jobs:
           set -euo pipefail
           node scripts/projection-build-plan.mjs --groups="$GROUPS" \
             --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
-          WCA_PROJECTION_BUILD_CONCURRENCY=1 node scripts/build-projection-groups.mjs \
+          WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/build-projection-groups.mjs \
             --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
             --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
             --include-compatibility="$(jq -r '.includeCompatibility' /tmp/build-plan.json)"

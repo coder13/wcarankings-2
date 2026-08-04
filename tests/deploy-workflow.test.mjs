@@ -396,7 +396,7 @@ test("bundled group artifacts share one isolated build database", () => {
   assert.match(groupBuilder, /import-projection-transfer\.mjs/);
   assert.match(groupBuilder, /publish-projection-transfer\.mjs --hydrate/);
   assert.match(groupBuilder, /--satisfied-groups="\$HYDRATE_GROUPS"/);
-  assert.match(groupBuilder, /WCA_PROJECTION_BUILD_CONCURRENCY=1/);
+  assert.match(groupBuilder, /WCA_PROJECTION_BUILD_CONCURRENCY=2/);
   assert.match(groupBuilder, /repair-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/);
   assert.match(builder, /path: \/tmp\/projection-release\/projection-release\.json/);
   assert.doesNotMatch(builder, /projection-release-group-/);
