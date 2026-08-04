@@ -126,19 +126,19 @@ export function compatibilityProjectionTasks({
     "compatibility-ranking-entries-single-source": (connection) =>
       createCompatibilitySource(
         connection,
-        "ranking_entries_single_source.sql",
+        "core/compatibility/ranking_entries_single_source.sql",
         names,
       ),
     "compatibility-ranking-entries-average-source": (connection) =>
       createCompatibilitySource(
         connection,
-        "ranking_entries_average_source.sql",
+        "core/compatibility/ranking_entries_average_source.sql",
         names,
       ),
     "compatibility-result-entries-single-source": (connection) =>
       createCompatibilitySource(
         connection,
-        "result_entries_single_source.sql",
+        "core/compatibility/result_entries_single_source.sql",
         names,
       ),
     "compatibility-ranking-entries-single": (connection) =>
@@ -146,7 +146,7 @@ export function compatibilityProjectionTasks({
         connection,
         entriesTables.single,
         entriesSources.single,
-        "ranking_entries_indexes.sql",
+        "core/compatibility/ranking_entries_indexes.sql",
         tableProgress,
       ),
     "compatibility-ranking-entries-average": (connection) =>
@@ -154,7 +154,7 @@ export function compatibilityProjectionTasks({
         connection,
         entriesTables.average,
         entriesSources.average,
-        "ranking_entries_indexes.sql",
+        "core/compatibility/ranking_entries_indexes.sql",
         tableProgress,
       ),
     "compatibility-result-entries-single": (connection) =>
@@ -162,13 +162,13 @@ export function compatibilityProjectionTasks({
         connection,
         resultEntriesTable,
         resultEntriesSource,
-        "result_entries_single_indexes.sql",
+        "core/compatibility/result_entries_single_indexes.sql",
         tableProgress,
       ),
     "compatibility-ranking-counts": async (connection) =>
       executeTableStatements(
         connection,
-        (await projectionSql("ranking_counts.sql"))
+        (await projectionSql("core/compatibility/ranking_counts.sql"))
           .replaceAll("ranking_entries_single", entriesTables.single)
           .replaceAll("ranking_entries_average", entriesTables.average)
           .replaceAll("ranking_counts", countsTable),
@@ -178,7 +178,7 @@ export function compatibilityProjectionTasks({
     "compatibility-result-counts": async (connection) =>
       executeTableStatements(
         connection,
-        (await projectionSql("result_counts.sql"))
+        (await projectionSql("core/compatibility/result_counts.sql"))
           .replaceAll("result_entries_single", resultEntriesTable)
           .replaceAll("result_counts", resultCountsTable),
         [],

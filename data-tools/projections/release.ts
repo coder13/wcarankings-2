@@ -65,7 +65,9 @@ export async function semanticProjectionFingerprints({
   for (const group of DEPLOYMENT_PROJECTION_GROUPS) {
     const inputs = [
       ...new Set([
-        ...group.sqlFiles.map((file) => `sql/ranking-projections/${file}`),
+        ...group.sqlFiles.map(
+          (file) => `data-tools/projection-catalog/${file}`,
+        ),
         ...resultMigrations,
       ]),
     ].sort();

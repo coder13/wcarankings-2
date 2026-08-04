@@ -7,9 +7,7 @@ import { elapsedMs, writeBuildLog } from "./progress.ts";
 const projectionDirectory = join(
   dirname(fileURLToPath(import.meta.url)),
   "..",
-  "..",
-  "sql",
-  "ranking-projections",
+  "projection-catalog",
 );
 
 export function statements(sql) {
