@@ -1,26 +1,9 @@
 // @ts-nocheck
 import { argumentValue } from "./lib/arguments.ts";
+import { checkServerDatasetCompatibility } from "./lib/release-compatibility.ts";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { argumentValue } from "./lib/cli.mjs";
-
-export function checkServerDatasetCompatibility({
-  server,
-  datasetSchemaVersion,
-}) {
-  const version = Number(datasetSchemaVersion);
-  const minimum = Number(server?.minimumDatasetSchemaVersion);
-  const maximum = Number(server?.maximumDatasetSchemaVersion);
-  if (![version, minimum, maximum].every(Number.isInteger)) {
-    throw new Error("Compatibility versions must be integers");
-  }
-  if (version < minimum || version > maximum) {
-    throw new Error(
-      `Dataset schema version ${version} is outside the server's supported range ${minimum}-${maximum}`,
-    );
-  }
-  return { compatible: true, datasetSchemaVersion: version, minimum, maximum };
-}
 
 async function main() {
   const compatibility = JSON.parse(

@@ -4,10 +4,7 @@ import {
   primaryNameToken,
   SYSTEM_LIST_DEFINITIONS,
 } from "../scripts/lib/system-list-definitions.ts";
-import {
-  boardMemberIds,
-  roleMemberIds,
-} from "../scripts/refresh-board-list.ts";
+import { roleMemberIds } from "../scripts/lib/board-lists.ts";
 
 test("system list aliases are stable and unique", () => {
   assert.deepEqual(
@@ -22,7 +19,7 @@ test("system list aliases are stable and unique", () => {
 
 test("board refresh normalizes unique WCA IDs from public role records", () => {
   assert.deepEqual(
-    boardMemberIds([
+    roleMemberIds([
       { user: { wca_id: "2012PARK03" } },
       { user: { wca_id: "2012park03" } },
       { user: { wca_id: "not-a-wca-id" } },
