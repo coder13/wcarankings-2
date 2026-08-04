@@ -134,7 +134,10 @@ test("renders the rankings shell with extracted components", () => {
 });
 
 test("renders a full-width spinner and fallback periods before rankings load", () => {
-  const markup = renderExplorerMarkup({ initial: undefined });
+  const markup = renderExplorerMarkup({
+    initial: undefined,
+    options: { showSubjectSwitch: true },
+  });
 
   assert.match(markup, /listMessage--initialLoading/);
   assert.match(markup, /role="status" aria-label="Loading rankings"/);

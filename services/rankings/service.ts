@@ -508,12 +508,8 @@ async function queryPersonMetric(input: QueryInput) {
     "score.region_id = ?",
     `score.${positionColumn} IS NOT NULL`,
   ];
-  const gender = genderCondition("person", input.gender);
+  const gender = genderCondition("score", input.gender);
   if (input.gender.length) return queryFilteredPersonMetric(input, kinch, gender);
-  if (gender.sql) {
-    conditions.push(gender.sql);
-    values.push(...gender.values);
-  }
   let peopleTimings = { queueMs: 0, statementMs: 0 };
   let peopleReturnedRows = 0;
 
@@ -680,7 +676,7 @@ async function queryFilteredPersonMetric(
   else if (search) limit = input.searchLimit;
   const result = await query<FilteredPersonMetricRow>(
     filteredPersonMetricQuery({ scoreValue, scoreOrder, conditions, pageConditions }),
-    [...values, input.scope, input.regionId, input.scope, input.regionId, ...pageValues, limit],
+    [...values, ...pageValues, limit, input.scope, input.regionId, input.scope, input.regionId],
   );
   const timings = {
     queueMs: peopleTimings.queueMs + result.timings.queueMs,
@@ -781,8 +777,27 @@ function personWindowKey(input: QueryInput, windowStart: number, dataVersion: st
     scope: input.scope,
     regionId: input.regionId,
     year: input.year,
+    kinchOrder: input.eventId === "sor-kinch" ? input.kinchOrder : null,
     windowStart,
   });
+}
+
+function isPersonMetric(input: QueryInput) {
+  return input.eventId === "SOR" || input.eventId === "sor-kinch";
+}
+
+function isPrimedPersonMetricWindow(input: QueryInput, windowStart: number) {
+  return isPersonMetric(input)
+    && input.scope === "world"
+    && input.gender.length === 0
+    && windowStart === 1;
+}
+
+function loadRankingWindow(input: QueryInput, metadata: RankingsMetadata) {
+  if (isPersonMetric(input)) return queryPersonMetric(input);
+  return input.gender.length && input.year === null
+    ? queryGenderPage(input)
+    : queryNormalPage(input, metadata, RANKINGS_WINDOW_SIZE);
 }
 
 function slicePersonWindow(
@@ -811,12 +826,8 @@ function slicePersonWindow(
 
 export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams) {
   const input = parseInput(searchParams);
-  if (input.year !== null && (input.eventId === "SOR" || input.eventId === "sor-kinch"))
+  if (input.year !== null && isPersonMetric(input))
     throw new ApiInputError("year is only available for person event rankings.");
-  if (input.eventId === "SOR" || input.eventId === "sor-kinch") {
-    const result = await queryMysql(input);
-    return { ...result, cacheOutcome: "bypass" as const, cacheLayer: "memory" as const, dataVersion: null };
-  }
   const metadata = await getCurrentRankingsMetadata();
   if (input.year !== null && !metadata.availableYears.includes(input.year))
     throw new ApiInputError(`year ${input.year} is unavailable.`);
@@ -847,12 +858,8 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
   };
   const cached = (await rankingsWindowCache.getWithStatus(
     personWindowKey(input, windowStart, metadata.fetchedAt),
-    async () => {
-      const result = input.gender.length && input.year === null
-        ? await queryGenderPage(windowInput)
-        : await queryNormalPage(windowInput, metadata, RANKINGS_WINDOW_SIZE);
-      return result as unknown as Record<string, unknown>;
-    },
+    async () => loadRankingWindow(windowInput, metadata) as unknown as Record<string, unknown>,
+    { pin: isPrimedPersonMetricWindow(input, windowStart) },
   )) as {
     value: {
       data: Record<string, unknown>;
@@ -872,10 +879,7 @@ export async function loadRankingsWithDiagnostics(searchParams: URLSearchParams)
       personWindowKey(input, nextWindowStart, metadata.fetchedAt),
       async () => {
         const nextInput = { ...input, startRank: nextWindowStart, limit: RANKINGS_WINDOW_SIZE };
-        const result = input.gender.length && input.year === null
-          ? await queryGenderPage(nextInput)
-          : await queryNormalPage(nextInput, metadata, RANKINGS_WINDOW_SIZE);
-        return result as unknown as Record<string, unknown>;
+        return loadRankingWindow(nextInput, metadata) as unknown as Record<string, unknown>;
       },
     ).catch((error) => console.warn("Ranking window prefetch failed", error));
   }

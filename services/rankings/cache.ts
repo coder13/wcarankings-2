@@ -189,20 +189,27 @@ export const rankingsPageCache = new RankingsPageCache<Record<string, unknown>>(
 /** Shared process-local windows used to serve adjacent 50-row pages from one 400-row query. */
 export class RankingsWindowCache<T extends object> {
   private readonly cache = new LRUCache<string, T>({ max: RANKINGS_WINDOW_CACHE_CAPACITY });
+  private readonly pinned = new Map<string, T>();
   private readonly pending = new Map<string, Promise<T>>();
 
   clear() {
     this.cache.clear();
+    this.pinned.clear();
     this.pending.clear();
   }
 
-  async getWithStatus(key: string, load: () => Promise<T>) {
-    const cached = this.cache.get(key);
+  has(key: string) {
+    return this.pinned.has(key) || this.cache.has(key);
+  }
+
+  async getWithStatus(key: string, load: () => Promise<T>, { pin = false } = {}) {
+    const cached = this.pinned.get(key) ?? this.cache.get(key);
     if (cached !== undefined) return { value: cached, outcome: "hit" as const };
     const inFlight = this.pending.get(key);
     if (inFlight) return { value: await inFlight, outcome: "coalesced" as const };
     const request = load().then((value) => {
-      this.cache.set(key, value);
+      if (pin) this.pinned.set(key, value);
+      else this.cache.set(key, value);
       return value;
     });
     this.pending.set(key, request);

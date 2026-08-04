@@ -34,27 +34,19 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
   },
   {
     name: "result-facts",
-    schemaVersion: 2,
+    schemaVersion: 3,
     dependencies: [],
     projectionNames: ["result-facts"],
     tables: ["result_facts"],
     sqlFiles: ["result_facts.sql"],
   },
   {
-    name: "solve-facts",
-    schemaVersion: 1,
-    dependencies: ["result-facts"],
-    projectionNames: ["solve-facts"],
-    tables: ["solve_facts"],
-    sqlFiles: ["solve_facts.sql"],
-  },
-  {
     name: "result-rankings",
-    schemaVersion: 4,
-    dependencies: ["result-facts", "solve-facts"],
+    schemaVersion: 7,
+    dependencies: ["result-facts"],
     projectionNames: ["result-rankings", "result-ranking-counts"],
-    tables: ["result_rankings_single", "result_rankings_average", "result_gender_rankings_single", "result_gender_rankings_average", "solve_personal_rankings", "result_ranking_counts", "result_gender_ranking_counts"],
-    sqlFiles: ["result_rankings_single.sql", "result_rankings_average.sql", "result_gender_rankings_single.sql", "result_gender_rankings_average.sql", "solve_personal_rankings.sql", "result_ranking_counts.sql", "result_gender_ranking_counts.sql"],
+    tables: ["result_rankings_single", "result_rankings_average", "solve_personal_rankings", "result_ranking_counts"],
+    sqlFiles: ["solve_facts.sql", "result_rankings_single.sql", "result_rankings_average.sql", "solve_personal_rankings.sql", "solve_facts_cleanup.sql", "result_ranking_counts.sql"],
   },
   {
     name: "competition-rankings",
@@ -66,7 +58,7 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
   },
   {
     name: "person-competition-rankings",
-    schemaVersion: 3,
+    schemaVersion: 4,
     dependencies: ["result-facts"],
     projectionNames: ["person-event-rankings", "person-ranking-counts", "person-metric-values", "person-metric-scores", "person-competition-rankings"],
     tables: [
@@ -91,7 +83,7 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
   },
   {
     name: "sum-of-ranks",
-    schemaVersion: 2,
+    schemaVersion: 3,
     dependencies: ["result-facts"],
     projectionNames: ["sum-of-ranks"],
     tables: ["person_sum_of_ranks_scores"],

@@ -131,27 +131,31 @@ export async function loadResultRankings(
       },
     };
   }
-  const genderSet = gender.join(",");
-  const lazySingle = resultType === "single" && (year !== null || gender.length > 0);
+  const yearSingle = resultType === "single" && year !== null;
+  const lazySingle = resultType === "single" && year === null && gender.length > 0;
+  const dynamicSingle = yearSingle || lazySingle;
   const lazyAverage = resultType === "average" && (year !== null || gender.length > 0);
-  const table = gender.length ? `result_gender_rankings_${resultType}` : baseTable;
+  const table = baseTable;
   const rankColumn = `${scope}_rank`;
   const positionColumn = `${scope}_position`;
   const conditions = ["ranking.event_id = ?"];
   const values: unknown[] = [eventId];
   const lazyConditions = ["solve.event_id = ?"];
   const lazyValues: unknown[] = [eventId];
+  const yearSingleConditions = ["facts.competition_year = ?", "facts.event_id = ?", "attempt.value > 0"];
+  const yearSingleValues: unknown[] = [year, eventId];
   const averageConditions = ["result.event_id = ?"];
   const averageValues: unknown[] = [eventId];
-  const averageJoins: string[] = [];
+  const averageJoins = ["JOIN result_facts average_facts ON average_facts.result_id = result.result_id"];
   if (gender.length) {
-    conditions.push(resultType === "single" ? "ranking.gender = ?" : "ranking.gender_set = ?");
-    values.push(genderSet);
     lazyConditions.push(`solve.gender IN (${gender.map(() => "?").join(", ")})`);
     lazyValues.push(...gender);
+    if (yearSingle) {
+      yearSingleConditions.push(`facts.gender IN (${gender.map(() => "?").join(", ")})`);
+      yearSingleValues.push(...gender);
+    }
     if (resultType === "average") {
-      averageJoins.push("JOIN persons filter_person ON filter_person.wca_id = result.person_id AND filter_person.sub_id = 1");
-      averageConditions.push(`(CASE WHEN filter_person.gender IN ('m', 'f') THEN filter_person.gender ELSE 'o' END) IN (${gender.map(() => "?").join(", ")})`);
+      averageConditions.push(`result.gender IN (${gender.map(() => "?").join(", ")})`);
       averageValues.push(...gender);
     }
   }
@@ -160,18 +164,18 @@ export async function loadResultRankings(
     values.push(regionId);
     lazyConditions.push(`solve.${scope}_id = ?`);
     lazyValues.push(regionId);
-    averageConditions.push(`result.person_${scope}_id = ?`);
+    yearSingleConditions.push(`facts.person_${scope}_id = ?`);
+    yearSingleValues.push(regionId);
+    averageConditions.push(`result.${scope}_id = ?`);
     averageValues.push(regionId);
   }
   if (year !== null) {
-    lazyConditions.push("solve.competition_start_date >= ?", "solve.competition_start_date < ?");
-    lazyValues.push(`${year}-01-01`, `${year + 1}-01-01`);
-    averageConditions.push("result.competition_start_date >= ?", "result.competition_start_date < ?");
+    averageConditions.push("average_facts.competition_start_date >= ?", "average_facts.competition_start_date < ?");
     averageValues.push(`${year}-01-01`, `${year + 1}-01-01`);
   }
   let peopleTimings = { queueMs: 0, statementMs: 0 };
   let peopleReturnedRows = 0;
-  let queryCount = lazySingle || lazyAverage ? 1 : 2;
+  let queryCount = dynamicSingle || lazyAverage ? 1 : 2;
   let rowLimit = limit + 1;
   if (search) {
     const people = await searchPersonIds(search, regexSearch, parseSearchLimit(params));
@@ -200,25 +204,37 @@ export async function loadResultRankings(
     values.push(...people.personIds);
     lazyConditions.push(`solve.person_id IN (${people.personIds.map(() => "?").join(", ")})`);
     lazyValues.push(...people.personIds);
+    yearSingleConditions.push(`facts.person_id IN (${people.personIds.map(() => "?").join(", ")})`);
+    yearSingleValues.push(...people.personIds);
     averageConditions.push(`result.person_id IN (${people.personIds.map(() => "?").join(", ")})`);
     averageValues.push(...people.personIds);
     rowLimit = parseSearchLimit(params);
-  } else if (!lazySingle && !lazyAverage) {
+  } else if (!dynamicSingle && !lazyAverage) {
     conditions.push(`ranking.${positionColumn} > ?`);
     values.push(start);
   }
 
   const rows = await query<ResultRankingRow & { total_count?: number }>(
-    lazySingle
+    yearSingle
+      ? filteredResultRankingsQuery({
+          source: "result_facts facts STRAIGHT_JOIN result_attempts attempt ON attempt.result_id = facts.result_id",
+          joins: "",
+          candidateColumns: `facts.result_id, attempt.attempt_number, facts.person_id,
+            attempt.value AS result_value, facts.person_country_id AS country_id,
+            facts.person_continent_id AS continent_id, facts.competition_id,
+            facts.competition_start_date,
+            CASE WHEN attempt.value = facts.best THEN facts.regional_single_record ELSE '' END AS record_code`,
+          conditions: yearSingleConditions,
+        })
+      : lazySingle
       ? lazySingleResultRankingsQuery(lazyConditions)
       : lazyAverage
         ? filteredResultRankingsQuery({
-            source: "result_facts result",
+            source: "result_rankings_average result",
             joins: averageJoins.join(" "),
             candidateColumns: `result.result_id, NULL AS attempt_number, result.person_id,
-              result.average AS result_value, result.person_country_id AS country_id,
-              result.person_continent_id AS continent_id, result.competition_id,
-              result.competition_start_date, result.regional_average_record AS record_code`,
+              result.result_value, result.country_id, result.continent_id, result.competition_id,
+              average_facts.competition_start_date, result.record_code`,
             conditions: averageConditions,
           })
         : resultRankingsQuery({
@@ -227,21 +243,16 @@ export async function loadResultRankings(
             positionColumn,
             conditions,
           }),
-    lazySingle
+    yearSingle
+      ? [...yearSingleValues, start, rowLimit]
+      : lazySingle
       ? [...lazyValues, start, rowLimit]
       : lazyAverage
         ? [...averageValues, start, rowLimit]
         : [...values, rowLimit],
   );
 
-  const counts = lazySingle || lazyAverage ? null : gender.length
-    ? await query<{ count: number }>(resultRankingCountsQuery(true), [
-        eventId,
-        resultType,
-        genderSet,
-        scope,
-        regionId,
-      ])
+  const counts = dynamicSingle || lazyAverage ? null
     : await query<{ count: number }>(resultRankingCountsQuery(), [
         eventId,
         resultType,
@@ -273,7 +284,7 @@ export async function loadResultRankings(
   }));
   const total = search
     ? entries.length
-    : lazySingle || lazyAverage
+    : dynamicSingle || lazyAverage
       ? Number(rows.rows[0]?.total_count ?? 0)
       : Number(counts?.rows[0]?.count ?? 0);
 

@@ -20,7 +20,7 @@ trap capture_failed_generation_diagnostics ERR
 [[ "$PRODUCTION_WCA_EXPORT_VALUE" =~ ^[0-9TZUTC:+.\ -]+$ ]]
 for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do
   case "$group" in
-    compatibility|result-facts|solve-facts|result-rankings|competition-rankings|person-competition-rankings|city-rankings|sum-of-ranks|yearly-person-rankings) ;;
+    compatibility|result-facts|result-rankings|competition-rankings|person-competition-rankings|city-rankings|sum-of-ranks|yearly-person-rankings) ;;
     *) echo "Unknown projection group: $group" >&2; exit 1 ;;
   esac
 done
@@ -613,7 +613,7 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
       data-tools /app/scripts/publish-projection-transfer.mjs \
         --groups="$PROJECTION_GROUPS" &
     wait_for_candidate_work "$!"
-    if [ "$PROJECTION_GROUPS" = "compatibility,result-facts,solve-facts,result-rankings,competition-rankings,person-competition-rankings,city-rankings,sum-of-ranks,yearly-person-rankings" ]; then
+    if [ "$PROJECTION_GROUPS" = "compatibility,result-facts,result-rankings,competition-rankings,person-competition-rankings,city-rankings,sum-of-ranks,yearly-person-rankings" ]; then
       dc run --rm --label "$candidate_work_label" \
         -e DATABASE_NAME_OVERRIDE="$candidate" \
         data-tools /app/scripts/check-ranking-projections.mjs &
@@ -684,7 +684,11 @@ ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
     *,yearly-person-rankings,*) retry_endpoint "/api/rankings?eventId=333&result=single&year=2024&start=0&limit=1&paged=1" ;;
   esac
   case ",$PROJECTION_GROUPS," in
-    *,sum-of-ranks,*) retry_endpoint "/api/rankings?eventId=SOR&result=single&start=0&limit=10" ;;
+    *,sum-of-ranks,*)
+      retry_endpoint "/api/rankings?eventId=SOR&result=single&start=0&paged=1"
+      retry_endpoint "/api/rankings?eventId=SOR&result=average&start=0&paged=1"
+      retry_endpoint "/api/rankings?eventId=sor-kinch&start=0&paged=1"
+      ;;
   esac
   case ",$PROJECTION_GROUPS," in
     *,competition-rankings,*) retry_endpoint "/api/rankings/competitions?ranking=competitor-count&start=0&limit=10" ;;

@@ -167,22 +167,20 @@ export function resultRankingsQuery(input: ResultRankingsQueryInput) {
     ORDER BY page.position`;
 }
 
-export function resultRankingCountsQuery(gender = false) {
-  return gender
-    ? "SELECT count FROM result_gender_ranking_counts WHERE event_id = ? AND result_type = ? AND gender_set = ? AND scope = ? AND region_id = ?"
-    : "SELECT count FROM result_ranking_counts WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?";
+export function resultRankingCountsQuery() {
+  return "SELECT count FROM result_ranking_counts WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?";
 }
 
 export function lazySingleResultRankingsQuery(conditions: string[]) {
   return sqlFragment`WITH scoped AS (
-      SELECT solve.*, solve.solve_value AS result_value,
-        RANK() OVER (ORDER BY solve.solve_value) AS rank,
+      SELECT solve.*,
+        RANK() OVER (ORDER BY solve.result_value) AS rank,
         ROW_NUMBER() OVER (
-          ORDER BY solve.solve_value, solve.competition_start_date, solve.competition_id,
+          ORDER BY solve.result_value, solve.competition_start_date, solve.competition_id,
             solve.result_id, solve.attempt_number
         ) AS position,
         COUNT(*) OVER () AS total_count
-      FROM solve_facts solve
+      FROM result_rankings_single solve
       WHERE ${conditions.join(" AND ")}
     ), page AS (
       SELECT * FROM scoped WHERE position > ? ORDER BY position LIMIT ?
@@ -418,29 +416,31 @@ export function personMetricEndQuery(positionColumn: string) {
 export function filteredPersonMetricQuery(input: FilteredPersonMetricQueryInput) {
   return sqlFragment`WITH filtered AS (
        SELECT score.person_id, ${input.scoreValue} AS best,
-         person.name AS person_name, person.country_id AS current_country_id,
          DENSE_RANK() OVER (ORDER BY ${input.scoreOrder}) AS filtered_rank,
          ROW_NUMBER() OVER (ORDER BY ${input.scoreOrder}, score.person_id) AS filtered_position,
          COUNT(*) OVER () AS total_count
        FROM person_sum_of_ranks_scores score
-       LEFT JOIN persons person ON person.wca_id = score.person_id AND person.sub_id = 1
        WHERE ${input.conditions.join(" AND ")}
+     ), page AS (
+       SELECT * FROM filtered
+       WHERE ${input.pageConditions.join(" AND ")}
+       ORDER BY filtered_position
+       LIMIT ?
      )
-     SELECT filtered.filtered_rank AS rank, filtered.filtered_position AS sub_rank, filtered.total_count,
-       filtered.person_id, COALESCE(filtered.person_name, filtered.person_id) AS person_name,
+     SELECT page.filtered_rank AS rank, page.filtered_position AS sub_rank, page.total_count,
+       page.person_id, COALESCE(person.name, page.person_id) AS person_name,
        COALESCE(display_country.id, '') AS country_id,
        COALESCE(display_country.name, display_country.id, '') AS country_name,
        COALESCE(display_country.iso2, '') AS country_iso2,
        COALESCE(display_country.continent_id, '') AS continent_id,
-       filtered.best
-     FROM filtered
-     LEFT JOIN countries current_country ON current_country.id = filtered.current_country_id
+       page.best
+     FROM page
+     LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
+     LEFT JOIN countries current_country ON current_country.id = person.country_id
      LEFT JOIN countries display_country ON display_country.id = CASE
        WHEN ? = 'country' THEN ?
        WHEN ? = 'continent' AND current_country.continent_id <> ? THEN NULL
-       ELSE filtered.current_country_id
+       ELSE person.country_id
      END
-     WHERE ${input.pageConditions.join(" AND ")}
-     ORDER BY filtered.filtered_position
-     LIMIT ?`;
+     ORDER BY page.filtered_position`;
 }

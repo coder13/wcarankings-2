@@ -82,11 +82,11 @@ function parseFilterKey(filterKey) {
 function sourceSpec(job, eventId, resultType) {
   const filter = parseFilterKey(job.filter_key);
   const scopeColumn = filter.scope === "continent" ? "continent" : filter.scope === "country" ? "country" : "world";
-  let source = job.grain === "person"
+  const source = job.grain === "person"
     ? "person_event_rankings"
     : resultType === "average"
-      ? (filter.genders.length ? "result_gender_rankings_average" : "result_rankings_average")
-      : (filter.genders.length === 1 ? "result_gender_rankings_single" : "result_rankings_single");
+      ? "result_rankings_average"
+      : "result_rankings_single";
   const rankColumn = `${scopeColumn}_rank`;
   const positionColumn = `${scopeColumn}_position`;
   const conditions = ["ranking.event_id = ?", `ranking.${rankColumn} > 0`];
@@ -100,19 +100,8 @@ function sourceSpec(job, eventId, resultType) {
     values.push(filter.regionId);
   }
   if (filter.genders.length) {
-    if (job.grain === "person") {
-      conditions.push(`ranking.gender IN (${filter.genders.map(() => "?").join(",")})`);
-      values.push(...filter.genders);
-    } else if (resultType === "average") {
-      conditions.push("ranking.gender_set = ?");
-      values.push(filter.genders.join(","));
-    } else {
-      conditions.push(`ranking.gender IN (${filter.genders.map(() => "?").join(",")})`);
-      values.push(...filter.genders);
-    }
-  }
-  if (job.grain === "result" && resultType === "average" && filter.genders.length === 0) {
-    source = "result_rankings_average";
+    conditions.push(`ranking.gender IN (${filter.genders.map(() => "?").join(",")})`);
+    values.push(...filter.genders);
   }
   return { source, rankColumn, positionColumn, conditions, values, filter };
 }

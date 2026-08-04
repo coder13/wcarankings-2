@@ -12,37 +12,74 @@ SELECT
   r.competition_id,
   COALESCE(comp.name, r.competition_id) AS competition_name,
   STR_TO_DATE(
-    CONCAT(comp.year, '-', LPAD(comp.month, 2, '0'), '-', LPAD(comp.day, 2, '0')),
+    CONCAT(
+      comp.year,
+      '-',
+      LPAD(comp.month, 2, '0'),
+      '-',
+      LPAD(comp.day, 2, '0')
+    ),
     '%Y-%m-%d'
   ) AS competition_date,
   r.round_type_id,
   COALESCE(r.regional_single_record, '') AS regional_single_record,
   DENSE_RANK() OVER (
-    PARTITION BY r.event_id
-    ORDER BY r.best
+    PARTITION BY
+      r.event_id
+    ORDER BY
+      r.best
   ) AS world_rank,
   DENSE_RANK() OVER (
-    PARTITION BY r.event_id, COALESCE(c.continent_id, '')
-    ORDER BY r.best
+    PARTITION BY
+      r.event_id,
+      COALESCE(c.continent_id, '')
+    ORDER BY
+      r.best
   ) AS continent_rank,
   DENSE_RANK() OVER (
-    PARTITION BY r.event_id, COALESCE(p.country_id, '')
-    ORDER BY r.best
+    PARTITION BY
+      r.event_id,
+      COALESCE(p.country_id, '')
+    ORDER BY
+      r.best
   ) AS country_rank,
   ROW_NUMBER() OVER (
-    PARTITION BY r.event_id
-    ORDER BY r.best, r.competition_id, r.round_type_id, r.person_id, r.id
+    PARTITION BY
+      r.event_id
+    ORDER BY
+      r.best,
+      r.competition_id,
+      r.round_type_id,
+      r.person_id,
+      r.id
   ) AS world_sub_rank,
   ROW_NUMBER() OVER (
-    PARTITION BY r.event_id, COALESCE(c.continent_id, '')
-    ORDER BY r.best, r.competition_id, r.round_type_id, r.person_id, r.id
+    PARTITION BY
+      r.event_id,
+      COALESCE(c.continent_id, '')
+    ORDER BY
+      r.best,
+      r.competition_id,
+      r.round_type_id,
+      r.person_id,
+      r.id
   ) AS continent_sub_rank,
   ROW_NUMBER() OVER (
-    PARTITION BY r.event_id, COALESCE(p.country_id, '')
-    ORDER BY r.best, r.competition_id, r.round_type_id, r.person_id, r.id
+    PARTITION BY
+      r.event_id,
+      COALESCE(p.country_id, '')
+    ORDER BY
+      r.best,
+      r.competition_id,
+      r.round_type_id,
+      r.person_id,
+      r.id
   ) AS country_sub_rank
-FROM results r
-LEFT JOIN persons p ON p.wca_id = r.person_id AND p.sub_id = 1
-LEFT JOIN countries c ON c.id = p.country_id
-LEFT JOIN competitions comp ON comp.id = r.competition_id
-WHERE r.best > 0;
+FROM
+  results r
+  LEFT JOIN persons p ON p.wca_id = r.person_id
+  AND p.sub_id = 1
+  LEFT JOIN countries c ON c.id = p.country_id
+  LEFT JOIN competitions comp ON comp.id = r.competition_id
+WHERE
+  r.best > 0;

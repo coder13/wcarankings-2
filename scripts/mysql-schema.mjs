@@ -22,6 +22,7 @@ const INDEXES = [
   ["results", "idx_results_average_event_best", "(`event_id`, `average`, `id`)", "event_id,average,id"],
   ["results", "idx_results_single_country_best", "(`event_id`, `person_country_id`, `best`, `id`)", "event_id,person_country_id,best,id"],
   ["results", "idx_results_average_country_best", "(`event_id`, `person_country_id`, `average`, `id`)", "event_id,person_country_id,average,id"],
+  ["results", "idx_results_competition_person", "(`competition_id`, `person_id`)", "competition_id,person_id"],
 ];
 
 const projectionDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "sql", "ranking-projections");
@@ -38,8 +39,26 @@ function elapsedMs(startedAt) {
   return Math.round(performance.now() - startedAt);
 }
 
+export function formatDuration(durationMs) {
+  const minutes = Math.floor(durationMs / 60_000);
+  const seconds = Math.floor((durationMs % 60_000) / 1_000);
+  const centiseconds = Math.floor((durationMs % 1_000) / 10);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
+}
+
 function writeBuildLog(message) {
   process.stdout.write(`[projection-build] ${message}\n`);
+}
+
+const BUILD_HEARTBEAT_INTERVAL_MS = 60_000;
+
+export function startBuildHeartbeat(label, startedAt, intervalMs = BUILD_HEARTBEAT_INTERVAL_MS) {
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) return () => {};
+  const timer = setInterval(() => {
+    writeBuildLog(`Still building ${label} after ${formatDuration(elapsedMs(startedAt))}…`);
+  }, intervalMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
 }
 
 export function createTableProgress(total) {
@@ -52,17 +71,24 @@ export function createTableProgress(total) {
   };
 }
 
-export async function runTimedBuildStep(label, build, { tableProgress, tableName } = {}) {
+export async function runTimedBuildStep(label, build, {
+  tableProgress,
+  tableName,
+  heartbeatIntervalMs,
+} = {}) {
   const startedAt = performance.now();
   const progress = tableProgress && tableName ? `${tableProgress.start(tableName)} ` : "";
   writeBuildLog(`${progress}Starting ${label}…`);
+  const stopHeartbeat = startBuildHeartbeat(label, startedAt, heartbeatIntervalMs);
   try {
     const result = await build();
     const durationMs = elapsedMs(startedAt);
-    writeBuildLog(`Finished ${label} in ${durationMs}ms.`);
+    stopHeartbeat();
+    writeBuildLog(`Finished ${label} in ${formatDuration(durationMs)}.`);
     return { result, durationMs };
   } catch (error) {
-    writeBuildLog(`Failed ${label} after ${elapsedMs(startedAt)}ms.`);
+    stopHeartbeat();
+    writeBuildLog(`Failed ${label} after ${formatDuration(elapsedMs(startedAt))}.`);
     throw error;
   }
 }
@@ -79,7 +105,7 @@ async function executeTableStatements(connection, sql, phases = [], { tableProgr
 
   function finishActiveTable() {
     if (!activeTable) return;
-    writeBuildLog(`Finished table ${activeTable} in ${elapsedMs(activeTableStartedAt)}ms.`);
+    writeBuildLog(`Finished table ${activeTable} in ${formatDuration(elapsedMs(activeTableStartedAt))}.`);
     activeTable = undefined;
     activeTableStartedAt = undefined;
   }
@@ -106,7 +132,7 @@ async function executeTableStatements(connection, sql, phases = [], { tableProgr
     finishActiveTable();
   } catch (error) {
     if (activeTable) {
-      writeBuildLog(`Failed table ${activeTable} after ${elapsedMs(activeTableStartedAt)}ms.`);
+      writeBuildLog(`Failed table ${activeTable} after ${formatDuration(elapsedMs(activeTableStartedAt))}.`);
     }
     throw error;
   }
@@ -143,13 +169,6 @@ const projectionDefinitions = [
     // country, competition, and historical record code at read time.
     enabledByDefault: true,
   },
-  {
-    name: "solve-facts",
-    dependencies: ["result-facts"],
-    files: ["solve_facts.sql"],
-    tables: ["solve_facts"],
-    enabledByDefault: true,
-  },
   { name: "person-event-rankings", dependencies: ["result-facts"], files: ["person_event_rankings.sql"], tables: ["person_event_rankings"], enabledByDefault: true },
   {
     name: "person-year-rankings",
@@ -160,16 +179,16 @@ const projectionDefinitions = [
   },
   {
     name: "result-rankings",
-    dependencies: ["result-facts", "solve-facts"],
-    files: ["result_rankings_single.sql", "result_rankings_average.sql", "result_gender_rankings_single.sql", "result_gender_rankings_average.sql", "solve_personal_rankings.sql"],
-    tables: ["result_rankings_single", "result_rankings_average", "result_gender_rankings_single", "result_gender_rankings_average", "solve_personal_rankings"],
+    dependencies: ["result-facts"],
+    files: ["solve_facts.sql", "result_rankings_single.sql", "result_rankings_average.sql", "solve_personal_rankings.sql", "solve_facts_cleanup.sql"],
+    tables: ["result_rankings_single", "result_rankings_average", "solve_personal_rankings"],
     enabledByDefault: true,
   },
   {
     name: "result-ranking-counts",
     dependencies: ["result-rankings"],
-    files: ["result_ranking_counts.sql", "result_gender_ranking_counts.sql"],
-    tables: ["result_ranking_counts", "result_gender_ranking_counts"],
+    files: ["result_ranking_counts.sql"],
+    tables: ["result_ranking_counts"],
     enabledByDefault: true,
   },
   { name: "person-ranking-counts", dependencies: ["person-event-rankings"], files: ["projection_counts.sql"], tables: ["person_ranking_counts"], enabledByDefault: true },
@@ -221,6 +240,10 @@ export const PUBLISHED_PROJECTION_TABLES = [
 ];
 export const RETIRED_PROJECTION_TABLES = [
   "person_sum_of_ranks_event_values",
+  "result_gender_ranking_counts",
+  "result_gender_rankings_average",
+  "result_gender_rankings_single",
+  "solve_facts",
 ];
 
 export const COMPATIBILITY_PROJECTION_TASKS = [
@@ -380,16 +403,19 @@ function orderedProjections(selectedNames = DEFAULT_PROJECTION_NAMES, satisfiedN
 async function buildProjection(connection, projection, projectionSuffix, tableProgress) {
   const startedAt = performance.now();
   writeBuildLog(`Starting projection ${projection.name}…`);
+  const stopHeartbeat = startBuildHeartbeat(`projection ${projection.name}`, startedAt);
   try {
     for (const table of projection.tables) await dropManagedObject(connection, `${table}${projectionSuffix}`);
     const phases = await projection.build(connection, projectionSuffix, tableProgress);
     const rowCounts = await projection.validate(connection, projectionSuffix);
     const durationMs = elapsedMs(startedAt);
     const timing = { name: projection.name, durationMs, rowCounts, phases };
-    writeBuildLog(`Finished projection ${projection.name} in ${durationMs}ms (${JSON.stringify(rowCounts)}).`);
+    stopHeartbeat();
+    writeBuildLog(`Finished projection ${projection.name} in ${formatDuration(durationMs)} (${JSON.stringify(rowCounts)}).`);
     return timing;
   } catch (error) {
-    writeBuildLog(`Failed projection ${projection.name} after ${elapsedMs(startedAt)}ms.`);
+    stopHeartbeat();
+    writeBuildLog(`Failed projection ${projection.name} after ${formatDuration(elapsedMs(startedAt))}.`);
     throw error;
   }
 }

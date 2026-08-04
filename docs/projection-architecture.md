@@ -2,13 +2,13 @@
 
 This document is the permanent schema and naming contract for CubeRanks
 projection work. Implemented core projections are listed separately from
-planned extension grains. Changes to a documented grain, identifier, metric
+planned extension lists and stats. Changes to a documented list or stat, identifier, metric
 version, or publication guarantee require an explicit migration and a
 corresponding update here.
 
 ## Goals
 
-- Build one projection per row grain, not one table per sorting option.
+- Build one projection for each supported list or stat, not one table per sorting option.
 - Keep high-cardinality ordering tables narrow.
 - Build downstream statistics from shared facts instead of repeatedly scanning
   raw WCA export tables.
@@ -56,29 +56,35 @@ Use these column names consistently:
 `position`. If existing tables are renamed, perform that change as an explicit
 migration rather than exposing either name in the UI.
 
-Do not include `_entries` in new table names. It does not identify a grain or
+Do not include `_entries` in new table names. It does not identify a list or stat or
 purpose. Existing `_entries` tables can remain temporarily for compatibility.
 
 ## Active projection graph
 
-The default import currently activates one new product projection:
+The default import activates shared facts and the result, person-metric,
+competition, city, Sum-of-Ranks, and yearly-person projection groups:
 
 ```text
-ranks_single + ranks_average + historical results
-└── temporary historical bests and ranked event values
-    └── person_sum_of_ranks_scores
+raw results + dimensions
+└── result_facts
+    ├── temporary solve_facts_stage
+    │   ├── result_rankings_single
+    │   └── solve_personal_rankings
+    ├── result_rankings_average
+    ├── person_event_rankings
+    │   └── person_metric_values → person_metric_scores
+    └── city, yearly, competition, and Sum-of-Ranks projections
 ```
 
-The result, general person-metric, competition, city, and time-based grains
-documented below remain registered or planned extensions. Registration does
-not activate a projection: inactive projections are not built, published,
-required by readiness checks, or exposed through public route handlers.
+Registration alone does not activate a future projection. Only the explicit
+default set is built, published, required by readiness checks, and exposed
+through public route handlers.
 
 ## Core fact table
 
 ### `result_facts`
 
-Grain:
+Source row:
 
 ```text
 one row per official WCA result
@@ -90,9 +96,11 @@ Columns:
 result_id
 event_id
 person_id
+gender
 person_country_id
 person_continent_id
 competition_id
+competition_year
 competition_start_date
 round_type_id
 is_final_round
@@ -103,6 +111,11 @@ attempt_count
 regional_single_record
 regional_average_record
 ```
+
+`gender` is normalized once to `m`, `f`, or `o` at the shared source row.
+This removes repeated profile lookups from solve, Average-result,
+person-event, and city staging while adding only one compact dimension to the
+fact row.
 
 The current public export v2 omits the five attempt values from `results`.
 They are therefore not repeated as always-NULL columns in `result_facts`;
@@ -133,20 +146,18 @@ Their `(event_id, result value)` prefixes also replace the narrower event/value
 indexes; do not maintain both pairs unless another measured query requires the
 different tie ordering.
 
-Yearly indexes are intentionally absent while time-based projections are
-planned. Add them only if benchmarks show that the yearly projections benefit
-enough to justify their size:
+Supported yearly Single and Average paths use these fact indexes:
 
 ```text
-(competition_year, event_id, best, result_id)
-(competition_year, event_id, average, result_id)
+(competition_year, event_id, person_id, person_country_id, best, result_id)
+(competition_year, event_id, person_id, person_country_id, average, result_id)
 ```
 
 ## Person-event rankings
 
 ### `person_event_rankings`
 
-Grain:
+List row:
 
 ```text
 person + event + result type
@@ -184,6 +195,13 @@ same column vocabulary.
 
 Display names and competition names should normally be joined after paging.
 
+Generation reads canonical positive personal-best values from `ranks_single`
+and `ranks_average`, then probes the person/event fact index only to resolve
+the earliest result that achieved each value. This replaces two window passes
+over all historical result candidates. The reduced best-result set receives
+the required World, continent, and country sorts. Normalized gender is carried
+from `result_facts`, so this stage does not repeat the profile join.
+
 Person search is deliberately a two-step lookup. Search `persons` first, using
 its `(wca_id, sub_id)` and `name` indexes for exact WCA IDs and prefix names.
 Regex name searches may scan `persons`, but must not scan this projection.
@@ -198,7 +216,7 @@ as a separate `wca_id` column.
 
 ### `person_ranking_counts`
 
-Grain:
+Stat row:
 
 ```text
 event + result type + scope + region
@@ -218,10 +236,11 @@ count
 
 ### `result_rankings`
 
-Grain:
+Logical list row:
 
 ```text
-official result + result type
+Single: official attempt
+Average: official result
 ```
 
 Columns:
@@ -231,6 +250,7 @@ result_id
 result_type
 event_id
 person_id
+gender
 competition_id
 result_value
 country_id
@@ -251,37 +271,43 @@ result_rankings_single
 result_rankings_average
 ```
 
-Result type is part of the logical grain, but separating it physically halves
-peak window-sort size and avoids repeating `result_type` in every row and browse
-index. Both tables have the same columns and API contract.
+Separating result types physically bounds each window build and avoids
+repeating `result_type` in every row and browse index. Single additionally
+stores `attempt_number` and `competition_start_date`, which are part of its
+deterministic attempt order.
 
 Their ordering should be deterministic:
 
 ```text
-result_value
-result_id
+Average: result_value, result_id
+Single: result_value, competition_start_date, competition_id, result_id, attempt_number
 ```
 
 Result rankings expose the same position-addressable page contract as the other
 list surfaces. Tied rank and stable position are separate: rank is calculated
 with `RANK()` from `result_value`, so it equals one plus the number of official
-result rows with a strictly better value and skips ranks after ties. Position
-uses `ROW_NUMBER()` over `result_value, result_id` to give every row a stable
-address. The World, continent, and country position columns support direct page
-windows, backward loading, and jumps without large offsets.
+rows with a strictly better value and skips ranks after ties. Position uses the
+deterministic ordering above to give every row a stable address. The World,
+continent, and country position columns support direct page windows, backward
+loading, and jumps without large offsets.
 
-The projection deliberately omits competition dates, round metadata, person
-names, competition names, and country display names. After selecting at most
-one page from the narrow ordering table, the API joins those display fields
-from the source tables. This avoids millions of competition lookups during
-generation and keeps the published table and indexes narrower.
+The projections omit round metadata, person names, competition names, and
+country display names. Average competition dates are joined from
+`result_facts` only for lazy date-filtered cohorts. Single retains its date
+because exact attempt ordering and its measured lazy index require it.
+
+Gender is stored as one normalized base column, not as separately materialized
+cohort tables. Unfiltered World, continent, and country positions remain the
+common precomputed path. Gender and year combinations are ranked in bounded,
+generation-keyed lazy windows. This retires three tables that expanded results
+into overlapping gender sets and repeated the same scope sorts.
 
 Person search uses the same `persons`-first lookup described for person-event
 rankings. Once a `person_id` is selected, use projection indexes matching the
 two exposed result views:
 
 ```text
-(person_id, event_id, result_type, world_position, result_id)
+(person_id, event_id, world_position, result_id[, attempt_number])
 ```
 
 The compatibility result projection retains its equivalent ranked access path:
@@ -295,7 +321,7 @@ projection display columns.
 
 ### `result_ranking_counts`
 
-Grain:
+Stat row:
 
 ```text
 event + result type + scope + region
@@ -341,6 +367,22 @@ regional cohort after representing that historical region in any included
 event. Equal totals use competition ranking (`1, 1, 3`), while positions break
 ties by WCA ID for stable positional paging.
 
+The stored geographic cohorts are the common path and remain directly pageable.
+Each score row also stores the person's normalized current gender. Gender
+selections are request-specific cohorts: MariaDB filters them through
+score-oriented indexes, computes ranks lazily, and caches a 400-row window so
+adjacent pages do not repeat the window calculation. The first unfiltered World
+windows for Single Sum of Ranks, Average Sum of Ranks, and Kinch are warmed
+during deployment and pinned for the active export generation. Less common
+gender/region cache windows are populated only when requested.
+
+A pre-change local `ANALYZE FORMAT=JSON` of the female World Single cohort took
+1.50 seconds. It read all 291,958 World score rows and performed the same number
+of person lookups; about 1.00 second was spent in that lookup join. Persisting
+normalized gender and joining display data only after window paging removes
+that fan-out. The next projection build reports the new covering index as its
+own phase so its build and storage cost can be reviewed independently.
+
 Kinch combines the current 17-event set into one score. Each normal event uses
 `100 × scope reference result ÷ personal result`, while FMC, 3BLD, 4BLD, and
 5BLD use the better of the Single and Average ratios. Multi-Blind uses the
@@ -356,7 +398,7 @@ published schema or readiness dependency because the product currently shows
 only overall rankings; event-level values remain available from the existing
 person-event ranking projections. Names and countries are joined only after
 selecting a score page. Counts use the score browse index rather than another
-persisted count grain.
+persisted stat row.
 
 ### Legacy local Sum of Ranks refresh benchmark
 
@@ -476,11 +518,11 @@ people under both SOR and Kinch ordering. Local HTTP observations returned the
 first 50-row SOR page in 6 ms, a page around position 250,000 in 21 ms, and the
 first Kinch page in 8 ms.
 
-### Inactive general metric projections
+### General metric projections
 
 ### `person_metric_values`
 
-Grain:
+Metric row:
 
 ```text
 metric version + event-set version + result type + scope + region + person + event
@@ -510,6 +552,11 @@ table. Its primary key already supports person-detail lookup, so no duplicate
 secondary index is maintained. Metric scores aggregate both value columns in
 one pass before expanding the much smaller person totals by metric.
 
+Reference values are collected once from the position-1 person-event row for
+each cohort. World, continent, and country values are then inserted in three
+sort-free passes. This replaces a 5.7M-row materialization that calculated the
+same `MIN(personal_result)` window twice per row.
+
 Initial metrics:
 
 ```text
@@ -519,7 +566,7 @@ kinch
 
 ### `person_metric_scores`
 
-Grain:
+Metric row:
 
 ```text
 metric + metric version + result type + scope + region + person
@@ -565,7 +612,7 @@ Any event-set or missing-event policy change increments `metric_version` or
 
 ### `person_year_rankings_single` and `person_year_rankings_average`
 
-Grain:
+List row:
 
 ```text
 year + person + event + result type
@@ -581,7 +628,7 @@ the deterministic internal position is never exposed in the UI.
 
 ### `result_year_rankings`
 
-Grain:
+List row:
 
 ```text
 year + official result + result type
@@ -591,7 +638,7 @@ This represents every valid result during a year.
 
 ### `person_event_weekly_bests`
 
-Grain:
+List row:
 
 ```text
 competition week + person + event + result type
@@ -601,7 +648,7 @@ Columns should include the retained `result_id` and `result_value`.
 
 ### `person_event_rank_changes`
 
-Grain:
+List row:
 
 ```text
 latest competition week + person + event + result type
@@ -613,7 +660,7 @@ latest week for every person.
 
 ### `record_week_streaks`
 
-Grain:
+List row:
 
 ```text
 result type + event + scope + region + record holder
@@ -626,7 +673,7 @@ ranking movement have different semantics.
 
 ### `competition_stats`
 
-Grain:
+Stat row:
 
 ```text
 competition
@@ -656,7 +703,7 @@ the shared paging engine.
 
 ### `competition_event_stats`
 
-Grain:
+Stat row:
 
 ```text
 competition + event
@@ -723,7 +770,7 @@ winning_average_result_id
 
 ### `competition_podium_members`
 
-Grain:
+List row:
 
 ```text
 competition + event + result type + podium position
@@ -746,7 +793,7 @@ components, including tied finishers at positions up to three, belong here.
 
 ### `city_event_stats`
 
-Grain:
+Stat row:
 
 ```text
 exact city name + country + event
@@ -771,7 +818,7 @@ cities in different countries.
 
 ### `entity_ranking_counts`
 
-Grain:
+Stat row:
 
 ```text
 ranking kind + event + result type
@@ -871,7 +918,7 @@ also retain their projection-level duration and validated row counts. A failed
 table and its containing projection both log their elapsed time before the
 error aborts publication.
 
-### Local result-ranking backfill benchmark
+### Historical local result-ranking backfill benchmark
 
 The first targeted all-results backfill ran on 2026-07-29 against 6,750,045 raw
 `results` rows. The logical projection was split into physical Single and
@@ -895,6 +942,12 @@ Local API checks for first, middle, final, Average, continent, and person-search
 windows completed in approximately 9–23ms end to end. The first-page database
 work reported 1.8ms for 50 rows.
 
+These numbers predate attempt-level Single rankings and are not a baseline for
+the current projection shape. The next GitHub Actions benchmark is the
+authoritative measurement for shared fact gender, facts-first index-free solve
+staging, one bulk Single index build, lazy gender cohorts, canonical
+person-event best staging, and sort-free metric reference joins.
+
 ## Future architecture decisions
 
 These decisions affect future migrations or planned projection layers; they do
@@ -906,7 +959,7 @@ not make the current contract provisional:
 2. Whether a future metric version should use different event sets or Kinch
    aggregation semantics.
 3. Whether yearly source indexes justify their storage cost.
-4. Whether competition-wide pages need another event-normalized grain.
+4. Whether competition-wide pages need another event-normalized list.
 5. Which system cohorts are large or frequent enough to materialize.
 6. Whether explicit `generation_id` columns add value beyond atomic table
    publication and export metadata.

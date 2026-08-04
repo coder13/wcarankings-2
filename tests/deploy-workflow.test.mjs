@@ -801,4 +801,7 @@ test("production staging remains sequential and activation is atomic", () => {
   assert.match(projectionDeploy, /publish-projection-transfer\.mjs[\s\S]*--prepare-only/);
   assert.match(projectionDeploy, /activate-ranking-generation\.mjs activate/);
   assert.match(projectionDeploy, /activate-ranking-generation\.mjs rollback/);
+  assert.match(projectionDeploy, /eventId=SOR&result=single&start=0&paged=1/);
+  assert.match(projectionDeploy, /eventId=SOR&result=average&start=0&paged=1/);
+  assert.match(projectionDeploy, /eventId=sor-kinch&start=0&paged=1/);
 });

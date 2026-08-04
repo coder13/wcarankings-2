@@ -1,36 +1,26 @@
--- One row per valid official attempt. This is the canonical Single ranking
--- grain; result rows remain the canonical Average ranking grain.
-CREATE TABLE solve_facts AS
+-- One row per valid official attempt. Keep this build-only stage minimal: its
+-- consumers scan every row, so indexes only add build time and disk traffic.
+DROP TEMPORARY TABLE IF EXISTS solve_facts_stage;
+
+-- phase: materialize minimal solve stage
+CREATE TEMPORARY TABLE solve_facts_stage ENGINE = InnoDB AS
 SELECT
   attempt.result_id,
   attempt.attempt_number,
   facts.event_id,
   facts.person_id,
-  CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END AS gender,
+  facts.gender,
   facts.competition_id,
-  facts.competition_year,
   facts.competition_start_date,
-  facts.round_type_id,
   facts.person_country_id AS country_id,
   facts.person_continent_id AS continent_id,
   attempt.value AS solve_value,
-  CASE WHEN attempt.value = facts.best THEN facts.regional_single_record ELSE '' END AS record_code
-FROM result_attempts attempt
-JOIN result_facts facts ON facts.result_id = attempt.result_id
-JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1
-WHERE attempt.value > 0;
-
-ALTER TABLE solve_facts
-  ADD PRIMARY KEY (result_id, attempt_number),
-  ADD INDEX idx_solve_facts_country_year (
-    gender, event_id, country_id, competition_start_date, solve_value,
-    competition_id, result_id, attempt_number
-  ),
-  ADD INDEX idx_solve_facts_event_country_value (
-    event_id, country_id, solve_value, competition_start_date,
-    competition_id, result_id, attempt_number
-  ),
-  ADD INDEX idx_solve_facts_event_continent_value (
-    event_id, continent_id, solve_value, competition_start_date,
-    competition_id, result_id, attempt_number
-  );
+  CASE
+    WHEN attempt.value = facts.best THEN facts.regional_single_record
+    ELSE ''
+  END AS record_code
+FROM
+  result_facts facts
+  STRAIGHT_JOIN result_attempts attempt ON attempt.result_id = facts.result_id
+WHERE
+  attempt.value > 0;

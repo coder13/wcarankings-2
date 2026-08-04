@@ -10,11 +10,38 @@ CREATE TEMPORARY TABLE regional_ranking_history_fixture (
   regional_average_record VARCHAR(3) NOT NULL
 );
 
-INSERT INTO regional_ranking_history_fixture
-  (event_id, person_id, person_country_id, continent_id, best, average, regional_single_record, regional_average_record)
+INSERT INTO
+  regional_ranking_history_fixture (
+    event_id,
+    person_id,
+    person_country_id,
+    continent_id,
+    best,
+    average,
+    regional_single_record,
+    regional_average_record
+  )
 VALUES
-  ('333', 'CHANGE1', 'United States', '_North America', 549, 600, '', ''),
-  ('333', 'CHANGE1', 'New Zealand', '_Oceania', 600, 650, '', '');
+  (
+    '333',
+    'CHANGE1',
+    'United States',
+    '_North America',
+    549,
+    600,
+    '',
+    ''
+  ),
+  (
+    '333',
+    'CHANGE1',
+    'New Zealand',
+    '_Oceania',
+    600,
+    650,
+    '',
+    ''
+  );
 
 -- The current persons.country_id for CHANGE1 is New Zealand. Normal country
 -- rankings must still expose 5.49 for the United States and 6.00 for NZ.

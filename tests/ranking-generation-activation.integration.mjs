@@ -53,7 +53,6 @@ if (!applicationUrl && !adminUrl) {
     groups: {
       compatibility: release("compatibility", "new"),
       "result-facts": release("result-facts", "new"),
-      "solve-facts": release("solve-facts", "new"),
       "result-rankings": release("result-rankings", "new"),
       "competition-rankings": release("competition-rankings", "new"),
       "person-competition-rankings": release("person-competition-rankings", "new"),

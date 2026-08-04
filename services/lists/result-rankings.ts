@@ -2,7 +2,6 @@ import { query } from "@/db";
 import {
   ensureDynamicListRankingTarget,
   isListRankingCacheable,
-  listRankingGenderSet,
   listRankingFilterKey,
   raiseListRankingRebuildPriority,
 } from "@/lib/list-ranking-cache";
@@ -20,17 +19,8 @@ type ResultListTarget = {
   personIds?: string[];
 };
 
-function resultSource(
-  resultType: "single" | "average",
-  gender: readonly string[],
-  scope: "world" | "continent" | "country",
-) {
-  if (resultType === "average") {
-    return gender.length ? "result_gender_rankings_average" : "result_rankings_average";
-  }
-  return gender.length && gender.length === 1 && scope !== "country"
-    ? "result_gender_rankings_single"
-    : "result_rankings_single";
+function resultSource(resultType: "single" | "average") {
+  return resultType === "average" ? "result_rankings_average" : "result_rankings_single";
 }
 
 function resultEntry(row: ResultRankingRow & { record_code?: string | null }) {
@@ -71,15 +61,10 @@ async function loadCachedResults(
     regionId: input.region.regionId,
     genders: input.gender,
   });
-  const source = resultSource(input.type, input.gender, input.region.scope);
+  const source = resultSource(input.type);
   const sourceGender = input.gender.length
-    ? input.type === "average"
-      ? " AND ranking.gender_set = ?"
-      : " AND ranking.gender = ?"
+    ? ` AND ranking.gender IN (${input.gender.map(() => "?").join(",")})`
     : "";
-  const sourceGenderValue = input.gender.length
-    ? listRankingGenderSet(input.gender)
-    : undefined;
   const sourceAttempt = input.type === "single"
     ? " AND ranking.attempt_number = entry.attempt_number"
     : "";
@@ -114,7 +99,7 @@ async function loadCachedResults(
     [
       input.eventId,
       input.type,
-      ...(sourceGenderValue ? [sourceGenderValue] : []),
+      ...input.gender,
       target.targetKey,
       filterKey,
       target.membershipVersion,
@@ -162,21 +147,12 @@ async function loadDirectResults(
   const values: unknown[] = [input.eventId];
   const joinValues: unknown[] = [];
   const joins: string[] = [];
-  const useGenderProjection = input.gender.length === 1 && input.type === "single" && input.region.scope !== "country";
-  const useAverageGenderProjection = input.gender.length > 0 && input.type === "average";
-  const useProjection = input.type === "average" || input.gender.length === 0 || useGenderProjection;
-  const source = useProjection
-    ? `${resultSource(input.type, input.gender, input.region.scope)} source`
-    : input.type === "single" ? "solve_facts source" : "result_facts source";
-  const resultValue = useProjection ? "source.result_value" : input.type === "single" ? "source.solve_value" : "source.average";
-  const countryId = useProjection ? "source.country_id" : input.type === "single" ? "source.country_id" : "source.person_country_id";
-  const continentId = useProjection ? "source.continent_id" : input.type === "single" ? "source.continent_id" : "source.person_continent_id";
-  const recordCode = useProjection ? "source.record_code" : input.type === "single" ? "source.record_code" : "source.regional_average_record";
+  const source = `${resultSource(input.type)} source`;
   const attemptNumber = input.type === "single" ? "source.attempt_number" : "NULL";
-  const competitionStartDate = useProjection && input.type === "average"
+  const competitionStartDate = input.type === "average"
     ? "order_facts.competition_start_date"
     : "source.competition_start_date";
-  if (useProjection && input.type === "average") {
+  if (input.type === "average") {
     joins.push("JOIN result_facts order_facts ON order_facts.result_id = source.result_id");
   }
   if (target.list) {
@@ -196,19 +172,8 @@ async function loadDirectResults(
     values.push(input.region.regionId);
   }
   if (input.gender.length) {
-    if (useAverageGenderProjection) {
-      conditions.push("source.gender_set = ?");
-    } else if (input.type === "average") {
-      joins.push("JOIN persons filter_person ON filter_person.wca_id = source.person_id AND filter_person.sub_id = 1");
-      conditions.push(`(CASE WHEN filter_person.gender IN ('m', 'f') THEN filter_person.gender ELSE 'o' END) IN (${input.gender.map(() => "?").join(",")})`);
-    } else if (useGenderProjection) {
-      conditions.push("source.gender = ?");
-    } else {
-      conditions.push(`source.gender IN (${input.gender.map(() => "?").join(",")})`);
-    }
-    if (useAverageGenderProjection) values.push(listRankingGenderSet(input.gender));
-    else if (useGenderProjection) values.push(input.gender[0]);
-    else values.push(...input.gender);
+    conditions.push(`source.gender IN (${input.gender.map(() => "?").join(",")})`);
+    values.push(...input.gender);
   }
   if (input.locate) {
     conditions.push("source.person_id = ?");
@@ -224,9 +189,9 @@ async function loadDirectResults(
     filteredResultRankingsQuery({
       source,
       joins: joins.join(" "),
-      candidateColumns: `source.result_id, ${attemptNumber} AS attempt_number, ${resultValue} AS result_value,
-        source.person_id, ${countryId} AS country_id, ${continentId} AS continent_id,
-        source.competition_id, ${competitionStartDate}, ${recordCode} AS record_code`,
+      candidateColumns: `source.result_id, ${attemptNumber} AS attempt_number, source.result_value,
+        source.person_id, source.country_id, source.continent_id,
+        source.competition_id, ${competitionStartDate}, source.record_code`,
       conditions,
     }),
     [...joinValues, ...values, input.start, input.limit + 1],

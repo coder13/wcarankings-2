@@ -260,6 +260,6 @@ test("compatibility SQL uses the matching staged result facts table", async () =
     resultFacts: "result_facts_staging",
   });
 
-  assert.match(sql, /FROM result_facts_staging r/);
-  assert.doesNotMatch(sql, /FROM result_facts r/);
+  assert.match(sql, /FROM\s+result_facts_staging r/);
+  assert.doesNotMatch(sql, /FROM\s+result_facts r/);
 });

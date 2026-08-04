@@ -43,10 +43,15 @@ Useful checks:
 pnpm run build
 pnpm test
 pnpm run lint
+pnpm run format:sql
+pnpm run format:sql:check
 pnpm run test:unit
 pnpm run storybook
 pnpm run build-storybook
 ```
+
+Run `pnpm run format:sql` to format SQL files. Run `pnpm run format:sql:check`
+to check SQL files without changing them.
 
 Storybook runs the client-side rankings explorer with deterministic preview data
 at `http://localhost:6006`, so it does not require MariaDB or a WCA export.
