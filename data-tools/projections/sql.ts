@@ -4,10 +4,19 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { elapsedMs, writeBuildLog } from "./progress.ts";
 
-const projectionDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "sql", "ranking-projections");
+const projectionDirectory = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "sql",
+  "ranking-projections",
+);
 
 export function statements(sql) {
-  return sql.split(/;\s*(?:\n|$)/).map((statement) => statement.trim()).filter(Boolean);
+  return sql
+    .split(/;\s*(?:\n|$)/)
+    .map((statement) => statement.trim())
+    .filter(Boolean);
 }
 
 export async function projectionSql(file) {
@@ -27,13 +36,20 @@ export function createdTables(sql) {
   });
 }
 
-export async function executeTableStatements(connection, sql, phases = [], { tableProgress } = {}) {
+export async function executeTableStatements(
+  connection,
+  sql,
+  phases = [],
+  { tableProgress } = {},
+) {
   let activeTable;
   let activeTableStartedAt;
 
   function finishActiveTable() {
     if (!activeTable) return;
-    writeBuildLog(`Finished table ${activeTable} in ${elapsedMs(activeTableStartedAt)}ms.`);
+    writeBuildLog(
+      `Finished table ${activeTable} in ${elapsedMs(activeTableStartedAt)}ms.`,
+    );
     activeTable = undefined;
     activeTableStartedAt = undefined;
   }
@@ -56,7 +72,10 @@ export async function executeTableStatements(connection, sql, phases = [], { tab
     }
     finishActiveTable();
   } catch (error) {
-    if (activeTable) writeBuildLog(`Failed table ${activeTable} after ${elapsedMs(activeTableStartedAt)}ms.`);
+    if (activeTable)
+      writeBuildLog(
+        `Failed table ${activeTable} after ${elapsedMs(activeTableStartedAt)}ms.`,
+      );
     throw error;
   }
 }

@@ -17,9 +17,14 @@ export function createTableProgress(total) {
   };
 }
 
-export async function runTimedBuildStep(label, build, { tableProgress, tableName } = {}) {
+export async function runTimedBuildStep(
+  label,
+  build,
+  { tableProgress, tableName } = {},
+) {
   const startedAt = performance.now();
-  const progress = tableProgress && tableName ? `${tableProgress.start(tableName)} ` : "";
+  const progress =
+    tableProgress && tableName ? `${tableProgress.start(tableName)} ` : "";
   writeBuildLog(`${progress}Starting ${label}…`);
   try {
     const result = await build();
