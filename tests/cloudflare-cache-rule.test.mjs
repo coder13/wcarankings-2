@@ -25,7 +25,7 @@ test("keeps Cloudflare eligibility limited to public GET API resources", async (
 
 test("synchronizer creates or updates only the managed Cloudflare cache rule", async () => {
   const source = await readFile(
-    new URL("scripts/sync-cloudflare-cache-rule.mjs", root),
+    new URL("scripts/sync-cloudflare-cache-rule.ts", root),
     "utf8",
   );
 

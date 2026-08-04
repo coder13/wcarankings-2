@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import test from "node:test";
+import { test } from "bun:test";
 
 const root = new URL("../", import.meta.url);
 
@@ -9,11 +9,11 @@ test("builds a result-level compatibility projection without unused secondary in
     readFile(new URL("sql/ranking-projections/result_entries_single_source.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_entries_single_indexes.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_counts.sql", root), "utf8"),
-    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
-    readFile(new URL("scripts/sync-wca-export.mjs", root), "utf8"),
-    readFile(new URL("scripts/check-ranking-projections.mjs", root), "utf8"),
-    readFile(new URL("scripts/backfill-result-entries.mjs", root), "utf8"),
-    readFile(new URL("scripts/backfill-result-rankings.mjs", root), "utf8"),
+    readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
+    readFile(new URL("scripts/sync-wca-export.ts", root), "utf8"),
+    readFile(new URL("scripts/check-ranking-projections.ts", root), "utf8"),
+    readFile(new URL("scripts/backfill-result-entries.ts", root), "utf8"),
+    readFile(new URL("scripts/backfill-result-rankings.ts", root), "utf8"),
     readFile(new URL("Dockerfile.data-tools", root), "utf8"),
     readFile(new URL(".github/workflows/pull-request.yml", root), "utf8"),
     readFile(new URL("tests/fixtures/visual-smoke.sql", root), "utf8"),
@@ -53,8 +53,8 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(backfill, /promoteProjectionTables/);
   assert.match(resultBackfill, /result-ranking-counts/);
   assert.match(dockerfile, /COPY --chown=data-tools:data-tools scripts \.\/scripts/);
-  assert.match(deploy, /backfill-result-entries\.mjs/);
-  assert.match(deploy, /refresh-rankings\.mjs/);
+  assert.match(deploy, /backfill-result-entries\.ts/);
+  assert.match(deploy, /refresh-rankings\.ts/);
   assert.match(fixture, /year SMALLINT/);
   assert.match(fixture, /month TINYINT/);
   assert.match(fixture, /day TINYINT/);
@@ -63,12 +63,11 @@ test("builds a result-level compatibility projection without unused secondary in
 });
 
 test("publishes indexed gender result rankings instead of ranking filtered rows at request time", async () => {
-  const [single, average, counts, schema, groups, resultService] = await Promise.all([
+  const [single, average, counts, groups, resultService] = await Promise.all([
     readFile(new URL("sql/ranking-projections/result_gender_rankings_single.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_gender_rankings_average.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/result_gender_ranking_counts.sql", root), "utf8"),
-    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
-    readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
+    readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
     readFile(new URL("services/rankings/result.ts", root), "utf8"),
   ]);
 
@@ -79,9 +78,9 @@ test("publishes indexed gender result rankings instead of ranking filtered rows 
     assert.match(source, /ADD PRIMARY KEY \(gender_set, result_id\)/);
   }
   assert.match(counts, /gender_set/);
-  assert.match(schema, /result_gender_rankings_single/);
-  assert.match(schema, /result_gender_ranking_counts/);
-  assert.match(groups, /schemaVersion: 2/);
+  assert.match(groups, /result_gender_rankings_single/);
+  assert.match(groups, /result_gender_ranking_counts/);
+  assert.match(groups, /releaseSchemaVersion: 2/);
   assert.match(groups, /result_gender_rankings_average/);
   assert.match(resultService, /result_gender_rankings_\$\{resultType\}/);
   assert.match(resultService, /ranking\.gender_set = \?/);

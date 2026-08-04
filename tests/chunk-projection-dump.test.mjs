@@ -8,7 +8,7 @@ import test from "node:test";
 function chunkDump(input, rowsPerInsert = 2) {
   return spawnSync(
     process.execPath,
-    ["scripts/chunk-projection-dump.mjs", `--rows-per-insert=${rowsPerInsert}`],
+    ["scripts/chunk-projection-dump.ts", `--rows-per-insert=${rowsPerInsert}`],
     { cwd: new URL("..", import.meta.url), input, encoding: "utf8" },
   );
 }
@@ -80,7 +80,7 @@ exit "${"$"}{MARIADB_EXIT_CODE:-0}"
   try {
     const imported = spawnSync(
       process.execPath,
-      ["scripts/chunk-projection-dump.mjs", "--import", "--rows-per-insert=2"],
+      ["scripts/chunk-projection-dump.ts", "--import", "--rows-per-insert=2"],
       { cwd: new URL("..", import.meta.url), input, encoding: "utf8", env: environment },
     );
     assert.equal(imported.status, 0, imported.stderr);
@@ -107,7 +107,7 @@ exit "${"$"}{MARIADB_EXIT_CODE:-0}"
 
     const failed = spawnSync(
       process.execPath,
-      ["scripts/chunk-projection-dump.mjs", "--import"],
+      ["scripts/chunk-projection-dump.ts", "--import"],
       {
         cwd: new URL("..", import.meta.url),
         input,

@@ -10,7 +10,7 @@ test("yearly person rankings retain historical cohorts and deterministic ties", 
     readFile(new URL("sql/ranking-projections/person_year_rankings_single.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/person_year_rankings_average.sql", root), "utf8"),
     readFile(new URL("sql/ranking-projections/person_year_ranking_counts.sql", root), "utf8"),
-    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
+    readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
     readFile(new URL("services/rankings/service.ts", root), "utf8"),
     readFile(new URL("services/rankings/metadata.ts", root), "utf8"),
     readFile(new URL("Dockerfile", root), "utf8"),
@@ -28,5 +28,5 @@ test("yearly person rankings retain historical cohorts and deterministic ties", 
   assert.match(schema, /person-year-rankings/);
   assert.match(rankings, /parseYear/);
   assert.match(metadata, /person_year_ranking_counts/);
-  assert.match(dockerfile, /backfill-person-year-rankings\.mjs/);
+  assert.match(dockerfile, /backfill-person-year-rankings\.ts/);
 });

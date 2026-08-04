@@ -34,6 +34,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -49,7 +53,7 @@ jobs:
       - name: Calculate independent component identities
         id: components
         run: |
-          fingerprints=$(node scripts/server-component-fingerprints.mjs)
+          fingerprints=$(bun scripts/server-component-fingerprints.ts)
           echo "app=$(jq -r '.app' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
           echo "flyway=$(jq -r '.flyway' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
           echo "data_tools=$(jq -r '.dataTools' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
@@ -184,7 +188,7 @@ jobs:
       - name: Verify data-tools image
         run: |
           docker run --rm --entrypoint sh wcarankings-data-tools:pull-request -c \
-            'test -f /app/release-compatibility.json && test -f /app/scripts/activate-ranking-generation.mjs && test -f /app/scripts/sync-wca-export.mjs'
+            'test -f /app/release-compatibility.json && test -f /app/scripts/activate-ranking-generation.ts && test -f /app/scripts/sync-wca-export.ts'
 
       - name: Exercise legacy Flyway baseline history split
         run: |
@@ -236,7 +240,7 @@ jobs:
           DATA_TOOLS_IMAGE_REF=wcarankings-data-tools:pull-request \
             docker compose run --rm \
               -e DATABASE_URL="$compatibility_database_url" \
-              data-tools /app/scripts/prepare-flyway-history.mjs
+              data-tools /app/scripts/prepare-flyway-history.ts
           split_valid=$(docker compose exec -T db mariadb \
             --user="$MYSQL_USER" \
             --password="$MYSQL_PASSWORD" \
@@ -285,7 +289,7 @@ jobs:
       - name: Verify production image contents
         run: |
           docker run --rm --entrypoint sh wcarankings-app:pull-request -c \
-            'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.mjs'
+            'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.ts'
 
       - name: Seed visual smoke-test database
         run: |
@@ -295,10 +299,10 @@ jobs:
             --user="$MYSQL_USER" \
             --password="$MYSQL_PASSWORD" \
             "$MYSQL_DATABASE" < tests/fixtures/visual-smoke.sql
-          docker compose run --rm data-tools /app/scripts/backfill-result-entries.mjs
-          docker compose run --rm data-tools /app/scripts/refresh-rankings.mjs
-          docker compose run --rm data-tools /app/scripts/activate-ranking-generation.mjs bootstrap
-          docker compose run --rm data-tools /app/scripts/activate-ranking-generation.mjs bootstrap \
+          docker compose run --rm data-tools /app/scripts/backfill-result-entries.ts
+          docker compose run --rm data-tools /app/scripts/refresh-rankings.ts
+          docker compose run --rm data-tools /app/scripts/activate-ranking-generation.ts bootstrap
+          docker compose run --rm data-tools /app/scripts/activate-ranking-generation.ts bootstrap \
             | grep -q '"bootstrapped":false'
 
       - name: Exercise candidate-schema activation against disposable MariaDB
@@ -312,11 +316,11 @@ jobs:
           docker compose run --rm \
             -e INTEGRATION_ADMIN_DATABASE_URL="$INTEGRATION_ADMIN_DATABASE_URL" \
             -v "$GITHUB_WORKSPACE:/app/repo:ro" \
-            data-tools --test /app/repo/tests/person-lookup-index.integration.mjs
+            data-tools --test /app/repo/tests/person-lookup-index.integration.ts
           docker compose run --rm \
             -e INTEGRATION_ADMIN_DATABASE_URL="$INTEGRATION_ADMIN_DATABASE_URL" \
             -v "$GITHUB_WORKSPACE:/app/repo:ro" \
-            data-tools /app/repo/tests/ranking-generation-activation.integration.mjs
+            data-tools /app/repo/tests/ranking-generation-activation.integration.ts
 
       - name: Start visual smoke-test app
         run: |
@@ -340,7 +344,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run visual smoke test
-        run: pnpm exec playwright test --config=playwright.visual-smoke.config.mjs
+        run: pnpm exec playwright test --config=playwright.visual-smoke.config.ts
 
       - name: Upload visual smoke-test artifact
         if: always()

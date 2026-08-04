@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 import {
   activateGeneration,
   activationTables,
@@ -8,7 +8,7 @@ import {
   matchesActiveGeneration,
   mergedGenerationState,
   rollbackGeneration,
-} from "../scripts/activate-ranking-generation.mjs";
+} from "../scripts/activate-ranking-generation.ts";
 
 const manifest = {
   version: 3,
