@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { argumentPresent, argumentValue } from "./lib/arguments.ts";
+import { databaseOptions } from "./lib/database.ts";
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { access, mkdir, rename, rm } from "node:fs/promises";
@@ -20,15 +22,9 @@ import {
 } from "./refresh-board-list.ts";
 
 const EXPORT_API = "https://www.worldcubeassociation.org/api/v0/export/public";
-const force = hasArgument("force");
-const dryRun = hasArgument("dry-run");
-const rawOnly = hasArgument("raw-only");
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
-}
+const force = argumentPresent("force");
+const dryRun = argumentPresent("dry-run");
+const rawOnly = argumentPresent("raw-only");
 
 const selectedProjectionNames = argumentValue("projection-names")
   .split(",")
@@ -38,20 +34,6 @@ const canonicalExportDate =
   argumentValue("canonical-export-date") ||
   process.env.CANONICAL_EXPORT_DATE ||
   "";
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database:
-      process.env.DATABASE_NAME_OVERRIDE ||
-      decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 async function getLatestExport() {
   const response = await fetch(EXPORT_API, {
@@ -160,7 +142,11 @@ function sqlEntry(archive) {
 }
 
 async function dropRankingViews() {
-  const connection = await mysql.createConnection(databaseOptions());
+  const connection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
   try {
     for (const name of [
       "ranking_counts_source",
@@ -193,7 +179,11 @@ function safeFailureMessage(error) {
 }
 
 async function updateImportRun(id, fields) {
-  const connection = await mysql.createConnection(databaseOptions());
+  const connection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
   try {
     const entries = Object.entries(fields);
     if (entries.length === 0) return;
@@ -209,7 +199,11 @@ async function updateImportRun(id, fields) {
 }
 
 async function createImportRun(latest, startedAt) {
-  const connection = await mysql.createConnection(databaseOptions());
+  const connection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
   try {
     const [result] = await connection.query(
       `INSERT INTO import_runs
@@ -230,7 +224,11 @@ async function createImportRun(latest, startedAt) {
 }
 
 async function collectImportCounts() {
-  const connection = await mysql.createConnection(databaseOptions());
+  const connection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
   try {
     const [coverage] = await connection.query(`
       SELECT
@@ -277,7 +275,11 @@ async function tableExists(connection, name) {
 }
 
 async function promoteRankings() {
-  const connection = await mysql.createConnection(databaseOptions());
+  const connection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
   try {
     const hasLegacyProjection = await tableExists(
       connection,
@@ -299,7 +301,9 @@ async function promoteRankings() {
 async function importSqlExport(zipPath) {
   const archive = await unzipper.Open.file(zipPath);
   const entry = sqlEntry(archive);
-  const options = databaseOptions();
+  const options = databaseOptions(undefined, {
+    databaseName: process.env.DATABASE_NAME_OVERRIDE,
+  });
   const child = spawn(
     "mariadb",
     [
@@ -333,7 +337,11 @@ async function importSqlExport(zipPath) {
 }
 
 async function getImportedDate() {
-  const connection = await mysql.createConnection(databaseOptions());
+  const connection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
   try {
     const [rows] = await connection.query(
       "SELECT value FROM export_metadata WHERE `key` = 'export_date' LIMIT 1",
@@ -348,7 +356,11 @@ async function getImportedDate() {
 }
 
 async function writeExportMetadata(latest) {
-  const connection = await mysql.createConnection(databaseOptions());
+  const connection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
   try {
     await connection.query(
       "INSERT INTO export_metadata (`key`, `value`) VALUES (?, ?), (?, ?), (?, ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
@@ -367,7 +379,11 @@ async function writeExportMetadata(latest) {
 }
 
 async function refreshRankingsSchema() {
-  const connection = await mysql.createConnection(databaseOptions());
+  const connection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
   try {
     await refreshMysqlSchema(connection, {
       projectionSuffix: "_staging",
@@ -375,7 +391,12 @@ async function refreshRankingsSchema() {
         selectedProjectionNames.length > 0
           ? selectedProjectionNames
           : undefined,
-      createConnection: () => mysql.createConnection(databaseOptions()),
+      createConnection: () =>
+        mysql.createConnection(
+          databaseOptions(undefined, {
+            databaseName: process.env.DATABASE_NAME_OVERRIDE,
+          }),
+        ),
     });
   } finally {
     await connection.end();
@@ -383,7 +404,11 @@ async function refreshRankingsSchema() {
 }
 
 async function refreshRawPersonLookupIndex() {
-  const connection = await mysql.createConnection(databaseOptions());
+  const connection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
   try {
     await ensureWcaPersonLookupIndex(connection);
   } finally {
@@ -468,8 +493,11 @@ async function main() {
     });
     await promoteRankings();
     await writeExportMetadata(latest);
-    const systemListConnection =
-      await mysql.createConnection(databaseOptions());
+    const systemListConnection = await mysql.createConnection(
+      databaseOptions(undefined, {
+        databaseName: process.env.DATABASE_NAME_OVERRIDE,
+      }),
+    );
     try {
       await refreshSystemLists(systemListConnection);
       await refreshBoardList(systemListConnection);

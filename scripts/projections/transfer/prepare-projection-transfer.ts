@@ -1,13 +1,13 @@
 // @ts-nocheck
+import { argumentValue } from "../../lib/arguments.ts";
+import { databaseOptions } from "../../lib/database.ts";
 import mysql from "mysql2/promise";
 import {
   DEPLOYMENT_PROJECTION_GROUPS,
   dropManagedObject,
-} from "../data-tools/projections/build.ts";
+} from "../../../data-tools/projections/build.ts";
 
-const groupName = process.argv
-  .find((value) => value.startsWith("--group="))
-  ?.slice("--group=".length);
+const groupName = argumentValue("group");
 const group = DEPLOYMENT_PROJECTION_GROUPS.find(
   ({ name }) => name === groupName,
 );

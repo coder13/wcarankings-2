@@ -516,7 +516,7 @@ jobs:
               wait_for_database_cooldown
             fi
             docker compose run --rm data-tools \
-              /app/scripts/activate-ranking-generation.ts bootstrap
+              /app/scripts/projections/generation/activate-ranking-generation.ts bootstrap
           REMOTE
           echo "CANDIDATE_STAGED=true" >> "$GITHUB_ENV"
 

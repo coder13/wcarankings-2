@@ -1,26 +1,21 @@
 // @ts-nocheck
+import { argumentPresent, argumentValue } from "../../lib/arguments.ts";
+import { runPool } from "../../lib/async.ts";
+import { databaseOptions } from "../../lib/database.ts";
 import mysql from "mysql2/promise";
 import {
   DEPLOYMENT_PROJECTION_GROUPS,
   dropManagedObject,
   promoteProjectionTables,
-} from "../data-tools/projections/build.ts";
-import { normalizeExportDate } from "../data-tools/shared/date.ts";
+} from "../../../data-tools/projections/build.ts";
+import { normalizeExportDate } from "../../../data-tools/shared/date.ts";
 
-const selectedNames = (
-  process.argv
-    .find((value) => value.startsWith("--groups="))
-    ?.slice("--groups=".length) || ""
-)
-  .split(",")
-  .filter(Boolean);
-const prepareOnly = process.argv.includes("--prepare-only");
-const hydrate = process.argv.includes("--hydrate");
+const selectedNames = argumentValue("groups").split(",").filter(Boolean);
+const prepareOnly = argumentPresent("prepare-only");
+const hydrate = argumentPresent("hydrate");
 if (prepareOnly && hydrate)
   throw new Error("--prepare-only and --hydrate cannot be combined.");
-const expectedExportDate = process.argv
-  .find((value) => value.startsWith("--expected-export-date="))
-  ?.slice("--expected-export-date=".length);
+const expectedExportDate = argumentValue("expected-export-date") || undefined;
 const groups =
   selectedNames.length === 0
     ? DEPLOYMENT_PROJECTION_GROUPS
@@ -50,20 +45,6 @@ if (
   throw new Error("WCA_PROJECTION_INDEX_CONCURRENCY must be between 1 and 4");
 }
 
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database:
-      process.env.DATABASE_NAME_OVERRIDE ||
-      decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
-
 async function tableExists(connection, table) {
   const [rows] = await connection.query(
     `SELECT 1
@@ -75,21 +56,9 @@ async function tableExists(connection, table) {
   return rows.length > 0;
 }
 
-async function runPool(items, concurrency, task) {
-  let cursor = 0;
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor;
-      cursor += 1;
-      await task(items[index]);
-    }
-  }
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, worker),
-  );
-}
-
-const options = databaseOptions();
+const options = databaseOptions(undefined, {
+  databaseName: process.env.DATABASE_NAME_OVERRIDE,
+});
 const connection = await mysql.createConnection(options);
 try {
   await connection.query("SET SESSION max_statement_time = 0");

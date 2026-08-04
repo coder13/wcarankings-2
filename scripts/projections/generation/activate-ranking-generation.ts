@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { argumentValue } from "../../lib/arguments.ts";
+import { databaseOptions } from "../../lib/database.ts";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
@@ -6,8 +8,8 @@ import {
   DEPLOYMENT_PROJECTION_GROUPS,
   PROJECTION_CAPABILITIES,
   PROJECTION_ARTIFACT_FORMAT_VERSION,
-} from "../data-tools/projections/jobs.ts";
-import { normalizeExportDate } from "../data-tools/shared/date.ts";
+} from "../../../data-tools/projections/jobs.ts";
+import { normalizeExportDate } from "../../../data-tools/shared/date.ts";
 
 export const WCA_RAW_TABLES = [
   "persons",

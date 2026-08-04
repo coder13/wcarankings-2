@@ -2,6 +2,19 @@
 
 `projection-release.sh` deploys one immutable projection release.
 
+TypeScript plans and validates the release coordinate. Bash transfers files and
+runs remote commands.
+
+Projection scripts are grouped by job:
+
+- `scripts/lib/` contains shared script helpers.
+- `scripts/projections/planning/` selects and validates release work.
+- `scripts/projections/release/` creates and verifies release artifacts.
+- `scripts/projections/build/` creates projection tables.
+- `scripts/projections/transfer/` moves projection tables between databases.
+- `scripts/projections/generation/` changes the active ranking generation.
+- `scripts/projections/verification/` checks the completed projection tables.
+
 The script has these phases:
 
 1. Validate the release coordinate.

@@ -7,7 +7,7 @@ import {
   activationTables,
   bootstrapGenerationState,
   rollbackGeneration,
-} from "../scripts/activate-ranking-generation.ts";
+} from "../scripts/projections/generation/activate-ranking-generation.ts";
 
 const applicationUrl = process.env.DATABASE_URL;
 const adminUrl = process.env.INTEGRATION_ADMIN_DATABASE_URL;

@@ -8,7 +8,7 @@ import {
   matchesActiveGeneration,
   mergedGenerationState,
   rollbackGeneration,
-} from "../scripts/activate-ranking-generation.ts";
+} from "../scripts/projections/generation/activate-ranking-generation.ts";
 
 const manifest = {
   version: 3,

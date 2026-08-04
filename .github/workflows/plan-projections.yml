@@ -105,7 +105,7 @@ jobs:
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             'cd /srv/wcarankings && docker compose run --rm -T data-tools \
-              /app/scripts/activate-ranking-generation.ts state' \
+              /app/scripts/projections/generation/activate-ranking-generation.ts state' \
             > /tmp/production-projection-state.json
           if ! jq -e 'type == "object"' /tmp/production-projection-state.json >/dev/null; then
             printf '{}\n' > /tmp/production-projection-state.json
@@ -123,7 +123,7 @@ jobs:
           args=(semantic --state-file=/tmp/production-projection-state.json \
             "--force-rebuild=$FORCE_REBUILD")
           if [ -n "$SELECTED_GROUPS" ]; then args+=("--groups=$SELECTED_GROUPS"); fi
-          bun scripts/projection-release-plan.ts "${args[@]}" > /tmp/semantic-plan.json
+          bun scripts/projections/planning/projection-release-plan.ts "${args[@]}" > /tmp/semantic-plan.json
           echo "required=$(jq -r '.required' /tmp/semantic-plan.json)" >> "$GITHUB_OUTPUT"
           echo "groups=$(jq -r '.changedGroupsCsv' /tmp/semantic-plan.json)" >> "$GITHUB_OUTPUT"
 
@@ -165,7 +165,7 @@ jobs:
           args=("--export-id=$EXPORT_VALUE" "--production-export-id=$PRODUCTION_EXPORT_VALUE" \
             --state-file=/tmp/production-projection-state.json "--force-rebuild=$FORCE_REBUILD")
           if [ -n "$selected_groups" ]; then args+=("--groups=$selected_groups"); fi
-          bun scripts/projection-release-plan.ts "${args[@]}" > /tmp/desired-plan.json
+          bun scripts/projections/planning/projection-release-plan.ts "${args[@]}" > /tmp/desired-plan.json
 
       - name: Resolve exact GHCR group descriptors
         id: registry
@@ -237,7 +237,7 @@ jobs:
             --available-artifacts-file=/tmp/available-artifacts.json \
             "--force-rebuild=$FORCE_REBUILD")
           if [ -n "$selected_groups" ]; then args+=("--groups=$selected_groups"); fi
-          bun scripts/projection-release-plan.ts "${args[@]}" > /tmp/final-plan.json
+          bun scripts/projections/planning/projection-release-plan.ts "${args[@]}" > /tmp/final-plan.json
           echo "required=$(jq -r '.required' /tmp/final-plan.json)" >> "$GITHUB_OUTPUT"
           echo "release_groups=$(jq -r '.releaseGroups | join(",")' /tmp/final-plan.json)" >> "$GITHUB_OUTPUT"
           echo "build_groups=$(jq -r '.buildGroupsCsv' /tmp/final-plan.json)" >> "$GITHUB_OUTPUT"

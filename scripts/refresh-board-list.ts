@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { argumentPresent } from "./lib/arguments.ts";
+import { databaseOptions } from "./lib/database.ts";
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
 import { enqueueListRankingRebuild } from "./list-ranking-jobs.ts";
@@ -173,7 +175,7 @@ export async function refreshDelegatesList(connection, fetchImpl = fetch) {
 
 async function main() {
   const connection = await mysql.createConnection(databaseOptions());
-  const refreshDelegates = hasArgument("delegates");
+  const refreshDelegates = argumentPresent("delegates");
   try {
     if (refreshDelegates) await refreshDelegatesList(connection);
     else await refreshBoardList(connection);

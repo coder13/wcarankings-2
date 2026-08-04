@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { argumentValue } from "../../lib/arguments.ts";
 import { createHash } from "node:crypto";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
@@ -7,8 +8,8 @@ import {
   MARIADB_COMPATIBILITY_VERSION,
   PROJECTION_ARTIFACT_FORMAT_VERSION,
   projectionGroup,
-} from "../data-tools/projections/jobs.ts";
-import { normalizeExportDate } from "../data-tools/shared/date.ts";
+} from "../../../data-tools/projections/jobs.ts";
+import { normalizeExportDate } from "../../../data-tools/shared/date.ts";
 
 export const PROJECTION_RELEASE_MANIFEST = "projection-release.json";
 

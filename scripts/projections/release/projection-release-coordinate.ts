@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { argumentValue } from "../../lib/arguments.ts";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -7,21 +8,12 @@ import {
   MARIADB_COMPATIBILITY_VERSION,
   PROJECTION_ARTIFACT_FORMAT_VERSION,
   projectionGroup,
-} from "../data-tools/projections/jobs.ts";
+} from "../../../data-tools/projections/jobs.ts";
 
 export const PROJECTION_RELEASE_MANIFEST = "projection-release.json";
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
-}
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  return (
-    process.argv
-      .find((value) => value.startsWith(prefix))
-      ?.slice(prefix.length) || ""
-  );
 }
 
 function validateCoordinate(group, coordinate) {

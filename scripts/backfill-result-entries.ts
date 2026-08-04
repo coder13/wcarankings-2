@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { argumentPresent } from "./lib/arguments.ts";
+import { databaseOptions } from "./lib/database.ts";
 import mysql from "mysql2/promise";
 import {
   PUBLISHED_PROJECTION_TABLES,
@@ -6,7 +8,7 @@ import {
   refreshMysqlSchema,
 } from "../data-tools/projections/build.ts";
 
-const force = hasArgument("force");
+const force = argumentPresent("force");
 const TABLES = PUBLISHED_PROJECTION_TABLES;
 
 async function projectionExists(connection) {

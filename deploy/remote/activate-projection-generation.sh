@@ -38,7 +38,7 @@ fi
 if [ "$phase" = activated ]; then
   set +e
   dc_with_stdin run --rm -T data-tools \
-    /app/scripts/activate-ranking-generation.ts verify-active \
+    /app/scripts/projections/generation/activate-ranking-generation.ts verify-active \
     --artifact-run-id="$ARTIFACT_RUN_ID" \
     --artifact-id="$ARTIFACT_ID" \
     --manifest=- \
@@ -232,7 +232,7 @@ rollback_on_failure() {
   if [ "$status" -ne 0 ]; then
     echo "Generation deployment failed; checking whether activation must be rolled back." >&2
     rollback_result=$(dc run --rm -T data-tools \
-      /app/scripts/activate-ranking-generation.ts rollback \
+      /app/scripts/projections/generation/activate-ranking-generation.ts rollback \
       --candidate-schema="$candidate" \
       --artifact-id="$ARTIFACT_ID" 2> /dev/null || printf '{}')
     if printf '%s' "$rollback_result" | grep -q '"rolledBack":true'; then
@@ -371,7 +371,7 @@ if [ "$phase" = raw_prepared ]; then
       -v "$metadata:/projection-transfer.json:ro" \
       -e DATABASE_NAME_OVERRIDE="$candidate" \
       -e WCA_PROJECTION_IMPORT_CONCURRENCY=2 \
-      data-tools /app/scripts/import-projection-transfer.ts \
+      data-tools /app/scripts/projections/transfer/import-projection-transfer.ts \
       --directory=/projection-transfer \
       --metadata=/projection-transfer.json \
       --concurrency=2 &
@@ -386,20 +386,20 @@ if [ "$phase" = raw_prepared ]; then
   dc run --rm --label "$candidate_work_label" \
     -e DATABASE_NAME_OVERRIDE="$candidate" \
     -e WCA_PROJECTION_INDEX_CONCURRENCY=2 \
-    data-tools /app/scripts/publish-projection-transfer.ts \
+    data-tools /app/scripts/projections/transfer/publish-projection-transfer.ts \
     --prepare-only \
     --expected-export-date="$WCA_EXPORT_VALUE" \
     --groups="$PROJECTION_GROUPS" &
   wait_for_candidate_work "$!"
   dc run --rm --label "$candidate_work_label" \
     -e DATABASE_NAME_OVERRIDE="$candidate" \
-    data-tools /app/scripts/publish-projection-transfer.ts \
+    data-tools /app/scripts/projections/transfer/publish-projection-transfer.ts \
     --groups="$PROJECTION_GROUPS" &
   wait_for_candidate_work "$!"
   if [ "$PROJECTION_GROUPS" = "compatibility,result-facts,result-rankings,competition-rankings,person-competition-rankings,city-rankings,sum-of-ranks,yearly-person-rankings" ]; then
     dc run --rm --label "$candidate_work_label" \
       -e DATABASE_NAME_OVERRIDE="$candidate" \
-      data-tools /app/scripts/check-ranking-projections.ts &
+      data-tools /app/scripts/projections/verification/check-ranking-projections.ts &
     wait_for_candidate_work "$!"
   fi
   printf "projections_prepared\n" > "$phase_file"
@@ -430,7 +430,7 @@ fi
 if [ "$phase" = projections_prepared ]; then
   dc_with_stdin run --rm -T \
     -e FAILURE_INJECTION_POINT="$FAILURE_INJECTION_POINT" \
-    data-tools /app/scripts/activate-ranking-generation.ts activate \
+    data-tools /app/scripts/projections/generation/activate-ranking-generation.ts activate \
     --candidate-schema="$candidate" \
     --artifact-run-id="$ARTIFACT_RUN_ID" \
     --artifact-id="$ARTIFACT_ID" \

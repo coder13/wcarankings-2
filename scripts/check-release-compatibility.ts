@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { argumentValue } from "./lib/arguments.ts";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { argumentValue } from "./lib/cli.mjs";

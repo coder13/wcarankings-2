@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { databaseOptions } from "./lib/database.ts";
 import { randomUUID } from "node:crypto";
 import mysql from "mysql2/promise";
 import { hasArgument } from "./lib/cli.mjs";
@@ -12,18 +13,6 @@ const LEASE_SECONDS = Math.max(
   30,
   Number(process.env.LIST_RANKING_WORKER_LEASE_SECONDS) || 600,
 );
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.slice(1)),
-  };
-}
 
 async function claimJob(connection) {
   const token = randomUUID();

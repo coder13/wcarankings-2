@@ -68,7 +68,7 @@ jobs:
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             'cd /srv/wcarankings && docker compose run --rm -T data-tools \
-              /app/scripts/activate-ranking-generation.ts state' \
+              /app/scripts/projections/generation/activate-ranking-generation.ts state' \
             > /tmp/production-projection-state.json
           jq -e 'type == "object"' /tmp/production-projection-state.json >/dev/null
           export_value=$(jq -r '.exportId // empty' /tmp/production-projection-state.json)
@@ -87,7 +87,7 @@ jobs:
           set -euo pipefail
           bun scripts/resolve-wca-export.ts > /tmp/wca-export.json
           latest_export=$(jq -r '.exportDate' /tmp/wca-export.json)
-          bun scripts/projection-release-plan.ts \
+          bun scripts/projections/planning/projection-release-plan.ts \
             "--export-id=$latest_export" \
             "--production-export-id=$CURRENT_PRODUCTION_EXPORT" \
             --state-file=/tmp/production-projection-state.json \
