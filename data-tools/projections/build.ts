@@ -419,7 +419,10 @@ export async function refreshMysqlSchema(
     // These are small raw-table views. The expensive helper tables and the
     // dependent source views are scheduled below, so they can use both build
     // workers and accurately contribute to table progress.
-    for (const file of ["wca_best_single.sql", "wca_best_average.sql"]) {
+    for (const file of [
+      "core/compatibility/wca_best_single.sql",
+      "core/compatibility/wca_best_average.sql",
+    ]) {
       await createCompatibilitySource(connection, file, names);
     }
   }
@@ -488,7 +491,9 @@ export async function refreshResultEntriesSchema(
     INDEXES.filter(([, name]) => name === "idx_results_single_event_best"),
   );
 
-  const source = await projectionSql("result_entries_single_source.sql");
+  const source = await projectionSql(
+    "core/compatibility/result_entries_single_source.sql",
+  );
   await connection.query(
     source.replaceAll("result_entries_single_source", resultEntriesSource),
   );
@@ -497,7 +502,9 @@ export async function refreshResultEntriesSchema(
       `CREATE TABLE \`${resultEntriesTable}\` AS SELECT * FROM \`${resultEntriesSource}\``,
     );
     for (const statement of statements(
-      await projectionSql("result_entries_single_indexes.sql"),
+      await projectionSql(
+        "core/compatibility/result_entries_single_indexes.sql",
+      ),
     )) {
       await connection.query(
         statement.replace(
@@ -509,7 +516,7 @@ export async function refreshResultEntriesSchema(
   });
   await executeTableStatements(
     connection,
-    (await projectionSql("result_counts.sql"))
+    (await projectionSql("core/compatibility/result_counts.sql"))
       .replaceAll("result_entries_single", resultEntriesTable)
       .replaceAll("result_counts", resultCountsTable),
   );

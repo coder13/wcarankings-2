@@ -290,7 +290,7 @@ test("compatibility source views wait for result facts", async () => {
 test("compatibility SQL uses the matching staged result facts table", async () => {
   const source = await readFile(
     new URL(
-      "../sql/ranking-projections/ranking_entries_single_source.sql",
+      "../data-tools/projection-catalog/core/compatibility/ranking_entries_single_source.sql",
       import.meta.url,
     ),
     "utf8",

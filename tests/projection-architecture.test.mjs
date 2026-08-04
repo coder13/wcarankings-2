@@ -82,53 +82,95 @@ test("keeps future grains registered while activating person metrics and competi
     readFile(new URL("data-tools/projections/sql.ts", root), "utf8"),
     readFile(new URL("data-tools/projections/compatibility.ts", root), "utf8"),
     readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/result_facts.sql", root), "utf8"),
     readFile(
-      new URL("sql/ranking-projections/person_event_rankings.sql", root),
+      new URL(
+        "data-tools/projection-catalog/core/result-facts/result_facts.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/result_rankings_single.sql", root),
+      new URL(
+        "data-tools/projection-catalog/people/event-rankings/person_event_rankings.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/result_rankings_average.sql", root),
+      new URL(
+        "data-tools/projection-catalog/people/result-rankings/result_rankings_single.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/person_metric_values.sql", root),
+      new URL(
+        "data-tools/projection-catalog/people/result-rankings/result_rankings_average.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/person_metric_scores.sql", root),
+      new URL(
+        "data-tools/projection-catalog/people/metric-values/person_metric_values.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/person_sum_of_ranks_scores.sql", root),
+      new URL(
+        "data-tools/projection-catalog/people/metric-scores/person_metric_scores.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/competition_podium_members.sql", root),
+      new URL(
+        "data-tools/projection-catalog/people/sum-of-ranks/person_sum_of_ranks_scores.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/competition_event_stats.sql", root),
+      new URL(
+        "data-tools/projection-catalog/competitions/podium-members/competition_podium_members.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/competition_stats.sql", root),
+      new URL(
+        "data-tools/projection-catalog/competitions/event-stats/competition_event_stats.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/person_competition_rankings.sql", root),
+      new URL(
+        "data-tools/projection-catalog/competitions/stats/competition_stats.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/city_event_stats.sql", root),
+      new URL(
+        "data-tools/projection-catalog/people/competition-rankings/person_competition_rankings.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/entity_ranking_counts.sql", root),
+      new URL(
+        "data-tools/projection-catalog/cities/event-stats/city_event_stats.sql",
+        root,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "data-tools/projection-catalog/core/entity-ranking-counts/entity_ranking_counts.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(new URL("scripts/sync-wca-export.ts", root), "utf8"),
@@ -166,10 +208,6 @@ test("keeps future grains registered while activating person metrics and competi
     schema,
     /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/,
   );
-  assert.match(
-    groups,
-    /id: "sum-of-ranks"[\s\S]*dependencies: \["result-facts"\]/,
-  );
   const { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } = await import(
     new URL("data-tools/projections/jobs.ts", root)
   );
@@ -199,6 +237,10 @@ test("keeps future grains registered while activating person metrics and competi
     )?.tables.includes("person_competition_ranking_counts"),
   );
   assert.ok(PROJECTION_JOBS.some((job) => job.enabledByDefault));
+  assert.deepEqual(
+    PROJECTION_JOBS.find((job) => job.id === "sum-of-ranks")?.dependencies,
+    ["result-facts"],
+  );
   assert.match(importer, /promoteProjectionTables/);
 
   assert.match(facts, /CREATE TABLE result_facts AS/);
@@ -351,31 +393,31 @@ test("keeps future grains registered while activating person metrics and competi
     /FROM competition_event_stats WHERE podium_score IS NOT NULL/,
   );
   assert.doesNotMatch(counts, /podium_(?:single|average)_score/);
-  assert.match(groups, /entity-ranking-counts/);
-  assert.match(
-    groups,
-    /id: "competition-event-stats"[\s\S]*enabledByDefault: true/,
+  assert.equal(
+    PROJECTION_JOBS.find((job) => job.id === "competition-event-stats")
+      ?.enabledByDefault,
+    true,
   );
 });
 
 test("does not introduce entries or sub-rank vocabulary in new schemas", async () => {
   const files = [
-    "person_event_rankings.sql",
-    "result_rankings_single.sql",
-    "result_rankings_average.sql",
-    "person_metric_values.sql",
-    "person_metric_scores.sql",
-    "competition_podium_members.sql",
-    "competition_event_stats.sql",
-    "competition_stats.sql",
-    "person_competition_rankings.sql",
-    "city_event_stats.sql",
-    "entity_ranking_counts.sql",
-    "person_sum_of_ranks_scores.sql",
+    "people/event-rankings/person_event_rankings.sql",
+    "people/result-rankings/result_rankings_single.sql",
+    "people/result-rankings/result_rankings_average.sql",
+    "people/metric-values/person_metric_values.sql",
+    "people/metric-scores/person_metric_scores.sql",
+    "competitions/podium-members/competition_podium_members.sql",
+    "competitions/event-stats/competition_event_stats.sql",
+    "competitions/stats/competition_stats.sql",
+    "people/competition-rankings/person_competition_rankings.sql",
+    "cities/event-stats/city_event_stats.sql",
+    "core/entity-ranking-counts/entity_ranking_counts.sql",
+    "people/sum-of-ranks/person_sum_of_ranks_scores.sql",
   ];
   const sources = await Promise.all(
     files.map((file) =>
-      readFile(new URL(`sql/ranking-projections/${file}`, root), "utf8"),
+      readFile(new URL(`data-tools/projection-catalog/${file}`, root), "utf8"),
     ),
   );
   for (const source of sources) {
@@ -472,17 +514,23 @@ test("only exposes APIs backed by active projections", async () => {
 
 test("compatibility projections omit disabled weekly ranking enhancements", async () => {
   const [groups, single, average] = await Promise.all([
-    readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
     readFile(
       new URL(
-        "sql/ranking-projections/ranking_entries_single_source.sql",
+        "data-tools/projection-catalog/core/compatibility/definition.ts",
         root,
       ),
       "utf8",
     ),
     readFile(
       new URL(
-        "sql/ranking-projections/ranking_entries_average_source.sql",
+        "data-tools/projection-catalog/core/compatibility/ranking_entries_single_source.sql",
+        root,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "data-tools/projection-catalog/core/compatibility/ranking_entries_average_source.sql",
         root,
       ),
       "utf8",
@@ -517,19 +565,22 @@ test("person search resolves IDs before querying projections", async () => {
     readFile(new URL("services/people/queries.ts", root), "utf8"),
     readFile(new URL("services/rankings/service.ts", root), "utf8"),
     readFile(
-      new URL("sql/ranking-projections/result_rankings_single.sql", root),
-      "utf8",
-    ),
-    readFile(
       new URL(
-        "sql/ranking-projections/result_gender_rankings_single.sql",
+        "data-tools/projection-catalog/people/result-rankings/result_rankings_single.sql",
         root,
       ),
       "utf8",
     ),
     readFile(
       new URL(
-        "sql/ranking-projections/result_entries_single_indexes.sql",
+        "data-tools/projection-catalog/people/result-rankings/result_gender_rankings_single.sql",
+        root,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "data-tools/projection-catalog/core/compatibility/result_entries_single_indexes.sql",
         root,
       ),
       "utf8",
@@ -557,9 +608,21 @@ test("person search resolves IDs before querying projections", async () => {
 test("builds Sum of Ranks as one published score projection", async () => {
   const [schema, jobs, backfill, publisher] = await Promise.all([
     readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
-    readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
+    readFile(
+      new URL(
+        "data-tools/projection-catalog/people/sum-of-ranks/definition.ts",
+        root,
+      ),
+      "utf8",
+    ),
     readFile(new URL("scripts/backfill-sum-of-ranks.ts", root), "utf8"),
-    readFile(new URL("scripts/publish-projection-transfer.ts", root), "utf8"),
+    readFile(
+      new URL(
+        "scripts/projections/transfer/publish-projection-transfer.ts",
+        root,
+      ),
+      "utf8",
+    ),
   ]);
   assert.match(jobs, /person_sum_of_ranks_scores\.sql/);
   assert.match(jobs, /person_sum_of_ranks_scores/);

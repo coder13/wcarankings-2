@@ -20,24 +20,36 @@ test("builds a result-level compatibility projection without unused secondary in
     fixture,
   ] = await Promise.all([
     readFile(
-      new URL("sql/ranking-projections/result_entries_single_source.sql", root),
-      "utf8",
-    ),
-    readFile(
       new URL(
-        "sql/ranking-projections/result_entries_single_indexes.sql",
+        "data-tools/projection-catalog/core/compatibility/result_entries_single_source.sql",
         root,
       ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/result_counts.sql", root),
+      new URL(
+        "data-tools/projection-catalog/core/compatibility/result_entries_single_indexes.sql",
+        root,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "data-tools/projection-catalog/core/compatibility/result_counts.sql",
+        root,
+      ),
       "utf8",
     ),
     readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
     readFile(new URL("data-tools/projections/database.ts", root), "utf8"),
     readFile(new URL("scripts/sync-wca-export.ts", root), "utf8"),
-    readFile(new URL("scripts/check-ranking-projections.ts", root), "utf8"),
+    readFile(
+      new URL(
+        "scripts/projections/verification/check-ranking-projections.ts",
+        root,
+      ),
+      "utf8",
+    ),
     readFile(new URL("scripts/backfill-result-entries.ts", root), "utf8"),
     readFile(new URL("scripts/backfill-result-rankings.ts", root), "utf8"),
     readFile(new URL("Dockerfile.data-tools", root), "utf8"),
@@ -110,23 +122,32 @@ test("publishes indexed gender result rankings instead of ranking filtered rows 
   const [single, average, counts, groups, resultService] = await Promise.all([
     readFile(
       new URL(
-        "sql/ranking-projections/result_gender_rankings_single.sql",
+        "data-tools/projection-catalog/people/result-rankings/result_gender_rankings_single.sql",
         root,
       ),
       "utf8",
     ),
     readFile(
       new URL(
-        "sql/ranking-projections/result_gender_rankings_average.sql",
+        "data-tools/projection-catalog/people/result-rankings/result_gender_rankings_average.sql",
         root,
       ),
       "utf8",
     ),
     readFile(
-      new URL("sql/ranking-projections/result_gender_ranking_counts.sql", root),
+      new URL(
+        "data-tools/projection-catalog/people/result-rankings/result_gender_ranking_counts.sql",
+        root,
+      ),
       "utf8",
     ),
-    readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
+    readFile(
+      new URL(
+        "data-tools/projection-catalog/people/result-rankings/definition.ts",
+        root,
+      ),
+      "utf8",
+    ),
     readFile(new URL("services/rankings/result.ts", root), "utf8"),
   ]);
 
@@ -157,14 +178,14 @@ test("normal rankings retain separate historical country and continent bests", a
   ] = await Promise.all([
     readFile(
       new URL(
-        "sql/ranking-projections/ranking_entries_single_source.sql",
+        "data-tools/projection-catalog/core/compatibility/ranking_entries_single_source.sql",
         root,
       ),
       "utf8",
     ),
     readFile(
       new URL(
-        "sql/ranking-projections/ranking_entries_average_source.sql",
+        "data-tools/projection-catalog/core/compatibility/ranking_entries_average_source.sql",
         root,
       ),
       "utf8",
