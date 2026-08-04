@@ -8,20 +8,24 @@ import {
   historicalStageSql,
   PROPOSED_STATS,
   recordsInMostEventsSql,
+  worldRecordsInMostEventsSql,
+  worldRecordsPerEventSql,
 } from "../scripts/benchmark-proposed-stats.mjs";
 
 test("catalogs every proposed statistic without activating production projections", () => {
   assert.deepEqual(
     PROPOSED_STATS.map(({ key }) => key),
     [
-      "medal-collection",
-      "most-solves-competition-year",
+      "medal-collection-overall-and-by-event",
+      "most-solves-competition-and-year",
+      "most-competitions",
       "rank-events-per-person",
       "oldest-standing-world-records",
-      "records-in-most-events",
+      "world-records-in-most-events-by-scope",
       "blindfolded-success-rate-streaks",
       "most-sub-x-solves",
-      "top-100-appearances",
+      "top-100-appearances-single-and-average",
+      "world-records-per-event",
       "historical-as-of-rankings",
     ],
   );
@@ -36,16 +40,19 @@ test("catalogs every proposed statistic without activating production projection
 });
 
 test("attempt candidates use one shared solve-grain shape and preserve failed attempts", () => {
-  const queries = buildAttemptQueries(10);
+  const queries = buildAttemptQueries([3, 4, 5, 6, 7, 8]);
   assert.match(
-    queries["most-solves-competition-year"],
+    queries["most-solves-competition"],
     /result_facts facts[\s\S]*result_attempts attempt/,
   );
+  assert.match(queries["most-solves-competition"], /SUM\(attempt\.value > 0\)/);
+  assert.match(queries["most-solves-year"], /GROUP BY facts\.competition_year/);
   assert.match(
     queries["blindfolded-success-rate-streaks"],
     /SUM\(attempt\.value > 0\)/,
   );
-  assert.match(queries["most-sub-x-solves"], /attempt\.value < 10/);
+  assert.match(queries["most-sub-x-solves"], /attempt\.value < 300/);
+  assert.match(queries["most-sub-x-solves"], /attempt\.value < 800/);
   assert.doesNotMatch(
     queries["blindfolded-success-rate-streaks"],
     /attempt\.value > 0\s*$/,
@@ -64,6 +71,11 @@ test("historical candidates expose record and bounded as-of ranking work", () =>
     recordsInMostEventsSql("result_facts"),
     /COUNT\(DISTINCT event_id\)/,
   );
+  assert.match(
+    worldRecordsInMostEventsSql("result_facts", "country"),
+    /person_country_id AS scope_id/,
+  );
+  assert.match(worldRecordsPerEventSql("result_facts"), /GROUP BY event_id/);
   assert.match(
     asOfRankingSql("result_facts", "2020-01-01"),
     /competition_start_date <= '2020-01-01'/,

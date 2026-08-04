@@ -6,28 +6,37 @@ import { pathToFileURL } from "node:url";
 
 import { databaseOptions } from "./lib/database.mjs";
 
-const DEFAULT_SUB_X = 10;
+const DEFAULT_SUB_X_SECONDS = [3, 4, 5, 6, 7, 8];
 const DEFAULT_REPETITIONS = 1;
 const TEMP_TABLE_PREFIX = "stat_experiment_";
 
 export const PROPOSED_STATS = [
   {
-    key: "medal-collection",
+    key: "medal-collection-overall-and-by-event",
     sourceTables: ["competition_podium_members"],
     sourceIndexes: ["PRIMARY", "idx_comp_podium_members_person"],
     status: "supported",
     timing: "materialize",
     notes:
-      "The active podium-member projection has one row per medal and a person-first lookup index.",
+      "The active podium-member projection has one row per medal; overall and event-scoped person counts use the same source.",
   },
   {
-    key: "most-solves-competition-year",
+    key: "most-solves-competition-and-year",
     sourceTables: ["result_facts", "result_attempts"],
     sourceIndexes: ["PRIMARY", "idx_result_attempts_result"],
     status: "partial",
     timing: "attempt-shared-vs-separate",
     notes:
-      "Attempt values are available, but the daily schema has no published solve-grain table.",
+      "Attempt values support successful/total counts by person and competition or year, but the daily schema has no published solve-grain table.",
+  },
+  {
+    key: "most-competitions",
+    sourceTables: ["result_facts"],
+    sourceIndexes: ["idx_result_facts_person_competition"],
+    status: "supported",
+    timing: "materialize",
+    notes:
+      "The person/competition index supports counting distinct competitions attended by each person.",
   },
   {
     key: "rank-events-per-person",
@@ -48,13 +57,13 @@ export const PROPOSED_STATS = [
       "Record codes and dates exist, but there is no record-period or standing-record index.",
   },
   {
-    key: "records-in-most-events",
+    key: "world-records-in-most-events-by-scope",
     sourceTables: ["result_facts"],
     sourceIndexes: ["PRIMARY"],
     status: "partial",
     timing: "historical-shared-vs-direct",
     notes:
-      "World-record codes can be counted, but a record-code access path is not materialized.",
+      "World-record codes can be counted for people, competitions, and countries, but a record-code access path is not materialized.",
   },
   {
     key: "blindfolded-success-rate-streaks",
@@ -72,10 +81,10 @@ export const PROPOSED_STATS = [
     status: "partial",
     timing: "attempt-shared-vs-separate",
     notes:
-      "A thresholded solve count is computable, but Sub-X needs an event and threshold policy.",
+      "A single attempt-facts consumer can produce the six requested columns: <3s, <4s, <5s, <6s, <7s, and <8s.",
   },
   {
-    key: "top-100-appearances",
+    key: "top-100-appearances-single-and-average",
     sourceTables: [
       "person_year_rankings_single",
       "person_year_rankings_average",
@@ -88,7 +97,16 @@ export const PROPOSED_STATS = [
     status: "supported",
     timing: "materialize",
     notes:
-      "Year/event/cohort/position browse indexes can restrict to the top 100 before grouping by person.",
+      "Year/event/cohort/position browse indexes can restrict both Single and Average rows to the top 100 before grouping by person.",
+  },
+  {
+    key: "world-records-per-event",
+    sourceTables: ["result_facts"],
+    sourceIndexes: ["PRIMARY"],
+    status: "partial",
+    timing: "historical-shared-vs-direct",
+    notes:
+      "Single and Average world-record claims can be grouped by event from the historical result-fact stage.",
   },
   {
     key: "historical-as-of-rankings",
@@ -118,6 +136,17 @@ function argumentValue(name, argv = process.argv) {
 function numericArgument(name, fallback, argv = process.argv) {
   const value = Number(argumentValue(name, argv));
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+function numericListArgument(name, fallback, argv = process.argv) {
+  const values = argumentValue(name, argv)
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .map((value) => Math.floor(value));
+  return values.length > 0
+    ? [...new Set(values)].sort((a, b) => a - b)
+    : fallback;
 }
 
 function parseDates(value) {
@@ -230,17 +259,41 @@ async function readInventory(connection) {
   return tables;
 }
 
-function directAttemptQueries(subX) {
+function directSubXSelect(alias, subXSeconds) {
+  return subXSeconds
+    .map(
+      (seconds) =>
+        `SUM(${alias}.value > 0 AND ${alias}.value < ${seconds * 100}) AS sub_${seconds}s_solves`,
+    )
+    .join(",\n        ");
+}
+
+function sharedSubXSelect(subXSeconds) {
+  return subXSeconds
+    .map(
+      (seconds) =>
+        `SUM(solve_value > 0 AND solve_value < ${seconds * 100}) AS sub_${seconds}s_solves`,
+    )
+    .join(",\n        ");
+}
+
+function directAttemptQueries(subXSeconds = DEFAULT_SUB_X_SECONDS) {
   const source = `
     FROM result_facts facts
     STRAIGHT_JOIN result_attempts attempt ON attempt.result_id = facts.result_id
   `;
   return {
-    "most-solves-competition-year": `
-      SELECT facts.competition_year, facts.competition_id, facts.person_id, COUNT(*) AS solve_count
+    "most-solves-competition": `
+      SELECT facts.competition_id, facts.person_id,
+        SUM(attempt.value > 0) AS solve_count, COUNT(*) AS attempt_count
       ${source}
-      WHERE attempt.value > 0
-      GROUP BY facts.competition_year, facts.competition_id, facts.person_id
+      GROUP BY facts.competition_id, facts.person_id
+    `,
+    "most-solves-year": `
+      SELECT facts.competition_year, facts.person_id,
+        SUM(attempt.value > 0) AS solve_count, COUNT(*) AS attempt_count
+      ${source}
+      GROUP BY facts.competition_year, facts.person_id
     `,
     "blindfolded-success-rate-streaks": `
       SELECT facts.person_id, facts.event_id,
@@ -251,21 +304,27 @@ function directAttemptQueries(subX) {
       GROUP BY facts.person_id, facts.event_id
     `,
     "most-sub-x-solves": `
-      SELECT facts.person_id, COUNT(*) AS sub_x_solves
+      SELECT facts.person_id,
+        ${directSubXSelect("attempt", subXSeconds)}
       ${source}
-      WHERE attempt.value > 0 AND attempt.value < ${subX}
       GROUP BY facts.person_id
     `,
   };
 }
 
-function sharedAttemptQueries() {
+function sharedAttemptQueries(subXSeconds = DEFAULT_SUB_X_SECONDS) {
   return {
-    "most-solves-competition-year": `
-      SELECT competition_year, competition_id, person_id, COUNT(*) AS solve_count
+    "most-solves-competition": `
+      SELECT competition_id, person_id,
+        SUM(solve_value > 0) AS solve_count, COUNT(*) AS attempt_count
       FROM ${identifier(`${TEMP_TABLE_PREFIX}attempt_facts`)}
-      WHERE solve_value > 0
-      GROUP BY competition_year, competition_id, person_id
+      GROUP BY competition_id, person_id
+    `,
+    "most-solves-year": `
+      SELECT competition_year, person_id,
+        SUM(solve_value > 0) AS solve_count, COUNT(*) AS attempt_count
+      FROM ${identifier(`${TEMP_TABLE_PREFIX}attempt_facts`)}
+      GROUP BY competition_year, person_id
     `,
     "blindfolded-success-rate-streaks": `
       SELECT person_id, event_id,
@@ -276,16 +335,12 @@ function sharedAttemptQueries() {
       GROUP BY person_id, event_id
     `,
     "most-sub-x-solves": `
-      SELECT person_id, COUNT(*) AS sub_x_solves
+      SELECT person_id,
+        ${sharedSubXSelect(subXSeconds)}
       FROM ${identifier(`${TEMP_TABLE_PREFIX}attempt_facts`)}
-      WHERE solve_value > 0 AND solve_value < :subX
       GROUP BY person_id
     `,
   };
-}
-
-function sharedAttemptQuery(query, subX) {
-  return query.replace(":subX", String(subX));
 }
 
 const ATTEMPT_STAGE_SQL = `
@@ -303,9 +358,9 @@ const ATTEMPT_STAGE_SQL = `
   STRAIGHT_JOIN result_attempts attempt ON attempt.result_id = facts.result_id
 `;
 
-async function measureAttemptScans(connection, { repetitions, subX }) {
-  const directQueries = directAttemptQueries(subX);
-  const sharedQueries = sharedAttemptQueries();
+async function measureAttemptScans(connection, { repetitions, subXSeconds }) {
+  const directQueries = directAttemptQueries(subXSeconds);
+  const sharedQueries = sharedAttemptQueries(subXSeconds);
   const plans = {
     stage: await explain(connection, ATTEMPT_STAGE_SQL),
     direct: {},
@@ -339,16 +394,13 @@ async function measureAttemptScans(connection, { repetitions, subX }) {
     );
     if (Object.keys(plans.shared).length === 0) {
       for (const [key, query] of Object.entries(sharedQueries))
-        plans.shared[key] = await explain(
-          connection,
-          sharedAttemptQuery(query, subX),
-        );
+        plans.shared[key] = await explain(connection, query);
     }
     const consumers = [];
     for (const [key, query] of Object.entries(sharedQueries)) {
       const measured = await timedQuery(
         connection,
-        `SELECT COUNT(*) AS result_count FROM (${sharedAttemptQuery(query, subX)}) consumer`,
+        `SELECT COUNT(*) AS result_count FROM (${query}) consumer`,
       );
       consumers.push({
         key,
@@ -371,6 +423,7 @@ async function measureAttemptScans(connection, { repetitions, subX }) {
     name: "attempt-facts-shared-vs-separate",
     source: ["result_facts", "result_attempts"],
     stageSql: ATTEMPT_STAGE_SQL,
+    subXSeconds,
     plans,
     direct,
     shared,
@@ -404,7 +457,7 @@ async function measureMaterializedAggregation(connection, definition) {
     );
     const consumer = await timedQuery(
       connection,
-      `SELECT * FROM ${identifier(`${TEMP_TABLE_PREFIX}${definition.key.replaceAll("-", "_")}`)} ORDER BY ${definition.orderBy} LIMIT 100`,
+      `SELECT * FROM ${identifier(`${TEMP_TABLE_PREFIX}${definition.key.replaceAll("-", "_")}`)} ${definition.consumerWhere ?? ""} ORDER BY ${definition.orderBy} LIMIT 100`,
     );
     await dropTempTable(
       connection,
@@ -429,7 +482,8 @@ async function measureMaterializedAggregation(connection, definition) {
 
 function historicalStageSql() {
   return `
-    SELECT result_id, event_id, person_id, competition_start_date,
+    SELECT result_id, event_id, person_id, person_country_id, competition_id,
+      competition_start_date,
       best, average, regional_single_record, regional_average_record
     FROM result_facts
     WHERE best > 0 OR average > 0
@@ -464,6 +518,41 @@ function recordsInMostEventsSql(source) {
     FROM ${source}
     WHERE regional_single_record = 'WR' OR regional_average_record = 'WR'
     GROUP BY person_id
+  `;
+}
+
+function worldRecordsPerEventSql(source) {
+  return `
+    SELECT event_id,
+      SUM(regional_single_record = 'WR') AS single_world_record_claims,
+      SUM(regional_average_record = 'WR') AS average_world_record_claims,
+      COUNT(DISTINCT CASE
+        WHEN regional_single_record = 'WR' OR regional_average_record = 'WR'
+        THEN person_id
+      END) AS world_record_holders,
+      MIN(CASE
+        WHEN regional_single_record = 'WR' OR regional_average_record = 'WR'
+        THEN competition_start_date
+      END) AS earliest_world_record_date
+    FROM ${source}
+    WHERE regional_single_record = 'WR' OR regional_average_record = 'WR'
+    GROUP BY event_id
+  `;
+}
+
+function worldRecordsInMostEventsSql(source, scope) {
+  const column = {
+    person: "person_id",
+    competition: "competition_id",
+    country: "person_country_id",
+  }[scope];
+  if (!column) throw new Error(`Unsupported world-record scope: ${scope}`);
+  return `
+    SELECT ${column} AS scope_id, COUNT(DISTINCT event_id) AS record_event_count
+    FROM ${source}
+    WHERE (regional_single_record = 'WR' OR regional_average_record = 'WR')
+      AND ${column} <> ''
+    GROUP BY ${column}
   `;
 }
 
@@ -504,17 +593,41 @@ async function historicalDates(connection, requested) {
 async function measureHistorical(connection, { repetitions, dates }) {
   const stageSql = historicalStageSql();
   const directQueries = {
+    recordsInMostEventsPerson: worldRecordsInMostEventsSql(
+      "result_facts",
+      "person",
+    ),
+    recordsInMostEventsCompetition: worldRecordsInMostEventsSql(
+      "result_facts",
+      "competition",
+    ),
+    recordsInMostEventsCountry: worldRecordsInMostEventsSql(
+      "result_facts",
+      "country",
+    ),
+    recordsPerEvent: worldRecordsPerEventSql("result_facts"),
     records: historicalRecordSql("result_facts"),
-    recordsInMostEvents: recordsInMostEventsSql("result_facts"),
   };
   const asOfQueries = Object.fromEntries(
     dates.map((date) => [date, asOfRankingSql("result_facts", date)]),
   );
   const sharedRecords = {
-    records: historicalRecordSql(
+    recordsInMostEventsPerson: worldRecordsInMostEventsSql(
+      identifier(`${TEMP_TABLE_PREFIX}historical_facts`),
+      "person",
+    ),
+    recordsInMostEventsCompetition: worldRecordsInMostEventsSql(
+      identifier(`${TEMP_TABLE_PREFIX}historical_facts`),
+      "competition",
+    ),
+    recordsInMostEventsCountry: worldRecordsInMostEventsSql(
+      identifier(`${TEMP_TABLE_PREFIX}historical_facts`),
+      "country",
+    ),
+    recordsPerEvent: worldRecordsPerEventSql(
       identifier(`${TEMP_TABLE_PREFIX}historical_facts`),
     ),
-    recordsInMostEvents: recordsInMostEventsSql(
+    records: historicalRecordSql(
       identifier(`${TEMP_TABLE_PREFIX}historical_facts`),
     ),
   };
@@ -637,13 +750,16 @@ function currentBranch() {
 async function main(argv = process.argv) {
   if (argv.includes("--help")) {
     process.stdout.write(
-      "Usage: node scripts/benchmark-proposed-stats.mjs [--output=path] [--sub-x=10] [--repetitions=1] [--as-of=YYYY-MM-DD,...]\n",
+      "Usage: node scripts/benchmark-proposed-stats.mjs [--output=path] [--section=all|aggregations|attempts|historical] [--sub-x=3,4,5,6,7,8] [--repetitions=1] [--as-of=YYYY-MM-DD,...]\n",
     );
     return;
   }
   const outputPath = argumentValue("output", argv);
-  const subX = numericArgument("sub-x", DEFAULT_SUB_X, argv);
+  const subXSeconds = numericListArgument("sub-x", DEFAULT_SUB_X_SECONDS, argv);
   const repetitions = numericArgument("repetitions", DEFAULT_REPETITIONS, argv);
+  const section = argumentValue("section", argv) || "all";
+  if (!["all", "aggregations", "attempts", "historical"].includes(section))
+    throw new Error(`Unsupported benchmark section: ${section}`);
   const requestedDates = parseDates(argumentValue("as-of", argv));
   const mysql = await import("mysql2/promise");
   const connection = await mysql.default.createConnection(databaseOptions());
@@ -654,9 +770,17 @@ async function main(argv = process.argv) {
     const cohortId = await worldCohortId(connection);
     const aggregationDefinitions = [
       {
-        key: "medal-collection",
+        key: "medal-collection-overall",
         source: ["competition_podium_members"],
         sql: `SELECT person_id, SUM(podium_position = 1) AS gold_medals, SUM(podium_position = 2) AS silver_medals, SUM(podium_position = 3) AS bronze_medals, COUNT(*) AS medal_count FROM competition_podium_members GROUP BY person_id`,
+        orderBy: "medal_count DESC, person_id",
+        repetitions,
+      },
+      {
+        key: "medal-collection-by-event",
+        source: ["competition_podium_members"],
+        sql: `SELECT event_id, person_id, SUM(podium_position = 1) AS gold_medals, SUM(podium_position = 2) AS silver_medals, SUM(podium_position = 3) AS bronze_medals, COUNT(*) AS medal_count FROM competition_podium_members GROUP BY event_id, person_id`,
+        consumerWhere: "WHERE event_id = '333'",
         orderBy: "medal_count DESC, person_id",
         repetitions,
       },
@@ -668,23 +792,40 @@ async function main(argv = process.argv) {
         repetitions,
       },
       {
-        key: "top-100-appearances",
+        key: "most-competitions",
+        source: ["result_facts"],
+        sql: `SELECT person_id, COUNT(DISTINCT competition_id) AS competition_count FROM result_facts GROUP BY person_id`,
+        orderBy: "competition_count DESC, person_id",
+        repetitions,
+      },
+      {
+        key: "top-100-appearances-single",
         source: ["person_year_rankings_single", "person_year_ranking_cohorts"],
         sql: `SELECT person_id, COUNT(*) AS top_100_appearances FROM person_year_rankings_single WHERE cohort_id = ${cohortId} AND position <= 100 GROUP BY person_id`,
         orderBy: "top_100_appearances DESC, person_id",
         repetitions,
       },
+      {
+        key: "top-100-appearances-average",
+        source: ["person_year_rankings_average", "person_year_ranking_cohorts"],
+        sql: `SELECT person_id, COUNT(*) AS top_100_appearances FROM person_year_rankings_average WHERE cohort_id = ${cohortId} AND position <= 100 GROUP BY person_id`,
+        orderBy: "top_100_appearances DESC, person_id",
+        repetitions,
+      },
     ];
-    const historicalAsOfDates = await historicalDates(
-      connection,
-      requestedDates,
-    );
+    const runAggregations = section === "all" || section === "aggregations";
+    const runAttempts = section === "all" || section === "attempts";
+    const runHistorical = section === "all" || section === "historical";
+    const historicalAsOfDates = runHistorical
+      ? await historicalDates(connection, requestedDates)
+      : [];
     const report = {
       schemaVersion: 1,
       generatedAt: new Date().toISOString(),
       branch: currentBranch(),
       configuration: {
-        subX,
+        section,
+        subXSeconds,
         repetitions,
         historicalAsOfDates,
         worldCohortId: cohortId,
@@ -695,22 +836,28 @@ async function main(argv = process.argv) {
       attemptFacts: null,
       historical: null,
     };
-    for (const definition of aggregationDefinitions) {
-      process.stderr.write(`[proposed-stats] measuring ${definition.key}\n`);
-      report.materializedAggregations.push(
-        await measureMaterializedAggregation(connection, definition),
-      );
+    if (runAggregations) {
+      for (const definition of aggregationDefinitions) {
+        process.stderr.write(`[proposed-stats] measuring ${definition.key}\n`);
+        report.materializedAggregations.push(
+          await measureMaterializedAggregation(connection, definition),
+        );
+      }
     }
-    process.stderr.write("[proposed-stats] measuring shared attempt stage\n");
-    report.attemptFacts = await measureAttemptScans(connection, {
-      repetitions,
-      subX,
-    });
-    process.stderr.write("[proposed-stats] measuring historical stages\n");
-    report.historical = await measureHistorical(connection, {
-      repetitions,
-      dates: historicalAsOfDates,
-    });
+    if (runAttempts) {
+      process.stderr.write("[proposed-stats] measuring shared attempt stage\n");
+      report.attemptFacts = await measureAttemptScans(connection, {
+        repetitions,
+        subXSeconds,
+      });
+    }
+    if (runHistorical) {
+      process.stderr.write("[proposed-stats] measuring historical stages\n");
+      report.historical = await measureHistorical(connection, {
+        repetitions,
+        dates: historicalAsOfDates,
+      });
+    }
     report.conclusions = {
       dailyBuildPolicy:
         "Do not add any proposed statistic to the production projection registry from this experiment.",
@@ -735,6 +882,8 @@ export {
   historicalRecordSql,
   historicalStageSql,
   recordsInMostEventsSql,
+  worldRecordsInMostEventsSql,
+  worldRecordsPerEventSql,
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
