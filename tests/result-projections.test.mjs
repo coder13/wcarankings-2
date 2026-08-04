@@ -161,6 +161,9 @@ test("normal rankings retain separate historical country and continent bests", a
   assert.match(sources, /regional_record = 'NR'/);
   assert.match(listRankings, /let rankingColumn = "world_rank";[\s\S]*input\.region\.scope === "continent"/);
   assert.match(listRankings, /`ranking\.\$\{rankingColumn\} > 0`/);
+  assert.match(listRankings, /ranking\.person_id = CONVERT\(member\.person_id USING utf8mb4\)/);
+  assert.match(listRankings, /person\.wca_id = CONVERT\(ranking\.person_id USING utf8mb4\)/);
+  assert.match(listRankings, /country\.id = CONVERT\(page\.country_id USING utf8mb4\)/);
   assert.match(resultAttemptsMigration, /ALTER TABLE result_attempts/);
   assert.match(resultAttemptsMigration, /ADD INDEX idx_result_attempts_result/);
   assert.doesNotMatch(resultAttemptsMigration, /information_schema\.tables/);

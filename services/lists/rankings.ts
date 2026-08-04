@@ -67,17 +67,21 @@ async function loadScopedRankings(
   const result = await query<ListRankingRow>(
     `WITH scoped_rankings AS (
        SELECT ${rankingColumns}, COUNT(*) OVER () AS total,
-         ranking.person_id, ranking.result_id, ranking.result_value AS best,
+         ranking.person_id, COALESCE(person.name, CONVERT(ranking.person_id USING utf8mb4)) AS person_name,
+         ranking.result_id, ranking.result_value AS best,
          ranking.country_id, ranking.continent_id
        FROM ${scopedSource.from(source)}
+       LEFT JOIN persons person
+         ON person.wca_id = CONVERT(ranking.person_id USING utf8mb4)
+        AND person.sub_id = 1
        WHERE ${scopedConditions.join(" AND ")}
      ), page AS (
        SELECT * FROM scoped_rankings WHERE ${conditions.join(" AND ")}
        ORDER BY sub_rank LIMIT ?
      )
      SELECT page.rank, page.sub_rank, page.total, page.person_id,
-       COALESCE(person.name, page.person_id) AS person_name,
-       page.country_id, COALESCE(country.name, page.country_id) AS country_name,
+       page.person_name, page.country_id,
+       COALESCE(country.name, CONVERT(page.country_id USING utf8mb4)) AS country_name,
        COALESCE(country.iso2, '') AS country_iso2, page.continent_id, page.best,
        facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name,
        IF(facts.${input.type === "average" ? "regional_average_record" : "regional_single_record"} = 'WR', 1, 0) AS is_world_record,
@@ -85,8 +89,7 @@ async function loadScopedRankings(
        IF(facts.${input.type === "average" ? "regional_average_record" : "regional_single_record"} = 'NR', 1, 0) AS is_country_record
      FROM page
      JOIN result_facts facts ON facts.result_id = page.result_id
-     LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-     LEFT JOIN countries country ON country.id = page.country_id
+     LEFT JOIN countries country ON country.id = CONVERT(page.country_id USING utf8mb4)
      LEFT JOIN competitions competition ON competition.id = facts.competition_id
      ORDER BY page.sub_rank`,
     [...scopedValues, ...values],
@@ -271,7 +274,7 @@ export async function loadListRankings(list: ListSummary, searchParams: URLSearc
       {
         from: (source) => `list_members AS member
        JOIN ${source} AS ranking
-         ON ranking.person_id = member.person_id`,
+         ON ranking.person_id = CONVERT(member.person_id USING utf8mb4)`,
         conditions: ["member.list_id = ?"],
         values: [list.id],
       },
