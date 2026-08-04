@@ -25,6 +25,7 @@ const projectionDefinitions = PROJECTION_JOBS
     files: [...job.sqlFiles],
     tables: [...job.tables],
     enabledByDefault: job.enabledByDefault,
+    estimatedDurationMs: job.estimatedDurationMs ?? 0,
   }));
 
 export const SEMANTIC_PROJECTION_TABLES = projectionDefinitions.flatMap(({ tables }) => tables);
@@ -52,29 +53,6 @@ export const PUBLISHED_PROJECTION_TABLES = [
 export const RETIRED_PROJECTION_TABLES = [
   "person_sum_of_ranks_event_values",
 ];
-
-// Initial scheduling hints. The per-task logs provide the data to tune these
-// values as the projection workload evolves; they do not affect SQL semantics.
-const PROJECTION_DURATION_ESTIMATES_MS = {
-  "sum-of-ranks": 180_000,
-  "competition-podium-members": 30_000,
-  "competition-event-stats": 90_000,
-  "result-facts": 150_000,
-  "person-event-rankings": 90_000,
-  "person-year-rankings": 150_000,
-  "result-rankings": 150_000,
-  "result-ranking-counts": 15_000,
-  "person-ranking-counts": 15_000,
-  "person-metric-values": 90_000,
-  "person-metric-scores": 45_000,
-  "competition-stats": 30_000,
-  "city-event-stats": 90_000,
-  "entity-ranking-counts": 15_000,
-};
-
-function projectionDurationEstimate(name) {
-  return PROJECTION_DURATION_ESTIMATES_MS[name] ?? 0;
-}
 
 function projectionNames(sql, suffix) {
   return [...SEMANTIC_PROJECTION_TABLES, ...COMPATIBILITY_PROJECTION_TABLES]
@@ -210,7 +188,7 @@ async function buildRegisteredProjectionsConcurrently(projections, {
   const tasks = projections.map((projection) => ({
     name: projection.name,
     dependencies: projection.dependencies,
-    estimatedDurationMs: projectionDurationEstimate(projection.name),
+    estimatedDurationMs: projection.estimatedDurationMs,
     run: async (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
   }));
   return runDependencyAwareTasks(tasks, {
@@ -364,7 +342,7 @@ export async function refreshMysqlSchema(
     name: `projection:${projection.name}`,
     dependencies: projection.dependencies.map((dependency) =>
       dependency === "raw-wca" ? dependency : `projection:${dependency}`),
-    estimatedDurationMs: projectionDurationEstimate(projection.name),
+    estimatedDurationMs: projection.estimatedDurationMs,
     run: (worker) => buildProjection(worker, projection, projectionSuffix, tableProgress),
   }));
   const compatibilityTasks = includeCompatibility ? compatibilityProjectionTasks({
