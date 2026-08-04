@@ -10,69 +10,11 @@ capture_failed_generation_diagnostics() {
 }
 trap capture_failed_generation_diagnostics ERR
 
-# Validate immutable release coordinates.
-[[ "$EXPECTED_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]]
-[[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-[[ "$ARTIFACT_RUN_ID" =~ ^[0-9]+$ ]]
-[[ "$ARTIFACT_ID" =~ ^[0-9]+$ ]]
-[[ "$DATA_TOOLS_IMAGE" =~ ^ghcr\.io/.+@sha256:[0-9a-f]{64}$ ]]
-[[ "$FLYWAY_IMAGE" =~ ^ghcr\.io/.+@sha256:[0-9a-f]{64}$ ]]
-[[ "$WCA_EXPORT_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
-[[ "$WCA_EXPORT_VALUE" =~ ^[0-9TZUTC:+.\ -]+$ ]]
-[[ "$PRODUCTION_WCA_EXPORT_VALUE" =~ ^[0-9TZUTC:+.\ -]+$ ]]
-for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do
-  case "$group" in
-    compatibility | result-facts | result-rankings | competition-rankings | person-competition-rankings | city-rankings | sum-of-ranks | yearly-person-rankings) ;;
-    *)
-      echo "Unknown projection group: $group" >&2
-      exit 1
-      ;;
-  esac
-done
-gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}" \
-  > /tmp/artifact-coordinate.json
-jq -e \
-  --arg name "$ARTIFACT_NAME" \
-  --argjson run "$ARTIFACT_RUN_ID" \
-  '.name == $name and .workflow_run.id == $run and .expired == false' \
-  /tmp/artifact-coordinate.json > /dev/null
-
-# Verify the lightweight release coordinate and compatibility contract.
-bun scripts/projection-release-coordinate.ts verify \
-  --directory="$PROJECTION_ARTIFACT_DIR" \
-  --sha256="$EXPECTED_MANIFEST_SHA256" \
-  --groups="$PROJECTION_GROUPS" \
-  --export-id="$WCA_EXPORT_VALUE" \
-  --source-sha="$EXPECTED_SOURCE_SHA"
-normalize_export_identity() {
-  bun --eval '
-    import { normalizeExportDate } from "./data-tools/shared/date.ts";
-    const normalized = normalizeExportDate(process.argv[1]);
-    if (!normalized) {
-      console.error(`Invalid projection export identity: ${process.argv[1]}`);
-      process.exit(1);
-    }
-    process.stdout.write(normalized);
-  ' "$1"
-}
-normalized_build_export=$(normalize_export_identity "$WCA_EXPORT_VALUE")
-normalized_production_export=$(normalize_export_identity "$PRODUCTION_WCA_EXPORT_VALUE")
-echo "Projection export identity: build=$normalized_build_export; production=$normalized_production_export"
-if [ "$normalized_build_export" != "$normalized_production_export" ]; then
-  echo "Projection artifact must include the raw export because the build and production exports differ." >&2
-  jq -e '.raw != null' "$PROJECTION_ARTIFACT_DIR/projection-release.json" > /dev/null
-fi
-artifact_format=$(jq -r '.compatibility.artifactFormatVersion // "missing"' \
-  "$PROJECTION_ARTIFACT_DIR/projection-release.json")
-artifact_schema=$(jq -r '.compatibility.datasetSchemaVersion // "missing"' \
-  "$PROJECTION_ARTIFACT_DIR/projection-release.json")
-expected_format=$(jq -r '.artifactFormatVersion // "missing"' release-compatibility.json)
-expected_schema=$(jq -r '.datasetSchemaVersion // "missing"' release-compatibility.json)
-echo "Projection compatibility: artifact format=$artifact_format, schema=$artifact_schema; expected format=$expected_format, schema=$expected_schema"
-if [ "$artifact_format" != "$expected_format" ] || [ "$artifact_schema" != "$expected_schema" ]; then
-  echo "Projection artifact compatibility does not match the deployed server compatibility contract." >&2
-  exit 1
-fi
+# TypeScript owns release planning and validation. Bash only executes the plan.
+deployment_plan=$(bun scripts/projections/planning/plan-projection-deployment.ts \
+  --directory="$PROJECTION_ARTIFACT_DIR")
+has_raw=$(printf '%s' "$deployment_plan" | jq -r '.hasRaw')
+echo "Projection deployment plan: $deployment_plan"
 
 # Stage exact generation directly from GHCR.
 set -euo pipefail
@@ -104,8 +46,6 @@ trap - EXIT
 
 # Prepare, verify, and atomically activate the candidate generation.
 started_at=$(date +%s)
-has_raw=$(jq -r '.raw != null' \
-  "$PROJECTION_ARTIFACT_DIR/projection-release.json")
 ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
   "ARTIFACT_ID='$ARTIFACT_ID' \
    ARTIFACT_RUN_ID='$ARTIFACT_RUN_ID' \

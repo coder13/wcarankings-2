@@ -1,30 +1,10 @@
 // @ts-nocheck
+import { argumentValue } from "../../lib/arguments.ts";
+import { runPool } from "../../lib/async.ts";
+import { databaseOptions } from "../../lib/database.ts";
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  return (
-    process.argv
-      .find((value) => value.startsWith(prefix))
-      ?.slice(prefix.length) || ""
-  );
-}
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: url.port || "3306",
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database:
-      process.env.DATABASE_NAME_OVERRIDE ||
-      decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 function mariadbArguments(options) {
   return [
@@ -59,20 +39,6 @@ function runMariaDb(options, { input, sql } = {}) {
   });
 }
 
-async function runPool(items, concurrency, task) {
-  let cursor = 0;
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor;
-      cursor += 1;
-      await task(items[index], index);
-    }
-  }
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, worker),
-  );
-}
-
 const directory = resolve(argumentValue("directory"));
 const metadataPath = resolve(argumentValue("metadata"));
 const concurrency = Number(
@@ -100,7 +66,9 @@ for (const table of metadata.tables) {
     throw new Error(`Unsafe transfer table: ${table}`);
 }
 
-const options = databaseOptions();
+const options = databaseOptions(undefined, {
+  databaseName: process.env.DATABASE_NAME_OVERRIDE,
+});
 const schemas = await Promise.all(
   metadata.tables.map((table) =>
     readFile(resolve(directory, `${table}.sql`), "utf8"),

@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { argumentPresent } from "./lib/arguments.ts";
+import { databaseOptions } from "./lib/database.ts";
 import mysql from "mysql2/promise";
 import {
   PUBLISHED_PROJECTION_TABLES,
@@ -6,20 +8,8 @@ import {
   refreshMysqlSchema,
 } from "../data-tools/projections/build.ts";
 
-const force = process.argv.includes("--force");
+const force = argumentPresent("force");
 const TABLES = PUBLISHED_PROJECTION_TABLES;
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 async function projectionExists(connection) {
   const [rows] = await connection.query(

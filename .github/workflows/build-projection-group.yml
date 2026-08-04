@@ -117,7 +117,7 @@ jobs:
             fi
             repository=${ref%%:*}
             oras pull "${repository}@${digest}" -o "$destination"
-            bun scripts/projection-release-artifact.ts verify \
+            bun scripts/projections/release/projection-release-artifact.ts verify \
               --directory="$destination" --groups="$group" \
               --export-id="${{ inputs.export_value }}" \
               --fingerprints-file=/tmp/fingerprints.json
@@ -126,9 +126,9 @@ jobs:
             transfer_directory="/tmp/transfer-${group}"
             mkdir -p "$transfer_directory"
             tar -xzf "$destination/$archive" -C "$transfer_directory"
-            DATABASE_NAME_OVERRIDE="$MYSQL_DATABASE" bun scripts/import-projection-transfer.ts \
+            DATABASE_NAME_OVERRIDE="$MYSQL_DATABASE" bun scripts/projections/transfer/import-projection-transfer.ts \
               --directory="$transfer_directory" --metadata="$metadata" --concurrency=2
-            bun scripts/publish-projection-transfer.ts --hydrate --groups="$group" \
+            bun scripts/projections/transfer/publish-projection-transfer.ts --hydrate --groups="$group" \
               --expected-export-date="${{ inputs.export_value }}"
           done
 
@@ -138,9 +138,9 @@ jobs:
           AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}
         run: |
           set -euo pipefail
-          bun scripts/projection-build-plan.ts --groups="$GROUP" \
+          bun scripts/projections/planning/projection-build-plan.ts --groups="$GROUP" \
             --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
-          WCA_PROJECTION_BUILD_CONCURRENCY=2 bun scripts/build-projection-groups.ts \
+          WCA_PROJECTION_BUILD_CONCURRENCY=2 bun scripts/projections/build/build-projection-groups.ts \
             --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
             --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
             --include-compatibility="$(jq -r '.includeCompatibility' /tmp/build-plan.json)"
@@ -151,11 +151,11 @@ jobs:
           if [ "$GROUP" = yearly-person-rankings ]; then prefix=yearly; fi
           metadata="$directory/${prefix}-projection-transfer.json"
           archive="$directory/${prefix}-projection-transfer.tar.gz"
-          bun scripts/prepare-projection-transfer.ts --group="$GROUP" > "$metadata"
-          bun scripts/export-projection-transfer.ts --metadata="$metadata" --output="$archive"
+          bun scripts/projections/transfer/prepare-projection-transfer.ts --group="$GROUP" > "$metadata"
+          bun scripts/projections/transfer/export-projection-transfer.ts --metadata="$metadata" --output="$archive"
 
           printf '{"groups":%s}\n' "$FINGERPRINTS" > /tmp/fingerprints.json
-          bun scripts/projection-release-artifact.ts create --directory="$directory" \
+          bun scripts/projections/release/projection-release-artifact.ts create --directory="$directory" \
             --export-id="${{ inputs.export_value }}" --export-date="${{ inputs.export_date }}" \
             --groups="$GROUP" --fingerprints-file=/tmp/fingerprints.json \
             --compatibility-file=release-compatibility.json --source-sha="${{ inputs.ref }}"

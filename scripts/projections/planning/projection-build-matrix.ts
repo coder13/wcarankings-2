@@ -1,13 +1,12 @@
 // @ts-nocheck
+import { argumentValue } from "../../lib/arguments.ts";
 import {
   groupDependencyClosure,
   projectionGroup,
-} from "../data-tools/projections/jobs.ts";
+} from "../../../data-tools/projections/jobs.ts";
 
 const selected = (process.env.BUILD_GROUPS || "").split(",").filter(Boolean);
-const wave = Number(
-  process.argv.find((value) => value.startsWith("--wave="))?.slice(7) || 1,
-);
+const wave = Number(argumentValue("wave") || 1);
 if (![1, 2].includes(wave)) throw new Error("--wave must be 1 or 2");
 const selectedSet = new Set(selected);
 

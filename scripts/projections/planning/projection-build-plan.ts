@@ -1,11 +1,6 @@
 // @ts-nocheck
-import { projectionBuildPlan } from "../data-tools/projections/build.ts";
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
-}
+import { argumentValue } from "../../lib/arguments.ts";
+import { projectionBuildPlan } from "../../../data-tools/projections/build.ts";
 
 const groups = argumentValue("groups")
   .split(",")

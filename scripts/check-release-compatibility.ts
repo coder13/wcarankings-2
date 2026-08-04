@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { argumentValue } from "./lib/arguments.ts";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
@@ -18,12 +19,6 @@ export function checkServerDatasetCompatibility({
     );
   }
   return { compatible: true, datasetSchemaVersion: version, minimum, maximum };
-}
-
-function argumentValue(name) {
-  const prefix = `--${name}=`;
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
 }
 
 async function main() {

@@ -8,7 +8,7 @@ import {
   projectionReleasePlan,
   projectionSemanticPlan,
   semanticProjectionFingerprints,
-} from "../scripts/projection-release-plan.ts";
+} from "../scripts/projections/planning/projection-release-plan.ts";
 
 const repositoryRoot = join(import.meta.dirname, "..");
 const exportId = "2026-07-30T00:00:30Z";
@@ -101,7 +101,7 @@ test("a result-facts semantic change selects only its downstream closure", async
   const baseline = await projectionFingerprints({ exportId, repositoryRoot });
   const factsPath = join(
     temporaryRoot,
-    "sql/ranking-projections/result_facts.sql",
+    "data-tools/projection-catalog/core/result-facts/result_facts.sql",
   );
   await writeFile(
     factsPath,

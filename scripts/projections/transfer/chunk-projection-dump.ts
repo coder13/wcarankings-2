@@ -1,15 +1,11 @@
 // @ts-nocheck
+import { argumentPresent, argumentValue } from "../../lib/arguments.ts";
 import { once } from "node:events";
 import { createInterface } from "node:readline";
 import { spawn } from "node:child_process";
 
-const rowsArgument = process.argv.find((value) =>
-  value.startsWith("--rows-per-insert="),
-);
-const rowsPerInsert = Number(
-  rowsArgument?.slice("--rows-per-insert=".length) || 1000,
-);
-const importDump = process.argv.includes("--import");
+const rowsPerInsert = Number(argumentValue("rows-per-insert") || 1000);
+const importDump = argumentPresent("import");
 
 if (!Number.isSafeInteger(rowsPerInsert) || rowsPerInsert < 1) {
   throw new Error("--rows-per-insert must be a positive integer.");

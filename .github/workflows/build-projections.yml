@@ -118,8 +118,8 @@ jobs:
         env:
           BUILD_GROUPS: ${{ inputs.build_groups }}
         run: |
-          wave_one=$(bun scripts/projection-build-matrix.ts --wave=1)
-          wave_two=$(bun scripts/projection-build-matrix.ts --wave=2)
+          wave_one=$(bun scripts/projections/planning/projection-build-matrix.ts --wave=1)
+          wave_two=$(bun scripts/projections/planning/projection-build-matrix.ts --wave=2)
           echo "wave_one=$wave_one" >> "$GITHUB_OUTPUT"
           echo "wave_two=$wave_two" >> "$GITHUB_OUTPUT"
           echo "wave_two_required=$(jq -r '.include | length > 0' <<<"$wave_two")" >> "$GITHUB_OUTPUT"
@@ -268,7 +268,7 @@ jobs:
           printf '{"groups":%s}\n' "$FINGERPRINTS" > /tmp/fingerprints.json
           raw=()
           if [ '${{ inputs.include_raw }}' = true ]; then raw+=(--raw-file=/tmp/raw-coordinate.json); fi
-          result=$(bun scripts/projection-release-coordinate.ts create \
+          result=$(bun scripts/projections/release/projection-release-coordinate.ts create \
             --directory="$RELEASE_DIR" \
             --export-id="${{ inputs.export_value }}" \
             --export-date="${{ inputs.export_date }}" \

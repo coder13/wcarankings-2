@@ -16,7 +16,7 @@ docker --config "$auth_directory" pull ghcr.io/oras-project/oras:v1.3.0
 docker image inspect "$DATA_TOOLS_IMAGE" > /dev/null
 docker image inspect "$FLYWAY_IMAGE" > /dev/null
 docker run --rm --entrypoint sh "$DATA_TOOLS_IMAGE" -c \
-  'test -f /app/release-compatibility.json && test -f /app/scripts/activate-ranking-generation.ts && test -f /app/scripts/import-projection-transfer.ts'
+  'test -f /app/release-compatibility.json && test -f /app/scripts/projections/generation/activate-ranking-generation.ts && test -f /app/scripts/projections/transfer/import-projection-transfer.ts'
 docker run --rm --entrypoint cat "$DATA_TOOLS_IMAGE" \
   /app/release-compatibility.json > "$stage_directory/data-tools-compatibility.json"
 jq -e \
@@ -71,7 +71,7 @@ for group in $(printf '%s' "$PROJECTION_GROUPS" | tr ',' ' '); do
     -v "$destination:/artifact:ro" \
     -v "$stage_directory/fingerprints.json:/fingerprints.json:ro" \
     "$DATA_TOOLS_IMAGE" \
-    /app/scripts/projection-release-artifact.ts verify \
+    /app/scripts/projections/release/projection-release-artifact.ts verify \
     --directory=/artifact \
     --groups="$group" \
     --export-id="$WCA_EXPORT_VALUE" \

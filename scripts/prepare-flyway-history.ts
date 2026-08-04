@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { databaseOptions } from "./lib/database.ts";
 import { readdir } from "node:fs/promises";
 import mysql from "mysql2/promise";
 
@@ -7,18 +8,6 @@ const APP_TABLE = "flyway_schema_history_app";
 const RESULTS_TABLE = "flyway_schema_history_results";
 const MIGRATIONS_ROOT =
   process.env.FLYWAY_MIGRATIONS_ROOT || "/app/migrations/mysql";
-
-function databaseOptions(connectionString = process.env.DATABASE_URL) {
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  const url = new URL(connectionString);
-  return {
-    host: url.hostname,
-    port: Number(url.port || 3306),
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-  };
-}
 
 function identifier(value) {
   if (!/^[a-z][a-z0-9_]{0,63}$/.test(value))

@@ -44,7 +44,7 @@ jobs:
           done
 
       - name: Exercise bulk projection table transfer
-        run: bash scripts/test-bulk-projection-transfer.sh
+        run: bash scripts/projections/transfer/test-bulk-projection-transfer.sh
 
       - name: Clean up containers
         if: always()
