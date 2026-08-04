@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export const SERVER_COMPONENT_PATHS = {
@@ -51,6 +51,9 @@ export function componentFingerprint(
     .toString()
     .split("\0")
     .filter(Boolean)
+    .filter((file) =>
+      existsSync(new URL(file, pathToFileURL(`${repositoryRoot}/`))),
+    )
     .sort();
   const checksums = files
     .map(

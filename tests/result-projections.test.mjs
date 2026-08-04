@@ -10,6 +10,7 @@ test("builds a result-level compatibility projection without unused secondary in
     indexes,
     counts,
     schema,
+    database,
     importer,
     preflight,
     backfill,
@@ -34,6 +35,7 @@ test("builds a result-level compatibility projection without unused secondary in
       "utf8",
     ),
     readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
+    readFile(new URL("data-tools/projections/database.ts", root), "utf8"),
     readFile(new URL("scripts/sync-wca-export.ts", root), "utf8"),
     readFile(new URL("scripts/check-ranking-projections.ts", root), "utf8"),
     readFile(new URL("scripts/backfill-result-entries.ts", root), "utf8"),
@@ -70,14 +72,17 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(schema, /\(\?!\[A-Za-z0-9_\]\)/);
   assert.doesNotMatch(schema, /replaceAll\(table, `\$\{table\}\$\{suffix\}`\)/);
   assert.match(schema, /idx_results_single_event_best/);
-  assert.match(schema, /export async function ensureWcaPersonLookupIndex/);
-  assert.match(schema, /table === "persons" && name === "idx_persons_wca_sub"/);
+  assert.match(database, /export async function ensureWcaPersonLookupIndex/);
+  assert.match(
+    database,
+    /table === "persons" && name === "idx_persons_wca_sub"/,
+  );
   assert.match(
     importer,
     /if \(rawOnly\) \{\s+await refreshRawPersonLookupIndex\(\)/,
   );
   assert.match(
-    schema,
+    database,
     /Skipping \$\{table\} index \$\{name\}; table is not present/,
   );
   assert.match(importer, /result_entries_single_staging/);
