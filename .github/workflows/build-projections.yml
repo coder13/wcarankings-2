@@ -115,6 +115,7 @@ jobs:
       hydrate_groups: ${{ inputs.hydrate_groups }}
       fingerprints: ${{ inputs.fingerprints }}
       available_artifacts: ${{ inputs.available_artifacts }}
+      run_benchmark: ${{ inputs.run_benchmark }}
     secrets: inherit
 
   compose:
@@ -254,136 +255,14 @@ jobs:
       && inputs.build_groups != ''
       && needs.raw-export.result == 'success'
       && needs.build.result == 'success'
-    needs: [raw-export, build]
+      && needs.compose.result == 'success'
+    needs: [raw-export, build, compose]
     runs-on: ubuntu-latest
-    env:
-      MYSQL_DATABASE: wcarankings
-      MYSQL_USER: wcarankings
-      MYSQL_PASSWORD: projection-build
-      MYSQL_ROOT_PASSWORD: projection-build-root
-      DATABASE_URL: mysql://wcarankings:projection-build@127.0.0.1:13307/wcarankings
-      WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
-      BENCHMARK_REPORT_DIR: benchmark-reports
-      BUILD_GROUPS: ${{ inputs.build_groups }}
-      FINGERPRINTS: ${{ inputs.fingerprints }}
-      AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}
-
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref }}
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install MariaDB client
-        run: |
-          command -v mariadb >/dev/null || {
-            sudo apt-get update
-            sudo apt-get install --yes --no-install-recommends mariadb-client
-          }
-
-      - run: pnpm install --frozen-lockfile --prod
-
-      - uses: oras-project/setup-oras@v1
-
-      - name: Authenticate immutable projection storage
-        run: echo "${{ github.token }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Restore WCA SQL export
-        uses: actions/cache/restore@v4
-        with:
-          path: /tmp/wca-export-cache
-          key: wca-sql-export-${{ inputs.export_date }}
-          fail-on-cache-miss: true
-
-      - name: Import generated projection groups
-        run: |
-          set -euo pipefail
-          printf '{"groups":%s}\n' "$FINGERPRINTS" > /tmp/fingerprints.json
-          printf '%s\n' "$AVAILABLE_ARTIFACTS" > /tmp/available-artifacts.json
-          owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
-          docker compose up -d db
-          until docker compose exec -T db mariadb-admin ping -h 127.0.0.1 \
-            -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --silent; do sleep 2; done
-          docker compose exec -T db mariadb --user="$MYSQL_USER" --password="$MYSQL_PASSWORD" \
-            "$MYSQL_DATABASE" --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL, value INT NOT NULL)"
-          docker compose run --rm flyway migrate
-          docker compose run --rm -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
-            -e FLYWAY_TABLE=flyway_schema_history_results flyway migrate
-          node scripts/sync-wca-export.mjs --force --raw-only \
-            --sql-path="/tmp/wca-export-cache/wca-export-${{ inputs.export_date }}.sql.zip" \
-            --canonical-export-date="${{ inputs.export_value }}"
-
-          for group in $(printf '%s' "$BUILD_GROUPS" | tr ',' ' '); do
-            destination="/tmp/restored/$group"
-            mkdir -p "$destination"
-            ref=$(jq -r --arg group "$group" '.[$group].ref // empty' /tmp/available-artifacts.json)
-            digest=$(jq -r --arg group "$group" '.[$group].digest // empty' /tmp/available-artifacts.json)
-            if [ -z "$digest" ]; then
-              fingerprint=$(jq -r --arg group "$group" '.groups[$group].artifactFingerprint' /tmp/fingerprints.json)
-              tagged_ref="ghcr.io/${owner}/wcarankings-projection-${group}:${fingerprint}"
-              digest=$(oras manifest fetch --descriptor "$tagged_ref" | jq -r '.digest')
-              ref="$tagged_ref"
-            fi
-            repository=${ref%%:*}
-            oras pull "${repository}@${digest}" -o "$destination"
-            node scripts/projection-release-artifact.mjs verify \
-              --directory="$destination" --groups="$group" \
-              --export-id="${{ inputs.export_value }}" \
-              --fingerprints-file=/tmp/fingerprints.json
-            metadata=$(find "$destination" -maxdepth 1 -name '*-projection-transfer.json' -print -quit)
-            archive=$(jq -r '.archiveFile' "$metadata")
-            transfer_directory="/tmp/transfer-$group"
-            mkdir -p "$transfer_directory"
-            tar -xzf "$destination/$archive" -C "$transfer_directory"
-            DATABASE_NAME_OVERRIDE="$MYSQL_DATABASE" node scripts/import-projection-transfer.mjs \
-              --directory="$transfer_directory" --metadata="$metadata" --concurrency=2
-          done
-          node scripts/publish-projection-transfer.mjs --hydrate \
-            --groups="$BUILD_GROUPS" --expected-export-date="${{ inputs.export_value }}"
-
       - name: Run ranking scroll benchmark
         env:
-          DATABASE_STATEMENT_TIMEOUT_MS: 60000
-          DEPLOYED_MAIN_SHA: ${{ inputs.ref }}
+          BENCHMARK_STATUS: ${{ needs.build.outputs.benchmark_status }}
         run: |
           set -euo pipefail
-          docker build --tag wcarankings-app:projection-benchmark .
-          docker tag wcarankings-app:projection-benchmark wcarankings-app:latest
-          DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@db:3306/$MYSQL_DATABASE" \
-            DATABASE_STATEMENT_TIMEOUT_MS=60000 \
-            DEPLOYED_MAIN_SHA="$DEPLOYED_MAIN_SHA" \
-            docker compose up --detach app
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent --show-error http://127.0.0.1:3000/api/health/live >/dev/null; then break; fi
-            if [ "$attempt" = 30 ]; then docker compose logs app; exit 1; fi
-            sleep 2
-          done
-          benchmark_status=0
-          for suite in persons results competitions cities; do
-            pnpm run "benchmark:ranking-scroll:$suite" -- \
-              --target=http://127.0.0.1:3000 \
-              --report-dir="$BENCHMARK_REPORT_DIR" \
-              --label=projection-build || benchmark_status=$?
-          done
-          exit "$benchmark_status"
-
-      - name: Upload ranking scroll benchmark report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ranking-scroll-benchmark-${{ github.run_id }}-${{ github.run_attempt }}
-          path: benchmark-reports/*.json
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Clean runner database
-        if: always()
-        run: docker compose down --volumes --remove-orphans
+          echo "Integrated benchmark status: ${BENCHMARK_STATUS:-missing}"
+          test "${BENCHMARK_STATUS:-missing}" = 0

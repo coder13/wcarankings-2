@@ -349,14 +349,16 @@ test("labeled PR projection builds run the scroll benchmark and publish a reusab
   assert.match(prProjectionRelease, /run_benchmark: true/);
   assert.match(builder, /run_benchmark:/);
   assert.match(builder, /benchmark:/);
-  assert.match(builder, /docker build --tag wcarankings-app:projection-benchmark/);
-  assert.match(builder, /DATABASE_STATEMENT_TIMEOUT_MS=60000/);
-  assert.match(builder, /docker compose up --detach app/);
-  assert.match(builder, /for suite in persons results competitions cities/);
-  assert.match(builder, /benchmark:ranking-scroll:\$suite/);
-  assert.match(builder, /ranking-scroll-benchmark-\$\{\{ github\.run_id \}\}/);
-  assert.match(builder, /Import generated projection groups/);
-  assert.match(builder, /Install MariaDB client/);
+  assert.match(builder, /needs: \[raw-export, build, compose\]/);
+  assert.match(builder, /needs\.build\.outputs\.benchmark_status/);
+  assert.match(groupBuilder, /docker build --tag wcarankings-app:projection-benchmark/);
+  assert.match(groupBuilder, /docker tag wcarankings-app:projection-benchmark wcarankings-app:latest/);
+  assert.match(groupBuilder, /DATABASE_STATEMENT_TIMEOUT_MS=60000/);
+  assert.match(groupBuilder, /docker compose up --detach app/);
+  assert.match(groupBuilder, /for suite in persons results competitions cities/);
+  assert.match(groupBuilder, /benchmark:ranking-scroll:\$suite/);
+  assert.match(groupBuilder, /ranking-scroll-benchmark-\$\{\{ github\.run_id \}\}/);
+  assert.doesNotMatch(builder, /Import generated projection groups/);
   assert.match(groupBuilder, /Install MariaDB client/);
 });
 

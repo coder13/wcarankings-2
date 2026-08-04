@@ -26,6 +26,15 @@ on:
         required: false
         default: "{}"
         type: string
+      run_benchmark:
+        description: Run the ranking scroll benchmark against the generated database.
+        required: false
+        default: false
+        type: boolean
+    outputs:
+      benchmark_status:
+        description: Exit status from the optional ranking scroll benchmark.
+        value: ${{ jobs.build.outputs.benchmark_status }}
 
 permissions:
   contents: read
@@ -34,6 +43,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      benchmark_status: ${{ steps.benchmark.outputs.status }}
     env:
       MYSQL_DATABASE: wcarankings
       MYSQL_USER: wcarankings
@@ -192,6 +203,69 @@ jobs:
               echo "- Dependencies hydrated: ${HYDRATE_GROUPS:-none}"
             } >> "$GITHUB_STEP_SUMMARY"
           done
+
+      - name: Run ranking scroll benchmark
+        if: inputs.run_benchmark == true
+        id: benchmark
+        env:
+          BENCHMARK_REPORT_DIR: benchmark-reports
+          DATABASE_STATEMENT_TIMEOUT_MS: 60000
+          DEPLOYED_MAIN_SHA: ${{ inputs.ref }}
+        run: |
+          set +e
+          benchmark_status=0
+          docker build --tag wcarankings-app:projection-benchmark .
+          if [ "$?" -ne 0 ]; then
+            benchmark_status=1
+          else
+            docker tag wcarankings-app:projection-benchmark wcarankings-app:latest
+            if [ "$?" -ne 0 ]; then benchmark_status=1; fi
+          fi
+
+          if [ "$benchmark_status" -eq 0 ]; then
+            DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@db:3306/$MYSQL_DATABASE" \
+              DATABASE_STATEMENT_TIMEOUT_MS=60000 \
+              DEPLOYED_MAIN_SHA="$DEPLOYED_MAIN_SHA" \
+              docker compose up --detach app
+            if [ "$?" -ne 0 ]; then benchmark_status=1; fi
+          fi
+
+          if [ "$benchmark_status" -eq 0 ]; then
+            healthy=false
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error http://127.0.0.1:3000/api/health/live >/dev/null; then
+                healthy=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$healthy" != true ]; then
+              docker compose logs app
+              benchmark_status=1
+            fi
+          fi
+
+          if [ "$benchmark_status" -eq 0 ]; then
+            for suite in persons results competitions cities; do
+              pnpm run "benchmark:ranking-scroll:$suite" -- \
+                --target=http://127.0.0.1:3000 \
+                --report-dir="$BENCHMARK_REPORT_DIR" \
+                --label=projection-build
+              if [ "$?" -ne 0 ]; then benchmark_status=1; fi
+            done
+          fi
+
+          echo "status=$benchmark_status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload ranking scroll benchmark report
+        if: always() && inputs.run_benchmark == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ranking-scroll-benchmark-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmark-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Clean isolated database
         if: always()
