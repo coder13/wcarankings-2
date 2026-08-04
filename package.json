@@ -24,8 +24,7 @@
     "data-tools:typecheck": "bunx tsc --project tsconfig.data-tools.json",
     "test:projections": "bun test tests/projection-*.test.mjs tests/result-projections.test.mjs tests/ranking-generation-activation.test.mjs tests/projection-transfer.test.mjs",
     "sync:wca": "bun scripts/sync-wca-export.ts",
-    "sync:wca:local": "docker compose --env-file .env.local run --rm flyway migrate && bun --env-file=.env.local scripts/sync-wca-export.ts",
-    "load:rankings": "bun scripts/load-rankings.ts"
+    "sync:wca:local": "docker compose --env-file .env.local run --rm flyway migrate && bun --env-file=.env.local scripts/sync-wca-export.ts"
   },
   "dependencies": {
     "@cubing/icons": "^3.0.5",

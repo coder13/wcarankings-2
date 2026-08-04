@@ -145,12 +145,12 @@ before it is considered ready for ranking traffic.
 The first complete production publication through this workflow ran on
 2026-07-29 against the `2026-07-29T00:00:23Z` WCA generation:
 
-| Phase | Time |
-| --- | ---: |
-| Cold Actions build and index-free dump | 42m 27s |
-| Upload, bulk import, index rebuild, validation, and atomic publication | 6m 47s |
-| Entire deployment job | 53m 40s |
-| Compressed transfer artifact | 432,325,262 bytes |
+| Phase                                                                  |              Time |
+| ---------------------------------------------------------------------- | ----------------: |
+| Cold Actions build and index-free dump                                 |           42m 27s |
+| Upload, bulk import, index rebuild, validation, and atomic publication |            6m 47s |
+| Entire deployment job                                                  |           53m 40s |
+| Compressed transfer artifact                                           | 432,325,262 bytes |
 
 The cold artifact was saved to the Actions cache. A subsequent successful
 cache-hit deployment skipped generation and completed the entire deployment job
@@ -175,35 +175,6 @@ the improvement comes from avoiding their initial and production construction.
 The next transfer optimization target is the compatibility table's data build
 and replay cost, or a physical backup/restore format that avoids row-by-row
 logical replay.
-
-## Ranking performance verification
-
-`GET /api/health/live` checks process liveness and `GET /api/health/ready`
-checks database and projection readiness. Both are `no-store`; deployment waits
-for readiness before rendering the page.
-
-Run the repeatable local traffic mix after starting the app:
-
-```bash
-pnpm run load:rankings
-```
-
-It covers normal browsing, distant pages, incremental search typing, and unique
-queries. It defaults to localhost; a remote target requires
-`--target=https://example.com --allow-remote`. Its JSON report includes request
-and status counts, p50/p95 latency, cache outcomes, and Server-Timing samples.
-
-Inspect an indexed production path without changing data (use a representative
-cohort):
-
-```sql
-EXPLAIN ANALYZE SELECT world_rank, world_sub_rank, person_id
-FROM ranking_entries_single
-WHERE event_id = '333' AND world_rank > 0
-  AND world_sub_rank >= 5001 AND world_sub_rank < 5051
-ORDER BY world_sub_rank;
-```
-
 The result-level single projection is paged with the same keyset pattern. Do not
 query or offset-scan the raw `results` table for the top-results page:
 
