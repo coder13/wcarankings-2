@@ -2,3 +2,6 @@ services:
   db:
     command:
       - --innodb-buffer-pool-size=10G
+      - --innodb-log-file-size=1G
+      - --innodb-log-buffer-size=128M
+      - --innodb-flush-log-at-trx-commit=2
