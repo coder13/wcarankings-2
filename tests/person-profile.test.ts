@@ -10,7 +10,9 @@ test("person profile route batches profile data from ranking projections", async
   ]);
 
   assert.match(loader, /FROM person_event_rankings ranking/);
-  assert.match(loader, /FROM person_metric_values/);
+  assert.match(loader, /INNER JOIN person_event_rankings reference/);
+  assert.match(loader, /reference\.world_position = 1/);
+  assert.doesNotMatch(loader, /person_metric_values/);
   assert.match(loader, /FROM person_sum_of_ranks_scores/);
   assert.match(loader, /getCurrentRankingsMetadata/);
   assert.match(loader, /Promise\.all/);

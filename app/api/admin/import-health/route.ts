@@ -15,8 +15,6 @@ const expectedProjectionTables = [
   "ranking_entries_single",
   "ranking_entries_average",
   "ranking_counts",
-  "result_entries_single",
-  "result_counts",
   "person_sum_of_ranks_scores",
   "competition_podium_members",
   "competition_event_stats",

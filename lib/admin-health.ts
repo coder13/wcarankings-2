@@ -9,8 +9,6 @@ export const capabilityTables = {
     "ranking_entries_single",
     "ranking_entries_average",
     "ranking_counts",
-    "result_entries_single",
-    "result_counts",
   ],
   resultRankings: [
     "result_rankings_single",

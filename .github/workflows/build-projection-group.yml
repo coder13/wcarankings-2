@@ -147,62 +147,18 @@ jobs:
               --expected-export-date="${{ inputs.export_value }}"
           done
 
-      - name: Build projection bundle
-        env:
-          FINGERPRINTS: ${{ inputs.fingerprints }}
-          AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}
+      - name: Build projection tables
         run: |
           set -euo pipefail
           node scripts/projection-build-plan.mjs --groups="$GROUPS" \
             --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
-          WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/build-projection-groups.mjs \
+          defer_indexes=1
+          if [ '${{ inputs.run_benchmark }}' = true ]; then defer_indexes=0; fi
+          WCA_DEFER_PROJECTION_INDEXES="$defer_indexes" \
+            WCA_PROJECTION_BUILD_CONCURRENCY=2 node scripts/build-projection-groups.mjs \
             --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
             --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
             --include-compatibility="$(jq -r '.includeCompatibility' /tmp/build-plan.json)"
-
-          printf '{"groups":%s}\n' "$FINGERPRINTS" > /tmp/fingerprints.json
-          owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
-          for group in $(printf '%s' "$GROUPS" | tr ',' ' '); do
-            directory="/tmp/built/${group}"
-            mkdir -p "$directory"
-            prefix="$group"
-            if [ "$group" = yearly-person-rankings ]; then prefix=yearly; fi
-            metadata="$directory/${prefix}-projection-transfer.json"
-            archive="$directory/${prefix}-projection-transfer.tar.gz"
-            node scripts/prepare-projection-transfer.mjs --group="$group" > "$metadata"
-            node scripts/export-projection-transfer.mjs --metadata="$metadata" --output="$archive"
-
-            node scripts/projection-release-artifact.mjs create --directory="$directory" \
-              --export-id="${{ inputs.export_value }}" --export-date="${{ inputs.export_date }}" \
-              --groups="$group" --fingerprints-file=/tmp/fingerprints.json \
-              --compatibility-file=release-compatibility.json --source-sha="${{ inputs.ref }}"
-
-            fingerprint=$(jq -r --arg group "$group" '.groups[$group].artifactFingerprint' /tmp/fingerprints.json)
-            corrupt=$(jq -r --arg group "$group" '.[$group].valid == false' <<<"$AVAILABLE_ARTIFACTS")
-            tag="$fingerprint"
-            if [ "$corrupt" = true ]; then tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
-            ref="ghcr.io/${owner}/wcarankings-projection-${group}:${tag}"
-            archive_name=$(basename "$archive")
-            metadata_name=$(basename "$metadata")
-            pushd "$directory" >/dev/null
-            oras push "$ref" \
-              --artifact-type application/vnd.cuberanks.projection.group.v4 \
-              --annotation "io.wcarankings.group=$group" \
-              --annotation "io.wcarankings.export-id=${{ inputs.export_value }}" \
-              --annotation "io.wcarankings.artifact-fingerprint=$fingerprint" \
-              --annotation "io.wcarankings.format-version=4" \
-              "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json" \
-              "$archive_name:application/vnd.cuberanks.projection.tables.v1+gzip" \
-              "$metadata_name:application/vnd.cuberanks.projection.transfer.v4+json"
-            popd >/dev/null
-            digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
-            {
-              echo "### Projection group"
-              echo "- Group: $group"
-              echo "- Digest: $digest"
-              echo "- Dependencies hydrated: ${HYDRATE_GROUPS:-none}"
-            } >> "$GITHUB_STEP_SUMMARY"
-          done
 
       - name: Run ranking scroll benchmark
         if: inputs.run_benchmark == true
@@ -255,6 +211,7 @@ jobs:
             done
           fi
 
+          docker compose stop app >/dev/null 2>&1 || true
           echo "status=$benchmark_status" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -266,6 +223,56 @@ jobs:
           path: benchmark-reports/*.json
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Package projection bundles
+        env:
+          FINGERPRINTS: ${{ inputs.fingerprints }}
+          AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}
+        run: |
+          set -euo pipefail
+          printf '{"groups":%s}\n' "$FINGERPRINTS" > /tmp/fingerprints.json
+          owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          for group in $(printf '%s' "$GROUPS" | tr ',' ' '); do
+            directory="/tmp/built/${group}"
+            mkdir -p "$directory"
+            prefix="$group"
+            if [ "$group" = yearly-person-rankings ]; then prefix=yearly; fi
+            metadata="$directory/${prefix}-projection-transfer.json"
+            archive="$directory/${prefix}-projection-transfer.tar.gz"
+            node scripts/prepare-projection-transfer.mjs --group="$group" > "$metadata"
+            node scripts/export-projection-transfer.mjs --metadata="$metadata" --output="$archive"
+
+            node scripts/projection-release-artifact.mjs create --directory="$directory" \
+              --export-id="${{ inputs.export_value }}" --export-date="${{ inputs.export_date }}" \
+              --groups="$group" --fingerprints-file=/tmp/fingerprints.json \
+              --compatibility-file=release-compatibility.json --source-sha="${{ inputs.ref }}"
+
+            fingerprint=$(jq -r --arg group "$group" '.groups[$group].artifactFingerprint' /tmp/fingerprints.json)
+            corrupt=$(jq -r --arg group "$group" '.[$group].valid == false' <<<"$AVAILABLE_ARTIFACTS")
+            tag="$fingerprint"
+            if [ "$corrupt" = true ]; then tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
+            ref="ghcr.io/${owner}/wcarankings-projection-${group}:${tag}"
+            archive_name=$(basename "$archive")
+            metadata_name=$(basename "$metadata")
+            pushd "$directory" >/dev/null
+            oras push "$ref" \
+              --artifact-type application/vnd.cuberanks.projection.group.v4 \
+              --annotation "io.wcarankings.group=$group" \
+              --annotation "io.wcarankings.export-id=${{ inputs.export_value }}" \
+              --annotation "io.wcarankings.artifact-fingerprint=$fingerprint" \
+              --annotation "io.wcarankings.format-version=4" \
+              "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json" \
+              "$archive_name:application/vnd.cuberanks.projection.tables.v1+gzip" \
+              "$metadata_name:application/vnd.cuberanks.projection.transfer.v4+json"
+            popd >/dev/null
+            digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
+            {
+              echo "### Projection group"
+              echo "- Group: $group"
+              echo "- Digest: $digest"
+              echo "- Dependencies hydrated: ${HYDRATE_GROUPS:-none}"
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
 
       - name: Clean isolated database
         if: always()

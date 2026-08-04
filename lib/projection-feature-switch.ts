@@ -8,8 +8,6 @@ const CORE_TABLES = [
   "ranking_entries_single",
   "ranking_entries_average",
   "ranking_counts",
-  "result_entries_single",
-  "result_counts",
 ] as const;
 const RESULT_RANKINGS_TABLES = [
   "result_rankings_single",

@@ -101,14 +101,7 @@ CREATE TABLE person_event_rankings (
   continent_rank INT UNSIGNED NOT NULL,
   continent_position INT UNSIGNED NOT NULL,
   country_rank INT UNSIGNED NOT NULL,
-  country_position INT UNSIGNED NOT NULL,
-  previous_world_rank INT,
-  previous_continent_rank INT,
-  previous_country_rank INT,
-  world_rank_delta INT,
-  continent_rank_delta INT,
-  country_rank_delta INT,
-  rank_delta_state VARCHAR(11) CHARACTER SET ascii NOT NULL
+  country_position INT UNSIGNED NOT NULL
 );
 
 -- phase: rank person event bests
@@ -171,14 +164,7 @@ SELECT
     ORDER BY
       best.result_value,
       best.person_id
-  ) AS country_position,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  'unavailable'
+  ) AS country_position
 FROM
   person_event_best_results best;
 

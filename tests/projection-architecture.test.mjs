@@ -103,8 +103,36 @@ test("formats table progress against the complete build workload", async () => {
   assert.ok(await countProjectionTables(PROJECTION_REGISTRY) >= PROJECTION_REGISTRY.length);
 });
 
-test("keeps future grains registered while activating person metrics and competition bests", async () => {
-  const [schema, groups, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, personCompetitionRankings, cities, counts, importer] =
+test("defers declared leaf indexes without dropping primary keys", async () => {
+  const [{ DEPLOYMENT_PROJECTION_GROUPS, DEFERRED_PROJECTION_INDEX_TABLES }, indexes] =
+    await Promise.all([
+      import(new URL("scripts/projection-groups.mjs", root)),
+      import(new URL("scripts/lib/projection-indexes.mjs", root)),
+    ]);
+  const resultGroup = DEPLOYMENT_PROJECTION_GROUPS.find(({ name }) =>
+    name === "result-rankings");
+  assert.ok(resultGroup);
+  const definitions = await indexes.projectionIndexesForGroup(resultGroup);
+  assert.ok(definitions.some(({ name }) => name === "idx_results_single_lazy_gender"));
+  assert.equal(DEFERRED_PROJECTION_INDEX_TABLES.has("result_rankings_single"), true);
+  assert.equal(DEFERRED_PROJECTION_INDEX_TABLES.has("result_facts"), false);
+
+  const single = await readFile(
+    new URL("sql/ranking-projections/result_rankings_single.sql", root),
+    "utf8",
+  );
+  const alter = single.split(/;\s*(?:\n|$)/).find((statement) =>
+    statement.includes("ALTER TABLE result_rankings_single"));
+  const deferred = indexes.deferSecondaryIndexes(
+    alter,
+    new Set(["result_rankings_single"]),
+  );
+  assert.match(deferred, /ADD PRIMARY KEY/);
+  assert.doesNotMatch(deferred, /ADD (?:UNIQUE )?INDEX/);
+});
+
+test("keeps future grains registered while activating person and competition rankings", async () => {
+  const [schema, groups, facts, people, resultSingles, resultAverages, sumScores, podiums, competitionEvents, competitions, personCompetitionRankings, cities, counts, importer, profile] =
     await Promise.all([
       readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
       readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
@@ -112,8 +140,6 @@ test("keeps future grains registered while activating person metrics and competi
       readSql("sql/ranking-projections/person_event_rankings.sql"),
       readSql("sql/ranking-projections/result_rankings_single.sql"),
       readSql("sql/ranking-projections/result_rankings_average.sql"),
-      readSql("sql/ranking-projections/person_metric_values.sql"),
-      readSql("sql/ranking-projections/person_metric_scores.sql"),
       readSql("sql/ranking-projections/person_sum_of_ranks_scores.sql"),
       readSql("sql/ranking-projections/competition_podium_members.sql"),
       readSql("sql/ranking-projections/competition_event_stats.sql"),
@@ -122,6 +148,7 @@ test("keeps future grains registered while activating person metrics and competi
       readSql("sql/ranking-projections/city_event_stats.sql"),
       readSql("sql/ranking-projections/entity_ranking_counts.sql"),
       readFile(new URL("scripts/sync-wca-export.mjs", root), "utf8"),
+      readFile(new URL("lib/person-profile.ts", root), "utf8"),
     ]);
   const results = `${resultSingles}\n${resultAverages}`;
 
@@ -134,7 +161,6 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /COMPATIBILITY_PROJECTION_TASKS/);
   assert.match(schema, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-single/);
   assert.match(schema, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-average/);
-  assert.match(schema, /compatibility-result-counts[\s\S]*compatibility-result-entries-single/);
   assert.match(schema, /process\.env\.WCA_PROJECTION_BUILD_CONCURRENCY \?\? 2/);
   assert.match(schema, /createConnection/);
   assert.match(schema, /build:/);
@@ -172,6 +198,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(people, /CREATE TABLE person_event_rankings \(/);
   assert.match(people, /-- phase: rank person event bests/);
   assert.match(people, /world_position/);
+  assert.doesNotMatch(people, /previous_world_rank|rank_delta_state/);
   assert.match(results, /CREATE TABLE result_rankings_single \(/);
   assert.match(resultSingles, /result_value INT UNSIGNED NOT NULL/);
   assert.doesNotMatch(resultSingles, /solve\.\*/);
@@ -185,16 +212,11 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(results, /world_position/);
   assert.match(results, /continent_position/);
   assert.match(results, /country_position/);
-  assert.match(metricValues, /kinch_value/);
-  assert.match(metricValues, /CREATE TEMPORARY TABLE person_metric_references/);
-  assert.match(metricValues, /world_position = 1/);
-  assert.match(metricValues, /continent_position = 1/);
-  assert.match(metricValues, /country_position = 1/);
-  assert.match(metricValues, /-- phase: materialize world person metric values/);
-  assert.match(metricValues, /-- phase: materialize continent person metric values/);
-  assert.match(metricValues, /-- phase: materialize country person metric values/);
-  assert.doesNotMatch(metricValues, /MIN\(personal_result\) OVER/);
-  assert.match(metricScores, /CREATE TABLE person_metric_counts AS/);
+  assert.doesNotMatch(schema, /name: "person-metric-(?:values|scores)"/);
+  assert.doesNotMatch(groups, /tables:\s*\[[^\]]*person_metric_(?:values|scores|counts)/);
+  assert.match(groups, /retiredTables: \[[\s\S]*"person_metric_values"[\s\S]*"person_metric_scores"[\s\S]*"person_metric_counts"/);
+  assert.match(profile, /INNER JOIN person_event_rankings reference/);
+  assert.match(profile, /reference\.world_position = 1/);
   assert.match(sumScores, /CREATE TEMPORARY TABLE sum_of_ranks_historical_bests/);
   assert.match(sumScores, /result\.person_country_id/);
   assert.match(sumScores, /result\.person_continent_id/);
@@ -296,8 +318,6 @@ test("does not introduce entries or sub-rank vocabulary in new schemas", async (
     "person_event_rankings.sql",
     "result_rankings_single.sql",
     "result_rankings_average.sql",
-    "person_metric_values.sql",
-    "person_metric_scores.sql",
     "competition_podium_members.sql",
     "competition_event_stats.sql",
     "competition_stats.sql",
@@ -423,12 +443,11 @@ test("backfills only the active competition-event projection", async () => {
 });
 
 test("person search resolves IDs before querying projections", async () => {
-  const [searchQueries, rankings, results, averageResults, compatibilityResults] = await Promise.all([
+  const [searchQueries, rankings, results, averageResults] = await Promise.all([
     readFile(new URL("services/people/queries.ts", root), "utf8"),
     readFile(new URL("services/rankings/service.ts", root), "utf8"),
     readSql("sql/ranking-projections/result_rankings_single.sql"),
     readSql("sql/ranking-projections/result_rankings_average.sql"),
-    readSql("sql/ranking-projections/result_entries_single_indexes.sql"),
   ]);
 
   assert.match(searchQueries, /FROM persons/);
@@ -443,10 +462,6 @@ test("person search resolves IDs before querying projections", async () => {
   assert.match(averageResults, /gender ENUM\('m', 'f', 'o'\) NOT NULL/);
   assert.doesNotMatch(averageResults, /FIND_IN_SET|gender_set/);
   assert.match(averageResults, /idx_results_average_person/);
-  assert.match(compatibilityResults, /PRIMARY KEY \(result_id\)/);
-  assert.match(compatibilityResults, /idx_result_entries_single_event/);
-  assert.match(compatibilityResults, /idx_result_entries_single_continent/);
-  assert.match(compatibilityResults, /idx_result_entries_single_country/);
 });
 
 test("builds Sum of Ranks as one published score projection", async () => {

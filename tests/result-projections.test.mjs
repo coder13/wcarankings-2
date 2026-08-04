@@ -5,12 +5,10 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const readSql = async (path) => (await readFile(new URL(path, root), "utf8")).replace(/\s+/g, " ");
 
-test("builds a result-level compatibility projection with count-oriented indexes", async () => {
-  const [source, indexes, counts, schema, importer, preflight, backfill, resultBackfill, dockerfile, deploy, fixture] = await Promise.all([
-    readSql("sql/ranking-projections/result_entries_single_source.sql"),
-    readSql("sql/ranking-projections/result_entries_single_indexes.sql"),
-    readSql("sql/ranking-projections/result_counts.sql"),
+test("retires the unused result-level compatibility projection", async () => {
+  const [schema, groups, importer, preflight, backfill, resultBackfill, dockerfile, deploy, fixture] = await Promise.all([
     readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
+    readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
     readFile(new URL("scripts/sync-wca-export.mjs", root), "utf8"),
     readFile(new URL("scripts/check-ranking-projections.mjs", root), "utf8"),
     readFile(new URL("scripts/backfill-result-entries.mjs", root), "utf8"),
@@ -20,26 +18,10 @@ test("builds a result-level compatibility projection with count-oriented indexes
     readSql("tests/fixtures/visual-smoke.sql"),
   ]);
 
-  assert.match(source, /FROM results r/);
-  assert.match(source, /WHERE r\.best > 0/);
-  assert.match(source, /r\.id AS result_id/);
-  assert.match(source, /comp\.year/);
-  assert.match(source, /comp\.month/);
-  assert.match(source, /comp\.day/);
-  assert.doesNotMatch(source, /comp\.start_date/);
-  assert.match(source, /DENSE_RANK\(\) OVER \(/);
-  assert.match(source, /ROW_NUMBER\(\) OVER \(/);
-  assert.match(source, /PARTITION BY r\.event_id, COALESCE\(c\.continent_id, ''\)/);
-  assert.match(source, /PARTITION BY r\.event_id, COALESCE\(p\.country_id, ''\)/);
-  assert.match(indexes, /PRIMARY KEY \(result_id\)/);
-  assert.match(indexes, /idx_result_entries_single_event \(event_id\)/);
-  assert.match(indexes, /idx_result_entries_single_continent \(event_id, continent_id\)/);
-  assert.match(indexes, /idx_result_entries_single_country \(event_id, country_id\)/);
-  assert.match(counts, /FROM result_entries_single/);
-  assert.match(counts, /PRIMARY KEY \(event_id, scope, region_id\)/);
-  assert.match(schema, /result_entries_single_source/);
-  assert.match(schema, /result_entries_single_indexes\.sql/);
-  assert.match(schema, /result_counts\.sql/);
+  assert.doesNotMatch(groups, /tables:\s*\[[^\]]*result_entries_single/);
+  assert.doesNotMatch(groups, /tables:\s*\[[^\]]*result_counts/);
+  assert.match(groups, /retiredTables: \["result_entries_single", "result_counts"\]/);
+  assert.match(schema, /RETIRED_PROJECTION_TABLES/);
   assert.match(schema, /\(\?!\[A-Za-z0-9_\]\)/);
   assert.doesNotMatch(schema, /replaceAll\(table, `\$\{table\}\$\{suffix\}`\)/);
   assert.match(schema, /idx_results_single_event_best/);
@@ -48,14 +30,10 @@ test("builds a result-level compatibility projection with count-oriented indexes
   assert.match(schema, /table === "persons" && name === "idx_persons_wca_sub"/);
   assert.match(importer, /if \(rawOnly\) \{\s+await refreshRawPersonLookupIndex\(\)/);
   assert.match(schema, /Skipping \$\{table\} index \$\{name\}; table is not present/);
-  assert.match(importer, /result_entries_single_staging/);
-  assert.match(importer, /result_counts_staging/);
+  assert.match(importer, /result_rankings_single_staging/);
+  assert.match(importer, /result_ranking_counts_staging/);
   assert.match(importer, /published_result_count/);
-  assert.match(preflight, /result_entries_single/);
-  assert.match(preflight, /idx_result_entries_single_event/);
-  assert.match(preflight, /idx_result_entries_single_continent/);
-  assert.match(preflight, /idx_result_entries_single_country/);
-  assert.doesNotMatch(preflight, /idx_result_entries_single_world/);
+  assert.doesNotMatch(preflight, /result_entries_single|result_counts/);
   assert.match(backfill, /refreshMysqlSchema/);
   assert.match(backfill, /promoteProjectionTables/);
   assert.match(resultBackfill, /result-ranking-counts/);
@@ -94,7 +72,7 @@ test("materializes attempt facts once as an index-free build stage", async () =>
   assert.match(cleanup, /DROP TEMPORARY TABLE solve_facts_stage/);
   assert.match(schema, /name: "result-rankings"[\s\S]*files: \["solve_facts\.sql"[\s\S]*"solve_facts_cleanup\.sql"\]/);
   assert.doesNotMatch(schema, /name: "solve-facts"/);
-  assert.match(schema, /RETIRED_PROJECTION_TABLES = \[[\s\S]*"solve_facts"/);
+  assert.match(groups, /retiredTables: \[[\s\S]*"solve_facts"/);
   assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts"\][\s\S]*solve_facts_cleanup\.sql/);
   assert.doesNotMatch(groups, /name: "solve-facts"/);
   assert.match(single, /-- phase: materialize Single result rankings/);
@@ -141,8 +119,9 @@ test("defers all gender result cohorts to normalized base projections", async ()
   }
   assert.match(single, /solve\.gender/);
   assert.match(average, /result\.gender/);
-  assert.match(schema, /RETIRED_PROJECTION_TABLES = \[[\s\S]*"result_gender_ranking_counts"[\s\S]*"result_gender_rankings_average"[\s\S]*"result_gender_rankings_single"/);
-  assert.doesNotMatch(groups, /result_gender_rankings|result_gender_ranking_counts/);
+  assert.match(schema, /RETIRED_PROJECTION_TABLES/);
+  assert.match(groups, /retiredTables: \[[\s\S]*"result_gender_ranking_counts"[\s\S]*"result_gender_rankings_average"[\s\S]*"result_gender_rankings_single"/);
+  assert.doesNotMatch(groups, /tables:\s*\[[^\]]*result_gender_(?:rankings|ranking_counts)/);
   assert.doesNotMatch(listResults, /result_gender_rankings|gender_set/);
   assert.match(listResults, /ranking\.gender IN/);
   assert.doesNotMatch(listWorker, /result_gender_rankings|gender_set/);

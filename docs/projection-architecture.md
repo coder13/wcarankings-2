@@ -61,7 +61,7 @@ purpose. Existing `_entries` tables can remain temporarily for compatibility.
 
 ## Active projection graph
 
-The default import activates shared facts and the result, person-metric,
+The default import activates shared facts and the result, person-event,
 competition, city, Sum-of-Ranks, and yearly-person projection groups:
 
 ```text
@@ -71,7 +71,6 @@ raw results + dimensions
     │   ├── result_rankings_single
     │   └── result_rankings_average
     ├── person_event_rankings
-    │   └── person_metric_values → person_metric_scores
     └── city, yearly, competition, and Sum-of-Ranks projections
 ```
 
@@ -178,13 +177,6 @@ continent_rank
 continent_position
 country_rank
 country_position
-previous_world_rank
-previous_continent_rank
-previous_country_rank
-world_rank_delta
-continent_rank_delta
-country_rank_delta
-rank_delta_state
 ```
 
 Physically splitting this into `person_event_single_rankings` and
@@ -476,10 +468,14 @@ Caching only the compressed WCA archive therefore does not remove the dominant
 cost: importing raw data and rebuilding compatibility projections and indexes
 inside a cold MariaDB instance. Transfer artifacts are now cached by export
 date and projection-schema hash so unchanged deploys can reuse a validated
-generation. New artifacts omit secondary indexes during logical import and
-rebuild all indexes for a table together after its bulk data load. A future
-runner experiment may still benefit from caching a validated imported database
-snapshot or building only the projection group being deployed.
+generation. Daily Actions builds omit secondary indexes from leaf projections.
+Their exact desired definitions are read from the projection SQL and stored in
+transfer metadata, so the importer bulk-loads index-free rows and constructs the
+final indexes once. `result_facts` keeps its builder-side indexes because later
+projection groups use them. Benchmark builds opt out of deferral and run against
+fully indexed canonical tables before packaging. A future runner experiment may
+still benefit from caching a validated imported database snapshot or building
+only the projection group being deployed.
 
 The first successful production publication used a 432,325,262-byte artifact.
 The cold Actions build and dump took 2,547 seconds; transfer, bulk import,
@@ -492,13 +488,13 @@ The 22 deferred indexes took approximately 171 seconds on the successful
 cache-hit run. The five `result_entries_single` indexes accounted for 125.6
 seconds; Sum of Ranks indexes took 15.6 seconds, person-event single and average
 indexes took 14.4 and 12.3 seconds, and competition indexes took less than three
-seconds. No application query used the compatibility result table's five
-secondary indexes; result browsing uses `result_rankings`. The unused indexes
-were subsequently removed, leaving the compatibility table's primary key. The
-next cold build and dump completed in 24 minutes 15 seconds, a 42.9% reduction,
-and production transfer and publication completed in 5 minutes 08 seconds, a
-27.2% reduction. Deferred-index work fell to 17 indexes and approximately 43
-seconds.
+seconds. No application query used the compatibility result table; result
+browsing uses `result_rankings`. Its unused indexes were first removed, and the
+table and its count table were later retired entirely. The next cold build and
+dump after the index removal completed in 24 minutes 15 seconds, a 42.9%
+reduction, and production transfer and publication completed in 5 minutes 08
+seconds, a 27.2% reduction. Deferred-index work fell to 17 indexes and
+approximately 43 seconds.
 
 Deployment projection builds use the export date already published on
 production, not the newest export advertised by the WCA API. This keeps raw
@@ -517,95 +513,17 @@ people under both SOR and Kinch ordering. Local HTTP observations returned the
 first 50-row SOR page in 6 ms, a page around position 250,000 in 21 ms, and the
 first Kinch page in 8 ms.
 
-### General metric projections
+### Metric detail reads
 
-### `person_metric_values`
+`person_metric_values`, `person_metric_scores`, and `person_metric_counts` are
+retired. No list or ranking API read them, and their 5.7 million transferred
+rows duplicated data already present in the canonical projections.
 
-Metric row:
-
-```text
-metric version + event-set version + result type + scope + region + person + event
-```
-
-Columns:
-
-```text
-metric_version
-event_set_version
-result_type
-scope
-region_id
-person_id
-event_id
-event_rank
-personal_result
-reference_result
-sum_of_ranks_value
-kinch_value
-```
-
-The shared input and reference values are stored once per scope/person/event.
-Metric values use separate columns rather than duplicating the row once per
-metric. This keeps the components auditable while halving the largest metric
-table. Its primary key already supports person-detail lookup, so no duplicate
-secondary index is maintained. Metric scores aggregate both value columns in
-one pass before expanding the much smaller person totals by metric.
-
-Reference values are collected once from the position-1 person-event row for
-each cohort. World, continent, and country values are then inserted in three
-sort-free passes. This replaces a 5.7M-row materialization that calculated the
-same `MIN(personal_result)` window twice per row.
-
-Initial metrics:
-
-```text
-sum_of_ranks
-kinch
-```
-
-### `person_metric_scores`
-
-Metric row:
-
-```text
-metric + metric version + result type + scope + region + person
-```
-
-Columns:
-
-```text
-metric
-metric_version
-event_set_version
-result_type
-scope
-region_id
-person_id
-score
-coverage
-required_coverage
-rank
-position
-```
-
-Sum of Ranks v1 includes people with partial coverage. Missing results use the
-event-specific fallback rank for the selected scope and region. Kinch must have
-an explicit, versioned missing-event and Overall aggregation policy.
-
-The v1 policy is:
-
-- Sum of Ranks Single includes all 17 current Single events.
-- Sum of Ranks Average includes all 16 current Average events.
-- If an event has 10 ranked competitors, a missing result contributes rank 11.
-- Fallbacks are calculated independently for World, continent, and country.
-- Kinch combines all 17 current events, chooses the better Single/Average ratio
-  for FMC and blindfolded events, uses the special Multi-Blind score, and
-  assigns zero percent to each missing event.
-- Country Kinch rows store both NR Kinch ordering and CR Kinch companion
-  score/rank/position values for country-cohort CR ordering.
-
-Any event-set or missing-event policy change increments `metric_version` or
-`event_set_version`; it does not silently reinterpret stored v1 rows.
+Overall Sum of Ranks and Kinch pages and profile totals read
+`person_sum_of_ranks_scores`. A profile's bounded per-event Kinch detail joins
+the selected person's `person_event_rankings` rows to the corresponding World
+position-1 rows and calculates the ratios at request time. This adds a small
+indexed lookup to a person profile while avoiding a global daily materialization.
 
 ## Time-based rankings
 
@@ -952,9 +870,8 @@ person-event best staging, and sort-free metric reference joins.
 These decisions affect future migrations or planned projection layers; they do
 not make the current contract provisional:
 
-1. When compatibility `_entries` tables can be retired after consumers move to
-   unified semantic ranking tables. `result_entries_single` is the highest
-   priority because it repeats millions of result rows and a full index set.
+1. When the remaining person-ranking compatibility `_entries` tables can be
+   retired after all consumers move to unified semantic ranking tables.
 2. Whether a future metric version should use different event sets or Kinch
    aggregation semantics.
 3. Whether yearly source indexes justify their storage cost.

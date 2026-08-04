@@ -102,7 +102,6 @@ test("bootstrap fails closed without complete, valid export metadata", async () 
   const tables = [
     "ranking_generation_state", "export_metadata",
     "ranking_entries_single", "ranking_entries_average", "ranking_counts",
-    "result_entries_single", "result_counts",
   ];
   for (const exportRows of [
     [],
@@ -133,7 +132,6 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
   const tables = [
     "ranking_generation_state", "export_metadata",
     "ranking_entries_single", "ranking_entries_average", "ranking_counts",
-    "result_entries_single", "result_counts",
     "competition_podium_members", "competition_event_stats", "competition_stats",
     "city_event_stats",
   ];
@@ -233,14 +231,15 @@ test("activated-phase recovery verifies the exact release identity and fingerpri
 
 test("activation renames raw data, projections, export metadata, and state atomically", async () => {
   const tables = activationTables(manifest);
+  const retired = ["result_entries_single", "result_counts", "person_metric_values"];
   const connection = fakeConnection({
     schemas: {
-      wcarankings: tables,
+      wcarankings: [...tables, ...retired],
       wcarankings_candidate_30: tables,
       wcarankings_candidate_30_previous: [],
     },
   });
-  await activateGeneration({
+  const result = await activateGeneration({
     connection,
     productionSchema: "wcarankings",
     candidateSchema: "wcarankings_candidate_30",
@@ -254,7 +253,34 @@ test("activation renames raw data, projections, export metadata, and state atomi
   assert.match(rename.sql, /`wcarankings_candidate_30`\.`export_metadata` TO `wcarankings`\.`export_metadata`/);
   assert.match(rename.sql, /`wcarankings_candidate_30`\.`ranking_generation_state` TO `wcarankings`\.`ranking_generation_state`/);
   assert.match(rename.sql, /`wcarankings`\.`results` TO `wcarankings_candidate_30_previous`\.`results`/);
+  assert.match(rename.sql, /`wcarankings`\.`result_entries_single` TO `wcarankings_candidate_30_previous`\.`result_entries_single`/);
+  assert.ok(result.state.previousTables.includes("person_metric_values"));
   assert.doesNotMatch(rename.sql, /DROP TABLE/);
+});
+
+test("rollback restores projection tables retired by the active generation", async () => {
+  const tables = activationTables(manifest);
+  const activeRow = stateRow({
+    artifactId: 30,
+    activation: tables,
+    previous: [...tables, "result_entries_single"],
+  });
+  const connection = fakeConnection({
+    activeRow,
+    schemas: {
+      wcarankings: tables,
+      wcarankings_candidate_30: [],
+    },
+  });
+  const result = await rollbackGeneration({
+    connection,
+    productionSchema: "wcarankings",
+    candidateSchema: "wcarankings_candidate_30",
+    artifactId: 30,
+  });
+  assert.equal(result.rolledBack, true);
+  const rename = connection.statements.find(({ sql }) => sql.startsWith("RENAME TABLE"));
+  assert.match(rename.sql, /`wcarankings_candidate_30_previous`\.`result_entries_single` TO `wcarankings`\.`result_entries_single`/);
 });
 
 test("failure before state staging cannot change active production tables", async () => {
