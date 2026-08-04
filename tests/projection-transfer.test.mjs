@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import test from "node:test";
-import { normalizeExportDate } from "../scripts/lib/projection-transfer-date.mjs";
+import { test } from "bun:test";
+import { normalizeExportDate } from "../data-tools/shared/date.ts";
 
 const prepare = await readFile(
-  new URL("../scripts/prepare-projection-transfer.mjs", import.meta.url),
+  new URL("../scripts/prepare-projection-transfer.ts", import.meta.url),
   "utf8",
 );
 const publish = await readFile(
-  new URL("../scripts/publish-projection-transfer.mjs", import.meta.url),
+  new URL("../scripts/publish-projection-transfer.ts", import.meta.url),
   "utf8",
 );
 const dockerfile = await readFile(
@@ -16,15 +16,15 @@ const dockerfile = await readFile(
   "utf8",
 );
 const schema = await readFile(
-  new URL("../scripts/mysql-schema.mjs", import.meta.url),
+  new URL("../data-tools/projections/build.ts", import.meta.url),
   "utf8",
 );
 const groups = await readFile(
-  new URL("../scripts/projection-groups.mjs", import.meta.url),
+  new URL("../data-tools/projections/jobs.ts", import.meta.url),
   "utf8",
 );
 const syncWcaExport = await readFile(
-  new URL("../scripts/sync-wca-export.mjs", import.meta.url),
+  new URL("../scripts/sync-wca-export.ts", import.meta.url),
   "utf8",
 );
 const canonicalExportMigration = await readFile(
@@ -75,7 +75,9 @@ test("rejects missing and invalid export dates", () => {
 
 test("packages the export-date normalizer with the publisher", () => {
   assert.match(dockerfile, /COPY --chown=data-tools:data-tools scripts \.\/scripts/);
-  assert.match(dockerfile, /ENTRYPOINT \["node"\]/);
+  assert.match(dockerfile, /COPY --chown=data-tools:data-tools data-tools \.\/data-tools/);
+  assert.match(dockerfile, /FROM oven\/bun:1\.3\.3-debian/);
+  assert.match(dockerfile, /ENTRYPOINT \["bun"\]/);
 });
 
 test("supports a canonical export date when importing a supplied SQL export", () => {
@@ -94,9 +96,10 @@ test("dry-run WCA export caching does not require a database connection", () => 
   );
 });
 
-test("publishes result facts as an independent dependency artifact", () => {
-  assert.match(schema, /name: "result-facts"[\s\S]*enabledByDefault: true/);
-  assert.match(groups, /name: "result-facts"[\s\S]*tables: \["result_facts"\]/);
-  assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts"\]/);
-  assert.match(groups, /name: "city-rankings"[\s\S]*dependencies: \["result-facts", "competition-rankings"\]/);
+test("publishes result facts as an independent dependency artifact", async () => {
+  const { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } = await import("../data-tools/projections/jobs.ts");
+  assert.ok(PROJECTION_JOBS.some((job) => job.id === "result-facts" && job.enabledByDefault));
+  assert.deepEqual(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "result-facts")?.tables, ["result_facts"]);
+  assert.deepEqual(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "result-rankings")?.dependencies, ["result-facts"]);
+  assert.deepEqual(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "city-rankings")?.dependencies, ["result-facts", "competition-rankings"]);
 });

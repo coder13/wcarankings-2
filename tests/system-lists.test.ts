@@ -3,11 +3,8 @@ import test from "node:test";
 import {
   primaryNameToken,
   SYSTEM_LIST_DEFINITIONS,
-} from "../scripts/lib/system-list-definitions.mjs";
-import {
-  boardMemberIds,
-  roleMemberIds,
-} from "../scripts/refresh-board-list.mjs";
+} from "../scripts/system-list-definitions.ts";
+import { boardMemberIds, roleMemberIds } from "../scripts/refresh-board-list.ts";
 
 test("system list aliases are stable and unique", () => {
   assert.deepEqual(

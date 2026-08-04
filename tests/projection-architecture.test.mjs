@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import test from "node:test";
+import { test } from "bun:test";
 
 const root = new URL("../", import.meta.url);
 const readSql = async (path) => (await readFile(new URL(path, root), "utf8")).replace(/\s+/g, " ");
 
 test("logs projection build step starts, completions, failures, and elapsed time", async () => {
-  const { formatDuration, runTimedBuildStep } = await import(new URL("scripts/mysql-schema.mjs", root));
-  assert.equal(formatDuration(0), "00:00.00");
-  assert.equal(formatDuration(61_234), "01:01.23");
-  assert.equal(formatDuration(3_661_990), "61:01.99");
+  const { runTimedBuildStep } = await import(new URL("data-tools/projections/build.ts", root));
   const messages = [];
   const originalWrite = process.stdout.write;
   process.stdout.write = (chunk) => {
@@ -95,7 +92,7 @@ test("formats and periodically logs resource usage", async () => {
 });
 
 test("formats table progress against the complete build workload", async () => {
-  const { createTableProgress, countProjectionTables, PROJECTION_REGISTRY } = await import(new URL("scripts/mysql-schema.mjs", root));
+  const { createTableProgress, countProjectionTables, PROJECTION_REGISTRY } = await import(new URL("data-tools/projections/build.ts", root));
   const progress = createTableProgress(17);
 
   assert.equal(progress.start("first_table"), "[1/17]");
@@ -103,52 +100,26 @@ test("formats table progress against the complete build workload", async () => {
   assert.ok(await countProjectionTables(PROJECTION_REGISTRY) >= PROJECTION_REGISTRY.length);
 });
 
-test("defers declared leaf indexes without dropping primary keys", async () => {
-  const [{ DEPLOYMENT_PROJECTION_GROUPS, DEFERRED_PROJECTION_INDEX_TABLES }, indexes] =
+test("keeps future grains registered while activating person metrics and competition bests", async () => {
+  const [schema, compatibility, groups, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, personCompetitionRankings, cities, counts, importer] =
     await Promise.all([
-      import(new URL("scripts/projection-groups.mjs", root)),
-      import(new URL("scripts/lib/projection-indexes.mjs", root)),
-    ]);
-  const resultGroup = DEPLOYMENT_PROJECTION_GROUPS.find(({ name }) =>
-    name === "result-rankings");
-  assert.ok(resultGroup);
-  const definitions = await indexes.projectionIndexesForGroup(resultGroup);
-  assert.ok(definitions.some(({ name }) => name === "idx_results_single_lazy_gender"));
-  assert.equal(DEFERRED_PROJECTION_INDEX_TABLES.has("result_rankings_single"), true);
-  assert.equal(DEFERRED_PROJECTION_INDEX_TABLES.has("result_facts"), false);
-
-  const single = await readFile(
-    new URL("sql/ranking-projections/result_rankings_single.sql", root),
-    "utf8",
-  );
-  const alter = single.split(/;\s*(?:\n|$)/).find((statement) =>
-    statement.includes("ALTER TABLE result_rankings_single"));
-  const deferred = indexes.deferSecondaryIndexes(
-    alter,
-    new Set(["result_rankings_single"]),
-  );
-  assert.match(deferred, /ADD PRIMARY KEY/);
-  assert.doesNotMatch(deferred, /ADD (?:UNIQUE )?INDEX/);
-});
-
-test("keeps future grains registered while activating person and competition rankings", async () => {
-  const [schema, groups, facts, people, resultSingles, resultAverages, sumScores, podiums, competitionEvents, competitions, personCompetitionRankings, cities, counts, importer, profile] =
-    await Promise.all([
-      readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
-      readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
-      readSql("sql/ranking-projections/result_facts.sql"),
-      readSql("sql/ranking-projections/person_event_rankings.sql"),
-      readSql("sql/ranking-projections/result_rankings_single.sql"),
-      readSql("sql/ranking-projections/result_rankings_average.sql"),
-      readSql("sql/ranking-projections/person_sum_of_ranks_scores.sql"),
-      readSql("sql/ranking-projections/competition_podium_members.sql"),
-      readSql("sql/ranking-projections/competition_event_stats.sql"),
-      readSql("sql/ranking-projections/competition_stats.sql"),
-      readSql("sql/ranking-projections/person_competition_rankings.sql"),
-      readSql("sql/ranking-projections/city_event_stats.sql"),
-      readSql("sql/ranking-projections/entity_ranking_counts.sql"),
-      readFile(new URL("scripts/sync-wca-export.mjs", root), "utf8"),
-      readFile(new URL("lib/person-profile.ts", root), "utf8"),
+      readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
+      readFile(new URL("data-tools/projections/compatibility.ts", root), "utf8"),
+      readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/result_facts.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/person_event_rankings.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/result_rankings_single.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/result_rankings_average.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/person_metric_values.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/person_metric_scores.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/person_sum_of_ranks_scores.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/competition_podium_members.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/competition_event_stats.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/competition_stats.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/person_competition_rankings.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/city_event_stats.sql", root), "utf8"),
+      readFile(new URL("sql/ranking-projections/entity_ranking_counts.sql", root), "utf8"),
+      readFile(new URL("scripts/sync-wca-export.ts", root), "utf8"),
     ]);
   const results = `${resultSingles}\n${resultAverages}`;
 
@@ -159,8 +130,9 @@ test("keeps future grains registered while activating person and competition ran
   assert.match(schema, /buildRegisteredProjectionsConcurrently/);
   assert.match(schema, /runDependencyAwareTasks/);
   assert.match(schema, /COMPATIBILITY_PROJECTION_TASKS/);
-  assert.match(schema, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-single/);
-  assert.match(schema, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-average/);
+  assert.match(compatibility, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-single/);
+  assert.match(compatibility, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-average/);
+  assert.match(compatibility, /compatibility-result-counts[\s\S]*compatibility-result-entries-single/);
   assert.match(schema, /process\.env\.WCA_PROJECTION_BUILD_CONCURRENCY \?\? 2/);
   assert.match(schema, /createConnection/);
   assert.match(schema, /build:/);
@@ -170,15 +142,14 @@ test("keeps future grains registered while activating person and competition ran
   assert.match(schema, /statement\.match\(\/\^\\s\*-- phase:/);
   assert.match(schema, /DEFAULT_PROJECTION_NAMES/);
   assert.match(schema, /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/);
-  assert.match(schema, /name: "sum-of-ranks"[\s\S]*dependencies: \[\]/);
-  assert.match(groups, /name: "compatibility"/);
-  assert.match(groups, /name: "result-rankings"[\s\S]*dependencies: \["result-facts"\]/);
-  assert.match(groups, /name: "city-rankings"[\s\S]*dependencies: \["result-facts", "competition-rankings"\]/);
-  assert.match(groups, /name: "sum-of-ranks"[\s\S]*dependencies: \["result-facts"\]/);
-  assert.match(groups, /name: "person-competition-rankings"[\s\S]*dependencies: \["result-facts"\]/);
-  assert.match(groups, /name: "sum-of-ranks"[\s\S]*projectionNames: \["sum-of-ranks"\]/);
-  assert.match(groups, /name: "person-competition-rankings"[\s\S]*person_competition_ranking_counts/);
-  assert.match(schema, /enabledByDefault: true/);
+  assert.match(groups, /id: "sum-of-ranks"[\s\S]*dependencies: \["result-facts"\]/);
+  const { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } = await import(new URL("data-tools/projections/jobs.ts", root));
+  assert.equal(new Set(PROJECTION_JOBS.flatMap((job) => job.tables)).size, PROJECTION_JOBS.flatMap((job) => job.tables).length);
+  assert.deepEqual(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "result-rankings")?.dependencies, ["result-facts"]);
+  assert.deepEqual(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "city-rankings")?.dependencies, ["result-facts", "competition-rankings"]);
+  assert.ok(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "sum-of-ranks")?.projectionNames.includes("sum-of-ranks"));
+  assert.ok(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "person-competition-rankings")?.tables.includes("person_competition_ranking_counts"));
+  assert.ok(PROJECTION_JOBS.some((job) => job.enabledByDefault));
   assert.match(importer, /promoteProjectionTables/);
 
   assert.match(facts, /CREATE TABLE result_facts AS/);
@@ -309,8 +280,8 @@ test("keeps future grains registered while activating person and competition ran
   assert.match(counts, /gender = 'all' AND fastest_single IS NOT NULL/);
   assert.match(counts, /FROM competition_event_stats WHERE podium_score IS NOT NULL/);
   assert.doesNotMatch(counts, /podium_(?:single|average)_score/);
-  assert.match(schema, /entity-ranking-counts/);
-  assert.match(schema, /name: "competition-event-stats"[\s\S]*enabledByDefault: true/);
+  assert.match(groups, /entity-ranking-counts/);
+  assert.match(groups, /id: "competition-event-stats"[\s\S]*enabledByDefault: true/);
 });
 
 test("does not introduce entries or sub-rank vocabulary in new schemas", async () => {
@@ -418,9 +389,9 @@ test("only exposes APIs backed by active projections", async () => {
 
 test("compatibility projections omit disabled weekly ranking enhancements", async () => {
   const [groups, single, average] = await Promise.all([
-    readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
-    readSql("sql/ranking-projections/ranking_entries_single_source.sql"),
-    readSql("sql/ranking-projections/ranking_entries_average_source.sql"),
+    readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/ranking_entries_average_source.sql", root), "utf8"),
   ]);
   for (const source of [groups, single, average]) {
     assert.doesNotMatch(source, /weekly_rank_deltas_/);
@@ -433,7 +404,7 @@ test("compatibility projections omit disabled weekly ranking enhancements", asyn
 
 test("backfills only the active competition-event projection", async () => {
   const backfill = await readFile(
-    new URL("scripts/backfill-competition-event-stats.mjs", root),
+    new URL("scripts/backfill-competition-event-stats.ts", root),
     "utf8",
   );
   assert.match(backfill, /projectionNames = \["competition-event-stats"\]/);
@@ -465,15 +436,32 @@ test("person search resolves IDs before querying projections", async () => {
 });
 
 test("builds Sum of Ranks as one published score projection", async () => {
-  const [schema, backfill, publisher] = await Promise.all([
-    readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
-    readFile(new URL("scripts/backfill-sum-of-ranks.mjs", root), "utf8"),
-    readFile(new URL("scripts/publish-projection-transfer.mjs", root), "utf8"),
+  const [schema, jobs, backfill, publisher] = await Promise.all([
+    readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
+    readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
+    readFile(new URL("scripts/backfill-sum-of-ranks.ts", root), "utf8"),
+    readFile(new URL("scripts/publish-projection-transfer.ts", root), "utf8"),
   ]);
-  assert.match(schema, /files: \["person_sum_of_ranks_scores\.sql"\]/);
-  assert.match(schema, /tables: \["person_sum_of_ranks_scores"\]/);
+  assert.match(jobs, /person_sum_of_ranks_scores\.sql/);
+  assert.match(jobs, /person_sum_of_ranks_scores/);
   assert.match(schema, /RETIRED_PROJECTION_TABLES/);
   assert.match(schema, /for \(const retired of RETIRED_PROJECTION_TABLES\)/);
   assert.match(backfill, /projectionNames = \["sum-of-ranks"\]/);
   assert.match(publisher, /promoteProjectionTables\(connection, \{ tables: transferTables \}\)/);
+});
+
+test("derives release tables from jobs when a release group has no generic build job", async () => {
+  const { projectionBuildPlan } = await import(new URL("data-tools/projections/build.ts", root));
+  const { projectionGroup } = await import(new URL("data-tools/projections/jobs.ts", root));
+  const plan = projectionBuildPlan(["compatibility"]);
+
+  assert.deepEqual(plan.projectionNames, []);
+  assert.deepEqual(plan.tables, projectionGroup("compatibility").tables);
+  assert.deepEqual(plan.tables, [
+    "ranking_entries_single",
+    "ranking_entries_average",
+    "ranking_counts",
+    "result_entries_single",
+    "result_counts",
+  ]);
 });

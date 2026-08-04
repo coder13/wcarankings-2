@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import test from "node:test";
+import { test } from "bun:test";
 
 import {
   DEFAULT_PROJECTION_NAMES,
@@ -14,7 +14,7 @@ import {
   personYearRankingTaskPlan,
   renameCompatibilitySql,
   runDependencyAwareTasks,
-} from "../scripts/mysql-schema.mjs";
+} from "../data-tools/projections/build.ts";
 
 function fakeConnection(id, closed) {
   return {

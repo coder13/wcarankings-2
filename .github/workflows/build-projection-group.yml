@@ -61,6 +61,10 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
 
@@ -102,7 +106,7 @@ jobs:
           docker compose run --rm flyway migrate
           docker compose run --rm -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
             -e FLYWAY_TABLE=flyway_schema_history_results flyway migrate
-          node scripts/sync-wca-export.mjs --force --raw-only \
+          bun scripts/sync-wca-export.ts --force --raw-only \
             --sql-path="/tmp/wca-export-cache/wca-export-${{ inputs.export_date }}.sql.zip" \
             --canonical-export-date="${{ inputs.export_value }}"
 
@@ -132,7 +136,7 @@ jobs:
             fi
             repository=${ref%%:*}
             oras pull "${repository}@${digest}" -o "$destination"
-            node scripts/projection-release-artifact.mjs verify \
+            bun scripts/projection-release-artifact.ts verify \
               --directory="$destination" --groups="$group" \
               --export-id="${{ inputs.export_value }}" \
               --fingerprints-file=/tmp/fingerprints.json
@@ -141,9 +145,9 @@ jobs:
             transfer_directory="/tmp/transfer-${group}"
             mkdir -p "$transfer_directory"
             tar -xzf "$destination/$archive" -C "$transfer_directory"
-            DATABASE_NAME_OVERRIDE="$MYSQL_DATABASE" node scripts/import-projection-transfer.mjs \
+            DATABASE_NAME_OVERRIDE="$MYSQL_DATABASE" bun scripts/import-projection-transfer.ts \
               --directory="$transfer_directory" --metadata="$metadata" --concurrency=2
-            node scripts/publish-projection-transfer.mjs --hydrate --groups="$group" \
+            bun scripts/publish-projection-transfer.ts --hydrate --groups="$group" \
               --expected-export-date="${{ inputs.export_value }}"
           done
 
@@ -230,7 +234,28 @@ jobs:
           AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}
         run: |
           set -euo pipefail
+          bun scripts/projection-build-plan.ts --groups="$GROUP" \
+            --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
+          WCA_PROJECTION_BUILD_CONCURRENCY=2 bun scripts/build-projection-groups.ts \
+            --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
+            --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
+            --include-compatibility="$(jq -r '.includeCompatibility' /tmp/build-plan.json)"
+
+          directory="/tmp/built/${GROUP}"
+          mkdir -p "$directory"
+          prefix="$GROUP"
+          if [ "$GROUP" = yearly-person-rankings ]; then prefix=yearly; fi
+          metadata="$directory/${prefix}-projection-transfer.json"
+          archive="$directory/${prefix}-projection-transfer.tar.gz"
+          bun scripts/prepare-projection-transfer.ts --group="$GROUP" > "$metadata"
+          bun scripts/export-projection-transfer.ts --metadata="$metadata" --output="$archive"
+
           printf '{"groups":%s}\n' "$FINGERPRINTS" > /tmp/fingerprints.json
+          bun scripts/projection-release-artifact.ts create --directory="$directory" \
+            --export-id="${{ inputs.export_value }}" --export-date="${{ inputs.export_date }}" \
+            --groups="$GROUP" --fingerprints-file=/tmp/fingerprints.json \
+            --compatibility-file=release-compatibility.json --source-sha="${{ inputs.ref }}"
+
           owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
           for group in $(printf '%s' "$GROUPS" | tr ',' ' '); do
             directory="/tmp/built/${group}"

@@ -35,7 +35,7 @@ cat > "$transfer_root/transfer.json" << 'JSON'
   "tables": ["bulk_transfer_alpha", "bulk_transfer_beta"]
 }
 JSON
-node scripts/export-projection-transfer.mjs \
+bun scripts/export-projection-transfer.ts \
   --metadata="$transfer_root/transfer.json" \
   --output="$transfer_root/transfer.tar.gz"
 docker compose exec -T db mariadb \
@@ -50,7 +50,7 @@ DATA_TOOLS_IMAGE_REF=wcarankings-data-tools:pull-request \
   -e WCA_PROJECTION_IMPORT_CONCURRENCY=2 \
   -v "$transfer_root/files:/projection-transfer:ro" \
   -v "$transfer_root/transfer.json:/projection-transfer.json:ro" \
-  data-tools /app/scripts/import-projection-transfer.mjs \
+  data-tools /app/scripts/import-projection-transfer.ts \
   --directory=/projection-transfer \
   --metadata=/projection-transfer.json \
   --concurrency=2

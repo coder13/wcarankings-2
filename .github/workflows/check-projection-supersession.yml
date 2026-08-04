@@ -46,6 +46,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
         with:
           ref: main
 
@@ -64,7 +68,7 @@ jobs:
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
             'cd /srv/wcarankings && docker compose run --rm -T data-tools \
-              /app/scripts/activate-ranking-generation.mjs state' \
+              /app/scripts/activate-ranking-generation.ts state' \
             > /tmp/production-projection-state.json
           jq -e 'type == "object"' /tmp/production-projection-state.json >/dev/null
           export_value=$(jq -r '.exportId // empty' /tmp/production-projection-state.json)
@@ -81,9 +85,9 @@ jobs:
           CURRENT_PRODUCTION_EXPORT: ${{ steps.production.outputs.export_value }}
         run: |
           set -euo pipefail
-          node scripts/resolve-wca-export.mjs > /tmp/wca-export.json
+          bun scripts/resolve-wca-export.ts > /tmp/wca-export.json
           latest_export=$(jq -r '.exportDate' /tmp/wca-export.json)
-          node scripts/projection-release-plan.mjs \
+          bun scripts/projection-release-plan.ts \
             "--export-id=$latest_export" \
             "--production-export-id=$CURRENT_PRODUCTION_EXPORT" \
             --state-file=/tmp/production-projection-state.json \

@@ -73,7 +73,7 @@ services:
   list-ranking-worker:
     image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
     restart: unless-stopped
-    command: ["/app/scripts/list-ranking-worker.mjs"]
+    command: ["/app/scripts/list-ranking-worker.ts"]
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}

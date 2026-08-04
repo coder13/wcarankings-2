@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import test from "node:test";
+import { test } from "bun:test";
 import {
   projectionFingerprints,
   projectionReleasePlan,
   projectionSemanticPlan,
   semanticProjectionFingerprints,
-} from "../scripts/projection-release-plan.mjs";
+} from "../scripts/projection-release-plan.ts";
 
 const repositoryRoot = join(import.meta.dirname, "..");
 const exportId = "2026-07-30T00:00:30Z";

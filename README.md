@@ -88,7 +88,7 @@ db/                          MySQL connection pool
 migrations/mysql/            Flyway versioned MariaDB migrations
 sql/ranking-projections/     Readable SQL for daily derived ranking projections
 Dockerfile.flyway             Pinned Flyway migration image
-scripts/sync-wca-export.mjs  WCA SQL export downloader and importer
+scripts/sync-wca-export.ts  WCA SQL export downloader and importer
 Dockerfile                   Multi-stage production image
 docker-compose.yml           MariaDB + app services
 ```

@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "bun:test";
 import {
   createProjectionReleaseManifest,
   verifyProjectionReleaseManifest,
-} from "../scripts/projection-release-artifact.mjs";
+} from "../scripts/projection-release-artifact.ts";
 
 async function fixture({ raw = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "projection-artifact-"));
