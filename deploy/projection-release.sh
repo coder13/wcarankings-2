@@ -23,6 +23,9 @@ scp -q -o BatchMode=yes \
   "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-${ARTIFACT_ID}-release.json"
 scp -q -o BatchMode=yes docker-compose.yml \
   "$SERVER_USER@$SERVER_IP:/srv/wcarankings/.projection-compose-${ARTIFACT_ID}.yml"
+remote_deployment_directory="/tmp/wcarankings-${ARTIFACT_ID}-deploy"
+scp -qr -o BatchMode=yes "$deploy_dir/remote" \
+  "$SERVER_USER@$SERVER_IP:$remote_deployment_directory"
 local_auth_directory=$(mktemp -d)
 cleanup_local_auth() {
   docker --config "$local_auth_directory" logout ghcr.io > /dev/null 2>&1 || true
@@ -35,26 +38,30 @@ printf '%s' "$GHCR_TOKEN" \
 scp -q -o BatchMode=yes "$local_auth_directory/config.json" \
   "$SERVER_USER@$SERVER_IP:/tmp/wcarankings-${ARTIFACT_ID}-docker-config.json"
 ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-  "ARTIFACT_ID='$ARTIFACT_ID' \
+  "DEPLOYMENT_DIRECTORY='$remote_deployment_directory' \
+   ARTIFACT_ID='$ARTIFACT_ID' \
    PROJECTION_GROUPS='$PROJECTION_GROUPS' \
    WCA_EXPORT_VALUE='$WCA_EXPORT_VALUE' \
    EXPECTED_SOURCE_SHA='$EXPECTED_SOURCE_SHA' \
    DATA_TOOLS_IMAGE='$DATA_TOOLS_IMAGE' \
-   FLYWAY_IMAGE='$FLYWAY_IMAGE' sh -s" < "$deploy_dir/remote/stage-projection-artifact.sh"
+   FLYWAY_IMAGE='$FLYWAY_IMAGE' \
+   sh '$remote_deployment_directory/projection-release.sh' stage"
 cleanup_local_auth
 trap - EXIT
 
 # Prepare, verify, and atomically activate the candidate generation.
 started_at=$(date +%s)
 ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-  "ARTIFACT_ID='$ARTIFACT_ID' \
+  "DEPLOYMENT_DIRECTORY='$remote_deployment_directory' \
+   ARTIFACT_ID='$ARTIFACT_ID' \
    ARTIFACT_RUN_ID='$ARTIFACT_RUN_ID' \
    PROJECTION_GROUPS='$PROJECTION_GROUPS' \
    WCA_EXPORT_VALUE='$WCA_EXPORT_VALUE' \
    HAS_RAW='$has_raw' \
    DATA_TOOLS_IMAGE_REF='wcarankings-data-tools:artifact-${ARTIFACT_ID}' \
    FLYWAY_IMAGE_REF='wcarankings-flyway:artifact-${ARTIFACT_ID}' \
-   FAILURE_INJECTION_POINT='$FAILURE_INJECTION_POINT' sh -s" < "$deploy_dir/remote/activate-projection-generation.sh"
+   FAILURE_INJECTION_POINT='$FAILURE_INJECTION_POINT' \
+   sh '$remote_deployment_directory/projection-release.sh' activate"
 completed_at=$(date +%s)
 duration=$((completed_at - started_at))
 echo "duration_seconds=$duration" >> "$GITHUB_OUTPUT"
@@ -79,15 +86,13 @@ fi
 } >> "$GITHUB_STEP_SUMMARY"
 
 # Refresh database-backed and externally sourced system lists after activation.
-for list_name in system board delegates; do
-  ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-    "ARTIFACT_ID='$ARTIFACT_ID' LIST_NAME='$list_name' sh -s" \
-    < "$deploy_dir/remote/refresh-projection-lists.sh"
-done
+ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
+  "DEPLOYMENT_DIRECTORY='$remote_deployment_directory' \
+   ARTIFACT_ID='$ARTIFACT_ID' \
+   sh '$remote_deployment_directory/projection-release.sh' refresh-lists"
 
 trap - ERR
 ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-  "rm -f '/srv/wcarankings/.projection-compose-${ARTIFACT_ID}.yml'; \
-   docker image rm \
-    'wcarankings-data-tools:artifact-${ARTIFACT_ID}' \
-    'wcarankings-flyway:artifact-${ARTIFACT_ID}' || true"
+  "DEPLOYMENT_DIRECTORY='$remote_deployment_directory' \
+   ARTIFACT_ID='$ARTIFACT_ID' \
+   sh '$remote_deployment_directory/projection-release.sh' cleanup"

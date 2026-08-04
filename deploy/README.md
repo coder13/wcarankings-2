@@ -15,10 +15,14 @@ Projection scripts are grouped by job:
 - `scripts/projections/generation/` changes the active ranking generation.
 - `scripts/projections/verification/` checks the completed projection tables.
 
-The script has these phases:
+`remote/projection-release.sh` is the one remote entry point. It dispatches
+these phases:
 
 1. Validate the release coordinate.
 2. Transfer and verify release artifacts.
 3. Prepare the candidate database generation.
 4. Activate the generation and run smoke checks.
 5. Refresh system lists and remove temporary deployment files.
+
+The phase implementations live in `remote/phases/`. They are not invoked by
+the GitHub workflow directly.
