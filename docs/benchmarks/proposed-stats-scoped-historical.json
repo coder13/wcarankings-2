@@ -1,0 +1,1775 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-04T15:38:50.373Z",
+  "branch": "agent/stats-experiment-harness",
+  "configuration": {
+    "section": "historical",
+    "subXSeconds": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "repetitions": 1,
+    "historicalAsOfDates": [
+      "1982-06-05",
+      "2004-06-30",
+      "2026-07-26"
+    ],
+    "worldCohortId": 1
+  },
+  "catalog": [
+    {
+      "key": "medal-collection-overall-and-by-event",
+      "sourceTables": [
+        "competition_podium_members"
+      ],
+      "sourceIndexes": [
+        "PRIMARY",
+        "idx_comp_podium_members_person"
+      ],
+      "status": "supported",
+      "timing": "materialize",
+      "notes": "The active podium-member projection has one row per medal; overall and event-scoped person counts use the same source."
+    },
+    {
+      "key": "most-solves-competition-and-year",
+      "sourceTables": [
+        "result_facts",
+        "result_attempts"
+      ],
+      "sourceIndexes": [
+        "PRIMARY",
+        "idx_result_attempts_result"
+      ],
+      "status": "partial",
+      "timing": "attempt-shared-vs-separate",
+      "notes": "Attempt values support successful/total counts by person and competition or year, but the daily schema has no published solve-grain table."
+    },
+    {
+      "key": "most-competitions",
+      "sourceTables": [
+        "result_facts"
+      ],
+      "sourceIndexes": [
+        "idx_result_facts_person_competition"
+      ],
+      "status": "supported",
+      "timing": "materialize",
+      "notes": "The person/competition index supports counting distinct competitions attended by each person."
+    },
+    {
+      "key": "rank-events-per-person",
+      "sourceTables": [
+        "person_event_rankings"
+      ],
+      "sourceIndexes": [
+        "PRIMARY"
+      ],
+      "status": "supported",
+      "timing": "materialize",
+      "notes": "The person-first primary key supports event coverage aggregation without scanning raw results."
+    },
+    {
+      "key": "oldest-standing-world-records",
+      "sourceTables": [
+        "result_facts"
+      ],
+      "sourceIndexes": [
+        "PRIMARY"
+      ],
+      "status": "partial",
+      "timing": "historical-shared-vs-direct",
+      "notes": "Record codes and dates exist, but there is no record-period or standing-record index."
+    },
+    {
+      "key": "world-records-in-most-events-by-scope",
+      "sourceTables": [
+        "result_facts"
+      ],
+      "sourceIndexes": [
+        "PRIMARY"
+      ],
+      "status": "partial",
+      "timing": "historical-shared-vs-direct",
+      "notes": "World-record codes can be counted for people, competitions, and countries, but a record-code access path is not materialized."
+    },
+    {
+      "key": "blindfolded-success-rate-streaks",
+      "sourceTables": [
+        "result_facts",
+        "result_attempts"
+      ],
+      "sourceIndexes": [
+        "PRIMARY",
+        "idx_result_attempts_result"
+      ],
+      "status": "partial",
+      "timing": "attempt-shared-vs-separate",
+      "notes": "Attempt values include successes and DNFs; streak semantics still need a product definition."
+    },
+    {
+      "key": "most-sub-x-solves",
+      "sourceTables": [
+        "result_facts",
+        "result_attempts"
+      ],
+      "sourceIndexes": [
+        "PRIMARY",
+        "idx_result_attempts_result"
+      ],
+      "status": "partial",
+      "timing": "attempt-shared-vs-separate",
+      "notes": "A single attempt-facts consumer can produce the six requested columns: <3s, <4s, <5s, <6s, <7s, and <8s."
+    },
+    {
+      "key": "top-100-appearances-single-and-average",
+      "sourceTables": [
+        "person_year_rankings_single",
+        "person_year_rankings_average",
+        "person_year_ranking_cohorts"
+      ],
+      "sourceIndexes": [
+        "idx_person_year_single_browse",
+        "idx_person_year_average_browse"
+      ],
+      "status": "supported",
+      "timing": "materialize",
+      "notes": "Year/event/cohort/position browse indexes can restrict both Single and Average rows to the top 100 before grouping by person."
+    },
+    {
+      "key": "world-records-per-event",
+      "sourceTables": [
+        "result_facts"
+      ],
+      "sourceIndexes": [
+        "PRIMARY"
+      ],
+      "status": "partial",
+      "timing": "historical-shared-vs-direct",
+      "notes": "Single and Average world-record claims can be grouped by event from the historical result-fact stage."
+    },
+    {
+      "key": "historical-as-of-rankings",
+      "sourceTables": [
+        "result_facts"
+      ],
+      "sourceIndexes": [
+        "idx_result_facts_single_ranking_cover",
+        "idx_result_facts_average_ranking_cover"
+      ],
+      "status": "partial",
+      "timing": "historical-shared-vs-direct",
+      "notes": "Current result facts cover value ordering, but each as-of date still requires a historical window rank."
+    }
+  ],
+  "inventory": {
+    "competition_podium_members": {
+      "rowsEstimate": 394903,
+      "dataBytes": 37355520,
+      "indexBytes": 27901952,
+      "engine": "InnoDB",
+      "columns": [
+        {
+          "name": "competition_id",
+          "type": "varchar(32)",
+          "nullable": false
+        },
+        {
+          "name": "event_id",
+          "type": "varchar(6)",
+          "nullable": false
+        },
+        {
+          "name": "result_type",
+          "type": "varchar(7)",
+          "nullable": false
+        },
+        {
+          "name": "podium_position",
+          "type": "smallint(6)",
+          "nullable": false
+        },
+        {
+          "name": "person_id",
+          "type": "varchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "result_id",
+          "type": "bigint(20)",
+          "nullable": false
+        },
+        {
+          "name": "result_value",
+          "type": "int(11)",
+          "nullable": false
+        }
+      ],
+      "indexes": {
+        "PRIMARY": {
+          "unique": true,
+          "columns": [
+            "competition_id",
+            "event_id",
+            "result_type",
+            "podium_position",
+            "result_id"
+          ],
+          "cardinality": 18804
+        },
+        "idx_comp_podium_members_person": {
+          "unique": false,
+          "columns": [
+            "person_id",
+            "event_id",
+            "result_type",
+            "competition_id"
+          ],
+          "cardinality": 23229
+        }
+      }
+    },
+    "result_facts": {
+      "rowsEstimate": 6572230,
+      "dataBytes": 792707072,
+      "indexBytes": 2930655232,
+      "engine": "InnoDB",
+      "columns": [
+        {
+          "name": "result_id",
+          "type": "bigint(20)",
+          "nullable": false
+        },
+        {
+          "name": "event_id",
+          "type": "varchar(6)",
+          "nullable": false
+        },
+        {
+          "name": "person_id",
+          "type": "varchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "person_country_id",
+          "type": "varchar(50)",
+          "nullable": true
+        },
+        {
+          "name": "person_continent_id",
+          "type": "varchar(50)",
+          "nullable": false
+        },
+        {
+          "name": "competition_id",
+          "type": "varchar(32)",
+          "nullable": false
+        },
+        {
+          "name": "competition_year",
+          "type": "smallint(5) unsigned",
+          "nullable": false
+        },
+        {
+          "name": "competition_start_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "round_type_id",
+          "type": "varchar(1)",
+          "nullable": false
+        },
+        {
+          "name": "is_final_round",
+          "type": "int(4)",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "smallint(6)",
+          "nullable": false
+        },
+        {
+          "name": "best",
+          "type": "int(11)",
+          "nullable": false
+        },
+        {
+          "name": "average",
+          "type": "int(11)",
+          "nullable": false
+        },
+        {
+          "name": "attempt_count",
+          "type": "int(11)",
+          "nullable": false
+        },
+        {
+          "name": "regional_single_record",
+          "type": "varchar(3)",
+          "nullable": false
+        },
+        {
+          "name": "regional_average_record",
+          "type": "varchar(3)",
+          "nullable": false
+        }
+      ],
+      "indexes": {
+        "PRIMARY": {
+          "unique": true,
+          "columns": [
+            "result_id"
+          ],
+          "cardinality": 6572230
+        },
+        "idx_result_facts_person_event_date": {
+          "unique": false,
+          "columns": [
+            "person_id",
+            "event_id",
+            "competition_start_date",
+            "result_id"
+          ],
+          "cardinality": 285749
+        },
+        "idx_result_facts_competition_event": {
+          "unique": false,
+          "columns": [
+            "competition_id",
+            "event_id",
+            "result_id"
+          ],
+          "cardinality": 23223
+        },
+        "idx_result_facts_single_ranking_cover": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "best",
+            "competition_start_date",
+            "competition_id",
+            "person_id",
+            "result_id",
+            "round_type_id",
+            "person_country_id",
+            "person_continent_id"
+          ],
+          "cardinality": 2979
+        },
+        "idx_result_facts_average_ranking_cover": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "average",
+            "competition_start_date",
+            "competition_id",
+            "person_id",
+            "result_id",
+            "round_type_id",
+            "person_country_id",
+            "person_continent_id"
+          ],
+          "cardinality": 3178
+        },
+        "idx_result_facts_average_country_year": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "person_country_id",
+            "competition_start_date",
+            "average",
+            "competition_id",
+            "result_id",
+            "person_id"
+          ],
+          "cardinality": 3279
+        },
+        "idx_result_facts_average_continent_year": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "person_continent_id",
+            "competition_start_date",
+            "average",
+            "competition_id",
+            "result_id",
+            "person_id"
+          ],
+          "cardinality": 3597
+        },
+        "idx_result_facts_average_country_value": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "person_country_id",
+            "average",
+            "competition_start_date",
+            "competition_id",
+            "result_id",
+            "person_id"
+          ],
+          "cardinality": 3279
+        }
+      }
+    },
+    "result_attempts": {
+      "rowsEstimate": 31062285,
+      "dataBytes": 1258291200,
+      "indexBytes": 650100736,
+      "engine": "InnoDB",
+      "columns": [
+        {
+          "name": "value",
+          "type": "int(11)",
+          "nullable": false
+        },
+        {
+          "name": "attempt_number",
+          "type": "tinyint(3) unsigned",
+          "nullable": false
+        },
+        {
+          "name": "result_id",
+          "type": "bigint(20)",
+          "nullable": false
+        }
+      ],
+      "indexes": {
+        "idx_result_attempts_result": {
+          "unique": false,
+          "columns": [
+            "result_id",
+            "attempt_number"
+          ],
+          "cardinality": 7765571
+        }
+      }
+    },
+    "person_event_rankings": {
+      "rowsEstimate": 1898442,
+      "dataBytes": 286244864,
+      "indexBytes": 974487552,
+      "engine": "InnoDB",
+      "columns": [
+        {
+          "name": "person_id",
+          "type": "varchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "event_id",
+          "type": "varchar(6)",
+          "nullable": false
+        },
+        {
+          "name": "result_type",
+          "type": "varchar(7)",
+          "nullable": false
+        },
+        {
+          "name": "result_id",
+          "type": "bigint(20)",
+          "nullable": true
+        },
+        {
+          "name": "result_value",
+          "type": "int(11)",
+          "nullable": true
+        },
+        {
+          "name": "country_id",
+          "type": "varchar(50)",
+          "nullable": true
+        },
+        {
+          "name": "continent_id",
+          "type": "varchar(50)",
+          "nullable": true
+        },
+        {
+          "name": "gender",
+          "type": "varchar(1)",
+          "nullable": true
+        },
+        {
+          "name": "world_rank",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "world_position",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "continent_rank",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "continent_position",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "country_rank",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "country_position",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "previous_world_rank",
+          "type": "int(2)",
+          "nullable": true
+        },
+        {
+          "name": "previous_continent_rank",
+          "type": "int(2)",
+          "nullable": true
+        },
+        {
+          "name": "previous_country_rank",
+          "type": "int(2)",
+          "nullable": true
+        },
+        {
+          "name": "world_rank_delta",
+          "type": "int(2)",
+          "nullable": true
+        },
+        {
+          "name": "continent_rank_delta",
+          "type": "int(2)",
+          "nullable": true
+        },
+        {
+          "name": "country_rank_delta",
+          "type": "int(2)",
+          "nullable": true
+        },
+        {
+          "name": "rank_delta_state",
+          "type": "varchar(11)",
+          "nullable": false
+        }
+      ],
+      "indexes": {
+        "PRIMARY": {
+          "unique": true,
+          "columns": [
+            "person_id",
+            "event_id",
+            "result_type"
+          ],
+          "cardinality": 316407
+        },
+        "idx_person_event_world": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "world_position",
+            "person_id"
+          ],
+          "cardinality": 21
+        },
+        "idx_person_event_continent": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "continent_id",
+            "continent_position",
+            "person_id"
+          ],
+          "cardinality": 20
+        },
+        "idx_person_event_country": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "country_id",
+            "country_position",
+            "person_id"
+          ],
+          "cardinality": 20
+        },
+        "idx_person_event_continent_value": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "continent_id",
+            "result_value",
+            "person_id"
+          ],
+          "cardinality": 21
+        },
+        "idx_person_event_country_value": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "country_id",
+            "result_value",
+            "person_id"
+          ],
+          "cardinality": 21
+        },
+        "idx_person_event_gender_value": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "gender",
+            "result_value",
+            "person_id"
+          ],
+          "cardinality": 21
+        },
+        "idx_person_event_continent_gender_value": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "continent_id",
+            "gender",
+            "result_value",
+            "person_id"
+          ],
+          "cardinality": 21
+        },
+        "idx_person_event_country_gender_value": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "country_id",
+            "gender",
+            "result_value",
+            "person_id"
+          ],
+          "cardinality": 21
+        },
+        "idx_person_event_gender_world": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "gender",
+            "world_position",
+            "person_id"
+          ],
+          "cardinality": 21
+        },
+        "idx_person_event_gender_continent": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "gender",
+            "continent_id",
+            "continent_position",
+            "person_id"
+          ],
+          "cardinality": 21
+        },
+        "idx_person_event_gender_country": {
+          "unique": false,
+          "columns": [
+            "event_id",
+            "result_type",
+            "gender",
+            "country_id",
+            "country_position",
+            "person_id"
+          ],
+          "cardinality": 21
+        }
+      }
+    },
+    "person_year_rankings_single": {
+      "rowsEstimate": 6072316,
+      "dataBytes": 500154368,
+      "indexBytes": 710868992,
+      "engine": "InnoDB",
+      "columns": [
+        {
+          "name": "year",
+          "type": "int(11)",
+          "nullable": false
+        },
+        {
+          "name": "event_id",
+          "type": "varchar(6)",
+          "nullable": false
+        },
+        {
+          "name": "cohort_id",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "person_id",
+          "type": "varchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "result_id",
+          "type": "bigint(20)",
+          "nullable": true
+        },
+        {
+          "name": "result_value",
+          "type": "int(11)",
+          "nullable": true
+        },
+        {
+          "name": "public_rank",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "bigint(21)",
+          "nullable": false
+        }
+      ],
+      "indexes": {
+        "PRIMARY": {
+          "unique": true,
+          "columns": [
+            "year",
+            "event_id",
+            "cohort_id",
+            "person_id"
+          ],
+          "cardinality": 6754
+        },
+        "idx_person_year_single_browse": {
+          "unique": false,
+          "columns": [
+            "year",
+            "event_id",
+            "cohort_id",
+            "position",
+            "person_id"
+          ],
+          "cardinality": 5280
+        },
+        "idx_person_year_single_value": {
+          "unique": false,
+          "columns": [
+            "year",
+            "event_id",
+            "cohort_id",
+            "result_value",
+            "person_id"
+          ],
+          "cardinality": 5669
+        },
+        "idx_person_year_single_person": {
+          "unique": false,
+          "columns": [
+            "year",
+            "event_id",
+            "cohort_id",
+            "person_id"
+          ],
+          "cardinality": 6024
+        }
+      }
+    },
+    "person_year_rankings_average": {
+      "rowsEstimate": 5245196,
+      "dataBytes": 434094080,
+      "indexBytes": 616431616,
+      "engine": "InnoDB",
+      "columns": [
+        {
+          "name": "year",
+          "type": "int(11)",
+          "nullable": false
+        },
+        {
+          "name": "event_id",
+          "type": "varchar(6)",
+          "nullable": false
+        },
+        {
+          "name": "cohort_id",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "person_id",
+          "type": "varchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "result_id",
+          "type": "bigint(20)",
+          "nullable": true
+        },
+        {
+          "name": "result_value",
+          "type": "int(11)",
+          "nullable": true
+        },
+        {
+          "name": "public_rank",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "bigint(21)",
+          "nullable": false
+        }
+      ],
+      "indexes": {
+        "PRIMARY": {
+          "unique": true,
+          "columns": [
+            "year",
+            "event_id",
+            "cohort_id",
+            "person_id"
+          ],
+          "cardinality": 6327
+        },
+        "idx_person_year_average_browse": {
+          "unique": false,
+          "columns": [
+            "year",
+            "event_id",
+            "cohort_id",
+            "position",
+            "person_id"
+          ],
+          "cardinality": 4934
+        },
+        "idx_person_year_average_value": {
+          "unique": false,
+          "columns": [
+            "year",
+            "event_id",
+            "cohort_id",
+            "result_value",
+            "person_id"
+          ],
+          "cardinality": 4892
+        },
+        "idx_person_year_average_person": {
+          "unique": false,
+          "columns": [
+            "year",
+            "event_id",
+            "cohort_id",
+            "person_id"
+          ],
+          "cardinality": 5177
+        }
+      }
+    },
+    "person_year_ranking_cohorts": {
+      "rowsEstimate": 215,
+      "dataBytes": 16384,
+      "indexBytes": 16384,
+      "engine": "InnoDB",
+      "columns": [
+        {
+          "name": "cohort_id",
+          "type": "bigint(21)",
+          "nullable": false
+        },
+        {
+          "name": "scope",
+          "type": "varchar(9)",
+          "nullable": true
+        },
+        {
+          "name": "region_id",
+          "type": "varchar(50)",
+          "nullable": true
+        }
+      ],
+      "indexes": {
+        "PRIMARY": {
+          "unique": true,
+          "columns": [
+            "cohort_id"
+          ],
+          "cardinality": 215
+        },
+        "idx_person_year_cohort_region": {
+          "unique": true,
+          "columns": [
+            "scope",
+            "region_id"
+          ],
+          "cardinality": 3
+        }
+      }
+    }
+  },
+  "materializedAggregations": [],
+  "attemptFacts": null,
+  "historical": {
+    "name": "historical-record-and-as-of-ranking-stages",
+    "source": [
+      "result_facts"
+    ],
+    "dates": [
+      "1982-06-05",
+      "2004-06-30",
+      "2026-07-26"
+    ],
+    "stageSql": "\n    SELECT result_id, event_id, person_id, person_country_id, competition_id,\n      competition_start_date,\n      best, average, regional_single_record, regional_average_record\n    FROM result_facts\n    WHERE best > 0 OR average > 0\n  ",
+    "plans": {
+      "stage": {
+        "query_block": {
+          "select_id": 1,
+          "cost": 1112.641278,
+          "nested_loop": [
+            {
+              "table": {
+                "table_name": "result_facts",
+                "access_type": "ALL",
+                "loops": 1,
+                "rows": 6572230,
+                "cost": 1112.641278,
+                "filtered": 100,
+                "attached_condition": "result_facts.best > 0 or result_facts.average > 0"
+              }
+            }
+          ]
+        }
+      },
+      "direct": {
+        "recordsInMostEventsPerson": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 5639.170382,
+            "nested_loop": [
+              {
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "result_facts.person_id",
+                    "table": {
+                      "table_name": "result_facts",
+                      "access_type": "ALL",
+                      "possible_keys": [
+                        "idx_result_facts_person_event_date"
+                      ],
+                      "loops": 1,
+                      "rows": 6572230,
+                      "cost": 1112.641278,
+                      "filtered": 100,
+                      "attached_condition": "(result_facts.regional_single_record = 'WR' or result_facts.regional_average_record = 'WR') and result_facts.person_id <> ''"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "recordsInMostEventsCompetition": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 5639.170382,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "result_facts",
+                  "access_type": "range",
+                  "possible_keys": [
+                    "idx_result_facts_competition_event"
+                  ],
+                  "key": "idx_result_facts_competition_event",
+                  "key_length": "130",
+                  "used_key_parts": [
+                    "competition_id"
+                  ],
+                  "loops": 1,
+                  "rows": 6572230,
+                  "cost": 1112.641278,
+                  "filtered": 100,
+                  "attached_condition": "(result_facts.regional_single_record = 'WR' or result_facts.regional_average_record = 'WR') and result_facts.competition_id <> ''"
+                }
+              }
+            ]
+          }
+        },
+        "recordsInMostEventsCountry": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 5639.170382,
+            "nested_loop": [
+              {
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "result_facts.person_country_id",
+                    "table": {
+                      "table_name": "result_facts",
+                      "access_type": "ALL",
+                      "loops": 1,
+                      "rows": 6572230,
+                      "cost": 1112.641278,
+                      "filtered": 100,
+                      "attached_condition": "(result_facts.regional_single_record = 'WR' or result_facts.regional_average_record = 'WR') and result_facts.person_country_id <> ''"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "recordsPerEvent": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 5639.170382,
+            "nested_loop": [
+              {
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "result_facts.event_id",
+                    "table": {
+                      "table_name": "result_facts",
+                      "access_type": "ALL",
+                      "loops": 1,
+                      "rows": 6572230,
+                      "cost": 1112.641278,
+                      "filtered": 100,
+                      "attached_condition": "result_facts.regional_single_record = 'WR' or result_facts.regional_average_record = 'WR'"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "records": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 7559.97571,
+            "filesort": {
+              "sort_key": "result_facts.event_id, result_facts.person_id",
+              "temporary_table": {
+                "nested_loop": [
+                  {
+                    "table": {
+                      "table_name": "<derived3>",
+                      "access_type": "ALL",
+                      "loops": 1,
+                      "rows": 2979,
+                      "cost": 7436.763163,
+                      "filtered": 100,
+                      "attached_condition": "standing.result_value > 0 and standing.result_value is not null",
+                      "materialized": {
+                        "query_block": {
+                          "select_id": 3,
+                          "cost": 4.567145435,
+                          "having_condition": "result_value > 0",
+                          "filesort": {
+                            "sort_key": "result_facts.event_id",
+                            "temporary_table": {
+                              "nested_loop": [
+                                {
+                                  "table": {
+                                    "table_name": "result_facts",
+                                    "access_type": "ALL",
+                                    "possible_keys": [
+                                      "idx_result_facts_single_ranking_cover",
+                                      "idx_result_facts_average_ranking_cover",
+                                      "idx_result_facts_average_country_year",
+                                      "idx_result_facts_average_continent_year",
+                                      "idx_result_facts_average_country_value"
+                                    ],
+                                    "loops": 1,
+                                    "rows": 6572230,
+                                    "cost": 1112.641278,
+                                    "filtered": 100,
+                                    "attached_condition": "result_facts.best > 0 and result_facts.regional_single_record = 'WR'"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "table": {
+                      "table_name": "result_facts",
+                      "access_type": "ref",
+                      "possible_keys": [
+                        "idx_result_facts_single_ranking_cover",
+                        "idx_result_facts_average_ranking_cover",
+                        "idx_result_facts_average_country_year",
+                        "idx_result_facts_average_continent_year",
+                        "idx_result_facts_average_country_value"
+                      ],
+                      "key": "idx_result_facts_single_ranking_cover",
+                      "key_length": "30",
+                      "used_key_parts": [
+                        "event_id",
+                        "best"
+                      ],
+                      "ref": [
+                        "standing.event_id",
+                        "standing.result_value"
+                      ],
+                      "loops": 2979,
+                      "rows": 16,
+                      "cost": 91.30086864,
+                      "filtered": 100,
+                      "attached_condition": "result_facts.regional_single_record = 'WR'"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "as-of:1982-06-05": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 1338.930499,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "<derived2>",
+                  "access_type": "ALL",
+                  "loops": 1,
+                  "rows": 6572230,
+                  "cost": 1338.930499,
+                  "filtered": 100,
+                  "attached_condition": "ranked.world_rank <= 100",
+                  "materialized": {
+                    "query_block": {
+                      "select_id": 2,
+                      "cost": 1253.454437,
+                      "window_functions_computation": {
+                        "sorts": [
+                          {
+                            "filesort": {
+                              "sort_key": "result_facts.event_id, result_facts.best"
+                            }
+                          }
+                        ],
+                        "temporary_table": {
+                          "nested_loop": [
+                            {
+                              "table": {
+                                "table_name": "result_facts",
+                                "access_type": "index",
+                                "key": "idx_result_facts_single_ranking_cover",
+                                "key_length": "625",
+                                "used_key_parts": [
+                                  "event_id",
+                                  "best",
+                                  "competition_start_date",
+                                  "competition_id",
+                                  "person_id",
+                                  "result_id",
+                                  "round_type_id",
+                                  "person_country_id",
+                                  "person_continent_id"
+                                ],
+                                "loops": 1,
+                                "rows": 6572230,
+                                "cost": 1253.454437,
+                                "filtered": 100,
+                                "attached_condition": "result_facts.best > 0 and result_facts.competition_start_date <= '1982-06-05'",
+                                "using_index": true
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "as-of:2004-06-30": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 1338.930499,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "<derived2>",
+                  "access_type": "ALL",
+                  "loops": 1,
+                  "rows": 6572230,
+                  "cost": 1338.930499,
+                  "filtered": 100,
+                  "attached_condition": "ranked.world_rank <= 100",
+                  "materialized": {
+                    "query_block": {
+                      "select_id": 2,
+                      "cost": 1253.454437,
+                      "window_functions_computation": {
+                        "sorts": [
+                          {
+                            "filesort": {
+                              "sort_key": "result_facts.event_id, result_facts.best"
+                            }
+                          }
+                        ],
+                        "temporary_table": {
+                          "nested_loop": [
+                            {
+                              "table": {
+                                "table_name": "result_facts",
+                                "access_type": "index",
+                                "key": "idx_result_facts_single_ranking_cover",
+                                "key_length": "625",
+                                "used_key_parts": [
+                                  "event_id",
+                                  "best",
+                                  "competition_start_date",
+                                  "competition_id",
+                                  "person_id",
+                                  "result_id",
+                                  "round_type_id",
+                                  "person_country_id",
+                                  "person_continent_id"
+                                ],
+                                "loops": 1,
+                                "rows": 6572230,
+                                "cost": 1253.454437,
+                                "filtered": 100,
+                                "attached_condition": "result_facts.best > 0 and result_facts.competition_start_date <= '2004-06-30'",
+                                "using_index": true
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "as-of:2026-07-26": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 1338.930499,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "<derived2>",
+                  "access_type": "ALL",
+                  "loops": 1,
+                  "rows": 6572230,
+                  "cost": 1338.930499,
+                  "filtered": 100,
+                  "attached_condition": "ranked.world_rank <= 100",
+                  "materialized": {
+                    "query_block": {
+                      "select_id": 2,
+                      "cost": 1253.454437,
+                      "window_functions_computation": {
+                        "sorts": [
+                          {
+                            "filesort": {
+                              "sort_key": "result_facts.event_id, result_facts.best"
+                            }
+                          }
+                        ],
+                        "temporary_table": {
+                          "nested_loop": [
+                            {
+                              "table": {
+                                "table_name": "result_facts",
+                                "access_type": "index",
+                                "key": "idx_result_facts_single_ranking_cover",
+                                "key_length": "625",
+                                "used_key_parts": [
+                                  "event_id",
+                                  "best",
+                                  "competition_start_date",
+                                  "competition_id",
+                                  "person_id",
+                                  "result_id",
+                                  "round_type_id",
+                                  "person_country_id",
+                                  "person_continent_id"
+                                ],
+                                "loops": 1,
+                                "rows": 6572230,
+                                "cost": 1253.454437,
+                                "filtered": 100,
+                                "attached_condition": "result_facts.best > 0 and result_facts.competition_start_date <= '2026-07-26'",
+                                "using_index": true
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "shared": {
+        "recordsInMostEventsPerson": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 5541.844616,
+            "nested_loop": [
+              {
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "stat_experiment_historical_facts.person_id",
+                    "table": {
+                      "table_name": "stat_experiment_historical_facts",
+                      "access_type": "ALL",
+                      "loops": 1,
+                      "rows": 6469540,
+                      "cost": 1086.439318,
+                      "filtered": 100,
+                      "attached_condition": "(stat_experiment_historical_facts.regional_single_record = 'WR' or stat_experiment_historical_facts.regional_average_record = 'WR') and stat_experiment_historical_facts.person_id <> ''"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "recordsInMostEventsCompetition": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 5541.844616,
+            "nested_loop": [
+              {
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "stat_experiment_historical_facts.competition_id",
+                    "table": {
+                      "table_name": "stat_experiment_historical_facts",
+                      "access_type": "ALL",
+                      "loops": 1,
+                      "rows": 6469540,
+                      "cost": 1086.439318,
+                      "filtered": 100,
+                      "attached_condition": "(stat_experiment_historical_facts.regional_single_record = 'WR' or stat_experiment_historical_facts.regional_average_record = 'WR') and stat_experiment_historical_facts.competition_id <> ''"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "recordsInMostEventsCountry": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 5541.844616,
+            "nested_loop": [
+              {
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "stat_experiment_historical_facts.person_country_id",
+                    "table": {
+                      "table_name": "stat_experiment_historical_facts",
+                      "access_type": "ALL",
+                      "loops": 1,
+                      "rows": 6469540,
+                      "cost": 1086.439318,
+                      "filtered": 100,
+                      "attached_condition": "(stat_experiment_historical_facts.regional_single_record = 'WR' or stat_experiment_historical_facts.regional_average_record = 'WR') and stat_experiment_historical_facts.person_country_id <> ''"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "recordsPerEvent": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 5541.844616,
+            "nested_loop": [
+              {
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "stat_experiment_historical_facts.event_id",
+                    "table": {
+                      "table_name": "stat_experiment_historical_facts",
+                      "access_type": "ALL",
+                      "loops": 1,
+                      "rows": 6469540,
+                      "cost": 1086.439318,
+                      "filtered": 100,
+                      "attached_condition": "stat_experiment_historical_facts.regional_single_record = 'WR' or stat_experiment_historical_facts.regional_average_record = 'WR'"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "records": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 74889.35938,
+            "filesort": {
+              "sort_key": "stat_experiment_historical_facts.event_id, stat_experiment_historical_facts.person_id",
+              "temporary_table": {
+                "nested_loop": [
+                  {
+                    "table": {
+                      "table_name": "stat_experiment_historical_facts",
+                      "access_type": "ALL",
+                      "loops": 1,
+                      "rows": 6469540,
+                      "cost": 1086.439318,
+                      "filtered": 100,
+                      "attached_condition": "stat_experiment_historical_facts.best > 0 and stat_experiment_historical_facts.regional_single_record = 'WR'"
+                    }
+                  },
+                  {
+                    "table": {
+                      "table_name": "<derived3>",
+                      "access_type": "ref",
+                      "possible_keys": [
+                        "key0"
+                      ],
+                      "key": "key0",
+                      "key_length": "31",
+                      "used_key_parts": [
+                        "event_id",
+                        "result_value"
+                      ],
+                      "ref": [
+                        "wcarankings.stat_experiment_historical_facts.event_id",
+                        "wcarankings.stat_experiment_historical_facts.best"
+                      ],
+                      "loops": 6469540,
+                      "rows": 10,
+                      "cost": 28667.61215,
+                      "filtered": 100,
+                      "materialized": {
+                        "query_block": {
+                          "select_id": 3,
+                          "cost": 5541.844616,
+                          "having_condition": "result_value > 0",
+                          "filesort": {
+                            "sort_key": "stat_experiment_historical_facts.event_id",
+                            "temporary_table": {
+                              "nested_loop": [
+                                {
+                                  "table": {
+                                    "table_name": "stat_experiment_historical_facts",
+                                    "access_type": "ALL",
+                                    "loops": 1,
+                                    "rows": 6469540,
+                                    "cost": 1086.439318,
+                                    "filtered": 100,
+                                    "attached_condition": "stat_experiment_historical_facts.best > 0 and stat_experiment_historical_facts.regional_single_record = 'WR'"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "as-of:1982-06-05": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 1318.009954,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "<derived2>",
+                  "access_type": "ALL",
+                  "loops": 1,
+                  "rows": 6469540,
+                  "cost": 1318.009954,
+                  "filtered": 100,
+                  "attached_condition": "ranked.world_rank <= 100",
+                  "materialized": {
+                    "query_block": {
+                      "select_id": 2,
+                      "cost": 1086.439318,
+                      "window_functions_computation": {
+                        "sorts": [
+                          {
+                            "filesort": {
+                              "sort_key": "stat_experiment_historical_facts.event_id, stat_experiment_historical_facts.best"
+                            }
+                          }
+                        ],
+                        "temporary_table": {
+                          "nested_loop": [
+                            {
+                              "table": {
+                                "table_name": "stat_experiment_historical_facts",
+                                "access_type": "ALL",
+                                "loops": 1,
+                                "rows": 6469540,
+                                "cost": 1086.439318,
+                                "filtered": 100,
+                                "attached_condition": "stat_experiment_historical_facts.best > 0 and stat_experiment_historical_facts.competition_start_date <= '1982-06-05'"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "as-of:2004-06-30": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 1318.009954,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "<derived2>",
+                  "access_type": "ALL",
+                  "loops": 1,
+                  "rows": 6469540,
+                  "cost": 1318.009954,
+                  "filtered": 100,
+                  "attached_condition": "ranked.world_rank <= 100",
+                  "materialized": {
+                    "query_block": {
+                      "select_id": 2,
+                      "cost": 1086.439318,
+                      "window_functions_computation": {
+                        "sorts": [
+                          {
+                            "filesort": {
+                              "sort_key": "stat_experiment_historical_facts.event_id, stat_experiment_historical_facts.best"
+                            }
+                          }
+                        ],
+                        "temporary_table": {
+                          "nested_loop": [
+                            {
+                              "table": {
+                                "table_name": "stat_experiment_historical_facts",
+                                "access_type": "ALL",
+                                "loops": 1,
+                                "rows": 6469540,
+                                "cost": 1086.439318,
+                                "filtered": 100,
+                                "attached_condition": "stat_experiment_historical_facts.best > 0 and stat_experiment_historical_facts.competition_start_date <= '2004-06-30'"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "as-of:2026-07-26": {
+          "query_block": {
+            "select_id": 1,
+            "cost": 1318.009954,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "<derived2>",
+                  "access_type": "ALL",
+                  "loops": 1,
+                  "rows": 6469540,
+                  "cost": 1318.009954,
+                  "filtered": 100,
+                  "attached_condition": "ranked.world_rank <= 100",
+                  "materialized": {
+                    "query_block": {
+                      "select_id": 2,
+                      "cost": 1086.439318,
+                      "window_functions_computation": {
+                        "sorts": [
+                          {
+                            "filesort": {
+                              "sort_key": "stat_experiment_historical_facts.event_id, stat_experiment_historical_facts.best"
+                            }
+                          }
+                        ],
+                        "temporary_table": {
+                          "nested_loop": [
+                            {
+                              "table": {
+                                "table_name": "stat_experiment_historical_facts",
+                                "access_type": "ALL",
+                                "loops": 1,
+                                "rows": 6469540,
+                                "cost": 1086.439318,
+                                "filtered": 100,
+                                "attached_condition": "stat_experiment_historical_facts.best > 0 and stat_experiment_historical_facts.competition_start_date <= '2026-07-26'"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "direct": [
+      {
+        "repetition": 1,
+        "scans": [
+          {
+            "key": "recordsInMostEventsPerson",
+            "durationMs": 2582,
+            "rows": 307,
+            "countDurationMs": 1
+          },
+          {
+            "key": "recordsInMostEventsCompetition",
+            "durationMs": 14837,
+            "rows": 799,
+            "countDurationMs": 1
+          },
+          {
+            "key": "recordsInMostEventsCountry",
+            "durationMs": 2689,
+            "rows": 39,
+            "countDurationMs": 1
+          },
+          {
+            "key": "recordsPerEvent",
+            "durationMs": 2792,
+            "rows": 21,
+            "countDurationMs": 0
+          },
+          {
+            "key": "records",
+            "durationMs": 2354,
+            "rows": 24,
+            "countDurationMs": 1
+          },
+          {
+            "key": "as-of:1982-06-05",
+            "durationMs": 2456,
+            "rows": 19,
+            "countDurationMs": 0
+          },
+          {
+            "key": "as-of:2004-06-30",
+            "durationMs": 2368,
+            "rows": 253,
+            "countDurationMs": 1
+          },
+          {
+            "key": "as-of:2026-07-26",
+            "durationMs": 32777,
+            "rows": 2319,
+            "countDurationMs": 1
+          }
+        ],
+        "totalMs": 62855
+      }
+    ],
+    "shared": [
+      {
+        "repetition": 1,
+        "stage": {
+          "durationMs": 13469,
+          "rows": 6572854,
+          "countDurationMs": 2687
+        },
+        "consumers": [
+          {
+            "key": "recordsInMostEventsPerson",
+            "durationMs": 3089,
+            "rows": 307
+          },
+          {
+            "key": "recordsInMostEventsCompetition",
+            "durationMs": 3216,
+            "rows": 799
+          },
+          {
+            "key": "recordsInMostEventsCountry",
+            "durationMs": 3220,
+            "rows": 39
+          },
+          {
+            "key": "recordsPerEvent",
+            "durationMs": 3266,
+            "rows": 21
+          },
+          {
+            "key": "records",
+            "durationMs": 6256,
+            "rows": 24
+          },
+          {
+            "key": "as-of:1982-06-05",
+            "durationMs": 3025,
+            "rows": 19
+          },
+          {
+            "key": "as-of:2004-06-30",
+            "durationMs": 3090,
+            "rows": 253
+          },
+          {
+            "key": "as-of:2026-07-26",
+            "durationMs": 55730,
+            "rows": 2319
+          }
+        ],
+        "totalMs": 94361
+      }
+    ],
+    "comparison": {
+      "separateTotalMs": 62855,
+      "sharedTotalMs": 94361,
+      "sharedStageRows": 6572854
+    }
+  },
+  "conclusions": {
+    "dailyBuildPolicy": "Do not add any proposed statistic to the production projection registry from this experiment.",
+    "attemptStage": "Compare sharedTotalMs with separateTotalMs; a shared stage is not a win if its materialization plus repeated consumers is slower or adds large persistent storage pressure.",
+    "historicalStages": "Treat as-of rankings and standing-record history as lazy or batch-only until a bounded snapshot design beats repeated full result-fact scans.",
+    "productValueGate": "Only promote a candidate after a product owner confirms the use case and the measured incremental build cost is acceptable."
+  }
+}
