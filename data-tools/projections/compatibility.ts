@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { executeTableStatements, projectionSql, runTimedBuildStep, statements } from "./build.ts";
+import { runTimedBuildStep } from "./progress.ts";
+import { executeTableStatements, projectionSql, statements } from "./sql.ts";
 
 export const COMPATIBILITY_PROJECTION_TASKS = [
   { name: "compatibility-ranking-entries-single-source", dependencies: ["projection:result-facts"], estimatedDurationMs: 0 },

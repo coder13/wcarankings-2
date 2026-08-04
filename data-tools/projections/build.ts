@@ -1,124 +1,21 @@
 // @ts-nocheck
-import { readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } from "./jobs.ts";
 import { compatibilityProjectionTasks } from "./compatibility.ts";
+import { dropManagedObject, ensureIndexes, ensureWcaPersonLookupIndex, INDEXES, tableExists } from "./database.ts";
+import { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } from "./jobs.ts";
+import { elapsedMs, createTableProgress, runTimedBuildStep, writeBuildLog } from "./progress.ts";
 import { runDependencyAwareTasks } from "./scheduler.ts";
+import { createdTables, executeTableStatements, projectionSql, statements } from "./sql.ts";
 
 export { DEPLOYMENT_PROJECTION_GROUPS } from "./jobs.ts";
+export { ensureWcaPersonLookupIndex, dropManagedObject } from "./database.ts";
 export {
   COMPATIBILITY_PROJECTION_TASKS,
   COMPATIBILITY_TABLE_TASK_COUNT,
   renameCompatibilitySql,
 } from "./compatibility.ts";
+export { createTableProgress, elapsedMs, runTimedBuildStep, writeBuildLog } from "./progress.ts";
 export { runDependencyAwareTasks } from "./scheduler.ts";
-
-const INDEXES = [
-  ["persons", "idx_persons_wca_sub", "(`wca_id`, `sub_id`)", "wca_id,sub_id"],
-  ["persons", "idx_persons_name", "(`name`)", "name"],
-  ["ranks_single", "idx_ranks_single_world", "(`event_id`, `world_rank`, `person_id`)", "event_id,world_rank,person_id"],
-  ["ranks_single", "idx_ranks_single_continent", "(`event_id`, `continent_rank`, `person_id`)", "event_id,continent_rank,person_id"],
-  ["ranks_single", "idx_ranks_single_country", "(`event_id`, `country_rank`, `person_id`)", "event_id,country_rank,person_id"],
-  ["ranks_average", "idx_ranks_average_world", "(`event_id`, `world_rank`, `person_id`)", "event_id,world_rank,person_id"],
-  ["ranks_average", "idx_ranks_average_continent", "(`event_id`, `continent_rank`, `person_id`)", "event_id,continent_rank,person_id"],
-  ["ranks_average", "idx_ranks_average_country", "(`event_id`, `country_rank`, `person_id`)", "event_id,country_rank,person_id"],
-  ["results", "idx_results_single_best", "(`person_id`, `event_id`, `best`, `id`)", "person_id,event_id,best,id"],
-  ["results", "idx_results_single_event_best", "(`event_id`, `best`, `id`)", "event_id,best,id"],
-  ["results", "idx_results_average_best", "(`person_id`, `event_id`, `average`, `id`)", "person_id,event_id,average,id"],
-  ["result_attempts", "idx_result_attempts_result", "(`result_id`, `attempt_number`)", "result_id,attempt_number"],
-  ["results", "idx_results_average_event_best", "(`event_id`, `average`, `id`)", "event_id,average,id"],
-  ["results", "idx_results_single_country_best", "(`event_id`, `person_country_id`, `best`, `id`)", "event_id,person_country_id,best,id"],
-  ["results", "idx_results_average_country_best", "(`event_id`, `person_country_id`, `average`, `id`)", "event_id,person_country_id,average,id"],
-];
-
-const projectionDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "sql", "ranking-projections");
-
-export function statements(sql) {
-  return sql.split(/;\s*(?:\n|$)/).map((statement) => statement.trim()).filter(Boolean);
-}
-
-export async function projectionSql(file) {
-  return readFile(join(projectionDirectory, file), "utf8");
-}
-
-function elapsedMs(startedAt) {
-  return Math.round(performance.now() - startedAt);
-}
-
-function writeBuildLog(message) {
-  process.stdout.write(`[projection-build] ${message}\n`);
-}
-
-export function createTableProgress(total) {
-  let started = 0;
-  return {
-    start() {
-      started += 1;
-      return `[${started}/${total}]`;
-    },
-  };
-}
-
-export async function runTimedBuildStep(label, build, { tableProgress, tableName } = {}) {
-  const startedAt = performance.now();
-  const progress = tableProgress && tableName ? `${tableProgress.start(tableName)} ` : "";
-  writeBuildLog(`${progress}Starting ${label}…`);
-  try {
-    const result = await build();
-    const durationMs = elapsedMs(startedAt);
-    writeBuildLog(`Finished ${label} in ${durationMs}ms.`);
-    return { result, durationMs };
-  } catch (error) {
-    writeBuildLog(`Failed ${label} after ${elapsedMs(startedAt)}ms.`);
-    throw error;
-  }
-}
-
-function createdTableName(statement) {
-  return statement.match(
-    /\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:TEMPORARY\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([a-zA-Z0-9_]+)`?/i,
-  )?.[1];
-}
-
-export async function executeTableStatements(connection, sql, phases = [], { tableProgress } = {}) {
-  let activeTable;
-  let activeTableStartedAt;
-
-  function finishActiveTable() {
-    if (!activeTable) return;
-    writeBuildLog(`Finished table ${activeTable} in ${elapsedMs(activeTableStartedAt)}ms.`);
-    activeTable = undefined;
-    activeTableStartedAt = undefined;
-  }
-
-  try {
-    for (const statement of statements(sql)) {
-      const table = createdTableName(statement);
-      if (table) {
-        finishActiveTable();
-        activeTable = table;
-        activeTableStartedAt = performance.now();
-        const progress = tableProgress ? `${tableProgress.start(table)} ` : "";
-        writeBuildLog(`${progress}Starting table ${table}…`);
-      }
-
-      const phase = statement.match(/^\s*-- phase:\s*([^\n]+)/)?.[1]?.trim();
-      const startedAt = performance.now();
-      await connection.query(statement);
-      if (phase) phases.push({
-        name: phase,
-        durationMs: elapsedMs(startedAt),
-      });
-    }
-    finishActiveTable();
-  } catch (error) {
-    if (activeTable) {
-      writeBuildLog(`Failed table ${activeTable} after ${elapsedMs(activeTableStartedAt)}ms.`);
-    }
-    throw error;
-  }
-}
+export { executeTableStatements, projectionSql, statements } from "./sql.ts";
 
 const projectionDefinitions = PROJECTION_JOBS
   .filter((job) => job.kind !== "compatibility")
@@ -219,8 +116,7 @@ export async function countProjectionTables(projections) {
   let total = 0;
   for (const projection of projections) {
     for (const file of projection.files) {
-      const sql = projectionNames(await projectionSql(file), "");
-      total += statements(sql).filter((statement) => createdTableName(statement)).length;
+      total += createdTables(projectionNames(await projectionSql(file), "")).length;
     }
   }
   return total;
@@ -351,52 +247,6 @@ export async function buildRegisteredProjections(
   });
 }
 
-async function ensureIndexes(connection, indexes) {
-  for (const [table, name, columns, columnList] of indexes) {
-    if (table === "results" && process.env.WCA_SKIP_LARGE_INDEXES === "1") {
-      process.stdout.write(`Skipping large results index ${name} in constrained mode\n`);
-      continue;
-    }
-    const [tables] = await connection.query(
-      "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
-      [table],
-    );
-    if (tables.length === 0) {
-      process.stdout.write(`Skipping ${table} index ${name}; table is not present\n`);
-      continue;
-    }
-    const [existing] = await connection.query(
-      "SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ? LIMIT 1",
-      [table, name],
-    );
-    if (existing.length === 0) {
-      await connection.query(`ALTER TABLE \`${table}\` ADD INDEX \`${name}\` ${columns}`);
-      process.stdout.write(`Added ${table}.${name} (${columnList})\n`);
-    }
-  }
-}
-
-export async function ensureWcaPersonLookupIndex(connection) {
-  await ensureIndexes(connection, INDEXES.filter(([table, name]) =>
-    table === "persons" && name === "idx_persons_wca_sub"));
-}
-
-export async function dropManagedObject(connection, name) {
-  const [rows] = await connection.query(
-    "SELECT TABLE_TYPE AS type FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
-    [name],
-  );
-  if (rows[0]?.type === "VIEW") await connection.query(`DROP VIEW \`${name}\``);
-  if (rows[0]?.type === "BASE TABLE") await connection.query(`DROP TABLE \`${name}\``);
-}
-
-async function tableExists(connection, name) {
-  const [rows] = await connection.query(
-    "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
-    [name],
-  );
-  return rows.length > 0;
-}
 
 export async function promoteProjectionTables(connection, { projectionSuffix = "_staging", tables = PUBLISHED_PROJECTION_TABLES } = {}) {
   const renames = [];

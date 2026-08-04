@@ -43,9 +43,10 @@ test("formats table progress against the complete build workload", async () => {
 });
 
 test("keeps future grains registered while activating person metrics and competition bests", async () => {
-  const [schema, compatibility, groups, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, personCompetitionRankings, cities, counts, importer] =
+  const [schema, sql, compatibility, groups, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, personCompetitionRankings, cities, counts, importer] =
     await Promise.all([
       readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
+      readFile(new URL("data-tools/projections/sql.ts", root), "utf8"),
       readFile(new URL("data-tools/projections/compatibility.ts", root), "utf8"),
       readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
       readFile(new URL("sql/ranking-projections/result_facts.sql", root), "utf8"),
@@ -81,7 +82,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /validate:/);
   assert.match(schema, /durationMs/);
   assert.match(schema, /rowCounts/);
-  assert.match(schema, /statement\.match\(\/\^\\s\*-- phase:/);
+  assert.match(sql, /statement\.match\(\/\^\\s\*-- phase:/);
   assert.match(schema, /DEFAULT_PROJECTION_NAMES/);
   assert.match(schema, /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/);
   assert.match(groups, /id: "sum-of-ranks"[\s\S]*dependencies: \["result-facts"\]/);
