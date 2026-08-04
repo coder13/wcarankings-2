@@ -238,11 +238,24 @@ export async function loadPersonProfile(wcaId: string): Promise<PersonProfile | 
     [normalized, normalized],
   );
   const metricValuesPromise = optionalRows<MetricValueRow>(
-    `SELECT result_type, event_id, event_rank, kinch_value
-     FROM person_metric_values
-     WHERE metric_version = 1 AND event_set_version = 1
-       AND scope = 'world' AND region_id = '' AND person_id = ?
-     ORDER BY result_type, event_id`,
+    `SELECT ranking.result_type, ranking.event_id,
+       ranking.world_rank AS event_rank,
+       CASE
+         WHEN ranking.event_id = '333mbf' THEN NULL
+         ELSE CAST(100.0 * reference.result_value / ranking.result_value AS DECIMAL(18, 6))
+       END AS kinch_value
+     FROM person_event_rankings ranking
+     INNER JOIN person_event_rankings reference
+       ON reference.event_id = ranking.event_id
+      AND reference.result_type = ranking.result_type
+      AND reference.world_position = 1
+     WHERE ranking.person_id = ?
+       AND ranking.event_id IN (
+         '333', '222', '444', '555', '666', '777', '333bf', '333fm',
+         '333oh', 'clock', 'minx', 'pyram', 'skewb', 'sq1', '444bf',
+         '555bf', '333mbf'
+       )
+     ORDER BY ranking.result_type, ranking.event_id`,
     [normalized],
   );
   const metricScoresPromise = optionalRows<MetricScoreRow>(

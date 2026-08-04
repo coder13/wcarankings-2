@@ -8,8 +8,8 @@ These small tables provide page totals and list metadata for other statistics.
 They do not define a new ranking. They prevent a request from counting a large
 ranking table or raw fact set before returning a page.
 
-The support tables cover result lists by event, result type, scope, and region;
-person lists by event and scope; person-competition lists by scope,
+The support tables cover result rankings by event, result type, scope, and
+region; person lists by event and scope; person-competition lists by scope,
 region, and gender; entity lists by ranking kind, event, and result type; and
 yearly ranking by available year and cohort.
 
@@ -29,20 +29,14 @@ Each count table needs a primary or unique key matching its full filter definiti
 The source ranking must have a browse index matching the count grouping, or the
 count must be produced during the same build phase as the ranking.
 
-For raw result counts, the source result-entry table needs count-oriented indexes
-on `(event_id)`, `(event_id, continent_id)`, and `(event_id, country_id)`.
-
-## EXPLAIN summary
-
-The result-count review found a 6.35-million-row source scanned three times.
-The count-oriented indexes match the three geographic groupings and remove the
-need for repeated broad scans. Counts remain build-time work.
+`result_ranking_counts` is produced from the canonical result-ranking tables.
+The retired `result_counts` compatibility projection is not built or read.
 
 ## Build evidence
 
 Measured result counts:
 
-- `21.600 s` (`00:21.60`) for `result_counts`;
+- `21.600 s` (`00:21.60`) for the now-retired `result_counts`;
 - `39.093 s` (`00:39.09`) for `result_ranking_counts`;
 - `97.258 s` (`01:37.26`) for the earlier gender count table.
 

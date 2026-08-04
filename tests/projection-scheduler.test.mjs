@@ -362,13 +362,13 @@ test("compatibility build omits disabled weekly helper tables", () => {
   const averageSource = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
     name === "compatibility-ranking-entries-average-source");
   assert.deepEqual(averageSource.dependencies, ["projection:result-facts"]);
-  assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 5);
+  assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 3);
   const progress = createTableProgress(COMPATIBILITY_TABLE_TASK_COUNT);
   let lastProgress;
   for (const task of COMPATIBILITY_PROJECTION_TASKS) {
     if (task.table) lastProgress = progress.start(task.table);
   }
-  assert.equal(lastProgress, "[5/5]");
+  assert.equal(lastProgress, "[3/3]");
 });
 
 test("compatibility source views wait for result facts", async () => {
@@ -406,7 +406,6 @@ test("compatibility SQL uses the matching staged result facts table", async () =
       single: "ranking_entries_single_source_staging",
       average: "ranking_entries_average_source_staging",
     },
-    resultEntriesSource: "result_entries_single_source_staging",
     resultFacts: "result_facts_staging",
   });
 

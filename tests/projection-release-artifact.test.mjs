@@ -12,7 +12,7 @@ async function fixture({ raw = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "projection-artifact-"));
   const tables = [
     "ranking_entries_single_transfer", "ranking_entries_average_transfer",
-    "ranking_counts_transfer", "result_entries_single_transfer", "result_counts_transfer",
+    "ranking_counts_transfer",
     "projection_transfer_manifest_compatibility", "projection_transfer_indexes_compatibility",
   ];
   await writeFile(join(directory, "compatibility-projection-transfer.tar.gz"), "archive");
@@ -92,7 +92,7 @@ test("rejects transfer metadata from a different WCA export", async () => {
     exportDate: "2026-07-29 00:00:23 UTC",
     tables: [
       "ranking_entries_single_transfer", "ranking_entries_average_transfer",
-      "ranking_counts_transfer", "result_entries_single_transfer", "result_counts_transfer",
+      "ranking_counts_transfer",
       "projection_transfer_manifest_compatibility", "projection_transfer_indexes_compatibility",
     ],
   }));
