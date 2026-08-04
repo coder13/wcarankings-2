@@ -9,7 +9,10 @@ function argumentValue(name) {
 }
 
 function listArgument(name) {
-  return argumentValue(name).split(",").map((value) => value.trim()).filter(Boolean);
+  return argumentValue(name)
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 function databaseOptions(connectionString = process.env.DATABASE_URL) {

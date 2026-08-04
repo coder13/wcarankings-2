@@ -25,7 +25,7 @@ async function migrationFiles(directory) {
   const files = [];
   for (const entry of entries) {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await migrationFiles(path));
+    if (entry.isDirectory()) files.push(...(await migrationFiles(path)));
     if (entry.isFile()) files.push(path);
   }
   return files;
@@ -40,26 +40,38 @@ function requestedGroups(selectedGroups) {
   const requested = selectedGroups?.length
     ? new Set(selectedGroups)
     : new Set(DEPLOYMENT_PROJECTION_GROUPS.map(({ name }) => name));
-  const unknown = [...requested].filter((name) =>
-    !DEPLOYMENT_PROJECTION_GROUPS.some((group) => group.name === name));
+  const unknown = [...requested].filter(
+    (name) =>
+      !DEPLOYMENT_PROJECTION_GROUPS.some((group) => group.name === name),
+  );
   if (unknown.length > 0) {
-    throw new Error(`Unknown deployment projection group: ${unknown.join(", ")}`);
+    throw new Error(
+      `Unknown deployment projection group: ${unknown.join(", ")}`,
+    );
   }
   return requested;
 }
 
-export async function semanticProjectionFingerprints({ repositoryRoot = root } = {}) {
-  const resultMigrations = (await migrationFiles(join(repositoryRoot, "migrations", "mysql", "results")))
+export async function semanticProjectionFingerprints({
+  repositoryRoot = root,
+} = {}) {
+  const resultMigrations = (
+    await migrationFiles(join(repositoryRoot, "migrations", "mysql", "results"))
+  )
     .map((path) => relative(repositoryRoot, path))
     .sort();
   const groups = {};
 
   for (const group of DEPLOYMENT_PROJECTION_GROUPS) {
-    const inputs = [...new Set([
-      ...group.sqlFiles.map((file) => `sql/ranking-projections/${file}`),
-      ...resultMigrations,
-    ])].sort();
-    const files = await Promise.all(inputs.map((path) => fileFingerprint(repositoryRoot, path)));
+    const inputs = [
+      ...new Set([
+        ...group.sqlFiles.map((file) => `sql/ranking-projections/${file}`),
+        ...resultMigrations,
+      ]),
+    ].sort();
+    const files = await Promise.all(
+      inputs.map((path) => fileFingerprint(repositoryRoot, path)),
+    );
     const payload = {
       semanticFingerprintFormatVersion: SEMANTIC_FINGERPRINT_FORMAT_VERSION,
       group: group.name,
@@ -84,15 +96,19 @@ export async function semanticProjectionFingerprints({ repositoryRoot = root } =
 }
 
 function activeSemanticFingerprint(state, groupName) {
-  return state?.semanticFingerprints?.[groupName]
-    ?? state?.groups?.[groupName]?.semanticFingerprint
-    ?? null;
+  return (
+    state?.semanticFingerprints?.[groupName] ??
+    state?.groups?.[groupName]?.semanticFingerprint ??
+    null
+  );
 }
 
 function activeArtifactFingerprint(state, groupName) {
-  return state?.artifactFingerprints?.[groupName]
-    ?? state?.groups?.[groupName]?.artifactFingerprint
-    ?? null;
+  return (
+    state?.artifactFingerprints?.[groupName] ??
+    state?.groups?.[groupName]?.artifactFingerprint ??
+    null
+  );
 }
 
 export async function projectionSemanticPlan({
@@ -105,10 +121,14 @@ export async function projectionSemanticPlan({
   const requested = requestedGroups(selectedGroups);
   const changedRoots = forceRebuild
     ? [...requested]
-    : [...requested].filter((name) =>
-      activeSemanticFingerprint(productionState, name)
-        !== semantics.groups[name].semanticFingerprint);
-  const changedGroups = downstreamGroupClosure(changedRoots).map(({ name }) => name);
+    : [...requested].filter(
+        (name) =>
+          activeSemanticFingerprint(productionState, name) !==
+          semantics.groups[name].semanticFingerprint,
+      );
+  const changedGroups = downstreamGroupClosure(changedRoots).map(
+    ({ name }) => name,
+  );
   return {
     ...semantics,
     required: changedGroups.length > 0,
@@ -124,18 +144,22 @@ export async function projectionFingerprints({
   semanticFingerprints,
 } = {}) {
   const normalizedExportId = normalizeExportDate(exportId);
-  if (!normalizedExportId) throw new Error("exportId must be a valid timestamp");
-  const semantics = semanticFingerprints
-    ?? await semanticProjectionFingerprints({ repositoryRoot });
+  if (!normalizedExportId)
+    throw new Error("exportId must be a valid timestamp");
+  const semantics =
+    semanticFingerprints ??
+    (await semanticProjectionFingerprints({ repositoryRoot }));
   const groups = {};
 
   function create(groupName) {
     if (groups[groupName]) return groups[groupName];
     const group = projectionGroup(groupName);
-    const dependencies = Object.fromEntries(group.dependencies.map((dependency) => [
-      dependency,
-      create(dependency).artifactFingerprint,
-    ]));
+    const dependencies = Object.fromEntries(
+      group.dependencies.map((dependency) => [
+        dependency,
+        create(dependency).artifactFingerprint,
+      ]),
+    );
     const semantic = semantics.groups[groupName];
     if (!semantic?.semanticFingerprint) {
       throw new Error(`Missing semantic fingerprint for ${groupName}`);
@@ -202,19 +226,25 @@ export async function projectionReleasePlan({
   const normalizedProductionExportId = productionExportId
     ? normalizeExportDate(productionExportId)
     : null;
-  const exportChanged = !normalizedProductionExportId
-    || normalizedProductionExportId !== normalizedExportId;
-  const selected = exportChanged || forceRebuild
-    ? DEPLOYMENT_PROJECTION_GROUPS.map(({ name }) => name)
-    : semanticPlan.changedGroups;
+  const exportChanged =
+    !normalizedProductionExportId ||
+    normalizedProductionExportId !== normalizedExportId;
+  const selected =
+    exportChanged || forceRebuild
+      ? DEPLOYMENT_PROJECTION_GROUPS.map(({ name }) => name)
+      : semanticPlan.changedGroups;
 
   const activeGroups = [];
   const cachedGroups = [];
   const buildGroups = [];
   for (const name of selected) {
     const desired = fingerprints.groups[name];
-    if (!exportChanged && !forceRebuild
-      && activeArtifactFingerprint(productionState, name) === desired.artifactFingerprint) {
+    if (
+      !exportChanged &&
+      !forceRebuild &&
+      activeArtifactFingerprint(productionState, name) ===
+        desired.artifactFingerprint
+    ) {
       activeGroups.push(name);
     } else if (availableArtifact(availableArtifacts, name, desired)) {
       cachedGroups.push(name);
@@ -242,12 +272,12 @@ export async function projectionReleasePlan({
   }
   for (const group of [...builds]) satisfyDependencies(group);
 
-  const orderedBuildGroups = DEPLOYMENT_PROJECTION_GROUPS
-    .filter(({ name }) => builds.has(name))
-    .map(({ name }) => name);
-  const orderedHydrateGroups = DEPLOYMENT_PROJECTION_GROUPS
-    .filter(({ name }) => hydrateGroups.has(name) && !builds.has(name))
-    .map(({ name }) => name);
+  const orderedBuildGroups = DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) =>
+    builds.has(name),
+  ).map(({ name }) => name);
+  const orderedHydrateGroups = DEPLOYMENT_PROJECTION_GROUPS.filter(
+    ({ name }) => hydrateGroups.has(name) && !builds.has(name),
+  ).map(({ name }) => name);
   const releaseGroups = selected.filter((name) => !activeGroups.includes(name));
 
   return {
@@ -277,7 +307,10 @@ async function readJsonFile(path, fallback = {}) {
 export async function projectionReleasePlanCli() {
   const command = process.argv[2] === "semantic" ? "semantic" : "release";
   const statePath = argumentValue("state-file");
-  const groups = listArgument("groups");
+  const groups = argumentValue("groups")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
   const productionState = await readJsonFile(statePath);
   if (command === "semantic") {
     const plan = await projectionSemanticPlan({
@@ -292,13 +325,18 @@ export async function projectionReleasePlanCli() {
     exportId: argumentValue("export-id"),
     productionExportId: argumentValue("production-export-id"),
     productionState,
-    availableArtifacts: await readJsonFile(argumentValue("available-artifacts-file")),
+    availableArtifacts: await readJsonFile(
+      argumentValue("available-artifacts-file"),
+    ),
     selectedGroups: groups.length > 0 ? groups : undefined,
     forceRebuild: argumentValue("force-rebuild") === "true",
   });
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
 }
 
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+if (
+  process.argv[1] &&
+  pathToFileURL(process.argv[1]).href === import.meta.url
+) {
   await projectionReleasePlanCli();
 }

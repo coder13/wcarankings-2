@@ -20,14 +20,46 @@ const manifest = {
   },
   raw: { file: "wca-export.sql.zip" },
   groups: {
-    compatibility: { semanticFingerprint: "compat-semantic", artifactFingerprint: "compat-new", artifactDigest: "sha256:compat" },
-    "result-facts": { semanticFingerprint: "facts-semantic", artifactFingerprint: "facts-new", artifactDigest: "sha256:facts" },
-    "result-rankings": { semanticFingerprint: "result-semantic", artifactFingerprint: "result-new", artifactDigest: "sha256:result" },
-    "competition-rankings": { semanticFingerprint: "competition-semantic", artifactFingerprint: "competition-new", artifactDigest: "sha256:competition" },
-    "person-competition-rankings": { semanticFingerprint: "person-competition-semantic", artifactFingerprint: "person-competition-new", artifactDigest: "sha256:person-competition" },
-    "city-rankings": { semanticFingerprint: "city-semantic", artifactFingerprint: "city-new", artifactDigest: "sha256:city" },
-    "sum-of-ranks": { semanticFingerprint: "sum-semantic", artifactFingerprint: "sum-new", artifactDigest: "sha256:sum" },
-    "yearly-person-rankings": { semanticFingerprint: "yearly-semantic", artifactFingerprint: "yearly-new", artifactDigest: "sha256:yearly" },
+    compatibility: {
+      semanticFingerprint: "compat-semantic",
+      artifactFingerprint: "compat-new",
+      artifactDigest: "sha256:compat",
+    },
+    "result-facts": {
+      semanticFingerprint: "facts-semantic",
+      artifactFingerprint: "facts-new",
+      artifactDigest: "sha256:facts",
+    },
+    "result-rankings": {
+      semanticFingerprint: "result-semantic",
+      artifactFingerprint: "result-new",
+      artifactDigest: "sha256:result",
+    },
+    "competition-rankings": {
+      semanticFingerprint: "competition-semantic",
+      artifactFingerprint: "competition-new",
+      artifactDigest: "sha256:competition",
+    },
+    "person-competition-rankings": {
+      semanticFingerprint: "person-competition-semantic",
+      artifactFingerprint: "person-competition-new",
+      artifactDigest: "sha256:person-competition",
+    },
+    "city-rankings": {
+      semanticFingerprint: "city-semantic",
+      artifactFingerprint: "city-new",
+      artifactDigest: "sha256:city",
+    },
+    "sum-of-ranks": {
+      semanticFingerprint: "sum-semantic",
+      artifactFingerprint: "sum-new",
+      artifactDigest: "sha256:sum",
+    },
+    "yearly-person-rankings": {
+      semanticFingerprint: "yearly-semantic",
+      artifactFingerprint: "yearly-new",
+      artifactDigest: "sha256:yearly",
+    },
   },
 };
 
@@ -42,7 +74,10 @@ function stateRow({
     artifact_format_version: 3,
     dataset_schema_version: 1,
     fingerprints_json: JSON.stringify({
-      semantic: { compatibility: "compat-semantic-old", untouched: "same-semantic" },
+      semantic: {
+        compatibility: "compat-semantic-old",
+        untouched: "same-semantic",
+      },
       artifacts: { compatibility: "compat-old", untouched: "same" },
       digests: { compatibility: "sha256:old", untouched: "sha256:same" },
     }),
@@ -69,7 +104,8 @@ function fakeConnection({
     statements,
     async query(sql, parameters = []) {
       statements.push({ sql, parameters });
-      if (sql.includes("GET_LOCK")) return [[{ acquired: lockAcquired ? 1 : 0 }]];
+      if (sql.includes("GET_LOCK"))
+        return [[{ acquired: lockAcquired ? 1 : 0 }]];
       if (sql.includes("RELEASE_LOCK")) return [[{ released: 1 }]];
       if (sql.includes("information_schema.tables")) {
         return [[...(schemas[parameters[0]] || [])].map((name) => ({ name }))];
@@ -91,17 +127,28 @@ test("bootstrap preserves an existing active generation without writing", async 
     activeRow,
     schemas: { wcarankings: ["ranking_generation_state"] },
   });
-  const result = await bootstrapGenerationState({ connection, productionSchema: "wcarankings" });
+  const result = await bootstrapGenerationState({
+    connection,
+    productionSchema: "wcarankings",
+  });
 
   assert.equal(result.bootstrapped, false);
   assert.equal(result.state.generationId, activeRow.generation_id);
-  assert.equal(connection.statements.some(({ sql }) => sql.includes("INSERT INTO")), false);
+  assert.equal(
+    connection.statements.some(({ sql }) => sql.includes("INSERT INTO")),
+    false,
+  );
 });
 
 test("bootstrap fails closed without complete, valid export metadata", async () => {
   const tables = [
-    "ranking_generation_state", "export_metadata",
-    "ranking_entries_single", "ranking_entries_average", "ranking_counts",
+    "ranking_generation_state",
+    "export_metadata",
+    "ranking_entries_single",
+    "ranking_entries_average",
+    "ranking_counts",
+    "result_entries_single",
+    "result_counts",
   ];
   for (const exportRows of [
     [],
@@ -124,22 +171,35 @@ test("bootstrap fails closed without complete, valid export metadata", async () 
       bootstrapGenerationState({ connection, productionSchema: "wcarankings" }),
       /export_date|export identity|fetched_at/,
     );
-    assert.equal(connection.statements.some(({ sql }) => sql.includes("INSERT INTO")), false);
+    assert.equal(
+      connection.statements.some(({ sql }) => sql.includes("INSERT INTO")),
+      false,
+    );
   }
 });
 
 test("bootstrap records only table-proven partial capabilities and no fabricated fingerprints", async () => {
   const tables = [
-    "ranking_generation_state", "export_metadata",
-    "ranking_entries_single", "ranking_entries_average", "ranking_counts",
-    "competition_podium_members", "competition_event_stats", "competition_stats",
+    "ranking_generation_state",
+    "export_metadata",
+    "ranking_entries_single",
+    "ranking_entries_average",
+    "ranking_counts",
+    "result_entries_single",
+    "result_counts",
+    "competition_podium_members",
+    "competition_event_stats",
+    "competition_stats",
     "city_event_stats",
   ];
   const connection = fakeConnection({
     activeRow: null,
     schemas: { wcarankings: tables },
   });
-  const result = await bootstrapGenerationState({ connection, productionSchema: "wcarankings" });
+  const result = await bootstrapGenerationState({
+    connection,
+    productionSchema: "wcarankings",
+  });
 
   assert.equal(result.bootstrapped, true);
   assert.deepEqual(result.state.capabilities, {
@@ -155,8 +215,14 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
   assert.deepEqual(result.state.artifactDigests, {});
   assert.deepEqual(result.state.activationTables, []);
   assert.deepEqual(result.state.previousTables, []);
-  const insert = connection.statements.find(({ sql }) => sql.includes("INSERT INTO"));
-  assert.deepEqual(JSON.parse(insert.parameters[4]), { semantic: {}, artifacts: {}, digests: {} });
+  const insert = connection.statements.find(({ sql }) =>
+    sql.includes("INSERT INTO"),
+  );
+  assert.deepEqual(JSON.parse(insert.parameters[4]), {
+    semantic: {},
+    artifacts: {},
+    digests: {},
+  });
   assert.deepEqual(JSON.parse(insert.parameters[5]), result.state.capabilities);
 });
 
@@ -166,13 +232,19 @@ test("bootstrap fails without the ranking-generation advisory lock", async () =>
     bootstrapGenerationState({ connection, productionSchema: "wcarankings" }),
     /activation lock is already held/,
   );
-  assert.equal(connection.statements.some(({ sql }) => sql.includes("INSERT INTO")), false);
+  assert.equal(
+    connection.statements.some(({ sql }) => sql.includes("INSERT INTO")),
+    false,
+  );
 });
 
 test("capability table mapping keeps city and competition ownership independent", () => {
   const capabilities = capabilitiesFromTables([
-    "competition_podium_members", "competition_event_stats", "competition_stats",
-    "city_event_stats", "entity_ranking_counts",
+    "competition_podium_members",
+    "competition_event_stats",
+    "competition_stats",
+    "city_event_stats",
+    "entity_ranking_counts",
   ]);
   assert.equal(capabilities.competitionRankings, true);
   assert.equal(capabilities.cityEventStats, true);
@@ -181,9 +253,15 @@ test("capability table mapping keeps city and competition ownership independent"
 test("partial activation preserves unchanged artifacts and capabilities", () => {
   const next = mergedGenerationState({
     activeState: {
-      semanticFingerprints: { compatibility: "old-semantic", untouched: "same-semantic" },
+      semanticFingerprints: {
+        compatibility: "old-semantic",
+        untouched: "same-semantic",
+      },
       artifactFingerprints: { compatibility: "old", untouched: "same" },
-      artifactDigests: { compatibility: "sha256:old", untouched: "sha256:same" },
+      artifactDigests: {
+        compatibility: "sha256:old",
+        untouched: "sha256:same",
+      },
       capabilities: { core: false, sumOfRanks: true },
     },
     manifest: {
@@ -210,23 +288,42 @@ test("activated-phase recovery verifies the exact release identity and fingerpri
     artifactRunId: 20,
     artifactId: 30,
   });
-  assert.equal(matchesActiveGeneration({ activeState, manifest, artifactRunId: 20, artifactId: 30 }), true);
-  assert.equal(matchesActiveGeneration({ activeState, manifest, artifactRunId: 21, artifactId: 30 }), false);
-  assert.equal(matchesActiveGeneration({
-    activeState,
-    manifest: {
-      ...manifest,
-      groups: {
-        ...manifest.groups,
-        compatibility: {
-          ...manifest.groups.compatibility,
-          artifactFingerprint: "different",
+  assert.equal(
+    matchesActiveGeneration({
+      activeState,
+      manifest,
+      artifactRunId: 20,
+      artifactId: 30,
+    }),
+    true,
+  );
+  assert.equal(
+    matchesActiveGeneration({
+      activeState,
+      manifest,
+      artifactRunId: 21,
+      artifactId: 30,
+    }),
+    false,
+  );
+  assert.equal(
+    matchesActiveGeneration({
+      activeState,
+      manifest: {
+        ...manifest,
+        groups: {
+          ...manifest.groups,
+          compatibility: {
+            ...manifest.groups.compatibility,
+            artifactFingerprint: "different",
+          },
         },
       },
-    },
-    artifactRunId: 20,
-    artifactId: 30,
-  }), false);
+      artifactRunId: 20,
+      artifactId: 30,
+    }),
+    false,
+  );
 });
 
 test("activation renames raw data, projections, export metadata, and state atomically", async () => {
@@ -248,13 +345,22 @@ test("activation renames raw data, projections, export metadata, and state atomi
     artifactRunId: 20,
     artifactId: 30,
   });
-  const rename = connection.statements.find(({ sql }) => sql.startsWith("RENAME TABLE"));
+  const rename = connection.statements.find(({ sql }) =>
+    sql.startsWith("RENAME TABLE"),
+  );
   assert.ok(rename);
-  assert.match(rename.sql, /`wcarankings_candidate_30`\.`export_metadata` TO `wcarankings`\.`export_metadata`/);
-  assert.match(rename.sql, /`wcarankings_candidate_30`\.`ranking_generation_state` TO `wcarankings`\.`ranking_generation_state`/);
-  assert.match(rename.sql, /`wcarankings`\.`results` TO `wcarankings_candidate_30_previous`\.`results`/);
-  assert.match(rename.sql, /`wcarankings`\.`result_entries_single` TO `wcarankings_candidate_30_previous`\.`result_entries_single`/);
-  assert.ok(result.state.previousTables.includes("person_metric_values"));
+  assert.match(
+    rename.sql,
+    /`wcarankings_candidate_30`\.`export_metadata` TO `wcarankings`\.`export_metadata`/,
+  );
+  assert.match(
+    rename.sql,
+    /`wcarankings_candidate_30`\.`ranking_generation_state` TO `wcarankings`\.`ranking_generation_state`/,
+  );
+  assert.match(
+    rename.sql,
+    /`wcarankings`\.`results` TO `wcarankings_candidate_30_previous`\.`results`/,
+  );
   assert.doesNotMatch(rename.sql, /DROP TABLE/);
 });
 
@@ -333,8 +439,12 @@ test("failure after atomic rename still has matching active database state", asy
     }),
     /Injected failure/,
   );
-  const insertIndex = connection.statements.findIndex(({ sql }) => sql.includes("INSERT INTO"));
-  const renameIndex = connection.statements.findIndex(({ sql }) => sql.startsWith("RENAME TABLE"));
+  const insertIndex = connection.statements.findIndex(({ sql }) =>
+    sql.includes("INSERT INTO"),
+  );
+  const renameIndex = connection.statements.findIndex(({ sql }) =>
+    sql.startsWith("RENAME TABLE"),
+  );
   assert.ok(insertIndex >= 0 && renameIndex > insertIndex);
 });
 
@@ -354,8 +464,16 @@ test("rollback restores every prior table in one rename and keeps candidate work
     artifactId: 30,
   });
   assert.equal(result.rolledBack, true);
-  const rename = connection.statements.find(({ sql }) => sql.startsWith("RENAME TABLE"));
-  assert.match(rename.sql, /`wcarankings`\.`results` TO `wcarankings_candidate_30`\.`results`/);
-  assert.match(rename.sql, /`wcarankings_candidate_30_previous`\.`results` TO `wcarankings`\.`results`/);
+  const rename = connection.statements.find(({ sql }) =>
+    sql.startsWith("RENAME TABLE"),
+  );
+  assert.match(
+    rename.sql,
+    /`wcarankings`\.`results` TO `wcarankings_candidate_30`\.`results`/,
+  );
+  assert.match(
+    rename.sql,
+    /`wcarankings_candidate_30_previous`\.`results` TO `wcarankings`\.`results`/,
+  );
   assert.match(rename.sql, /ranking_generation_state/);
 });

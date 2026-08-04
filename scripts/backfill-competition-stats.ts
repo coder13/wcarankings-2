@@ -36,15 +36,18 @@ try {
      FROM information_schema.tables
      WHERE table_schema = DATABASE() AND table_name = 'competition_stats'`,
   );
-  const renames = existing.length > 0
-    ? "`competition_stats` TO `competition_stats_previous`, `competition_stats_staging` TO `competition_stats`"
-    : "`competition_stats_staging` TO `competition_stats`";
+  const renames =
+    existing.length > 0
+      ? "`competition_stats` TO `competition_stats_previous`, `competition_stats_staging` TO `competition_stats`"
+      : "`competition_stats_staging` TO `competition_stats`";
   await connection.query(`RENAME TABLE ${renames}`);
   await dropManagedObject(connection, previousTable);
-  process.stdout.write(`${JSON.stringify({
-    durationMs: Math.round(performance.now() - startedAt),
-    rowCounts,
-  })}\n`);
+  process.stdout.write(
+    `${JSON.stringify({
+      durationMs: Math.round(performance.now() - startedAt),
+      rowCounts,
+    })}\n`,
+  );
 } finally {
   await connection.end();
 }

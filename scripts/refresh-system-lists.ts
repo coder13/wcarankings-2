@@ -33,7 +33,9 @@ export async function refreshSystemLists(connection) {
       );
       const listId = listRows[0]?.id;
       if (!listId) {
-        throw new Error(`System list ${definition.alias} is missing. Run Flyway migrations first.`);
+        throw new Error(
+          `System list ${definition.alias} is missing. Run Flyway migrations first.`,
+        );
       }
 
       const [removed] = await connection.query(
@@ -113,7 +115,9 @@ export async function refreshSystemLists(connection) {
       );
       if (changed) {
         await enqueueListRankingRebuild(connection, {
-          id: Number(listId), membershipVersion: Number(listRows[0].membership_version ?? 1) + 1, kind: "system",
+          id: Number(listId),
+          membershipVersion: Number(listRows[0].membership_version ?? 1) + 1,
+          kind: "system",
         });
       }
     }

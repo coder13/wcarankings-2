@@ -3,8 +3,12 @@ import { once } from "node:events";
 import { createInterface } from "node:readline";
 import { spawn } from "node:child_process";
 
-const rowsArgument = process.argv.find((value) => value.startsWith("--rows-per-insert="));
-const rowsPerInsert = Number(rowsArgument?.slice("--rows-per-insert=".length) || 1000);
+const rowsArgument = process.argv.find((value) =>
+  value.startsWith("--rows-per-insert="),
+);
+const rowsPerInsert = Number(
+  rowsArgument?.slice("--rows-per-insert=".length) || 1000,
+);
 const importDump = process.argv.includes("--import");
 
 if (!Number.isSafeInteger(rowsPerInsert) || rowsPerInsert < 1) {
@@ -12,25 +16,36 @@ if (!Number.isSafeInteger(rowsPerInsert) || rowsPerInsert < 1) {
 }
 
 function importProcess() {
-  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required with --import.");
+  if (!process.env.DATABASE_URL)
+    throw new Error("DATABASE_URL is required with --import.");
   const url = new URL(process.env.DATABASE_URL);
-  const database = process.env.DATABASE_NAME_OVERRIDE
-    || decodeURIComponent(url.pathname.replace(/^\//, ""));
-  const child = spawn("mariadb", [
-    "--protocol=TCP",
-    `--host=${url.hostname}`,
-    `--port=${url.port || 3306}`,
-    `--user=${decodeURIComponent(url.username)}`,
-    database,
-  ], {
-    env: { ...process.env, MYSQL_PWD: decodeURIComponent(url.password) },
-    stdio: ["pipe", "inherit", "inherit"],
-  });
+  const database =
+    process.env.DATABASE_NAME_OVERRIDE ||
+    decodeURIComponent(url.pathname.replace(/^\//, ""));
+  const child = spawn(
+    "mariadb",
+    [
+      "--protocol=TCP",
+      `--host=${url.hostname}`,
+      `--port=${url.port || 3306}`,
+      `--user=${decodeURIComponent(url.username)}`,
+      database,
+    ],
+    {
+      env: { ...process.env, MYSQL_PWD: decodeURIComponent(url.password) },
+      stdio: ["pipe", "inherit", "inherit"],
+    },
+  );
   const completed = new Promise((resolve, reject) => {
     child.once("error", reject);
     child.once("close", (code, signal) => {
       if (code === 0) resolve();
-      else reject(new Error(`mariadb import failed with ${signal ? `signal ${signal}` : `exit code ${code}`}.`));
+      else
+        reject(
+          new Error(
+            `mariadb import failed with ${signal ? `signal ${signal}` : `exit code ${code}`}.`,
+          ),
+        );
     });
   });
   return { output: child.stdin, completed };
@@ -80,7 +95,8 @@ for await (const line of lines) {
   }
 }
 
-if (insertHeader) throw new Error(`Truncated projection dump after ${insertHeader}.`);
+if (insertHeader)
+  throw new Error(`Truncated projection dump after ${insertHeader}.`);
 if (importer) {
   output.end();
   await importer.completed;

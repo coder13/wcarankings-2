@@ -17,45 +17,59 @@ function databaseOptions(connectionString, database) {
   };
 }
 
-test("person lookup index survives the empty-candidate then raw-import lifecycle", {
-  skip: !adminDatabaseUrl && "INTEGRATION_ADMIN_DATABASE_URL is not configured",
-}, async () => {
-  const schema = `person_lookup_index_${process.pid}`;
-  const admin = await mysql.createConnection(databaseOptions(adminDatabaseUrl, "mysql"));
-  try {
-    await admin.query(`CREATE DATABASE \`${schema}\``);
-    const candidate = await mysql.createConnection(databaseOptions(adminDatabaseUrl, schema));
+test(
+  "person lookup index survives the empty-candidate then raw-import lifecycle",
+  {
+    skip:
+      !adminDatabaseUrl && "INTEGRATION_ADMIN_DATABASE_URL is not configured",
+  },
+  async () => {
+    const schema = `person_lookup_index_${process.pid}`;
+    const admin = await mysql.createConnection(
+      databaseOptions(adminDatabaseUrl, "mysql"),
+    );
     try {
-      const migration = await readFile(
-        new URL("../migrations/mysql/app/V13__person_ranking_lookup.sql", import.meta.url),
-        "utf8",
+      await admin.query(`CREATE DATABASE \`${schema}\``);
+      const candidate = await mysql.createConnection(
+        databaseOptions(adminDatabaseUrl, schema),
       );
-      await candidate.query(migration);
-      await candidate.query(`CREATE TABLE persons (
+      try {
+        const migration = await readFile(
+          new URL(
+            "../migrations/mysql/app/V13__person_ranking_lookup.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        );
+        await candidate.query(migration);
+        await candidate.query(`CREATE TABLE persons (
         wca_id VARCHAR(10) NOT NULL,
         sub_id TINYINT NOT NULL,
         name VARCHAR(255) NOT NULL
       )`);
-      await ensureWcaPersonLookupIndex(candidate);
-      await ensureWcaPersonLookupIndex(candidate);
+        await ensureWcaPersonLookupIndex(candidate);
+        await ensureWcaPersonLookupIndex(candidate);
 
-      const [indexes] = await candidate.query(
-        `SELECT index_name, GROUP_CONCAT(column_name ORDER BY seq_in_index) AS columns_csv
+        const [indexes] = await candidate.query(
+          `SELECT index_name, GROUP_CONCAT(column_name ORDER BY seq_in_index) AS columns_csv
            FROM information_schema.statistics
           WHERE table_schema = DATABASE()
             AND table_name = 'persons'
             AND index_name = 'idx_persons_wca_sub'
           GROUP BY index_name`,
-      );
-      assert.deepEqual(indexes, [{
-        index_name: "idx_persons_wca_sub",
-        columns_csv: "wca_id,sub_id",
-      }]);
+        );
+        assert.deepEqual(indexes, [
+          {
+            index_name: "idx_persons_wca_sub",
+            columns_csv: "wca_id,sub_id",
+          },
+        ]);
+      } finally {
+        await candidate.end();
+      }
     } finally {
-      await candidate.end();
+      await admin.query(`DROP DATABASE IF EXISTS \`${schema}\``);
+      await admin.end();
     }
-  } finally {
-    await admin.query(`DROP DATABASE IF EXISTS \`${schema}\``);
-    await admin.end();
-  }
-});
+  },
+);

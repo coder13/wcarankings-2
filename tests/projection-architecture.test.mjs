@@ -6,7 +6,9 @@ const root = new URL("../", import.meta.url);
 const readSql = async (path) => (await readFile(new URL(path, root), "utf8")).replace(/\s+/g, " ");
 
 test("logs projection build step starts, completions, failures, and elapsed time", async () => {
-  const { runTimedBuildStep } = await import(new URL("data-tools/projections/build.ts", root));
+  const { runTimedBuildStep } = await import(
+    new URL("data-tools/projections/build.ts", root)
+  );
   const messages = [];
   const originalWrite = process.stdout.write;
   process.stdout.write = (chunk) => {
@@ -14,7 +16,10 @@ test("logs projection build step starts, completions, failures, and elapsed time
     return true;
   };
   try {
-    const { result, durationMs } = await runTimedBuildStep("table example_staging", async () => "built");
+    const { result, durationMs } = await runTimedBuildStep(
+      "table example_staging",
+      async () => "built",
+    );
     assert.equal(result, "built");
     assert.ok(durationMs >= 0);
     await assert.rejects(
@@ -29,99 +34,106 @@ test("logs projection build step starts, completions, failures, and elapsed time
 
   const output = messages.join("");
   assert.match(output, /\[projection-build\] Starting table example_staging/);
-  assert.match(output, /\[projection-build\] Finished table example_staging in \d{2}:\d{2}\.\d{2}/);
-  assert.match(output, /\[projection-build\] Starting table broken_staging/);
-  assert.match(output, /\[projection-build\] Failed table broken_staging after \d{2}:\d{2}\.\d{2}/);
-});
-
-test("logs a heartbeat while a build step is still running", async () => {
-  const { runTimedBuildStep } = await import(new URL("scripts/mysql-schema.mjs", root));
-  const messages = [];
-  const originalWrite = process.stdout.write;
-  process.stdout.write = (chunk) => {
-    messages.push(String(chunk));
-    return true;
-  };
-  try {
-    await runTimedBuildStep(
-      "table slow_staging",
-      () => new Promise((resolve) => setTimeout(resolve, 15)),
-      { heartbeatIntervalMs: 5 },
-    );
-  } finally {
-    process.stdout.write = originalWrite;
-  }
-
-  const output = messages.join("");
-  assert.match(output, /\[projection-build\] Still building table slow_staging after \d{2}:\d{2}\.\d{2}/);
-  assert.match(output, /\[projection-build\] Finished table slow_staging in \d{2}:\d{2}\.\d{2}/);
-});
-
-test("formats and periodically logs resource usage", async () => {
-  const { formatResourceUsage, startResourceMonitor } = await import(new URL("scripts/mysql-schema.mjs", root));
-  const usage = formatResourceUsage({
-    load: [1.25, 0.75, 0.5],
-    cpuCount: 8,
-    totalMemory: 8 * 1024 * 1024 * 1024,
-    freeMemory: 2 * 1024 * 1024 * 1024,
-    processMemory: {
-      rss: 512 * 1024 * 1024,
-      heapUsed: 128 * 1024 * 1024,
-      heapTotal: 256 * 1024 * 1024,
-    },
-  });
-  assert.equal(
-    usage,
-    "Resource usage: cpu_load=1.25/0.75/0.50 cpu_count=8 system_memory=6144 MiB/8192 MiB (75.0%) process_rss=512 MiB process_heap=128 MiB/256 MiB",
+  assert.match(
+    output,
+    /\[projection-build\] Finished table example_staging in \d+ms/,
   );
-
-  const messages = [];
-  const originalWrite = process.stdout.write;
-  process.stdout.write = (chunk) => {
-    messages.push(String(chunk));
-    return true;
-  };
-  const stopResourceMonitor = startResourceMonitor(5);
-  try {
-    await new Promise((resolve) => setTimeout(resolve, 15));
-  } finally {
-    stopResourceMonitor();
-    process.stdout.write = originalWrite;
-  }
-  assert.match(messages.join(""), /\[projection-build\] Resource usage: cpu_load=/);
+  assert.match(output, /\[projection-build\] Starting table broken_staging/);
+  assert.match(
+    output,
+    /\[projection-build\] Failed table broken_staging after \d+ms/,
+  );
 });
 
 test("formats table progress against the complete build workload", async () => {
-  const { createTableProgress, countProjectionTables, PROJECTION_REGISTRY } = await import(new URL("data-tools/projections/build.ts", root));
+  const { createTableProgress, countProjectionTables, PROJECTION_REGISTRY } =
+    await import(new URL("data-tools/projections/build.ts", root));
   const progress = createTableProgress(17);
 
   assert.equal(progress.start("first_table"), "[1/17]");
   assert.equal(progress.start("second_table"), "[2/17]");
-  assert.ok(await countProjectionTables(PROJECTION_REGISTRY) >= PROJECTION_REGISTRY.length);
+  assert.ok(
+    (await countProjectionTables(PROJECTION_REGISTRY)) >=
+      PROJECTION_REGISTRY.length,
+  );
 });
 
 test("keeps future grains registered while activating person metrics and competition bests", async () => {
-  const [schema, sql, compatibility, groups, facts, people, resultSingles, resultAverages, metricValues, metricScores, sumScores, podiums, competitionEvents, competitions, personCompetitionRankings, cities, counts, importer] =
-    await Promise.all([
-      readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
-      readFile(new URL("data-tools/projections/sql.ts", root), "utf8"),
-      readFile(new URL("data-tools/projections/compatibility.ts", root), "utf8"),
-      readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/result_facts.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/person_event_rankings.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/result_rankings_single.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/result_rankings_average.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/person_metric_values.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/person_metric_scores.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/person_sum_of_ranks_scores.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/competition_podium_members.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/competition_event_stats.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/competition_stats.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/person_competition_rankings.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/city_event_stats.sql", root), "utf8"),
-      readFile(new URL("sql/ranking-projections/entity_ranking_counts.sql", root), "utf8"),
-      readFile(new URL("scripts/sync-wca-export.ts", root), "utf8"),
-    ]);
+  const [
+    schema,
+    sql,
+    compatibility,
+    groups,
+    facts,
+    people,
+    resultSingles,
+    resultAverages,
+    metricValues,
+    metricScores,
+    sumScores,
+    podiums,
+    competitionEvents,
+    competitions,
+    personCompetitionRankings,
+    cities,
+    counts,
+    importer,
+  ] = await Promise.all([
+    readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
+    readFile(new URL("data-tools/projections/sql.ts", root), "utf8"),
+    readFile(new URL("data-tools/projections/compatibility.ts", root), "utf8"),
+    readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
+    readFile(new URL("sql/ranking-projections/result_facts.sql", root), "utf8"),
+    readFile(
+      new URL("sql/ranking-projections/person_event_rankings.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/result_rankings_single.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/result_rankings_average.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/person_metric_values.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/person_metric_scores.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/person_sum_of_ranks_scores.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/competition_podium_members.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/competition_event_stats.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/competition_stats.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/person_competition_rankings.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/city_event_stats.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("sql/ranking-projections/entity_ranking_counts.sql", root),
+      "utf8",
+    ),
+    readFile(new URL("scripts/sync-wca-export.ts", root), "utf8"),
+  ]);
   const results = `${resultSingles}\n${resultAverages}`;
 
   assert.match(schema, /PROJECTION_REGISTRY/);
@@ -131,9 +143,18 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /buildRegisteredProjectionsConcurrently/);
   assert.match(schema, /runDependencyAwareTasks/);
   assert.match(schema, /COMPATIBILITY_PROJECTION_TASKS/);
-  assert.match(compatibility, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-single/);
-  assert.match(compatibility, /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-average/);
-  assert.match(compatibility, /compatibility-result-counts[\s\S]*compatibility-result-entries-single/);
+  assert.match(
+    compatibility,
+    /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-single/,
+  );
+  assert.match(
+    compatibility,
+    /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-average/,
+  );
+  assert.match(
+    compatibility,
+    /compatibility-result-counts[\s\S]*compatibility-result-entries-single/,
+  );
   assert.match(schema, /process\.env\.WCA_PROJECTION_BUILD_CONCURRENCY \?\? 2/);
   assert.match(schema, /createConnection/);
   assert.match(schema, /build:/);
@@ -142,14 +163,42 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /rowCounts/);
   assert.match(sql, /statement\.match\(\/\^\\s\*-- phase:/);
   assert.match(schema, /DEFAULT_PROJECTION_NAMES/);
-  assert.match(schema, /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/);
-  assert.match(groups, /id: "sum-of-ranks"[\s\S]*dependencies: \["result-facts"\]/);
-  const { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } = await import(new URL("data-tools/projections/jobs.ts", root));
-  assert.equal(new Set(PROJECTION_JOBS.flatMap((job) => job.tables)).size, PROJECTION_JOBS.flatMap((job) => job.tables).length);
-  assert.deepEqual(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "result-rankings")?.dependencies, ["result-facts"]);
-  assert.deepEqual(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "city-rankings")?.dependencies, ["result-facts", "competition-rankings"]);
-  assert.ok(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "sum-of-ranks")?.projectionNames.includes("sum-of-ranks"));
-  assert.ok(DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "person-competition-rankings")?.tables.includes("person_competition_ranking_counts"));
+  assert.match(
+    schema,
+    /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/,
+  );
+  assert.match(
+    groups,
+    /id: "sum-of-ranks"[\s\S]*dependencies: \["result-facts"\]/,
+  );
+  const { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } = await import(
+    new URL("data-tools/projections/jobs.ts", root)
+  );
+  assert.equal(
+    new Set(PROJECTION_JOBS.flatMap((job) => job.tables)).size,
+    PROJECTION_JOBS.flatMap((job) => job.tables).length,
+  );
+  assert.deepEqual(
+    DEPLOYMENT_PROJECTION_GROUPS.find(
+      (group) => group.name === "result-rankings",
+    )?.dependencies,
+    ["result-facts"],
+  );
+  assert.deepEqual(
+    DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "city-rankings")
+      ?.dependencies,
+    ["result-facts", "competition-rankings"],
+  );
+  assert.ok(
+    DEPLOYMENT_PROJECTION_GROUPS.find(
+      (group) => group.name === "sum-of-ranks",
+    )?.projectionNames.includes("sum-of-ranks"),
+  );
+  assert.ok(
+    DEPLOYMENT_PROJECTION_GROUPS.find(
+      (group) => group.name === "person-competition-rankings",
+    )?.tables.includes("person_competition_ranking_counts"),
+  );
   assert.ok(PROJECTION_JOBS.some((job) => job.enabledByDefault));
   assert.match(importer, /promoteProjectionTables/);
 
@@ -184,25 +233,37 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(results, /world_position/);
   assert.match(results, /continent_position/);
   assert.match(results, /country_position/);
-  assert.doesNotMatch(schema, /name: "person-metric-(?:values|scores)"/);
-  assert.doesNotMatch(groups, /tables:\s*\[[^\]]*person_metric_(?:values|scores|counts)/);
-  assert.match(groups, /retiredTables: \[[\s\S]*"person_metric_values"[\s\S]*"person_metric_scores"[\s\S]*"person_metric_counts"/);
-  assert.match(profile, /INNER JOIN person_event_rankings reference/);
-  assert.match(profile, /reference\.world_position = 1/);
-  assert.match(sumScores, /CREATE TEMPORARY TABLE sum_of_ranks_historical_bests/);
+  assert.match(metricValues, /kinch_value/);
+  assert.match(metricScores, /CREATE TABLE person_metric_counts AS/);
+  assert.match(
+    sumScores,
+    /CREATE TEMPORARY TABLE sum_of_ranks_historical_bests/,
+  );
   assert.match(sumScores, /result\.person_country_id/);
   assert.match(sumScores, /result\.person_continent_id/);
-  assert.match(sumScores, /result\.person_country_id, result\.person_continent_id/);
-  assert.doesNotMatch(sumScores, /result\.person_country_id, country\.continent_id/);
-  assert.match(sumScores, /MIN\(\s*CASE WHEN result\.best > 0/);
-  assert.match(sumScores, /MIN\(\s*CASE WHEN result\.average > 0/);
+  assert.match(
+    sumScores,
+    /result\.person_country_id, result\.person_continent_id/,
+  );
+  assert.doesNotMatch(
+    sumScores,
+    /result\.person_country_id, country\.continent_id/,
+  );
+  assert.match(sumScores, /MIN\(CASE WHEN result\.best > 0/);
+  assert.match(sumScores, /MIN\(CASE WHEN result\.average > 0/);
   assert.match(sumScores, /FROM ranks_single rank/);
   assert.match(sumScores, /FROM ranks_average rank/);
   assert.match(sumScores, /CREATE TEMPORARY TABLE sum_of_ranks_event_values/);
   assert.match(sumScores, /cohort_id SMALLINT UNSIGNED/);
-  assert.match(sumScores, /-- phase: aggregate historical Single and Average bests/);
+  assert.match(
+    sumScores,
+    /-- phase: aggregate historical Single and Average bests/,
+  );
   assert.match(sumScores, /-- phase: index person scores/);
-  assert.doesNotMatch(sumScores, /CREATE TABLE person_sum_of_ranks_event_values/);
+  assert.doesNotMatch(
+    sumScores,
+    /CREATE TABLE person_sum_of_ranks_event_values/,
+  );
   assert.match(sumScores, /CREATE TABLE person_sum_of_ranks_scores \(/);
   assert.match(sumScores, /gender ENUM\('m', 'f', 'o'\) NOT NULL/);
   assert.match(sumScores, /profile_person\.gender IN \('m', 'f'\)/);
@@ -220,7 +281,10 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(sumScores, /gender,\s+score, kinch_score, kinch_continent_score, person_id/);
   assert.match(sumScores, /-- phase: index lazy person metric gender cohorts/);
   assert.doesNotMatch(sumScores, /kinch_coverage = 16/);
-  assert.match(sumScores, /fallback_score AS SIGNED\)[\s\S]*person\.score_adjustment AS score/);
+  assert.match(
+    sumScores,
+    /fallback_score AS SIGNED\)[\s\S]*person\.score_adjustment AS score/,
+  );
   assert.match(sumScores, /ENGINE = MEMORY/);
   assert.doesNotMatch(sumScores, /CROSS JOIN/);
   assert.doesNotMatch(sumScores, /coverage = required_coverage/);
@@ -228,7 +292,10 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(podiums, /round_type\.final = 1/);
   assert.match(podiums, /result\.pos BETWEEN 1 AND 3/);
   assert.match(podiums, /result\.event_id IN \('333bf', '444bf', '555bf'\)/);
-  assert.match(podiums, /result\.event_id NOT IN \('333bf', '444bf', '555bf', '333mbf'\)/);
+  assert.match(
+    podiums,
+    /result\.event_id NOT IN \('333bf', '444bf', '555bf', '333mbf'\)/,
+  );
   assert.match(competitionEvents, /fastest_single_result_id/);
   assert.match(competitionEvents, /fastest_single_rank/);
   assert.match(competitionEvents, /fastest_single_position/);
@@ -253,13 +320,31 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(competitions, /idx_competition_stats_north/);
   assert.match(competitions, /idx_competition_stats_competitor_count/);
   assert.match(competitions, /idx_competition_stats_south/);
-  assert.match(personCompetitionRankings, /CREATE TABLE person_competition_counts AS/);
-  assert.match(personCompetitionRankings, /COUNT\(\s*DISTINCT facts\.competition_id\)/);
+  assert.match(
+    personCompetitionRankings,
+    /CREATE TABLE person_competition_counts AS/,
+  );
+  assert.match(
+    personCompetitionRankings,
+    /COUNT\(DISTINCT facts\.competition_id\)/,
+  );
   assert.match(personCompetitionRankings, /FROM result_facts/);
-  assert.match(personCompetitionRankings, /CREATE TABLE person_competition_rankings AS/);
-  assert.match(personCompetitionRankings, /PARTITION BY scope, region_id, gender/);
-  assert.match(personCompetitionRankings, /idx_person_competition_rankings_page/);
-  assert.match(personCompetitionRankings, /CREATE TABLE person_competition_ranking_counts AS/);
+  assert.match(
+    personCompetitionRankings,
+    /CREATE TABLE person_competition_rankings AS/,
+  );
+  assert.match(
+    personCompetitionRankings,
+    /PARTITION BY scope, region_id, gender/,
+  );
+  assert.match(
+    personCompetitionRankings,
+    /idx_person_competition_rankings_page/,
+  );
+  assert.match(
+    personCompetitionRankings,
+    /CREATE TABLE person_competition_ranking_counts AS/,
+  );
   assert.match(cities, /fastest_average_result_id/);
   assert.match(cities, /fastest_average_rank/);
   assert.match(cities, /facts\.gender AS person_gender/);
@@ -275,14 +360,26 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(cities, /COUNT\(\s*DISTINCT competition_id\) AS competition_count/);
   assert.match(cities, /comp\.country_id/);
   assert.match(cities, /official_solve_count/);
-  assert.match(cities, /LEFT JOIN city_event_winners winners USING \(city_name, country_id, event_id, gender\)/);
-  assert.match(cities, /ADD PRIMARY KEY \(city_name, country_id, event_id, gender\)/);
+  assert.match(
+    cities,
+    /LEFT JOIN winners USING \(city_name, country_id, event_id, gender\)/,
+  );
+  assert.match(
+    cities,
+    /ADD PRIMARY KEY \(city_name, country_id, event_id, gender\)/,
+  );
   assert.match(counts, /CREATE TABLE entity_ranking_counts AS/);
   assert.match(counts, /gender = 'all' AND fastest_single IS NOT NULL/);
-  assert.match(counts, /FROM competition_event_stats WHERE podium_score IS NOT NULL/);
+  assert.match(
+    counts,
+    /FROM competition_event_stats WHERE podium_score IS NOT NULL/,
+  );
   assert.doesNotMatch(counts, /podium_(?:single|average)_score/);
   assert.match(groups, /entity-ranking-counts/);
-  assert.match(groups, /id: "competition-event-stats"[\s\S]*enabledByDefault: true/);
+  assert.match(
+    groups,
+    /id: "competition-event-stats"[\s\S]*enabledByDefault: true/,
+  );
 });
 
 test("does not introduce entries or sub-rank vocabulary in new schemas", async () => {
@@ -298,8 +395,11 @@ test("does not introduce entries or sub-rank vocabulary in new schemas", async (
     "entity_ranking_counts.sql",
     "person_sum_of_ranks_scores.sql",
   ];
-  const sources = await Promise.all(files.map((file) =>
-    readFile(new URL(`sql/ranking-projections/${file}`, root), "utf8")));
+  const sources = await Promise.all(
+    files.map((file) =>
+      readFile(new URL(`sql/ranking-projections/${file}`, root), "utf8"),
+    ),
+  );
   for (const source of sources) {
     assert.doesNotMatch(source, /_entries\b/);
     assert.doesNotMatch(source, /sub_rank/);
@@ -307,16 +407,16 @@ test("does not introduce entries or sub-rank vocabulary in new schemas", async (
 });
 
 test("exposes bounded resource APIs without projection name scans", async () => {
-  const [shared, people, results, rankings, entities, search, rankingQueries, rankingCache] = await Promise.all([
-    readFile(new URL("lib/api/projection.ts", root), "utf8"),
-    readFile(new URL("services/rankings/person.ts", root), "utf8"),
-    readFile(new URL("services/rankings/result.ts", root), "utf8"),
-    readFile(new URL("services/rankings/service.ts", root), "utf8"),
-    readFile(new URL("services/rankings/entity.ts", root), "utf8"),
-    readFile(new URL("services/people/database.ts", root), "utf8"),
-    readFile(new URL("services/rankings/queries.ts", root), "utf8"),
-    readFile(new URL("services/rankings/cache.ts", root), "utf8"),
-  ]);
+  const [shared, people, results, rankings, entities, search, rankingQueries] =
+    await Promise.all([
+      readFile(new URL("lib/api/projection.ts", root), "utf8"),
+      readFile(new URL("services/rankings/person.ts", root), "utf8"),
+      readFile(new URL("services/rankings/result.ts", root), "utf8"),
+      readFile(new URL("services/rankings/service.ts", root), "utf8"),
+      readFile(new URL("services/rankings/entity.ts", root), "utf8"),
+      readFile(new URL("services/people/database.ts", root), "utf8"),
+      readFile(new URL("services/rankings/queries.ts", root), "utf8"),
+    ]);
 
   const rankingSources = `${rankings}\n${rankingQueries}`;
   const entitySources = `${entities}\n${rankingQueries}`;
@@ -333,7 +433,10 @@ test("exposes bounded resource APIs without projection name scans", async () => 
   assert.match(rankingSources, /FROM person_sum_of_ranks_scores score/);
   assert.match(rankingSources, /input\.eventId === "SOR"/);
   assert.match(rankingSources, /input\.eventId === "sor-kinch"/);
-  assert.match(rankingSources, /score\.\$\{input\.positionColumn\} AS sub_rank/);
+  assert.match(
+    rankingSources,
+    /score\.\$\{input\.positionColumn\} AS sub_rank/,
+  );
   assert.match(rankingSources, /\/ 17\.0/);
   assert.match(rankingSources, /kinch_continent_score/);
   assert.match(rankingSources, /kinchScoreColumn/);
@@ -349,17 +452,27 @@ test("exposes bounded resource APIs without projection name scans", async () => 
   assert.match(rankingCache, /if \(pin\) this\.pinned\.set\(key, value\)/);
   assert.match(rankingCache, /this\.pinned\.clear\(\)/);
   assert.match(rankingSources, /DENSE_RANK\(\) OVER/);
-  assert.doesNotMatch(rankingSources, /FROM person_sum_of_ranks_scores\n\s+LEFT JOIN persons/);
+  assert.doesNotMatch(
+    rankingSources,
+    /FROM person_sum_of_ranks_scores\n\s+LEFT JOIN persons/,
+  );
   assert.match(entitySources, /FROM competition_event_stats stats/);
   assert.match(entitySources, /stats\.\$\{positionColumn\} > \?/);
-  assert.match(entitySources, /INNER JOIN results result ON result\.id = page\.result_id/);
+  assert.match(
+    entitySources,
+    /INNER JOIN results result ON result\.id = page\.result_id/,
+  );
   assert.match(entitySources, /FROM city_event_stats stats/);
   assert.match(entitySources, /City rankings support one gender at a time/);
   assert.match(entitySources, /stats\.gender = \?/);
   assert.match(entitySources, /official_solve_count/);
   assert.match(search, /fetchPersonSearchRowsFromDatabase/);
 
-  for (const source of [personSources, `${results}\n${rankingQueries}`, rankingSources]) {
+  for (const source of [
+    personSources,
+    `${results}\n${rankingQueries}`,
+    rankingSources,
+  ]) {
     assert.doesNotMatch(source, /FROM results\b/);
     assert.doesNotMatch(source, /person_name LIKE/);
   }
@@ -391,8 +504,20 @@ test("only exposes APIs backed by active projections", async () => {
 test("compatibility projections omit disabled weekly ranking enhancements", async () => {
   const [groups, single, average] = await Promise.all([
     readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/ranking_entries_single_source.sql", root), "utf8"),
-    readFile(new URL("sql/ranking-projections/ranking_entries_average_source.sql", root), "utf8"),
+    readFile(
+      new URL(
+        "sql/ranking-projections/ranking_entries_single_source.sql",
+        root,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "sql/ranking-projections/ranking_entries_average_source.sql",
+        root,
+      ),
+      "utf8",
+    ),
   ]);
   for (const source of [groups, single, average]) {
     assert.doesNotMatch(source, /weekly_rank_deltas_/);
@@ -415,15 +540,40 @@ test("backfills only the active competition-event projection", async () => {
 });
 
 test("person search resolves IDs before querying projections", async () => {
-  const [searchQueries, rankings, results, averageResults] = await Promise.all([
+  const [
+    searchQueries,
+    rankings,
+    results,
+    genderResults,
+    compatibilityResults,
+  ] = await Promise.all([
     readFile(new URL("services/people/queries.ts", root), "utf8"),
     readFile(new URL("services/rankings/service.ts", root), "utf8"),
-    readSql("sql/ranking-projections/result_rankings_single.sql"),
-    readSql("sql/ranking-projections/result_rankings_average.sql"),
+    readFile(
+      new URL("sql/ranking-projections/result_rankings_single.sql", root),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "sql/ranking-projections/result_gender_rankings_single.sql",
+        root,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "sql/ranking-projections/result_entries_single_indexes.sql",
+        root,
+      ),
+      "utf8",
+    ),
   ]);
 
   assert.match(searchQueries, /FROM persons/);
-  assert.match(searchQueries, /LEFT JOIN person_competition_counts competition_counts/);
+  assert.match(
+    searchQueries,
+    /LEFT JOIN person_competition_counts competition_counts/,
+  );
   assert.match(searchQueries, /wca_id = \?/);
   assert.match(searchQueries, /name LIKE \?/);
   assert.match(rankings, /searchPersonIds/);
@@ -448,12 +598,19 @@ test("builds Sum of Ranks as one published score projection", async () => {
   assert.match(schema, /RETIRED_PROJECTION_TABLES/);
   assert.match(schema, /for \(const retired of RETIRED_PROJECTION_TABLES\)/);
   assert.match(backfill, /projectionNames = \["sum-of-ranks"\]/);
-  assert.match(publisher, /promoteProjectionTables\(connection, \{ tables: transferTables \}\)/);
+  assert.match(
+    publisher,
+    /promoteProjectionTables\(connection, \{ tables: transferTables \}\)/,
+  );
 });
 
 test("derives release tables from jobs when a release group has no generic build job", async () => {
-  const { projectionBuildPlan } = await import(new URL("data-tools/projections/build.ts", root));
-  const { projectionGroup } = await import(new URL("data-tools/projections/jobs.ts", root));
+  const { projectionBuildPlan } = await import(
+    new URL("data-tools/projections/build.ts", root)
+  );
+  const { projectionGroup } = await import(
+    new URL("data-tools/projections/jobs.ts", root)
+  );
   const plan = projectionBuildPlan(["compatibility"]);
 
   assert.deepEqual(plan.projectionNames, []);

@@ -33,7 +33,9 @@ try {
         )`,
   );
   if (existing.length === 3 && !force) {
-    process.stdout.write("Result rankings projection is already present. Nothing to do.\n");
+    process.stdout.write(
+      "Result rankings projection is already present. Nothing to do.\n",
+    );
   } else {
     const timings = await buildRegisteredProjections(connection, {
       projectionSuffix: "_staging",

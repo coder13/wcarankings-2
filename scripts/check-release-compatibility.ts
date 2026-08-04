@@ -3,7 +3,10 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { argumentValue } from "./lib/cli.mjs";
 
-export function checkServerDatasetCompatibility({ server, datasetSchemaVersion }) {
+export function checkServerDatasetCompatibility({
+  server,
+  datasetSchemaVersion,
+}) {
   const version = Number(datasetSchemaVersion);
   const minimum = Number(server?.minimumDatasetSchemaVersion);
   const maximum = Number(server?.maximumDatasetSchemaVersion);
@@ -29,6 +32,9 @@ async function main() {
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+if (
+  process.argv[1] &&
+  pathToFileURL(process.argv[1]).href === import.meta.url
+) {
   await main();
 }

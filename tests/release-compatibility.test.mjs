@@ -9,7 +9,8 @@ const server = {
 
 test("server compatibility depends on schema format, not an exact dataset fingerprint", () => {
   assert.equal(
-    checkServerDatasetCompatibility({ server, datasetSchemaVersion: 2 }).compatible,
+    checkServerDatasetCompatibility({ server, datasetSchemaVersion: 2 })
+      .compatible,
     true,
   );
 });

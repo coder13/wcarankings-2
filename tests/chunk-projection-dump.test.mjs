@@ -28,28 +28,36 @@ test("projection dump chunker bounds multi-row insert statements", () => {
   const result = chunkDump(input);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, [
-    "-- preamble",
-    "SET autocommit=0;",
-    "INSERT INTO `ranking_entries_single_transfer` VALUES",
-    "(1,'one'),",
-    "(2,'two');",
-    "INSERT INTO `ranking_entries_single_transfer` VALUES",
-    "(3,'three'),",
-    "(4,'four');",
-    "INSERT INTO `ranking_entries_single_transfer` VALUES",
-    "(5,'five');",
-    "COMMIT;",
-    "SET autocommit=1;",
-    "UNLOCK TABLES;",
-    "",
-  ].join("\n"));
+  assert.equal(
+    result.stdout,
+    [
+      "-- preamble",
+      "SET autocommit=0;",
+      "INSERT INTO `ranking_entries_single_transfer` VALUES",
+      "(1,'one'),",
+      "(2,'two');",
+      "INSERT INTO `ranking_entries_single_transfer` VALUES",
+      "(3,'three'),",
+      "(4,'four');",
+      "INSERT INTO `ranking_entries_single_transfer` VALUES",
+      "(5,'five');",
+      "COMMIT;",
+      "SET autocommit=1;",
+      "UNLOCK TABLES;",
+      "",
+    ].join("\n"),
+  );
 });
 
 test("projection dump chunker preserves ordinary SQL and rejects truncation", () => {
-  const ordinary = chunkDump("CREATE TABLE `example` (`id` INT);\nINSERT INTO `example` VALUES (1);\n");
+  const ordinary = chunkDump(
+    "CREATE TABLE `example` (`id` INT);\nINSERT INTO `example` VALUES (1);\n",
+  );
   assert.equal(ordinary.status, 0, ordinary.stderr);
-  assert.equal(ordinary.stdout, "CREATE TABLE `example` (`id` INT);\nINSERT INTO `example` VALUES (1);\n");
+  assert.equal(
+    ordinary.stdout,
+    "CREATE TABLE `example` (`id` INT);\nINSERT INTO `example` VALUES (1);\n",
+  );
 
   const truncated = chunkDump("INSERT INTO `example` VALUES\n(1),\n");
   assert.notEqual(truncated.status, 0);
@@ -61,11 +69,14 @@ test("projection dump importer streams bounded SQL and propagates MariaDB failur
   const mariadb = join(directory, "mariadb");
   const capture = join(directory, "capture.sql");
   const argumentsFile = join(directory, "arguments");
-  await writeFile(mariadb, `#!/bin/sh
+  await writeFile(
+    mariadb,
+    `#!/bin/sh
 printf '%s\n' "$@" > "$ARGUMENTS_FILE"
 cat > "$CAPTURE_FILE"
 exit "${"$"}{MARIADB_EXIT_CODE:-0}"
-`);
+`,
+  );
   await chmod(mariadb, 0o755);
   const input = "INSERT INTO `example_transfer` VALUES\n(1),\n(2),\n(3);\n";
   const environment = {
@@ -81,28 +92,39 @@ exit "${"$"}{MARIADB_EXIT_CODE:-0}"
     const imported = spawnSync(
       process.execPath,
       ["scripts/chunk-projection-dump.ts", "--import", "--rows-per-insert=2"],
-      { cwd: new URL("..", import.meta.url), input, encoding: "utf8", env: environment },
+      {
+        cwd: new URL("..", import.meta.url),
+        input,
+        encoding: "utf8",
+        env: environment,
+      },
     );
     assert.equal(imported.status, 0, imported.stderr);
-    assert.equal(await readFile(capture, "utf8"), [
-      "SET autocommit=0;",
-      "INSERT INTO `example_transfer` VALUES",
-      "(1),",
-      "(2);",
-      "INSERT INTO `example_transfer` VALUES",
-      "(3);",
-      "COMMIT;",
-      "SET autocommit=1;",
-      "",
-    ].join("\n"));
-    assert.equal(await readFile(argumentsFile, "utf8"), [
-      "--protocol=TCP",
-      "--host=db",
-      "--port=3306",
-      "--user=projection",
-      "candidate",
-      "",
-    ].join("\n"));
+    assert.equal(
+      await readFile(capture, "utf8"),
+      [
+        "SET autocommit=0;",
+        "INSERT INTO `example_transfer` VALUES",
+        "(1),",
+        "(2);",
+        "INSERT INTO `example_transfer` VALUES",
+        "(3);",
+        "COMMIT;",
+        "SET autocommit=1;",
+        "",
+      ].join("\n"),
+    );
+    assert.equal(
+      await readFile(argumentsFile, "utf8"),
+      [
+        "--protocol=TCP",
+        "--host=db",
+        "--port=3306",
+        "--user=projection",
+        "candidate",
+        "",
+      ].join("\n"),
+    );
     assert.doesNotMatch(await readFile(argumentsFile, "utf8"), /secret/);
 
     const failed = spawnSync(

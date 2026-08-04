@@ -44,15 +44,18 @@ test("dependency scheduler bounds and overlaps independent tasks", async () => {
     },
   });
 
-  const result = await runDependencyAwareTasks([
-    task("single"),
-    task("average"),
-    task("result"),
-    task("counts", ["single", "average"]),
-  ], {
-    createConnection: async () => fakeConnection(closed.length + 1, closed),
-    concurrency: 2,
-  });
+  const result = await runDependencyAwareTasks(
+    [
+      task("single"),
+      task("average"),
+      task("result"),
+      task("counts", ["single", "average"]),
+    ],
+    {
+      createConnection: async () => fakeConnection(closed.length + 1, closed),
+      concurrency: 2,
+    },
+  );
 
   assert.equal(maximum, 2);
   assert.ok(events.indexOf("start:single") < events.indexOf("finish:average"));
@@ -214,14 +217,21 @@ test("person-year stage failure blocks counts and completion", async () => {
 
 test("hydrated dependencies count as complete without executing them", async () => {
   const started = [];
-  await runDependencyAwareTasks([{
-    name: "city",
-    dependencies: ["facts", "competitions"],
-    async run() { started.push("city"); },
-  }], {
-    connection: {},
-    satisfiedDependencies: ["facts", "competitions"],
-  });
+  await runDependencyAwareTasks(
+    [
+      {
+        name: "city",
+        dependencies: ["facts", "competitions"],
+        async run() {
+          started.push("city");
+        },
+      },
+    ],
+    {
+      connection: {},
+      satisfiedDependencies: ["facts", "competitions"],
+    },
+  );
   assert.deepEqual(started, ["city"]);
 });
 
@@ -231,7 +241,10 @@ test("a city-only build plans only owned tasks and reports hydrated projections 
     ["result-facts", "competition-rankings"],
   );
   assert.deepEqual(plan.groups, ["city-rankings"]);
-  assert.deepEqual(plan.projectionNames, ["city-event-stats", "entity-ranking-counts"]);
+  assert.deepEqual(plan.projectionNames, [
+    "city-event-stats",
+    "entity-ranking-counts",
+  ]);
   assert.ok(plan.satisfiedProjectionNames.includes("result-facts"));
   assert.ok(plan.satisfiedProjectionNames.includes("competition-event-stats"));
   assert.equal(plan.tables.length, 2);
@@ -250,14 +263,17 @@ test("duration-aware scheduling pairs a long task with the shortest ready task",
     },
   });
 
-  await runDependencyAwareTasks([
-    task("long-first", 120_000, 20),
-    task("long-second", 120_000, 5),
-    task("short", 15_000, 5),
-  ], {
-    createConnection: async () => fakeConnection(started.length + 1, []),
-    concurrency: 2,
-  });
+  await runDependencyAwareTasks(
+    [
+      task("long-first", 120_000, 20),
+      task("long-second", 120_000, 5),
+      task("short", 15_000, 5),
+    ],
+    {
+      createConnection: async () => fakeConnection(started.length + 1, []),
+      concurrency: 2,
+    },
+  );
 
   assert.deepEqual(started.slice(0, 2), ["long-first", "short"]);
 });
@@ -266,34 +282,37 @@ test("dependency scheduler closes workers and does not start dependents after fa
   const started = [];
   const closed = [];
   await assert.rejects(
-    runDependencyAwareTasks([
-      {
-        name: "failing",
-        dependencies: [],
-        async run() {
-          started.push("failing");
-          throw new Error("expected failure");
+    runDependencyAwareTasks(
+      [
+        {
+          name: "failing",
+          dependencies: [],
+          async run() {
+            started.push("failing");
+            throw new Error("expected failure");
+          },
         },
-      },
-      {
-        name: "independent",
-        dependencies: [],
-        async run() {
-          started.push("independent");
-          await new Promise((resolve) => setTimeout(resolve, 15));
+        {
+          name: "independent",
+          dependencies: [],
+          async run() {
+            started.push("independent");
+            await new Promise((resolve) => setTimeout(resolve, 15));
+          },
         },
-      },
-      {
-        name: "dependent",
-        dependencies: ["failing"],
-        async run() {
-          started.push("dependent");
+        {
+          name: "dependent",
+          dependencies: ["failing"],
+          async run() {
+            started.push("dependent");
+          },
         },
+      ],
+      {
+        createConnection: async () => fakeConnection(closed.length + 1, closed),
+        concurrency: 2,
       },
-    ], {
-      createConnection: async () => fakeConnection(closed.length + 1, closed),
-      concurrency: 2,
-    }),
+    ),
     /expected failure/,
   );
 
@@ -304,16 +323,21 @@ test("dependency scheduler closes workers and does not start dependents after fa
 test("dependency scheduler rejects unknown dependencies before starting tasks", async () => {
   let started = false;
   await assert.rejects(
-    runDependencyAwareTasks([{
-      name: "counts",
-      dependencies: ["missing-entries"],
-      async run() {
-        started = true;
+    runDependencyAwareTasks(
+      [
+        {
+          name: "counts",
+          dependencies: ["missing-entries"],
+          async run() {
+            started = true;
+          },
+        },
+      ],
+      {
+        connection: {},
+        concurrency: 1,
       },
-    }], {
-      connection: {},
-      concurrency: 1,
-    }),
+    ),
     /Unknown task dependency missing-entries for counts/,
   );
   assert.equal(started, false);
@@ -327,19 +351,25 @@ test("projection build concurrency defaults to two and accepts configured bounds
     assert.equal(projectionConcurrency("4"), 4);
     assert.equal(projectionConcurrency("0"), 1);
   } finally {
-    if (previous === undefined) delete process.env.WCA_PROJECTION_BUILD_CONCURRENCY;
+    if (previous === undefined)
+      delete process.env.WCA_PROJECTION_BUILD_CONCURRENCY;
     else process.env.WCA_PROJECTION_BUILD_CONCURRENCY = previous;
   }
 });
 
 test("a full schema refresh keeps the default semantic projections when selection is omitted", () => {
-  assert.deepEqual(projectionNamesForRefresh(undefined), DEFAULT_PROJECTION_NAMES);
+  assert.deepEqual(
+    projectionNamesForRefresh(undefined),
+    DEFAULT_PROJECTION_NAMES,
+  );
   assert.deepEqual(projectionNamesForRefresh([]), []);
 });
 
 test("result-fact consumers never start from raw WCA tables alone", () => {
   for (const name of ["sum-of-ranks", "person-competition-rankings"]) {
-    const projection = PROJECTION_REGISTRY.find((candidate) => candidate.name === name);
+    const projection = PROJECTION_REGISTRY.find(
+      (candidate) => candidate.name === name,
+    );
     assert.ok(projection, `${name} is registered`);
     assert.deepEqual(projection.dependencies, ["result-facts"]);
   }
@@ -347,20 +377,30 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     "compatibility-ranking-entries-single-source",
     "compatibility-ranking-entries-average-source",
   ]) {
-    const task = COMPATIBILITY_PROJECTION_TASKS.find((candidate) => candidate.name === name);
+    const task = COMPATIBILITY_PROJECTION_TASKS.find(
+      (candidate) => candidate.name === name,
+    );
     assert.ok(task, `${name} is registered`);
     assert.deepEqual(task.dependencies, ["projection:result-facts"]);
   }
 });
 
 test("compatibility build omits disabled weekly helper tables", () => {
-  assert.equal(COMPATIBILITY_PROJECTION_TASKS.some(({ name, table }) =>
-    /weekly-rank-deltas|record-streaks/.test(name) || /weekly_rank_deltas|record_streaks/.test(table ?? "")), false);
-  const source = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
-    name === "compatibility-ranking-entries-single-source");
+  assert.equal(
+    COMPATIBILITY_PROJECTION_TASKS.some(
+      ({ name, table }) =>
+        /weekly-rank-deltas|record-streaks/.test(name) ||
+        /weekly_rank_deltas|record_streaks/.test(table ?? ""),
+    ),
+    false,
+  );
+  const source = COMPATIBILITY_PROJECTION_TASKS.find(
+    ({ name }) => name === "compatibility-ranking-entries-single-source",
+  );
   assert.deepEqual(source.dependencies, ["projection:result-facts"]);
-  const averageSource = COMPATIBILITY_PROJECTION_TASKS.find(({ name }) =>
-    name === "compatibility-ranking-entries-average-source");
+  const averageSource = COMPATIBILITY_PROJECTION_TASKS.find(
+    ({ name }) => name === "compatibility-ranking-entries-average-source",
+  );
   assert.deepEqual(averageSource.dependencies, ["projection:result-facts"]);
   assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 3);
   const progress = createTableProgress(COMPATIBILITY_TABLE_TASK_COUNT);
@@ -374,16 +414,16 @@ test("compatibility build omits disabled weekly helper tables", () => {
 test("compatibility source views wait for result facts", async () => {
   const names = new Set(["compatibility-ranking-entries-single-source"]);
   const events = [];
-  const tasks = COMPATIBILITY_PROJECTION_TASKS
-    .filter(({ name }) => names.has(name))
-    .map((task) => ({
-      ...task,
-      async run() {
-        events.push(`start:${task.name}`);
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        events.push(`finish:${task.name}`);
-      },
-    }));
+  const tasks = COMPATIBILITY_PROJECTION_TASKS.filter(({ name }) =>
+    names.has(name),
+  ).map((task) => ({
+    ...task,
+    async run() {
+      events.push(`start:${task.name}`);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      events.push(`finish:${task.name}`);
+    },
+  }));
 
   await runDependencyAwareTasks(tasks, {
     createConnection: async () => fakeConnection(events.length + 1, []),
@@ -398,7 +438,13 @@ test("compatibility source views wait for result facts", async () => {
 });
 
 test("compatibility SQL uses the matching staged result facts table", async () => {
-  const source = await readFile(new URL("../sql/ranking-projections/ranking_entries_single_source.sql", import.meta.url), "utf8");
+  const source = await readFile(
+    new URL(
+      "../sql/ranking-projections/ranking_entries_single_source.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
   const sql = renameCompatibilitySql(source, {
     bestSingle: "wca_best_single_staging",
     bestAverage: "wca_best_average_staging",
