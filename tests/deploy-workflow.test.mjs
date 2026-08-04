@@ -352,7 +352,8 @@ test("labeled PR projection builds run the scroll benchmark and publish a reusab
   assert.match(builder, /docker build --tag wcarankings-app:projection-benchmark/);
   assert.match(builder, /DATABASE_STATEMENT_TIMEOUT_MS=60000/);
   assert.match(builder, /docker compose up --detach app/);
-  assert.match(builder, /benchmark:ranking-scroll/);
+  assert.match(builder, /for suite in persons results competitions cities/);
+  assert.match(builder, /benchmark:ranking-scroll:\$suite/);
   assert.match(builder, /ranking-scroll-benchmark-\$\{\{ github\.run_id \}\}/);
   assert.match(builder, /Import generated projection groups/);
   assert.match(builder, /Install MariaDB client/);

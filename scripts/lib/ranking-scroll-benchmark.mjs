@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 export function scenarioName(suite, scenario) {
-  return `${suite}-${scenario.id}`;
+  return `${scenario.suite ?? suite}-${scenario.id}`;
 }
 
 export function scenarioUrl(target, scenario, page, pageSize) {

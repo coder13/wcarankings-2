@@ -366,10 +366,14 @@ jobs:
             if [ "$attempt" = 30 ]; then docker compose logs app; exit 1; fi
             sleep 2
           done
-          pnpm run benchmark:ranking-scroll -- \
-            --target=http://127.0.0.1:3000 \
-            --report-dir="$BENCHMARK_REPORT_DIR" \
-            --label=projection-build
+          benchmark_status=0
+          for suite in persons results competitions cities; do
+            pnpm run "benchmark:ranking-scroll:$suite" -- \
+              --target=http://127.0.0.1:3000 \
+              --report-dir="$BENCHMARK_REPORT_DIR" \
+              --label=projection-build || benchmark_status=$?
+          done
+          exit "$benchmark_status"
 
       - name: Upload ranking scroll benchmark report
         if: always()
