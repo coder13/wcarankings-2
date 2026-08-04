@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { compatibilityProjectionTasks } from "./compatibility.ts";
+import { rankingTableTasks } from "./ranking-tables.ts";
 import {
   dropManagedObject,
   ensureIndexes,
@@ -25,10 +25,10 @@ import {
 export { DEPLOYMENT_PROJECTION_GROUPS } from "./jobs.ts";
 export { ensureWcaPersonLookupIndex, dropManagedObject } from "./database.ts";
 export {
-  COMPATIBILITY_PROJECTION_TASKS,
-  COMPATIBILITY_TABLE_TASK_COUNT,
-  renameCompatibilitySql,
-} from "./compatibility.ts";
+  CORE_RANKING_TABLE_TASKS,
+  CORE_RANKING_TABLE_TASK_COUNT,
+  renameRankingTableSql,
+} from "./ranking-tables.ts";
 export {
   createTableProgress,
   elapsedMs,
@@ -39,7 +39,7 @@ export { runDependencyAwareTasks } from "./scheduler.ts";
 export { executeTableStatements, projectionSql, statements } from "./sql.ts";
 
 const projectionDefinitions = PROJECTION_JOBS.filter(
-  (job) => job.kind !== "compatibility",
+  (job) => job.kind !== "core",
 ).map((job) => ({
   name: job.id,
   dependencies: [...job.dependencies],
@@ -62,7 +62,7 @@ export function projectionNamesForRefresh(selectedNames) {
 export const ACTIVE_SEMANTIC_PROJECTION_TABLES = projectionDefinitions
   .filter(({ enabledByDefault }) => enabledByDefault)
   .flatMap(({ tables }) => tables);
-export const COMPATIBILITY_PROJECTION_TABLES = [
+export const CORE_RANKING_TABLES = [
   "ranking_entries_single",
   "ranking_entries_average",
   "ranking_counts",
@@ -70,13 +70,13 @@ export const COMPATIBILITY_PROJECTION_TABLES = [
   "result_counts",
 ];
 export const PUBLISHED_PROJECTION_TABLES = [
-  ...COMPATIBILITY_PROJECTION_TABLES,
+  ...CORE_RANKING_TABLES,
   ...ACTIVE_SEMANTIC_PROJECTION_TABLES,
 ];
 export const RETIRED_PROJECTION_TABLES = ["person_sum_of_ranks_event_values"];
 
 function projectionNames(sql, suffix) {
-  return [...SEMANTIC_PROJECTION_TABLES, ...COMPATIBILITY_PROJECTION_TABLES]
+  return [...SEMANTIC_PROJECTION_TABLES, ...CORE_RANKING_TABLES]
     .sort((left, right) => right.length - left.length)
     .reduce(
       (renamed, table) =>
@@ -192,7 +192,7 @@ export function projectionBuildPlan(
         satisfiedGroups.flatMap(({ projectionNames: names }) => names),
       ),
     ],
-    includeCompatibility: groups.some(({ name }) => name === "compatibility"),
+    includeRankingTables: groups.some(({ name }) => name === "ranking-tables"),
     tables: [...new Set(groups.flatMap(({ tables }) => tables))],
   };
 }
@@ -365,7 +365,7 @@ export async function refreshMysqlSchema(
     projectionSuffix = "",
     projectionNames: selectedNames,
     satisfiedProjectionNames = [],
-    includeCompatibility = true,
+    includeRankingTables = true,
     createConnection,
     concurrency,
   } = {},
@@ -388,7 +388,7 @@ export async function refreshMysqlSchema(
 
   await ensureIndexes(connection, INDEXES);
 
-  if (includeCompatibility) {
+  if (includeRankingTables) {
     for (const name of [
       countsTable,
       resultCountsTable,
@@ -420,8 +420,8 @@ export async function refreshMysqlSchema(
     // dependent source views are scheduled below, so they can use both build
     // workers and accurately contribute to table progress.
     for (const file of [
-      "core/compatibility/wca_best_single.sql",
-      "core/compatibility/wca_best_average.sql",
+      "core/ranking-tables/wca_best_single.sql",
+      "core/ranking-tables/wca_best_average.sql",
     ]) {
       await createCompatibilitySource(connection, file, names);
     }
@@ -433,7 +433,7 @@ export async function refreshMysqlSchema(
     satisfiedProjectionNames,
   );
   const tableProgress = createTableProgress(
-    (includeCompatibility ? COMPATIBILITY_TABLE_TASK_COUNT : 0) +
+    (includeRankingTables ? CORE_RANKING_TABLE_TASK_COUNT : 0) +
       (await countProjectionTables(semanticProjections)),
   );
   const semanticTasks = semanticProjections.map((projection) => ({
@@ -445,8 +445,8 @@ export async function refreshMysqlSchema(
     run: (worker) =>
       buildProjection(worker, projection, projectionSuffix, tableProgress),
   }));
-  const compatibilityTasks = includeCompatibility
-    ? compatibilityProjectionTasks({
+  const coreRankingTasks = includeRankingTables
+    ? rankingTableTasks({
         entriesTables,
         entriesSources,
         countsTable,
@@ -459,7 +459,7 @@ export async function refreshMysqlSchema(
         tableProgress,
       })
     : [];
-  await runDependencyAwareTasks([...compatibilityTasks, ...semanticTasks], {
+  await runDependencyAwareTasks([...coreRankingTasks, ...semanticTasks], {
     connection,
     createConnection,
     concurrency: maxConcurrency,
@@ -492,7 +492,7 @@ export async function refreshResultEntriesSchema(
   );
 
   const source = await projectionSql(
-    "core/compatibility/result_entries_single_source.sql",
+    "core/ranking-tables/result_entries_single_source.sql",
   );
   await connection.query(
     source.replaceAll("result_entries_single_source", resultEntriesSource),
@@ -503,7 +503,7 @@ export async function refreshResultEntriesSchema(
     );
     for (const statement of statements(
       await projectionSql(
-        "core/compatibility/result_entries_single_indexes.sql",
+        "core/ranking-tables/result_entries_single_indexes.sql",
       ),
     )) {
       await connection.query(
@@ -516,7 +516,7 @@ export async function refreshResultEntriesSchema(
   });
   await executeTableStatements(
     connection,
-    (await projectionSql("core/compatibility/result_counts.sql"))
+    (await projectionSql("core/ranking-tables/result_counts.sql"))
       .replaceAll("result_entries_single", resultEntriesTable)
       .replaceAll("result_counts", resultCountsTable),
   );

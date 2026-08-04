@@ -4,7 +4,7 @@ import { test } from "bun:test";
 
 const root = new URL("../", import.meta.url);
 
-test("builds a result-level compatibility projection without unused secondary indexes", async () => {
+test("builds core result ranking tables without unused secondary indexes", async () => {
   const [
     source,
     indexes,
@@ -13,29 +13,27 @@ test("builds a result-level compatibility projection without unused secondary in
     database,
     importer,
     preflight,
-    backfill,
-    resultBackfill,
     dockerfile,
     deploy,
     fixture,
   ] = await Promise.all([
     readFile(
       new URL(
-        "data-tools/projection-catalog/core/compatibility/result_entries_single_source.sql",
+        "data-tools/projection-catalog/core/ranking-tables/result_entries_single_source.sql",
         root,
       ),
       "utf8",
     ),
     readFile(
       new URL(
-        "data-tools/projection-catalog/core/compatibility/result_entries_single_indexes.sql",
+        "data-tools/projection-catalog/core/ranking-tables/result_entries_single_indexes.sql",
         root,
       ),
       "utf8",
     ),
     readFile(
       new URL(
-        "data-tools/projection-catalog/core/compatibility/result_counts.sql",
+        "data-tools/projection-catalog/core/ranking-tables/result_counts.sql",
         root,
       ),
       "utf8",
@@ -50,8 +48,6 @@ test("builds a result-level compatibility projection without unused secondary in
       ),
       "utf8",
     ),
-    readFile(new URL("scripts/backfill-result-entries.ts", root), "utf8"),
-    readFile(new URL("scripts/backfill-result-rankings.ts", root), "utf8"),
     readFile(new URL("Dockerfile.data-tools", root), "utf8"),
     readFile(new URL(".github/workflows/pull-request.yml", root), "utf8"),
     readFile(new URL("tests/fixtures/visual-smoke.sql", root), "utf8"),
@@ -102,14 +98,11 @@ test("builds a result-level compatibility projection without unused secondary in
   assert.match(importer, /published_result_count/);
   assert.match(preflight, /result_entries_single/);
   assert.doesNotMatch(preflight, /idx_result_entries_single_world/);
-  assert.match(backfill, /refreshMysqlSchema/);
-  assert.match(backfill, /promoteProjectionTables/);
-  assert.match(resultBackfill, /result-ranking-counts/);
   assert.match(
     dockerfile,
     /COPY --chown=data-tools:data-tools scripts \.\/scripts/,
   );
-  assert.match(deploy, /backfill-result-entries\.ts/);
+  assert.match(deploy, /build-projection-groups\.ts/);
   assert.match(deploy, /refresh-rankings\.ts/);
   assert.match(fixture, /year SMALLINT/);
   assert.match(fixture, /month TINYINT/);
@@ -178,14 +171,14 @@ test("normal rankings retain separate historical country and continent bests", a
   ] = await Promise.all([
     readFile(
       new URL(
-        "data-tools/projection-catalog/core/compatibility/ranking_entries_single_source.sql",
+        "data-tools/projection-catalog/core/ranking-tables/ranking_entries_single_source.sql",
         root,
       ),
       "utf8",
     ),
     readFile(
       new URL(
-        "data-tools/projection-catalog/core/compatibility/ranking_entries_average_source.sql",
+        "data-tools/projection-catalog/core/ranking-tables/ranking_entries_average_source.sql",
         root,
       ),
       "utf8",

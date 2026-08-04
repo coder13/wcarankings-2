@@ -113,7 +113,7 @@ test("a result-facts semantic change selects only its downstream closure", async
   });
   assert.deepEqual(plan.changedGroups, [
     "result-facts",
-    "compatibility",
+    "ranking-tables",
     "result-rankings",
     "person-competition-rankings",
     "city-rankings",
@@ -164,16 +164,17 @@ test("a new export selects every group while reusing exact artifacts", async () 
 test("a corrupt exact artifact is quarantined and rebuilt", async () => {
   const desired = await projectionFingerprints({ exportId, repositoryRoot });
   const state = productionState(desired);
-  state.semanticFingerprints.compatibility = "stale";
-  state.artifactFingerprints.compatibility = "stale";
+  state.semanticFingerprints["ranking-tables"] = "stale";
+  state.artifactFingerprints["ranking-tables"] = "stale";
   const plan = await projectionReleasePlan({
     exportId,
     productionExportId: exportId,
     productionState: state,
     availableArtifacts: {
-      compatibility: {
+      "ranking-tables": {
         valid: false,
-        artifactFingerprint: desired.groups.compatibility.artifactFingerprint,
+        artifactFingerprint:
+          desired.groups["ranking-tables"].artifactFingerprint,
       },
       "result-facts": {
         valid: true,
@@ -182,6 +183,6 @@ test("a corrupt exact artifact is quarantined and rebuilt", async () => {
     },
     repositoryRoot,
   });
-  assert.deepEqual(plan.buildGroups, ["compatibility"]);
+  assert.deepEqual(plan.buildGroups, ["ranking-tables"]);
   assert.deepEqual(plan.hydrateGroups, ["result-facts"]);
 });

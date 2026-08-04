@@ -16,21 +16,21 @@ async function fixture({ raw = false } = {}) {
     "ranking_counts_transfer",
     "result_entries_single_transfer",
     "result_counts_transfer",
-    "projection_transfer_manifest_compatibility",
-    "projection_transfer_indexes_compatibility",
+    "projection_transfer_manifest_ranking_tables",
+    "projection_transfer_indexes_ranking_tables",
   ];
   await writeFile(
-    join(directory, "compatibility-projection-transfer.tar.gz"),
+    join(directory, "ranking-tables-projection-transfer.tar.gz"),
     "archive",
   );
   await writeFile(
-    join(directory, "compatibility-projection-transfer.json"),
+    join(directory, "ranking-tables-projection-transfer.json"),
     JSON.stringify({
-      group: "compatibility",
+      group: "ranking-tables",
       exportDate: "2026-07-30 00:00:23 UTC",
       tables,
       format: "mariadb-tab-v1",
-      archiveFile: "compatibility-projection-transfer.tar.gz",
+      archiveFile: "ranking-tables-projection-transfer.tar.gz",
     }),
   );
   if (raw)
@@ -39,12 +39,12 @@ async function fixture({ raw = false } = {}) {
     directory,
     exportId: "2026-07-30 00:00:23 UTC",
     exportDate: "2026-07-30",
-    groups: ["compatibility"],
+    groups: ["ranking-tables"],
     fingerprints: {
       groups: {
-        compatibility: {
-          semanticFingerprint: "projection-semantic-compatibility-example",
-          artifactFingerprint: "projection-artifact-compatibility-example",
+        "ranking-tables": {
+          semanticFingerprint: "projection-semantic-ranking-tables-example",
+          artifactFingerprint: "projection-artifact-ranking-tables-example",
         },
       },
     },
@@ -64,11 +64,11 @@ test("creates and verifies checksummed projection release artifacts", async () =
   const verified = await verifyProjectionReleaseManifest({
     directory,
     expectedSha256: created.manifestSha256,
-    expectedGroups: ["compatibility"],
+    expectedGroups: ["ranking-tables"],
     expectedExportId: "2026-07-30 00:00:23 UTC",
     expectedSourceSha: "abc123",
   });
-  assert.equal(verified.manifest.groups.compatibility.archive.bytes, 7);
+  assert.equal(verified.manifest.groups["ranking-tables"].archive.bytes, 7);
   assert.equal(verified.manifest.sourceSha, "abc123");
 });
 
@@ -77,10 +77,10 @@ test("rejects a cached artifact whose fingerprints do not match the requested ar
   await assert.rejects(
     verifyProjectionReleaseManifest({
       directory,
-      expectedGroups: ["compatibility"],
+      expectedGroups: ["ranking-tables"],
       expectedFingerprints: {
         groups: {
-          compatibility: {
+          "ranking-tables": {
             semanticFingerprint: "different-semantic",
             artifactFingerprint: "different-artifact",
           },
@@ -106,13 +106,13 @@ test("checksums a bundled raw export as part of the exact generation", async () 
 test("rejects transfer metadata from a different WCA export", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projection-artifact-"));
   await writeFile(
-    join(directory, "compatibility-projection-transfer.tar.gz"),
+    join(directory, "ranking-tables-projection-transfer.tar.gz"),
     "archive",
   );
   await writeFile(
-    join(directory, "compatibility-projection-transfer.json"),
+    join(directory, "ranking-tables-projection-transfer.json"),
     JSON.stringify({
-      group: "compatibility",
+      group: "ranking-tables",
       exportDate: "2026-07-29 00:00:23 UTC",
       tables: [
         "ranking_entries_single_transfer",
@@ -120,8 +120,8 @@ test("rejects transfer metadata from a different WCA export", async () => {
         "ranking_counts_transfer",
         "result_entries_single_transfer",
         "result_counts_transfer",
-        "projection_transfer_manifest_compatibility",
-        "projection_transfer_indexes_compatibility",
+        "projection_transfer_manifest_ranking_tables",
+        "projection_transfer_indexes_ranking_tables",
       ],
     }),
   );
@@ -129,10 +129,10 @@ test("rejects transfer metadata from a different WCA export", async () => {
     createProjectionReleaseManifest({
       directory,
       exportId: "2026-07-30 00:00:23 UTC",
-      groups: ["compatibility"],
+      groups: ["ranking-tables"],
       fingerprints: {
         groups: {
-          compatibility: {
+          "ranking-tables": {
             semanticFingerprint: "semantic",
             artifactFingerprint: "artifact",
           },
@@ -161,14 +161,14 @@ test("rejects an artifact built from an unexpected source commit", async () => {
 test("rejects a projection archive changed after manifest creation", async () => {
   const { directory, created } = await fixture();
   await writeFile(
-    join(directory, "compatibility-projection-transfer.tar.gz"),
+    join(directory, "ranking-tables-projection-transfer.tar.gz"),
     "tampered",
   );
   await assert.rejects(
     verifyProjectionReleaseManifest({
       directory,
       expectedSha256: created.manifestSha256,
-      expectedGroups: ["compatibility"],
+      expectedGroups: ["ranking-tables"],
     }),
     /failed verification/,
   );

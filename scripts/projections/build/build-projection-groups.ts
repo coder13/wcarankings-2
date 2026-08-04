@@ -6,9 +6,9 @@ import { refreshMysqlSchema } from "../../../data-tools/projections/build.ts";
 
 const projectionNames = argumentList("projection-names");
 const satisfiedProjectionNames = argumentList("satisfied-projection-names");
-const includeCompatibility = argumentValue("include-compatibility") === "true";
+const includeRankingTables = argumentValue("include-ranking-tables") === "true";
 
-if (projectionNames.length === 0 && !includeCompatibility) {
+if (projectionNames.length === 0 && !includeRankingTables) {
   throw new Error("No projection work was selected");
 }
 
@@ -18,7 +18,7 @@ try {
   await refreshMysqlSchema(connection, {
     projectionNames,
     satisfiedProjectionNames,
-    includeCompatibility,
+    includeRankingTables,
     createConnection: () => mysql.createConnection(options),
   });
 } finally {

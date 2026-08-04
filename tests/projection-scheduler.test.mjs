@@ -4,14 +4,14 @@ import { test } from "bun:test";
 
 import {
   DEFAULT_PROJECTION_NAMES,
-  COMPATIBILITY_PROJECTION_TASKS,
-  COMPATIBILITY_TABLE_TASK_COUNT,
+  CORE_RANKING_TABLE_TASKS,
+  CORE_RANKING_TABLE_TASK_COUNT,
   PROJECTION_REGISTRY,
   createTableProgress,
   projectionBuildPlan,
   projectionConcurrency,
   projectionNamesForRefresh,
-  renameCompatibilitySql,
+  renameRankingTableSql,
   runDependencyAwareTasks,
 } from "../data-tools/projections/build.ts";
 
@@ -98,7 +98,7 @@ test("a city-only build plans only owned tasks and reports hydrated projections 
   assert.ok(plan.satisfiedProjectionNames.includes("result-facts"));
   assert.ok(plan.satisfiedProjectionNames.includes("competition-event-stats"));
   assert.equal(plan.tables.length, 2);
-  assert.equal(plan.includeCompatibility, false);
+  assert.equal(plan.includeRankingTables, false);
 });
 
 test("duration-aware scheduling pairs a long task with the shortest ready task", async () => {
@@ -224,10 +224,10 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     assert.deepEqual(projection.dependencies, ["result-facts"]);
   }
   for (const name of [
-    "compatibility-ranking-entries-single-source",
-    "compatibility-ranking-entries-average-source",
+    "ranking-tables-entries-single-source",
+    "ranking-tables-entries-average-source",
   ]) {
-    const task = COMPATIBILITY_PROJECTION_TASKS.find(
+    const task = CORE_RANKING_TABLE_TASKS.find(
       (candidate) => candidate.name === name,
     );
     assert.ok(task, `${name} is registered`);
@@ -235,36 +235,36 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
   }
 });
 
-test("compatibility build omits disabled weekly helper tables", () => {
+test("core ranking-table build omits disabled weekly helper tables", () => {
   assert.equal(
-    COMPATIBILITY_PROJECTION_TASKS.some(
+    CORE_RANKING_TABLE_TASKS.some(
       ({ name, table }) =>
         /weekly-rank-deltas|record-streaks/.test(name) ||
         /weekly_rank_deltas|record_streaks/.test(table ?? ""),
     ),
     false,
   );
-  const source = COMPATIBILITY_PROJECTION_TASKS.find(
-    ({ name }) => name === "compatibility-ranking-entries-single-source",
+  const source = CORE_RANKING_TABLE_TASKS.find(
+    ({ name }) => name === "ranking-tables-entries-single-source",
   );
   assert.deepEqual(source.dependencies, ["projection:result-facts"]);
-  const averageSource = COMPATIBILITY_PROJECTION_TASKS.find(
-    ({ name }) => name === "compatibility-ranking-entries-average-source",
+  const averageSource = CORE_RANKING_TABLE_TASKS.find(
+    ({ name }) => name === "ranking-tables-entries-average-source",
   );
   assert.deepEqual(averageSource.dependencies, ["projection:result-facts"]);
-  assert.equal(COMPATIBILITY_TABLE_TASK_COUNT, 5);
-  const progress = createTableProgress(COMPATIBILITY_TABLE_TASK_COUNT);
+  assert.equal(CORE_RANKING_TABLE_TASK_COUNT, 5);
+  const progress = createTableProgress(CORE_RANKING_TABLE_TASK_COUNT);
   let lastProgress;
-  for (const task of COMPATIBILITY_PROJECTION_TASKS) {
+  for (const task of CORE_RANKING_TABLE_TASKS) {
     if (task.table) lastProgress = progress.start(task.table);
   }
   assert.equal(lastProgress, "[5/5]");
 });
 
-test("compatibility source views wait for result facts", async () => {
-  const names = new Set(["compatibility-ranking-entries-single-source"]);
+test("core ranking-table source views wait for result facts", async () => {
+  const names = new Set(["ranking-tables-entries-single-source"]);
   const events = [];
-  const tasks = COMPATIBILITY_PROJECTION_TASKS.filter(({ name }) =>
+  const tasks = CORE_RANKING_TABLE_TASKS.filter(({ name }) =>
     names.has(name),
   ).map((task) => ({
     ...task,
@@ -282,20 +282,20 @@ test("compatibility source views wait for result facts", async () => {
   });
 
   assert.deepEqual(events, [
-    "start:compatibility-ranking-entries-single-source",
-    "finish:compatibility-ranking-entries-single-source",
+    "start:ranking-tables-entries-single-source",
+    "finish:ranking-tables-entries-single-source",
   ]);
 });
 
-test("compatibility SQL uses the matching staged result facts table", async () => {
+test("core ranking-table SQL uses the matching staged result facts table", async () => {
   const source = await readFile(
     new URL(
-      "../data-tools/projection-catalog/core/compatibility/ranking_entries_single_source.sql",
+      "../data-tools/projection-catalog/core/ranking-tables/ranking_entries_single_source.sql",
       import.meta.url,
     ),
     "utf8",
   );
-  const sql = renameCompatibilitySql(source, {
+  const sql = renameRankingTableSql(source, {
     bestSingle: "wca_best_single_staging",
     bestAverage: "wca_best_average_staging",
     entriesSources: {

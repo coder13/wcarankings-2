@@ -3,7 +3,7 @@ import { argumentPresent } from "./lib/arguments.ts";
 import { databaseOptions } from "./lib/database.ts";
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
-import { enqueueListRankingRebuild } from "./list-ranking-jobs.ts";
+import { enqueueListRankingRebuild } from "./lib/list-ranking-jobs.ts";
 
 const ROLE_LISTS = {
   board: {

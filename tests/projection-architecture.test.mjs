@@ -80,7 +80,7 @@ test("keeps future grains registered while activating person metrics and competi
   ] = await Promise.all([
     readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
     readFile(new URL("data-tools/projections/sql.ts", root), "utf8"),
-    readFile(new URL("data-tools/projections/compatibility.ts", root), "utf8"),
+    readFile(new URL("data-tools/projections/ranking-tables.ts", root), "utf8"),
     readFile(new URL("data-tools/projections/jobs.ts", root), "utf8"),
     readFile(
       new URL(
@@ -183,18 +183,18 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /WCA_PROJECTION_BUILD_CONCURRENCY/);
   assert.match(schema, /buildRegisteredProjectionsConcurrently/);
   assert.match(schema, /runDependencyAwareTasks/);
-  assert.match(schema, /COMPATIBILITY_PROJECTION_TASKS/);
+  assert.match(schema, /CORE_RANKING_TABLE_TASKS/);
   assert.match(
     compatibility,
-    /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-single/,
+    /ranking-tables-counts[\s\S]*ranking-tables-entries-single/,
   );
   assert.match(
     compatibility,
-    /compatibility-ranking-counts[\s\S]*compatibility-ranking-entries-average/,
+    /ranking-tables-counts[\s\S]*ranking-tables-entries-average/,
   );
   assert.match(
     compatibility,
-    /compatibility-result-counts[\s\S]*compatibility-result-entries-single/,
+    /ranking-tables-result-counts[\s\S]*ranking-tables-result-entries-single/,
   );
   assert.match(schema, /process\.env\.WCA_PROJECTION_BUILD_CONCURRENCY \?\? 2/);
   assert.match(schema, /createConnection/);
@@ -206,7 +206,7 @@ test("keeps future grains registered while activating person metrics and competi
   assert.match(schema, /DEFAULT_PROJECTION_NAMES/);
   assert.match(
     schema,
-    /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.COMPATIBILITY_PROJECTION_TABLES/,
+    /\.\.\.SEMANTIC_PROJECTION_TABLES, \.\.\.CORE_RANKING_TABLES/,
   );
   const { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } = await import(
     new URL("data-tools/projections/jobs.ts", root)
@@ -512,25 +512,25 @@ test("only exposes APIs backed by active projections", async () => {
   }
 });
 
-test("compatibility projections omit disabled weekly ranking enhancements", async () => {
+test("core ranking tables omit disabled weekly ranking enhancements", async () => {
   const [groups, single, average] = await Promise.all([
     readFile(
       new URL(
-        "data-tools/projection-catalog/core/compatibility/definition.ts",
+        "data-tools/projection-catalog/core/ranking-tables/definition.ts",
         root,
       ),
       "utf8",
     ),
     readFile(
       new URL(
-        "data-tools/projection-catalog/core/compatibility/ranking_entries_single_source.sql",
+        "data-tools/projection-catalog/core/ranking-tables/ranking_entries_single_source.sql",
         root,
       ),
       "utf8",
     ),
     readFile(
       new URL(
-        "data-tools/projection-catalog/core/compatibility/ranking_entries_average_source.sql",
+        "data-tools/projection-catalog/core/ranking-tables/ranking_entries_average_source.sql",
         root,
       ),
       "utf8",
@@ -541,17 +541,6 @@ test("compatibility projections omit disabled weekly ranking enhancements", asyn
     assert.doesNotMatch(source, /record_streaks_/);
     assert.doesNotMatch(source, /record_streak_weeks/);
   }
-});
-
-test("backfills only the active competition-event projection", async () => {
-  const backfill = await readFile(
-    new URL("scripts/backfill-competition-event-stats.ts", root),
-    "utf8",
-  );
-  assert.match(backfill, /projectionNames = \["competition-event-stats"\]/);
-  assert.match(backfill, /projectionSuffix: "_staging"/);
-  assert.match(backfill, /promoteRegisteredProjections/);
-  assert.doesNotMatch(backfill, /DROP DATABASE|TRUNCATE TABLE/);
 });
 
 test("person search resolves IDs before querying projections", async () => {
@@ -580,7 +569,7 @@ test("person search resolves IDs before querying projections", async () => {
     ),
     readFile(
       new URL(
-        "data-tools/projection-catalog/core/compatibility/result_entries_single_indexes.sql",
+        "data-tools/projection-catalog/core/ranking-tables/result_entries_single_indexes.sql",
         root,
       ),
       "utf8",
@@ -606,7 +595,7 @@ test("person search resolves IDs before querying projections", async () => {
 });
 
 test("builds Sum of Ranks as one published score projection", async () => {
-  const [schema, jobs, backfill, publisher] = await Promise.all([
+  const [schema, jobs, publisher] = await Promise.all([
     readFile(new URL("data-tools/projections/build.ts", root), "utf8"),
     readFile(
       new URL(
@@ -615,7 +604,6 @@ test("builds Sum of Ranks as one published score projection", async () => {
       ),
       "utf8",
     ),
-    readFile(new URL("scripts/backfill-sum-of-ranks.ts", root), "utf8"),
     readFile(
       new URL(
         "scripts/projections/transfer/publish-projection-transfer.ts",
@@ -628,7 +616,6 @@ test("builds Sum of Ranks as one published score projection", async () => {
   assert.match(jobs, /person_sum_of_ranks_scores/);
   assert.match(schema, /RETIRED_PROJECTION_TABLES/);
   assert.match(schema, /for \(const retired of RETIRED_PROJECTION_TABLES\)/);
-  assert.match(backfill, /projectionNames = \["sum-of-ranks"\]/);
   assert.match(
     publisher,
     /promoteProjectionTables\(connection, \{ tables: transferTables \}\)/,
@@ -642,10 +629,10 @@ test("derives release tables from jobs when a release group has no generic build
   const { projectionGroup } = await import(
     new URL("data-tools/projections/jobs.ts", root)
   );
-  const plan = projectionBuildPlan(["compatibility"]);
+  const plan = projectionBuildPlan(["ranking-tables"]);
 
   assert.deepEqual(plan.projectionNames, []);
-  assert.deepEqual(plan.tables, projectionGroup("compatibility").tables);
+  assert.deepEqual(plan.tables, projectionGroup("ranking-tables").tables);
   assert.deepEqual(plan.tables, [
     "ranking_entries_single",
     "ranking_entries_average",

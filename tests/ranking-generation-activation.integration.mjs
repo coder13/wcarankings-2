@@ -56,7 +56,7 @@ if (!applicationUrl && !adminUrl) {
     compatibility: { artifactFormatVersion: 3, datasetSchemaVersion: 1 },
     raw: { file: "wca-export.sql.zip" },
     groups: {
-      compatibility: release("compatibility", "new"),
+      "ranking-tables": release("ranking-tables", "new"),
       "result-facts": release("result-facts", "new"),
       "result-rankings": release("result-rankings", "new"),
       "competition-rankings": release("competition-rankings", "new"),
@@ -338,7 +338,7 @@ if (!applicationUrl && !adminUrl) {
       ...fullManifest,
       exportId: oldExportId,
       raw: null,
-      groups: { compatibility: release("compatibility", "partial") },
+      groups: { "ranking-tables": release("ranking-tables", "partial") },
     };
     const partialTables = activationTables(partialManifest);
     const adminForPartial = await mysql.createConnection(
@@ -386,8 +386,8 @@ if (!applicationUrl && !adminUrl) {
       const partialState = await state(partialConnection, schemas.production);
       const partialFingerprints = JSON.parse(partialState.fingerprints_json);
       assert.equal(
-        partialFingerprints.artifacts.compatibility,
-        "compatibility-artifact-partial",
+        partialFingerprints.artifacts["ranking-tables"],
+        "ranking-tables-artifact-partial",
       );
       assert.equal(
         partialFingerprints.artifacts["sum-of-ranks"],
