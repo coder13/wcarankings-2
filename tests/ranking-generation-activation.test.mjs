@@ -20,7 +20,7 @@ const manifest = {
   },
   raw: { file: "wca-export.sql.zip" },
   groups: {
-    compatibility: {
+    "ranking-tables": {
       semanticFingerprint: "compat-semantic",
       artifactFingerprint: "compat-new",
       artifactDigest: "sha256:compat",
@@ -75,11 +75,11 @@ function stateRow({
     dataset_schema_version: 1,
     fingerprints_json: JSON.stringify({
       semantic: {
-        compatibility: "compat-semantic-old",
+        "ranking-tables": "core-rankings-semantic-old",
         untouched: "same-semantic",
       },
-      artifacts: { compatibility: "compat-old", untouched: "same" },
-      digests: { compatibility: "sha256:old", untouched: "sha256:same" },
+      artifacts: { "ranking-tables": "core-rankings-old", untouched: "same" },
+      digests: { "ranking-tables": "sha256:old", untouched: "sha256:same" },
     }),
     capabilities_json: JSON.stringify({ core: true, sumOfRanks: true }),
     source_sha: "b".repeat(40),
@@ -254,12 +254,12 @@ test("partial activation preserves unchanged artifacts and capabilities", () => 
   const next = mergedGenerationState({
     activeState: {
       semanticFingerprints: {
-        compatibility: "old-semantic",
+        "ranking-tables": "old-semantic",
         untouched: "same-semantic",
       },
-      artifactFingerprints: { compatibility: "old", untouched: "same" },
+      artifactFingerprints: { "ranking-tables": "old", untouched: "same" },
       artifactDigests: {
-        compatibility: "sha256:old",
+        "ranking-tables": "sha256:old",
         untouched: "sha256:same",
       },
       capabilities: { core: false, sumOfRanks: true },
@@ -267,14 +267,14 @@ test("partial activation preserves unchanged artifacts and capabilities", () => 
     manifest: {
       ...manifest,
       raw: null,
-      groups: { compatibility: manifest.groups.compatibility },
+      groups: { "ranking-tables": manifest.groups["ranking-tables"] },
     },
     artifactRunId: 20,
     artifactId: 30,
   });
-  assert.equal(next.artifactFingerprints.compatibility, "compat-new");
+  assert.equal(next.artifactFingerprints["ranking-tables"], "compat-new");
   assert.equal(next.artifactFingerprints.untouched, "same");
-  assert.equal(next.artifactDigests.compatibility, "sha256:compat");
+  assert.equal(next.artifactDigests["ranking-tables"], "sha256:compat");
   assert.equal(next.capabilities.core, true);
   assert.equal(next.capabilities.sumOfRanks, true);
   assert.equal(next.artifactFormatVersion, 3);
@@ -313,8 +313,8 @@ test("activated-phase recovery verifies the exact release identity and fingerpri
         ...manifest,
         groups: {
           ...manifest.groups,
-          compatibility: {
-            ...manifest.groups.compatibility,
+          "ranking-tables": {
+            ...manifest.groups["ranking-tables"],
             artifactFingerprint: "different",
           },
         },

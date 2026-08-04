@@ -2,52 +2,52 @@
 import { runTimedBuildStep } from "./progress.ts";
 import { executeTableStatements, projectionSql, statements } from "./sql.ts";
 
-export const COMPATIBILITY_PROJECTION_TASKS = [
+export const CORE_RANKING_TABLE_TASKS = [
   {
-    name: "compatibility-ranking-entries-single-source",
+    name: "ranking-tables-entries-single-source",
     dependencies: ["projection:result-facts"],
     estimatedDurationMs: 0,
   },
   {
-    name: "compatibility-ranking-entries-average-source",
+    name: "ranking-tables-entries-average-source",
     dependencies: ["projection:result-facts"],
     estimatedDurationMs: 0,
   },
   {
-    name: "compatibility-result-entries-single-source",
+    name: "ranking-tables-result-entries-single-source",
     dependencies: ["raw-wca"],
     estimatedDurationMs: 0,
   },
   {
-    name: "compatibility-ranking-entries-single",
-    dependencies: ["compatibility-ranking-entries-single-source"],
+    name: "ranking-tables-entries-single",
+    dependencies: ["ranking-tables-entries-single-source"],
     table: "ranking_entries_single",
     estimatedDurationMs: 120_000,
   },
   {
-    name: "compatibility-ranking-entries-average",
-    dependencies: ["compatibility-ranking-entries-average-source"],
+    name: "ranking-tables-entries-average",
+    dependencies: ["ranking-tables-entries-average-source"],
     table: "ranking_entries_average",
     estimatedDurationMs: 120_000,
   },
   {
-    name: "compatibility-result-entries-single",
-    dependencies: ["compatibility-result-entries-single-source"],
+    name: "ranking-tables-result-entries-single",
+    dependencies: ["ranking-tables-result-entries-single-source"],
     table: "result_entries_single",
     estimatedDurationMs: 150_000,
   },
   {
-    name: "compatibility-ranking-counts",
+    name: "ranking-tables-counts",
     dependencies: [
-      "compatibility-ranking-entries-single",
-      "compatibility-ranking-entries-average",
+      "ranking-tables-entries-single",
+      "ranking-tables-entries-average",
     ],
     table: "ranking_counts",
     estimatedDurationMs: 15_000,
   },
   {
-    name: "compatibility-result-counts",
-    dependencies: ["compatibility-result-entries-single"],
+    name: "ranking-tables-result-counts",
+    dependencies: ["ranking-tables-result-entries-single"],
     table: "result_counts",
     estimatedDurationMs: 15_000,
   },
@@ -55,8 +55,9 @@ export const COMPATIBILITY_PROJECTION_TASKS = [
 
 // Source-view tasks coordinate dependencies but do not create a published
 // table. Keep progress tied strictly to the table work operators can observe.
-export const COMPATIBILITY_TABLE_TASK_COUNT =
-  COMPATIBILITY_PROJECTION_TASKS.filter(({ table }) => table).length;
+export const CORE_RANKING_TABLE_TASK_COUNT = CORE_RANKING_TABLE_TASKS.filter(
+  ({ table }) => table,
+).length;
 
 async function buildCompatibilityTable(
   connection,
@@ -84,7 +85,7 @@ async function buildCompatibilityTable(
   );
 }
 
-export function renameCompatibilitySql(
+export function renameRankingTableSql(
   sql,
   { bestSingle, bestAverage, entriesSources, resultEntriesSource, resultFacts },
 ) {
@@ -99,11 +100,11 @@ export function renameCompatibilitySql(
 
 async function createCompatibilitySource(connection, file, names) {
   await connection.query(
-    renameCompatibilitySql(await projectionSql(file), names),
+    renameRankingTableSql(await projectionSql(file), names),
   );
 }
 
-export function compatibilityProjectionTasks({
+export function rankingTableTasks({
   entriesTables,
   entriesSources,
   countsTable,
@@ -123,69 +124,69 @@ export function compatibilityProjectionTasks({
     resultFacts,
   };
   const runners = {
-    "compatibility-ranking-entries-single-source": (connection) =>
+    "ranking-tables-entries-single-source": (connection) =>
       createCompatibilitySource(
         connection,
-        "core/compatibility/ranking_entries_single_source.sql",
+        "core/ranking-tables/ranking_entries_single_source.sql",
         names,
       ),
-    "compatibility-ranking-entries-average-source": (connection) =>
+    "ranking-tables-entries-average-source": (connection) =>
       createCompatibilitySource(
         connection,
-        "core/compatibility/ranking_entries_average_source.sql",
+        "core/ranking-tables/ranking_entries_average_source.sql",
         names,
       ),
-    "compatibility-result-entries-single-source": (connection) =>
+    "ranking-tables-result-entries-single-source": (connection) =>
       createCompatibilitySource(
         connection,
-        "core/compatibility/result_entries_single_source.sql",
+        "core/ranking-tables/result_entries_single_source.sql",
         names,
       ),
-    "compatibility-ranking-entries-single": (connection) =>
+    "ranking-tables-entries-single": (connection) =>
       buildCompatibilityTable(
         connection,
         entriesTables.single,
         entriesSources.single,
-        "core/compatibility/ranking_entries_indexes.sql",
+        "core/ranking-tables/ranking_entries_indexes.sql",
         tableProgress,
       ),
-    "compatibility-ranking-entries-average": (connection) =>
+    "ranking-tables-entries-average": (connection) =>
       buildCompatibilityTable(
         connection,
         entriesTables.average,
         entriesSources.average,
-        "core/compatibility/ranking_entries_indexes.sql",
+        "core/ranking-tables/ranking_entries_indexes.sql",
         tableProgress,
       ),
-    "compatibility-result-entries-single": (connection) =>
+    "ranking-tables-result-entries-single": (connection) =>
       buildCompatibilityTable(
         connection,
         resultEntriesTable,
         resultEntriesSource,
-        "core/compatibility/result_entries_single_indexes.sql",
+        "core/ranking-tables/result_entries_single_indexes.sql",
         tableProgress,
       ),
-    "compatibility-ranking-counts": async (connection) =>
+    "ranking-tables-counts": async (connection) =>
       executeTableStatements(
         connection,
-        (await projectionSql("core/compatibility/ranking_counts.sql"))
+        (await projectionSql("core/ranking-tables/ranking_counts.sql"))
           .replaceAll("ranking_entries_single", entriesTables.single)
           .replaceAll("ranking_entries_average", entriesTables.average)
           .replaceAll("ranking_counts", countsTable),
         [],
         { tableProgress },
       ),
-    "compatibility-result-counts": async (connection) =>
+    "ranking-tables-result-counts": async (connection) =>
       executeTableStatements(
         connection,
-        (await projectionSql("core/compatibility/result_counts.sql"))
+        (await projectionSql("core/ranking-tables/result_counts.sql"))
           .replaceAll("result_entries_single", resultEntriesTable)
           .replaceAll("result_counts", resultCountsTable),
         [],
         { tableProgress },
       ),
   };
-  return COMPATIBILITY_PROJECTION_TASKS.map((task) => ({
+  return CORE_RANKING_TABLE_TASKS.map((task) => ({
     ...task,
     run: runners[task.name],
   }));

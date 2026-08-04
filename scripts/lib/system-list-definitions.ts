@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const SYSTEM_LIST_DEFINITIONS = [
   {
     key: "given-name-max",
@@ -18,7 +17,7 @@ export const SYSTEM_LIST_DEFINITIONS = [
   },
 ];
 
-export function primaryNameToken(name) {
+export function primaryNameToken(name: unknown) {
   return String(name ?? "")
     .normalize("NFKC")
     .split("(", 1)[0]

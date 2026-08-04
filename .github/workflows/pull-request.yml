@@ -321,7 +321,7 @@ jobs:
             --user="$MYSQL_USER" \
             --password="$MYSQL_PASSWORD" \
             "$MYSQL_DATABASE" < tests/fixtures/visual-smoke.sql
-          docker compose run --rm data-tools /app/scripts/backfill-result-entries.ts
+          docker compose run --rm data-tools /app/scripts/projections/build/build-projection-groups.ts
           docker compose run --rm data-tools /app/scripts/refresh-rankings.ts
           docker compose run --rm data-tools /app/scripts/projections/generation/activate-ranking-generation.ts bootstrap
           docker compose run --rm data-tools /app/scripts/projections/generation/activate-ranking-generation.ts bootstrap \

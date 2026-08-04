@@ -2,8 +2,8 @@
 import { databaseOptions } from "./lib/database.ts";
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
-import { SYSTEM_LIST_DEFINITIONS } from "./system-list-definitions.ts";
-import { enqueueListRankingRebuild } from "./list-ranking-jobs.ts";
+import { SYSTEM_LIST_DEFINITIONS } from "./lib/system-list-definitions.ts";
+import { enqueueListRankingRebuild } from "./lib/list-ranking-jobs.ts";
 
 export async function refreshSystemLists(connection) {
   await connection.beginTransaction();

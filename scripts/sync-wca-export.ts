@@ -15,7 +15,7 @@ import {
   refreshMysqlSchema,
 } from "../data-tools/projections/build.ts";
 import { refreshSystemLists } from "./refresh-system-lists.ts";
-import { enqueueAllListRankingRebuilds } from "./list-ranking-jobs.ts";
+import { enqueueAllListRankingRebuilds } from "./lib/list-ranking-jobs.ts";
 import {
   refreshBoardList,
   refreshDelegatesList,

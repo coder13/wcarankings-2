@@ -2,7 +2,7 @@ import { cityEventStatsJob } from "../projection-catalog/cities/event-stats/defi
 import { competitionEventStatsJob } from "../projection-catalog/competitions/event-stats/definition.ts";
 import { competitionPodiumMembersJob } from "../projection-catalog/competitions/podium-members/definition.ts";
 import { competitionStatsJob } from "../projection-catalog/competitions/stats/definition.ts";
-import { compatibilityJob } from "../projection-catalog/core/compatibility/definition.ts";
+import { rankingTablesJob } from "../projection-catalog/core/ranking-tables/definition.ts";
 import { entityRankingCountsJob } from "../projection-catalog/core/entity-ranking-counts/definition.ts";
 import { resultFactsJob } from "../projection-catalog/core/result-facts/definition.ts";
 import { personCompetitionRankingsJob } from "../projection-catalog/people/competition-rankings/definition.ts";
@@ -23,7 +23,7 @@ export const MARIADB_COMPATIBILITY_VERSION = "11.8";
 export const PROJECTION_ARTIFACT_FORMAT_VERSION = 4;
 
 export const PROJECTION_JOBS: readonly ProjectionJob[] = [
-  compatibilityJob,
+  rankingTablesJob,
   resultFactsJob,
   sumOfRanksJob,
   competitionPodiumMembersJob,
@@ -68,7 +68,7 @@ export const DEPLOYMENT_PROJECTION_GROUPS = unique(
           ),
       ),
       projectionNames: jobs
-        .filter((job) => job.kind !== "compatibility")
+        .filter((job) => job.kind !== "core")
         .map((job) => job.id),
       tables: jobs.flatMap((job) => job.tables),
       sqlFiles: unique(jobs.flatMap((job) => job.sqlFiles)),
@@ -87,7 +87,7 @@ export const DEPLOYMENT_PROJECTION_GROUPS = unique(
   );
 
 export const PROJECTION_CAPABILITIES = {
-  core: ["compatibility"],
+  core: ["ranking-tables"],
   resultRankings: ["result-rankings"],
   competitionRankings: ["competition-rankings"],
   personCompetitionRankings: ["person-competition-rankings"],

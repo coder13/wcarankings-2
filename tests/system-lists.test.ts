@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   primaryNameToken,
   SYSTEM_LIST_DEFINITIONS,
-} from "../scripts/system-list-definitions.ts";
+} from "../scripts/lib/system-list-definitions.ts";
 import {
   boardMemberIds,
   roleMemberIds,

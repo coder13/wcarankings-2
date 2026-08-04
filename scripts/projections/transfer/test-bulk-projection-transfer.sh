@@ -31,7 +31,7 @@ docker compose exec -T db mariadb \
   "
 cat > "$transfer_root/transfer.json" << 'JSON'
 {
-  "group": "compatibility",
+  "group": "ranking-tables",
   "tables": ["bulk_transfer_alpha", "bulk_transfer_beta"]
 }
 JSON

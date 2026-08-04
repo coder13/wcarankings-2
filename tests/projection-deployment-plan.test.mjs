@@ -17,7 +17,7 @@ function environment(overrides = {}) {
     FLYWAY_IMAGE: `ghcr.io/coder13/flyway@sha256:${"d".repeat(64)}`,
     GITHUB_REPOSITORY: "coder13/wcarankings-2",
     PRODUCTION_WCA_EXPORT_VALUE: "2026-08-04T00:00:00Z",
-    PROJECTION_GROUPS: "compatibility,result-facts",
+    PROJECTION_GROUPS: "ranking-tables,result-facts",
     WCA_EXPORT_DATE: "2026-08-04",
     WCA_EXPORT_VALUE: "2026-08-04T00:00:00Z",
     ...overrides,
@@ -26,7 +26,7 @@ function environment(overrides = {}) {
 
 test("deployment input parses immutable release values", () => {
   const input = deploymentInput(environment());
-  assert.deepEqual(input.groups, ["compatibility", "result-facts"]);
+  assert.deepEqual(input.groups, ["ranking-tables", "result-facts"]);
   assert.equal(input.artifactId, "42");
   assert.equal(input.wcaExportValue, "2026-08-04T00:00:00.000Z");
 });
