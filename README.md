@@ -64,9 +64,7 @@ virtualized row or accordion motion. It documents the shared geometry contract,
 cached-detail behavior, and regression checks.
 
 See [docs/deployment.md](docs/deployment.md) for Docker Compose setup, server
-prerequisites, the GitHub Actions-owned WCA refresh flow, and deployment flow. See
-[docs/cloudflare-cache.md](docs/cloudflare-cache.md) for the source-controlled
-public API edge-cache policy and setup.
+prerequisites, the GitHub Actions-owned WCA refresh flow, and deployment flow.
 
 ## WCA sign-in
 
