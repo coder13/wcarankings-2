@@ -40,6 +40,7 @@ jobs:
       MYSQL_PASSWORD: projection-build
       MYSQL_ROOT_PASSWORD: projection-build-root
       DATABASE_URL: mysql://wcarankings:projection-build@127.0.0.1:13307/wcarankings
+      COMPOSE_FILE: docker-compose.yml:docker-compose.projection-ci.yml
       WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
       GROUPS: ${{ inputs.groups }}
       HYDRATE_GROUPS: ${{ inputs.hydrate_groups }}
@@ -143,7 +144,7 @@ jobs:
           set -euo pipefail
           node scripts/projection-build-plan.mjs --groups="$GROUPS" \
             --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
-          WCA_PROJECTION_BUILD_CONCURRENCY=3 node scripts/build-projection-groups.mjs \
+          WCA_PROJECTION_BUILD_CONCURRENCY=1 node scripts/build-projection-groups.mjs \
             --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
             --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
             --include-compatibility="$(jq -r '.includeCompatibility' /tmp/build-plan.json)"
