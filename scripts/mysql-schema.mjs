@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { cpus, freemem, loadavg, totalmem } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEPLOYMENT_PROJECTION_GROUPS } from "./projection-groups.mjs";
@@ -51,6 +52,37 @@ function writeBuildLog(message) {
 }
 
 const BUILD_HEARTBEAT_INTERVAL_MS = 60_000;
+const RESOURCE_MONITOR_INTERVAL_MS = 5 * 60_000;
+
+function formatMiB(bytes) {
+  return `${(bytes / 1024 / 1024).toFixed(0)} MiB`;
+}
+
+export function formatResourceUsage({
+  load = loadavg(),
+  cpuCount = cpus().length,
+  totalMemory = totalmem(),
+  freeMemory = freemem(),
+  processMemory = process.memoryUsage(),
+} = {}) {
+  const usedMemory = Math.max(0, totalMemory - freeMemory);
+  const usedPercent = totalMemory > 0 ? (usedMemory / totalMemory * 100).toFixed(1) : "0.0";
+  const [oneMinute, fiveMinute, fifteenMinute] = load;
+  return [
+    `Resource usage: cpu_load=${oneMinute.toFixed(2)}/${fiveMinute.toFixed(2)}/${fifteenMinute.toFixed(2)}`,
+    `cpu_count=${cpuCount}`,
+    `system_memory=${formatMiB(usedMemory)}/${formatMiB(totalMemory)} (${usedPercent}%)`,
+    `process_rss=${formatMiB(processMemory.rss)}`,
+    `process_heap=${formatMiB(processMemory.heapUsed)}/${formatMiB(processMemory.heapTotal)}`,
+  ].join(" ");
+}
+
+export function startResourceMonitor(intervalMs = RESOURCE_MONITOR_INTERVAL_MS) {
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) return () => {};
+  const timer = setInterval(() => writeBuildLog(formatResourceUsage()), intervalMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
 
 export function startBuildHeartbeat(label, startedAt, intervalMs = BUILD_HEARTBEAT_INTERVAL_MS) {
   if (!Number.isFinite(intervalMs) || intervalMs <= 0) return () => {};
@@ -543,12 +575,17 @@ async function buildRegisteredProjectionsConcurrently(projections, {
     estimatedDurationMs: projectionDurationEstimate(projection.name),
     run: async (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
   }));
-  return runDependencyAwareTasks(tasks, {
-    connection,
-    createConnection,
-    concurrency,
-    satisfiedDependencies: ["raw-wca", ...satisfiedProjectionNames],
-  });
+  const stopResourceMonitor = startResourceMonitor();
+  try {
+    return await runDependencyAwareTasks(tasks, {
+      connection,
+      createConnection,
+      concurrency,
+      satisfiedDependencies: ["raw-wca", ...satisfiedProjectionNames],
+    });
+  } finally {
+    stopResourceMonitor();
+  }
 }
 
 /*
@@ -849,18 +886,23 @@ export async function refreshMysqlSchema(
       resultFacts,
       tableProgress,
     }) : [];
-  await runDependencyAwareTasks([
-    ...compatibilityTasks,
-    ...semanticTasks,
-  ], {
-    connection,
-    createConnection,
-    concurrency: maxConcurrency,
-    satisfiedDependencies: [
-      "raw-wca",
-      ...satisfiedProjectionNames.map((name) => `projection:${name}`),
-    ],
-  });
+  const stopResourceMonitor = startResourceMonitor();
+  try {
+    await runDependencyAwareTasks([
+      ...compatibilityTasks,
+      ...semanticTasks,
+    ], {
+      connection,
+      createConnection,
+      concurrency: maxConcurrency,
+      satisfiedDependencies: [
+        "raw-wca",
+        ...satisfiedProjectionNames.map((name) => `projection:${name}`),
+      ],
+    });
+  } finally {
+    stopResourceMonitor();
+  }
 }
 
 export async function refreshResultEntriesSchema(connection, { projectionSuffix = "" } = {}) {

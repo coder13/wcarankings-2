@@ -60,6 +60,40 @@ test("logs a heartbeat while a build step is still running", async () => {
   assert.match(output, /\[projection-build\] Finished table slow_staging in \d{2}:\d{2}\.\d{2}/);
 });
 
+test("formats and periodically logs resource usage", async () => {
+  const { formatResourceUsage, startResourceMonitor } = await import(new URL("scripts/mysql-schema.mjs", root));
+  const usage = formatResourceUsage({
+    load: [1.25, 0.75, 0.5],
+    cpuCount: 8,
+    totalMemory: 8 * 1024 * 1024 * 1024,
+    freeMemory: 2 * 1024 * 1024 * 1024,
+    processMemory: {
+      rss: 512 * 1024 * 1024,
+      heapUsed: 128 * 1024 * 1024,
+      heapTotal: 256 * 1024 * 1024,
+    },
+  });
+  assert.equal(
+    usage,
+    "Resource usage: cpu_load=1.25/0.75/0.50 cpu_count=8 system_memory=6144 MiB/8192 MiB (75.0%) process_rss=512 MiB process_heap=128 MiB/256 MiB",
+  );
+
+  const messages = [];
+  const originalWrite = process.stdout.write;
+  process.stdout.write = (chunk) => {
+    messages.push(String(chunk));
+    return true;
+  };
+  const stopResourceMonitor = startResourceMonitor(5);
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 15));
+  } finally {
+    stopResourceMonitor();
+    process.stdout.write = originalWrite;
+  }
+  assert.match(messages.join(""), /\[projection-build\] Resource usage: cpu_load=/);
+});
+
 test("formats table progress against the complete build workload", async () => {
   const { createTableProgress, countProjectionTables, PROJECTION_REGISTRY } = await import(new URL("scripts/mysql-schema.mjs", root));
   const progress = createTableProgress(17);
