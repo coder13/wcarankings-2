@@ -1,4 +1,4 @@
-name: Build Incremental Projection Artifacts
+name: Build Projection Artifacts
 
 on:
   workflow_call:
@@ -57,6 +57,7 @@ permissions:
 
 jobs:
   raw-export:
+    name: Prepare Raw Export
     runs-on: ubuntu-latest
     env:
       WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
@@ -104,6 +105,7 @@ jobs:
           key: wca-sql-export-${{ inputs.export_date }}
 
   build:
+    name: Build Projection Groups
     if: inputs.build_groups != ''
     needs: raw-export
     uses: ./.github/workflows/build-projection-group.yml
@@ -119,6 +121,7 @@ jobs:
     secrets: inherit
 
   compose:
+    name: Publish Projection Release
     if: >-
       always()
       && needs.raw-export.result == 'success'
@@ -144,7 +147,7 @@ jobs:
 
       - uses: oras-project/setup-oras@v1
 
-      - name: Authenticate immutable projection storage
+      - name: Sign In to GHCR
         run: echo "${{ github.token }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Restore raw WCA export for release
@@ -155,7 +158,7 @@ jobs:
           key: wca-sql-export-${{ inputs.export_date }}
           fail-on-cache-miss: true
 
-      - name: Resolve exact group coordinates
+      - name: Find Exact Projection Artifact References
         env:
           RELEASE_GROUPS: ${{ inputs.release_groups }}
           BUILD_GROUPS: ${{ inputs.build_groups }}
@@ -188,7 +191,7 @@ jobs:
             mv /tmp/coordinates.next /tmp/coordinates.json
           done
 
-      - name: Publish raw export coordinate
+      - name: Publish Raw Export Artifact
         if: inputs.include_raw
         id: raw
         run: |
@@ -215,7 +218,7 @@ jobs:
             '{ref:$ref,digest:$digest,file:$file,bytes:$bytes,sha256:$sha256}' \
             > /tmp/raw-coordinate.json
 
-      - name: Compose lightweight release coordinate
+      - name: Create Projection Release File
         id: release
         env:
           RELEASE_GROUPS: ${{ inputs.release_groups }}
@@ -249,6 +252,7 @@ jobs:
           compression-level: 0
 
   benchmark:
+    name: Measure Ranking Performance
     if: >-
       always()
       && inputs.run_benchmark == true

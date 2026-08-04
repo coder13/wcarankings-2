@@ -1,4 +1,4 @@
-name: Build Projection Bundle
+name: Build Projection Groups
 
 on:
   workflow_call:
@@ -81,7 +81,7 @@ jobs:
 
       - uses: oras-project/setup-oras@v1
 
-      - name: Authenticate immutable projection storage
+      - name: Sign In to GHCR
         run: echo "${{ github.token }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Restore WCA SQL export
@@ -91,7 +91,7 @@ jobs:
           key: wca-sql-export-${{ inputs.export_date }}
           fail-on-cache-miss: true
 
-      - name: Start isolated projection database
+      - name: Start Temporary Projection Database
         run: |
           set -euo pipefail
           docker compose up -d db
@@ -106,7 +106,7 @@ jobs:
             --sql-path="/tmp/wca-export-cache/wca-export-${{ inputs.export_date }}.sql.zip" \
             --canonical-export-date="${{ inputs.export_value }}"
 
-      - name: Restore immutable dependency groups
+      - name: Download Dependency Artifacts
         if: inputs.hydrate_groups != ''
         env:
           AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}

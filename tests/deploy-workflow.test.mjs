@@ -344,9 +344,13 @@ test("incremental planning classifies active, cached, build, and hydrate groups"
 test("labeled PR projection builds run the scroll benchmark and publish a reusable repair artifact", () => {
   assert.match(prProjectionRelease, /pull_request:\s*\n\s+types: \[labeled\]/);
   assert.match(prProjectionRelease, /github\.event\.label\.name == 'build-projections'/);
+  assert.match(prProjectionRelease, /name: Build Projection Artifacts/);
   assert.match(prProjectionRelease, /force_rebuild: true/);
   assert.match(prProjectionRelease, /bypass_artifact_cache: true/);
   assert.match(prProjectionRelease, /run_benchmark: true/);
+  assert.match(builder, /name: Build Projection Groups/);
+  assert.match(builder, /name: Publish Projection Release/);
+  assert.match(builder, /name: Find Exact Projection Artifact References/);
   assert.match(builder, /run_benchmark:/);
   assert.match(builder, /benchmark:/);
   assert.match(builder, /needs: \[raw-export, build, compose\]/);
@@ -379,7 +383,7 @@ test("projection deployment accepts and smoke-tests every capability group", asy
 });
 
 test("bundled group artifacts share one isolated build database", () => {
-  assert.match(builder, /build:\n\s+if: inputs\.build_groups != ''/);
+  assert.match(builder, /build:\n\s+name: Build Projection Groups\n\s+if: inputs\.build_groups != ''/);
   assert.match(builder, /uses: \.\/\.github\/workflows\/build-projection-group\.yml/);
   assert.match(builder, /groups: \$\{\{ inputs\.build_groups \}\}/);
   assert.doesNotMatch(builder, /projection-build-matrix\.mjs/);
