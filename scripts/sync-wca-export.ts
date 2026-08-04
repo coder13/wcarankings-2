@@ -14,14 +14,10 @@ import {
   promoteProjectionTables,
   refreshMysqlSchema,
 } from "../data-tools/projections/build.ts";
-import { refreshSystemLists } from "./refresh-system-lists.ts";
 import { enqueueAllListRankingRebuilds } from "./lib/list-ranking-jobs.ts";
-import {
-  refreshBoardList,
-  refreshDelegatesList,
-} from "./refresh-board-list.ts";
-
-const EXPORT_API = "https://www.worldcubeassociation.org/api/v0/export/public";
+import { refreshBoardList, refreshDelegatesList } from "./lib/board-lists.ts";
+import { refreshSystemLists } from "./lib/system-lists.ts";
+import { resolveWcaExport } from "./lib/wca-export.ts";
 const force = argumentPresent("force");
 const dryRun = argumentPresent("dry-run");
 const rawOnly = argumentPresent("raw-only");
@@ -34,29 +30,6 @@ const canonicalExportDate =
   argumentValue("canonical-export-date") ||
   process.env.CANONICAL_EXPORT_DATE ||
   "";
-
-async function getLatestExport() {
-  const response = await fetch(EXPORT_API, {
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok)
-    throw new Error(`WCA export API returned ${response.status}.`);
-  const payload = await response.json();
-  const exportDate = payload.export_date ?? payload.exportDate;
-  const sqlUrl = payload.sql_url ?? payload.sqlUrl;
-  const version =
-    payload.export_format_version ?? payload.exportFormatVersion ?? "2";
-  if (!exportDate || !sqlUrl)
-    throw new Error(
-      "The WCA export API response is missing export_date or sql_url.",
-    );
-  if (!String(version).startsWith("2")) {
-    throw new Error(
-      `Unsupported WCA export major version: ${version}. Review the importer before continuing.`,
-    );
-  }
-  return { exportDate, sqlUrl, version };
-}
 
 async function getSuppliedExportMetadata(path) {
   const archive = await unzipper.Open.file(path);
@@ -432,7 +405,7 @@ async function main() {
     const cachedPath = await getCachedExportForToday();
     latest = cachedPath
       ? await getSuppliedExportMetadata(cachedPath)
-      : await getLatestExport();
+      : await resolveWcaExport();
   }
   if (canonicalExportDate)
     latest = { ...latest, exportDate: canonicalExportDate };
