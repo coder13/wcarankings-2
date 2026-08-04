@@ -325,6 +325,52 @@ const PROJECTION_DURATION_ESTIMATES_MS = {
   "entity-ranking-counts": 15_000,
 };
 
+const PERSON_YEAR_RANKING_PROJECTION = "person-year-rankings";
+
+// These are internal scheduler stages. The final stage keeps the registered
+// projection name as a completion barrier for dependants and artifact export.
+const PERSON_YEAR_RANKING_STAGE_DEFINITIONS = [
+  { stage: "prepare", dependencies: [], estimatedDurationMs: 0 },
+  {
+    stage: "cohorts",
+    dependencies: ["prepare"],
+    estimatedDurationMs: 1_000,
+    file: "person_year_ranking_cohorts.sql",
+  },
+  {
+    stage: "single",
+    dependencies: ["cohorts"],
+    estimatedDurationMs: 400_000,
+    file: "person_year_rankings_single.sql",
+  },
+  {
+    stage: "average",
+    dependencies: ["cohorts"],
+    estimatedDurationMs: 400_000,
+    file: "person_year_rankings_average.sql",
+  },
+  {
+    stage: "counts",
+    dependencies: ["single", "average"],
+    estimatedDurationMs: 15_000,
+    file: "person_year_ranking_counts.sql",
+  },
+  { stage: "complete", dependencies: ["counts"], estimatedDurationMs: 0 },
+];
+
+export function personYearRankingTaskPlan({ taskPrefix = "", projectionDependencies = ["result-facts"] } = {}) {
+  const taskName = (stage) => stage === "complete"
+    ? `${taskPrefix}${PERSON_YEAR_RANKING_PROJECTION}`
+    : `${taskPrefix}${PERSON_YEAR_RANKING_PROJECTION}:${stage}`;
+  return PERSON_YEAR_RANKING_STAGE_DEFINITIONS.map((definition) => ({
+    ...definition,
+    name: taskName(definition.stage),
+    dependencies: definition.stage === "prepare"
+      ? [...projectionDependencies]
+      : definition.dependencies.map(taskName),
+  }));
+}
+
 const LONG_TASK_THRESHOLD_MS = 60_000;
 
 function projectionDurationEstimate(name) {
@@ -453,6 +499,98 @@ async function buildProjection(connection, projection, projectionSuffix, tablePr
   }
 }
 
+function personYearRankingTasks(projection, {
+  projectionSuffix,
+  tableProgress,
+  taskPrefix = "",
+  projectionDependencies = projection.dependencies,
+}) {
+  const state = {
+    startedAt: undefined,
+    stopHeartbeat: undefined,
+    finished: false,
+    phases: new Map(),
+  };
+
+  function failBuild() {
+    if (state.finished || state.startedAt === undefined) return;
+    state.finished = true;
+    state.stopHeartbeat?.();
+    writeBuildLog(
+      `Failed projection ${projection.name} after ${formatDuration(elapsedMs(state.startedAt))}.`,
+    );
+  }
+
+  async function runStage(descriptor, connection) {
+    try {
+      if (descriptor.stage === "prepare") {
+        state.startedAt = performance.now();
+        writeBuildLog(`Starting projection ${projection.name}…`);
+        state.stopHeartbeat = startBuildHeartbeat(`projection ${projection.name}`, state.startedAt);
+        for (const table of projection.tables) {
+          await dropManagedObject(connection, `${table}${projectionSuffix}`);
+        }
+        return undefined;
+      }
+
+      if (descriptor.stage === "complete") {
+        const rowCounts = await projection.validate(connection, projectionSuffix);
+        const durationMs = elapsedMs(state.startedAt);
+        const phases = PERSON_YEAR_RANKING_STAGE_DEFINITIONS
+          .flatMap(({ stage }) => state.phases.get(stage) ?? []);
+        const timing = { name: projection.name, durationMs, rowCounts, phases };
+        state.finished = true;
+        state.stopHeartbeat?.();
+        writeBuildLog(
+          `Finished projection ${projection.name} in ${formatDuration(durationMs)} (${JSON.stringify(rowCounts)}).`,
+        );
+        return timing;
+      }
+
+      const phases = [];
+      state.phases.set(descriptor.stage, phases);
+      const sql = projectionNames(await projectionSql(descriptor.file), projectionSuffix);
+      await executeTableStatements(connection, sql, phases, { tableProgress });
+      return undefined;
+    } catch (error) {
+      failBuild();
+      throw error;
+    }
+  }
+
+  return personYearRankingTaskPlan({ taskPrefix, projectionDependencies }).map((descriptor) => ({
+    name: descriptor.name,
+    dependencies: descriptor.dependencies,
+    estimatedDurationMs: descriptor.estimatedDurationMs,
+    run: (connection) => runStage(descriptor, connection),
+  }));
+}
+
+function projectionSchedulerTasks(projections, {
+  projectionSuffix,
+  tableProgress,
+  taskPrefix = "",
+  dependencyName = (dependency) => dependency,
+}) {
+  return projections.flatMap((projection) => {
+    const dependencies = projection.dependencies.map(dependencyName);
+    if (projection.name === PERSON_YEAR_RANKING_PROJECTION) {
+      return personYearRankingTasks(projection, {
+        projectionSuffix,
+        tableProgress,
+        taskPrefix,
+        projectionDependencies: dependencies,
+      });
+    }
+    return [{
+      name: `${taskPrefix}${projection.name}`,
+      dependencies,
+      estimatedDurationMs: projectionDurationEstimate(projection.name),
+      run: (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
+    }];
+  });
+}
+
 export function projectionConcurrency(value) {
   const parsed = Number(value ?? process.env.WCA_PROJECTION_BUILD_CONCURRENCY ?? 2);
   return Number.isFinite(parsed) && parsed > 1 ? Math.floor(parsed) : 1;
@@ -570,20 +708,19 @@ async function buildRegisteredProjectionsConcurrently(projections, {
   tableProgress,
   satisfiedProjectionNames = [],
 }) {
-  const tasks = projections.map((projection) => ({
-    name: projection.name,
-    dependencies: projection.dependencies,
-    estimatedDurationMs: projectionDurationEstimate(projection.name),
-    run: async (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
-  }));
+  const tasks = projectionSchedulerTasks(projections, {
+    projectionSuffix,
+    tableProgress,
+  });
   const stopResourceMonitor = startResourceMonitor();
   try {
-    return await runDependencyAwareTasks(tasks, {
+    const results = await runDependencyAwareTasks(tasks, {
       connection,
       createConnection,
       concurrency,
       satisfiedDependencies: ["raw-wca", ...satisfiedProjectionNames],
     });
+    return results.filter((result) => result !== undefined);
   } finally {
     stopResourceMonitor();
   }
@@ -868,13 +1005,13 @@ export async function refreshMysqlSchema(
     (includeCompatibility ? COMPATIBILITY_TABLE_TASK_COUNT : 0)
       + await countProjectionTables(semanticProjections),
   );
-  const semanticTasks = semanticProjections.map((projection) => ({
-    name: `projection:${projection.name}`,
-    dependencies: projection.dependencies.map((dependency) =>
-      dependency === "raw-wca" ? dependency : `projection:${dependency}`),
-    estimatedDurationMs: projectionDurationEstimate(projection.name),
-    run: (worker) => buildProjection(worker, projection, projectionSuffix, tableProgress),
-  }));
+  const semanticTasks = projectionSchedulerTasks(semanticProjections, {
+    projectionSuffix,
+    tableProgress,
+    taskPrefix: "projection:",
+    dependencyName: (dependency) =>
+      dependency === "raw-wca" ? dependency : `projection:${dependency}`,
+  });
   const compatibilityTasks = includeCompatibility ? compatibilityProjectionTasks({
       entriesTables,
       entriesSources,
