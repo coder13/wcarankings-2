@@ -70,11 +70,10 @@ test("builds a result-level compatibility projection with count-oriented indexes
 });
 
 test("materializes attempt facts once as an index-free build stage", async () => {
-  const [stage, cleanup, single, personal, schema, groups, queries, listResults, preflight] = await Promise.all([
+  const [stage, cleanup, single, schema, groups, queries, listResults, preflight] = await Promise.all([
     readSql("sql/ranking-projections/solve_facts.sql"),
     readSql("sql/ranking-projections/solve_facts_cleanup.sql"),
     readSql("sql/ranking-projections/result_rankings_single.sql"),
-    readSql("sql/ranking-projections/solve_personal_rankings.sql"),
     readFile(new URL("scripts/mysql-schema.mjs", root), "utf8"),
     readFile(new URL("scripts/projection-groups.mjs", root), "utf8"),
     readFile(new URL("services/rankings/queries.ts", root), "utf8"),
@@ -90,7 +89,8 @@ test("materializes attempt facts once as an index-free build stage", async () =>
   assert.doesNotMatch(stage, /competition_year|round_type_id/);
   assert.doesNotMatch(stage, /ALTER TABLE|ADD (?:PRIMARY KEY|INDEX)/);
   assert.match(single, /FROM solve_facts_stage solve/);
-  assert.match(personal, /FROM solve_facts_stage solve/);
+  assert.doesNotMatch(schema, /solve_personal_rankings\.sql/);
+  assert.doesNotMatch(groups, /solve_personal_rankings\.sql/);
   assert.match(cleanup, /DROP TEMPORARY TABLE solve_facts_stage/);
   assert.match(schema, /name: "result-rankings"[\s\S]*files: \["solve_facts\.sql"[\s\S]*"solve_facts_cleanup\.sql"\]/);
   assert.doesNotMatch(schema, /name: "solve-facts"/);
@@ -100,9 +100,6 @@ test("materializes attempt facts once as an index-free build stage", async () =>
   assert.match(single, /-- phase: materialize Single result rankings/);
   assert.match(single, /-- phase: index Single result rankings/);
   assert.equal((single.match(/ALTER TABLE result_rankings_single/g) ?? []).length, 1);
-  assert.match(personal, /-- phase: materialize solve personal rankings/);
-  assert.match(personal, /-- phase: index solve personal ranking primary key/);
-  assert.match(personal, /-- phase: index solve personal pages/);
   assert.match(single, /idx_results_single_lazy_gender/);
   assert.doesNotMatch(single, /idx_solve_facts_event_(?:country|continent)_value/);
   assert.match(queries, /FROM result_rankings_single solve/);

@@ -212,8 +212,8 @@ const projectionDefinitions = [
   {
     name: "result-rankings",
     dependencies: ["result-facts"],
-    files: ["solve_facts.sql", "result_rankings_single.sql", "result_rankings_average.sql", "solve_personal_rankings.sql", "solve_facts_cleanup.sql"],
-    tables: ["result_rankings_single", "result_rankings_average", "solve_personal_rankings"],
+    files: ["solve_facts.sql", "result_rankings_single.sql", "result_rankings_average.sql", "solve_facts_cleanup.sql"],
+    tables: ["result_rankings_single", "result_rankings_average"],
     enabledByDefault: true,
   },
   {
@@ -276,6 +276,7 @@ export const RETIRED_PROJECTION_TABLES = [
   "result_gender_rankings_average",
   "result_gender_rankings_single",
   "solve_facts",
+  "solve_personal_rankings",
 ];
 
 export const COMPATIBILITY_PROJECTION_TASKS = [

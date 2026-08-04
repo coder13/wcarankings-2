@@ -45,8 +45,8 @@ export const DEPLOYMENT_PROJECTION_GROUPS = [
     schemaVersion: 7,
     dependencies: ["result-facts"],
     projectionNames: ["result-rankings", "result-ranking-counts"],
-    tables: ["result_rankings_single", "result_rankings_average", "solve_personal_rankings", "result_ranking_counts"],
-    sqlFiles: ["solve_facts.sql", "result_rankings_single.sql", "result_rankings_average.sql", "solve_personal_rankings.sql", "solve_facts_cleanup.sql", "result_ranking_counts.sql"],
+    tables: ["result_rankings_single", "result_rankings_average", "result_ranking_counts"],
+    sqlFiles: ["solve_facts.sql", "result_rankings_single.sql", "result_rankings_average.sql", "solve_facts_cleanup.sql", "result_ranking_counts.sql"],
   },
   {
     name: "competition-rankings",

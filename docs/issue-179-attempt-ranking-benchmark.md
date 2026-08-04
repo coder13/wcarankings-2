@@ -39,7 +39,7 @@ A bounded `ANALYZE` of 500K source rows measured the forced facts-first join at
 1.08 seconds versus 16.07 seconds for the optimizer's persons-first plan. The
 projection therefore materializes one minimal temporary stage with
 `STRAIGHT_JOIN` in `result_facts -> result_attempts` order, builds
-`result_rankings_single` and `solve_personal_rankings` from it, and drops it.
+`result_rankings_single` and `result_rankings_average` from it, and drops it.
 Normalized gender is materialized once on `result_facts`, so the solve stage no
 longer repeats the profile lookup. The stage has no primary or secondary
 indexes because both consumers scan it.

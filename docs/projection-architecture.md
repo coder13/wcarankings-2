@@ -69,8 +69,7 @@ raw results + dimensions
 └── result_facts
     ├── temporary solve_facts_stage
     │   ├── result_rankings_single
-    │   └── solve_personal_rankings
-    ├── result_rankings_average
+    │   └── result_rankings_average
     ├── person_event_rankings
     │   └── person_metric_values → person_metric_scores
     └── city, yearly, competition, and Sum-of-Ranks projections
