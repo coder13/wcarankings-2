@@ -11,6 +11,7 @@ interface FilteredResultRankingsQueryInput {
 interface PersonEventResultRankingsQueryInput {
   source: "result_rankings_single" | "result_rankings_average";
   hasStoredDate: boolean;
+  year?: number | null;
 }
 
 export function resultRankingsQuery(input: ResultRankingsQueryInput) {
@@ -71,6 +72,7 @@ export function resultRankingCountsQuery() {
 export function personEventResultRankingsQuery({
   source,
   hasStoredDate,
+  year = null,
 }: PersonEventResultRankingsQueryInput) {
   const competitionStartDate = hasStoredDate
     ? "ranking.competition_start_date"
@@ -78,6 +80,16 @@ export function personEventResultRankingsQuery({
   const positionOrder = hasStoredDate
     ? "ranking.result_value, ranking.competition_start_date, ranking.competition_id, ranking.result_id, ranking.attempt_number"
     : "ranking.result_value, ranking.result_id";
+  const yearJoin =
+    !hasStoredDate && year !== null
+      ? "INNER JOIN result_facts year_facts ON year_facts.result_id = ranking.result_id"
+      : "";
+  let yearCondition = "";
+  if (year !== null) {
+    yearCondition = hasStoredDate
+      ? "AND YEAR(ranking.competition_start_date) = ?"
+      : "AND YEAR(year_facts.competition_start_date) = ?";
+  }
   return sqlFragment`
     WITH
       ranked AS (
@@ -102,9 +114,11 @@ export function personEventResultRankingsQuery({
           COUNT(*) OVER () AS total_count
         FROM
           ${source} ranking
+          ${yearJoin}
         WHERE
           ranking.person_id = ?
           AND ranking.event_id = ?
+          ${yearCondition}
       ),
       page AS (
         SELECT

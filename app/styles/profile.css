@@ -265,204 +265,27 @@
   font-variant-numeric: tabular-nums;
 }
 
-.profileResultsPage {
-  width: min(100%, 900px);
-  margin-inline: auto;
-}
-
-.profileResultsHeader,
-.profileResultsControls,
-.profileResultsSummary,
-.profileResultsEmpty,
-.profileResultsError {
-  padding-inline: var(--page-gutter);
-}
-
-.profileResultsHeader {
-  padding-top: 1rem;
-}
-
-.profileResultsHeader h1 {
-  margin: 0;
-  font-size: clamp(1.8rem, 5vw, 3rem);
-  font-weight: 300;
-}
-
-.profileResultsHeader p,
-.profileResultsSummary,
-.profileResultsRow small,
-.profileResultsSuggestions span,
-.profileResultsLoadingMore {
-  color: var(--text-muted);
-}
-
-.profileResultsHeader p {
-  margin: 0.3rem 0 0;
-}
-
-.profileResultsControls {
-  display: grid;
-  grid-template-columns: minmax(12rem, 1.5fr) minmax(8rem, 1fr) auto;
-  gap: 0.5rem;
-  margin-top: 1.1rem;
-}
-
-.profileResultsControls label,
-.profileResultsPersonPicker {
-  display: grid;
-  gap: 0.25rem;
-  color: var(--text-muted);
-  font-size: 0.78rem;
-}
-
-.profileResultsControls input,
-.profileResultsControls select,
-.profileResultsType button {
-  min-height: 2.7rem;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-}
-
-.profileResultsControls input,
-.profileResultsControls select {
-  padding-inline: 0.65rem;
-  border-radius: 0.45rem;
-}
-
-.profileResultsPersonPicker {
-  position: relative;
-}
-
-.profileResultsSuggestions {
-  position: absolute;
-  z-index: 2;
-  top: calc(100% + 0.25rem);
-  right: 0;
-  left: 0;
-  max-height: 16rem;
-  margin: 0;
-  padding: 0.25rem;
-  overflow-y: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.45rem;
-  background: var(--surface);
-  box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, black 16%, transparent);
-  list-style: none;
-}
-
-.profileResultsSuggestions button {
-  display: grid;
-  width: 100%;
-  gap: 0.1rem;
-  padding: 0.5rem;
-  border: 0;
-  border-radius: 0.3rem;
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-}
-
-.profileResultsSuggestions button:hover,
-.profileResultsSuggestions button:focus-visible {
-  background: var(--surface-hover);
-}
-
-.profileResultsType {
-  display: flex;
-  align-items: end;
-}
-
-.profileResultsType button {
-  padding-inline: 0.7rem;
-}
-
-.profileResultsType button:first-child {
-  border-radius: 0.45rem 0 0 0.45rem;
-}
-
-.profileResultsType button:last-child {
-  border-left: 0;
-  border-radius: 0 0.45rem 0.45rem 0;
-}
-
-.profileResultsType button.isActive {
-  border-color: var(--focus);
-  background: color-mix(in srgb, var(--focus) 16%, var(--surface));
-}
-
-.profileResultsSummary {
-  margin: 1rem 0 0.45rem;
-}
-
-.profileResultsError {
-  color: var(--record-national);
-}
-
-.profileResultsScroller {
-  height: min(65vh, 46rem);
-  overflow-y: auto;
-  border-block: 1px solid var(--border-subtle);
-}
-
-.profileResultsList {
-  position: relative;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.profileResultsRow {
-  position: absolute;
-  display: grid;
-  grid-template-columns: 5.5rem minmax(6rem, 0.7fr) minmax(0, 1.7fr) auto;
-  align-items: center;
-  width: 100%;
-  min-height: 72px;
-  padding: 0.75rem var(--page-gutter);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface);
-}
-
-.profileResultsRow:nth-child(even) {
-  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
-}
-
-.profileResultsRank,
-.profileResultsValue strong {
-  font-variant-numeric: tabular-nums;
-}
-
-.profileResultsValue,
-.profileResultsCompetition {
-  display: grid;
-  min-width: 0;
-  gap: 0.15rem;
-}
-
-.profileResultsCompetition strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.profileResultsPersonLink {
+  color: var(--text-subtle);
+  font-size: 1rem;
+  text-decoration: none;
   white-space: nowrap;
 }
 
-.profileResultsRecord {
-  color: var(--record-world);
-  font-size: 0.8rem;
-  font-weight: 700;
+.profileResultsPersonLink:hover,
+.profileResultsPersonLink:focus-visible {
+  color: var(--focus);
 }
 
-.profileResultsRow--loading,
-.profileResultsLoadingMore {
-  display: grid;
-  place-items: center;
+.profileResultsPage .header,
+.profileResultsPage .listContainer,
+.profileResultsPage .list {
+  max-width: none;
 }
 
-.profileResultsLoadingMore {
-  margin: 0.6rem;
-  text-align: center;
+.Jump--profileResults {
+  --rail-gender-width: 0px;
+  --rail-select-width: 0px;
 }
 
 @media (max-width: 759px) {
@@ -496,22 +319,5 @@
 
   .profilePanel--wide {
     grid-column: auto;
-  }
-
-  .profileResultsControls {
-    grid-template-columns: 1fr;
-  }
-
-  .profileResultsType {
-    justify-content: stretch;
-  }
-
-  .profileResultsType button {
-    flex: 1;
-  }
-
-  .profileResultsRow {
-    grid-template-columns: 3.5rem minmax(5rem, 0.7fr) minmax(0, 1.5fr) auto;
-    font-size: 0.9rem;
   }
 }

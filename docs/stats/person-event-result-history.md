@@ -11,7 +11,7 @@ Position gives each row a stable order.
 The API route is:
 
 ```text
-GET /api/people/{wcaId}/event/{eventId}/results?result=single|average
+GET /api/people/{wcaId}/event/{eventId}/results?result=single|average&year=2023
 ```
 
 `start` is one-based. `limit` is from 1 through 100. The UI does not link to
@@ -20,12 +20,13 @@ the API route directly.
 The page route is:
 
 ```text
-/profile/{wcaId}/results?eventId=333&resultType=single
+/profile/{wcaId}/results?eventId=333&resultType=single&year=2023
 ```
 
-The page has a person search field, an event selector, and a Single or Average
-selector. Person profile pages link to this page. It reads the API route in
-100-row pages.
+The URL selects the person. The page uses the normal rankings header, rail,
+bottom pager, footer, and result-row layout. Its rail has event, Single or
+Average, and year selectors. Person profile pages link to this page. It reads
+the API route in 100-row pages.
 
 ## Source data
 
@@ -38,7 +39,9 @@ and competition data after it selects the bounded page window.
 
 ## Request policy
 
-The route filters by person and event before it ranks rows. The existing
+The route filters by person and event before it ranks rows. A selected year is
+also filtered before ranking. Singles use their stored competition date.
+Averages read the date from `result_facts`. The existing
 `(person_id, event_id, world_position, result_id[, attempt_number])` indexes
 bound this candidate set. A generation-keyed 400-row memory window caches
 adjacent pages and joins equal requests in flight.

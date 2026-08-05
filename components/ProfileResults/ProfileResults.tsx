@@ -1,20 +1,25 @@
 "use client";
 
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { TextDropdown } from "@/components/Dropdown/TextDropdown";
+import { EventPicker } from "@/components/EventPicker/EventPicker";
+import { LoadingSpinner } from "@/components/LoadingSpinner/LoadingSpinner";
+import { RankingsRail } from "@/components/RankingsRail/RankingsRail";
+import { formatRankingNumber } from "@/components/RankingsExplorer/types";
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+  useHasScrolled,
+  useTopRailScrollProgress,
+} from "@/components/RankingsExplorer/useRailScrollProgress";
+import { useRankingListOffset } from "@/components/RankingsExplorer/useRankingListOffset";
+import { StatPageLayout } from "@/components/StatPageLayout/StatPageLayout";
 import { formatWcaResult, WCA_EVENTS, type RankingType } from "@/lib/wca";
 import { profileResultsHref } from "./profileResultsUrl";
 
 const PAGE_SIZE = 100;
-const ROW_HEIGHT = 72;
+const ROW_HEIGHT = 65;
 
 type ResultEntry = {
   rank: number;
@@ -34,17 +39,10 @@ type ResultEntry = {
 type ResultResponse = {
   entries: ResultEntry[];
   total: number;
+  availableYears: number[];
   hasMore: boolean;
+  snapshot?: { exportDate: string | null };
   error?: string;
-};
-
-type PersonSearchEntry = {
-  personId: string;
-  name: string;
-};
-
-type PersonSearchResponse = {
-  entries: PersonSearchEntry[];
 };
 
 function formatDate(value: string | null) {
@@ -63,6 +61,7 @@ function resultUrl(
   personId: string,
   eventId: string,
   resultType: RankingType,
+  year: number | null,
   start: number,
 ) {
   const params = new URLSearchParams({
@@ -70,6 +69,7 @@ function resultUrl(
     limit: `${PAGE_SIZE}`,
     start: `${start}`,
   });
+  if (year !== null) params.set("year", `${year}`);
   return `/api/people/${personId}/event/${eventId}/results?${params.toString()}`;
 }
 
@@ -77,39 +77,38 @@ export function ProfileResults({
   personId,
   eventId,
   resultType,
+  year,
 }: {
   personId: string;
   eventId: string;
   resultType: RankingType;
+  year: number | null;
 }) {
   const router = useRouter();
-  const listRef = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<ResultEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [personName, setPersonName] = useState(personId);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [exportDate, setExportDate] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [personQuery, setPersonQuery] = useState("");
-  const [personPickerOpen, setPersonPickerOpen] = useState(false);
-  const [personMatches, setPersonMatches] = useState<PersonSearchEntry[]>([]);
-  const datasetKey = `${personId}:${eventId}:${resultType}`;
-  // TanStack Virtual returns callback-bearing objects. This component does not memoize them.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const virtualizer = useVirtualizer({
+  const datasetKey = `${personId}:${eventId}:${resultType}:${year ?? ""}`;
+  const railProgress = useTopRailScrollProgress(ROW_HEIGHT * 2);
+  const hasScrolled = useHasScrolled();
+  const listOffset = useRankingListOffset();
+  const virtualizer = useWindowVirtualizer({
     count: total,
-    getScrollElement: () => listRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 12,
+    scrollMargin: listOffset,
   });
 
   const loadPage = useCallback(
     async (start: number, append: boolean, signal?: AbortSignal) => {
       const response = await fetch(
-        resultUrl(personId, eventId, resultType, start),
-        {
-          signal,
-        },
+        resultUrl(personId, eventId, resultType, year, start),
+        { signal },
       );
       const body = (await response.json()) as ResultResponse;
       if (!response.ok)
@@ -119,18 +118,22 @@ export function ProfileResults({
       );
       setTotal(body.total);
       setPersonName(body.entries[0]?.personName ?? personId);
+      setAvailableYears(body.availableYears);
+      setExportDate(body.snapshot?.exportDate ?? null);
       return body;
     },
-    [eventId, personId, resultType],
+    [eventId, personId, resultType, year],
   );
 
   useEffect(() => {
     const controller = new AbortController();
+    // The URL changed. Reset the old query state before loading the next one.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEntries([]);
     setTotal(0);
     setError("");
     setLoading(true);
-    listRef.current?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0, behavior: "auto" });
     loadPage(1, false, controller.signal)
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
@@ -144,39 +147,6 @@ export function ProfileResults({
     return () => controller.abort();
   }, [datasetKey, loadPage]);
 
-  useEffect(() => {
-    const query = personQuery.trim();
-    const ready =
-      personPickerOpen &&
-      query.length >= 2 &&
-      (!/^\d/.test(query) || /^\d{4}[a-z]{2}/i.test(query));
-    if (!ready) {
-      setPersonMatches([]);
-      return;
-    }
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => {
-      fetch(
-        `/api/people/search?q=${encodeURIComponent(query)}&limit=25&offset=0`,
-        {
-          signal: controller.signal,
-        },
-      )
-        .then(async (response) => {
-          if (!response.ok) throw new Error("Person search is unavailable.");
-          return (await response.json()) as PersonSearchResponse;
-        })
-        .then((body) => setPersonMatches(body.entries ?? []))
-        .catch(() => {
-          if (!controller.signal.aborted) setPersonMatches([]);
-        });
-    }, 150);
-    return () => {
-      window.clearTimeout(timeout);
-      controller.abort();
-    };
-  }, [personPickerOpen, personQuery]);
-
   const loadMore = useCallback(() => {
     if (loading || loadingMore || entries.length >= total) return;
     setLoadingMore(true);
@@ -189,20 +159,14 @@ export function ProfileResults({
       .finally(() => setLoadingMore(false));
   }, [entries.length, loadPage, loading, loadingMore, total]);
 
-  const choosePerson = useCallback(
-    (nextPersonId: string) => {
-      router.push(
-        profileResultsHref({ personId: nextPersonId, eventId, resultType }),
-      );
-      setPersonQuery("");
-      setPersonPickerOpen(false);
-    },
-    [eventId, resultType, router],
-  );
-
   const chooseResultType = (nextResultType: RankingType) => {
     router.replace(
-      profileResultsHref({ personId, eventId, resultType: nextResultType }),
+      profileResultsHref({
+        personId,
+        eventId,
+        resultType: nextResultType,
+        year,
+      }),
     );
   };
 
@@ -213,177 +177,206 @@ export function ProfileResults({
         personId,
         eventId: nextEventId,
         resultType: nextResultType,
+        year,
       }),
     );
   };
 
-  const chooseTypedPerson = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const match = personQuery.trim().match(/^\d{4}[a-z]{4}\d{2}$/i);
-    if (match) choosePerson(match[0]);
+  const chooseYear = (value: string) => {
+    router.replace(
+      profileResultsHref({
+        personId,
+        eventId,
+        resultType,
+        year: value ? Number(value) : null,
+      }),
+    );
   };
 
-  const event = WCA_EVENTS.find((candidate) => candidate.id === eventId);
+  const event = WCA_EVENTS.find((candidate) => candidate.id === eventId)!;
   const virtualRows = virtualizer.getVirtualItems();
   const lastVisibleIndex = virtualRows.at(-1)?.index ?? -1;
+  const firstVisibleIndex = virtualRows[0]?.index ?? 0;
+  const railYears =
+    year !== null && !availableYears.includes(year)
+      ? [year, ...availableYears]
+      : availableYears;
+  const yearOptions = [
+    { value: "", label: "All time" },
+    ...railYears.map((availableYear) => ({
+      value: `${availableYear}`,
+      label: `${availableYear}`,
+    })),
+  ];
 
   useEffect(() => {
+    // The window virtualizer reports the current visible range after render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (lastVisibleIndex >= entries.length - 16) loadMore();
   }, [entries.length, lastVisibleIndex, loadMore]);
 
-  return (
-    <>
-      <header className="profileResultsHeader">
-        <Link href={`/person/${personId}`} className="profileBackLink">
-          Back to profile
-        </Link>
-        <h1>{event?.shortName ?? eventId} results</h1>
-        <p>{personName}</p>
-      </header>
-
-      <section className="profileResultsControls" aria-label="Result controls">
-        <form
-          className="profileResultsPersonPicker"
-          onSubmit={chooseTypedPerson}
-        >
-          <label htmlFor="profile-results-person">Person</label>
-          <input
-            id="profile-results-person"
-            value={personQuery}
-            onChange={(event) => {
-              setPersonQuery(event.target.value);
-              setPersonPickerOpen(true);
-            }}
-            onFocus={() => setPersonPickerOpen(true)}
-            placeholder="Name or WCA ID"
-          />
-          {personPickerOpen && personMatches.length > 0 && (
-            <ul
-              className="profileResultsSuggestions"
-              aria-label="Person matches"
-            >
-              {personMatches.map((person) => (
-                <li key={person.personId}>
-                  <button
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => choosePerson(person.personId)}
-                  >
-                    <strong>{person.name}</strong>
-                    <span>{person.personId}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </form>
-        <label>
-          Event
-          <select
-            value={eventId}
-            onChange={(event) => chooseEvent(event.target.value)}
-          >
-            {WCA_EVENTS.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.shortName}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="profileResultsType" aria-label="Result type">
-          <button
-            type="button"
-            className={resultType === "single" ? "isActive" : ""}
-            onClick={() => chooseResultType("single")}
-          >
-            Single
-          </button>
-          <button
-            type="button"
-            className={resultType === "average" ? "isActive" : ""}
-            onClick={() => chooseResultType("average")}
-            disabled={eventId === "333mbf"}
-          >
-            Average
-          </button>
-        </div>
-      </section>
-
-      <section className="profileResultsSummary" aria-live="polite">
-        {loading
-          ? "Loading results"
-          : `${total.toLocaleString()} official results`}
-      </section>
-
-      {error ? <p className="profileResultsError">{error}</p> : null}
-      {!loading && !error && total === 0 ? (
-        <p className="profileResultsEmpty">
-          No official results match this event and result type.
-        </p>
-      ) : null}
-      <div
-        ref={listRef}
-        className="profileResultsScroller"
-        onScroll={(event) => {
-          const target = event.currentTarget;
-          if (
-            target.scrollTop + target.clientHeight >=
-            target.scrollHeight - 600
-          ) {
-            loadMore();
-          }
-        }}
-      >
-        <ol
-          className="profileResultsList"
-          style={{ height: virtualizer.getTotalSize() }}
-        >
-          {virtualRows.map((virtualRow) => {
-            const entry = entries[virtualRow.index];
-            if (!entry) {
-              return (
-                <li
-                  key={virtualRow.key}
-                  className="profileResultsRow profileResultsRow--loading"
-                  style={{ transform: `translateY(${virtualRow.start}px)` }}
-                >
-                  Loading results
-                </li>
-              );
-            }
-            return (
-              <li
-                key={entry.resultId + (entry.attemptNumber ?? 0)}
-                className="profileResultsRow"
-                style={{ transform: `translateY(${virtualRow.start}px)` }}
-              >
-                <span className="profileResultsRank">#{entry.rank}</span>
-                <span className="profileResultsValue">
-                  <strong>
-                    {entry.formattedValue ||
-                      formatWcaResult(eventId, entry.resultValue, resultType)}
-                  </strong>
-                  {entry.attemptNumber !== null && (
-                    <small>Attempt {entry.attemptNumber}</small>
-                  )}
-                </span>
-                <span className="profileResultsCompetition">
-                  <strong>{entry.competitionName}</strong>
-                  <small>{formatDate(entry.competitionStartDate)}</small>
-                </span>
-                {entry.recordCode && (
-                  <span className="profileResultsRecord">
-                    {entry.recordCode}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-        {loadingMore && (
-          <p className="profileResultsLoadingMore">Loading more results</p>
-        )}
+  let resultContent;
+  if (error) {
+    resultContent = <div className="listMessage">{error}</div>;
+  } else if (loading && entries.length === 0) {
+    resultContent = (
+      <div className="listMessage listMessage--initialLoading listMessage--delayed">
+        <LoadingSpinner label="Loading results" />
       </div>
-    </>
+    );
+  } else if (total === 0) {
+    resultContent = (
+      <div className="listMessage">
+        No official results match this event, result type, and year.
+      </div>
+    );
+  } else {
+    resultContent = (
+      <ol
+        className="list"
+        data-rankings-list
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualRows.map((virtualRow) => {
+          const entry = entries[virtualRow.index];
+          if (!entry) {
+            return (
+              <div
+                key={virtualRow.key}
+                className="virtualRow"
+                data-loading
+                style={{
+                  transform: `translateY(${virtualRow.start - listOffset}px)`,
+                }}
+              >
+                <div className="row row--loading" aria-hidden="true" />
+              </div>
+            );
+          }
+          return (
+            <div
+              key={entry.resultId + (entry.attemptNumber ?? 0)}
+              className="virtualRow"
+              data-alternate={virtualRow.index % 2 === 1}
+              style={{
+                transform: `translateY(${virtualRow.start - listOffset}px)`,
+              }}
+            >
+              <div className="listItem">
+                <div
+                  className={`row${virtualRow.index % 2 ? " row--alternate" : ""}`}
+                >
+                  <div className="rowHeader">
+                    <span className="rank">
+                      {formatRankingNumber(entry.rank)}
+                    </span>
+                    <span className="identity">
+                      <span className="personName">
+                        <span className="name">{entry.competitionName}</span>
+                        <span className="wcaId">
+                          {formatDate(entry.competitionStartDate)}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="result">
+                      <span className="resultValue">
+                        {entry.recordCode && (
+                          <span
+                            className={`recordBadge recordBadge--${entry.recordCode}`}
+                          >
+                            {entry.recordCode}
+                          </span>
+                        )}
+                        <span className="best">
+                          {entry.formattedValue ||
+                            formatWcaResult(
+                              eventId,
+                              entry.resultValue,
+                              resultType,
+                            )}
+                        </span>
+                      </span>
+                      {entry.attemptNumber !== null && (
+                        <span className="competitionName">
+                          Attempt {entry.attemptNumber}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </ol>
+    );
+  }
+
+  return (
+    <StatPageLayout
+      className="profileResultsPage"
+      header={
+        <Link className="profileResultsPersonLink" href={`/person/${personId}`}>
+          {personName}
+        </Link>
+      }
+      hasScrolled={hasScrolled}
+      exportDate={exportDate}
+      navigation={{
+        currentPosition: firstVisibleIndex + 1,
+        total,
+        onJumpUp: () =>
+          virtualizer.scrollToIndex(Math.max(0, firstVisibleIndex - 5_000)),
+        onJumpDown: () =>
+          virtualizer.scrollToIndex(
+            Math.min(total - 1, firstVisibleIndex + 5_000),
+          ),
+        onJumpToTop: () => virtualizer.scrollToIndex(0),
+        onJumpToEnd: () => virtualizer.scrollToIndex(Math.max(0, total - 1)),
+      }}
+      topRail={
+        <div
+          className="stickyRankingsRail"
+          style={{ "--rail-scroll-progress": railProgress } as CSSProperties}
+        >
+          <RankingsRail
+            className="Jump--rankings Jump--profileResults"
+            direction="up"
+            compactResultType={railProgress >= 1}
+          >
+            <div className="Jump-railSettings">
+              <EventPicker event={event} onChange={chooseEvent} />
+              <div className="Jump-resultTypeControl">
+                <button
+                  className="Jump-resultTypeToggle"
+                  type="button"
+                  disabled={eventId === "333mbf"}
+                  onClick={() =>
+                    chooseResultType(
+                      resultType === "single" ? "average" : "single",
+                    )
+                  }
+                >
+                  {resultType === "single" ? "Single" : "Average"}
+                </button>
+              </div>
+              <TextDropdown
+                options={yearOptions}
+                value={year ? `${year}` : ""}
+                onChange={chooseYear}
+                ariaLabel="Year"
+                className="personYearDropdown Jump-periodPicker"
+              />
+            </div>
+          </RankingsRail>
+        </div>
+      }
+    >
+      <main>
+        <div className="outerListWrapper" data-rankings-list-container>
+          <div className="listContainer">{resultContent}</div>
+        </div>
+      </main>
+    </StatPageLayout>
   );
 }

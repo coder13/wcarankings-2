@@ -5,6 +5,7 @@ import {
   parsePersonId,
   parseResultType,
   parseStart,
+  parseYear,
   type QueryTimings,
 } from "@/lib/api/projection";
 import { formatWcaResult, type RankingType } from "@/lib/wca";
@@ -19,6 +20,7 @@ type PersonEventResultInput = {
   personId: string;
   eventId: string;
   resultType: RankingType;
+  year: number | null;
   start: number;
   limit: number;
 };
@@ -63,6 +65,7 @@ function parseInput(
     personId: parsePersonId(normalized, { required: true }),
     eventId: parsedEventId!,
     resultType: parseResultType(normalized, parsedEventId),
+    year: parseYear(normalized),
     start: parseStart(normalized),
     limit: parseLimit(normalized),
   };
@@ -105,6 +108,7 @@ function windowKey(
     personId: input.personId,
     eventId: input.eventId,
     resultType: input.resultType,
+    year: input.year,
     windowStart,
   });
 }
@@ -121,10 +125,12 @@ async function loadWindow(
     personEventResultRankingsQuery({
       source,
       hasStoredDate: input.resultType === "single",
+      year: input.year,
     }),
     [
       input.personId,
       input.eventId,
+      ...(input.year === null ? [] : [input.year]),
       windowStart,
       windowStart + RANKINGS_WINDOW_SIZE,
     ],
@@ -176,6 +182,7 @@ export async function loadPersonEventResultRankings(
       startPosition,
       lastRank: entries.at(-1)?.rank ?? null,
       total,
+      availableYears: metadata.availableYears,
     },
     diagnostics: {
       timings:
