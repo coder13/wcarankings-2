@@ -92,6 +92,26 @@ Yearly and multi-gender requests rank the compact count tables in cached,
 bounded windows. The public rank uses `RANK()` by competition count. The stable
 position orders tied rows by `person_id`.
 
+## Person activity rankings
+
+### `person_activity_counts`, `person_activity_rankings`, and `person_activity_ranking_counts`
+
+The count table has one all-time row per person. It stores host-country count,
+competed-round count, and official-solve count. Competition totals remain in
+`person_competition_counts` and are not copied into this table.
+
+An official solve is a positive `result_attempts.value`. A competed round is
+one stored `result_facts` row. The count table carries current normalized
+gender, country, and continent values for lazy cohorts.
+
+The ranking table stores World, all-gender rows for each new activity metric.
+Its public rank uses `RANK()` by descending metric value. Its stable position
+orders tied rows by `person_id`.
+
+Region and gender combinations rank the compact count table in cached,
+bounded windows. The competition metric uses the existing person-competition
+ranking tables.
+
 ## Core fact table
 
 ### `result_facts`

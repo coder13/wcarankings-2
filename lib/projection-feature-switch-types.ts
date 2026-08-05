@@ -4,6 +4,7 @@ export type ProjectionFeatureSwitch = {
   core: boolean;
   resultRankings: boolean;
   competitionRankings: boolean;
+  personActivityRankings: boolean;
   personCompetitionRankings: boolean;
   personMedalRankings: boolean;
   cityEventStats: boolean;
@@ -17,6 +18,7 @@ export const DEFAULT_PROJECTION_FEATURE_SWITCH: ProjectionFeatureSwitch = {
   core: true,
   resultRankings: true,
   competitionRankings: true,
+  personActivityRankings: true,
   personCompetitionRankings: true,
   personMedalRankings: true,
   cityEventStats: true,
@@ -30,6 +32,7 @@ export const UNAVAILABLE_PROJECTION_FEATURE_SWITCH: ProjectionFeatureSwitch = {
   core: false,
   resultRankings: false,
   competitionRankings: false,
+  personActivityRankings: false,
   personCompetitionRankings: false,
   personMedalRankings: false,
   cityEventStats: false,
