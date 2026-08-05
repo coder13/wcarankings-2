@@ -82,7 +82,10 @@ test("materializes attempt facts once as an index-free build stage", async () =>
   assert.doesNotMatch(single, /idx_solve_facts_event_(?:country|continent)_value/);
   assert.match(queries, /FROM result_rankings_single solve/);
   assert.doesNotMatch(queries, /FROM solve_facts solve/);
-  assert.match(listResults, /return resultType === "average" \? "result_rankings_average" : "result_rankings_single"/);
+  assert.match(
+    listResults,
+    /return resultType === "average"\s*\?\s*"result_rankings_average"\s*:\s*"result_rankings_single"/,
+  );
   assert.doesNotMatch(listResults, /"solve_facts source"/);
   assert.match(preflight, /idx_results_single_lazy_gender/);
   assert.match(preflight, /RESULT_FACT_COLUMNS = \["result_id", "gender"\]/);
