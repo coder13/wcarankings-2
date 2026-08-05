@@ -5,23 +5,29 @@ import { isEventId, isRankingType } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
 
+interface ProfileResultsSearchParams {
+  eventId?: string;
+  resultType?: string;
+  year?: string;
+}
+
+interface ProfileResultsPageProps {
+  params: Promise<{ wcaId: string }>;
+  searchParams: Promise<ProfileResultsSearchParams>;
+}
+
 export default async function ProfileResultsPage({
   params,
   searchParams,
-}: {
-  params: Promise<{ wcaId: string }>;
-  searchParams: Promise<{
-    eventId?: string;
-    resultType?: string;
-    year?: string;
-  }>;
-}) {
+}: ProfileResultsPageProps) {
   const [{ wcaId }, query] = await Promise.all([params, searchParams]);
   const personId = normalizeProfileWcaId(wcaId);
   if (!personId) notFound();
-  const eventId = isEventId(query.eventId) ? query.eventId : "333";
-  const resultType = isRankingType(query.resultType)
-    ? query.resultType
+  const requestedEventId = query.eventId ?? null;
+  const requestedResultType = query.resultType ?? null;
+  const eventId = isEventId(requestedEventId) ? requestedEventId : "333";
+  const resultType = isRankingType(requestedResultType)
+    ? requestedResultType
     : "single";
   const year = /^\d{4}$/.test(query.year ?? "") ? Number(query.year) : null;
   return (

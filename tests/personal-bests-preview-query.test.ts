@@ -7,10 +7,7 @@ import {
 } from "../services/people/personal-bests-preview";
 
 test("the personal bests preview normalizes the person ID", () => {
-  assert.equal(
-    parsePersonalBestsPreviewPersonId("2021zajd03"),
-    "2021ZAJD03",
-  );
+  assert.equal(parsePersonalBestsPreviewPersonId("2021zajd03"), "2021ZAJD03");
 });
 
 test("the personal bests preview reads only one person's indexed rows", () => {

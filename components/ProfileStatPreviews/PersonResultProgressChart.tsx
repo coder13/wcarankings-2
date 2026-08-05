@@ -12,6 +12,23 @@ import {
 import { formatWcaResult, type RankingType } from "@/lib/wca";
 import type { PersonResultProgressPoint } from "@/services/rankings/person-result-progress";
 
+interface ResultProgressTooltipPayload {
+  payload?: PersonResultProgressPoint;
+}
+
+interface ResultProgressTooltipProps {
+  active?: boolean;
+  payload?: readonly ResultProgressTooltipPayload[];
+  eventId: string;
+  resultType: RankingType;
+}
+
+interface PersonResultProgressChartProps {
+  points: PersonResultProgressPoint[];
+  eventId: string;
+  resultType: RankingType;
+}
+
 function formatDate(date: string, options: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat(undefined, options).format(
     new Date(`${date}T12:00:00`),
@@ -33,12 +50,7 @@ function ResultProgressTooltip({
   payload,
   eventId,
   resultType,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: PersonResultProgressPoint }>;
-  eventId: string;
-  resultType: RankingType;
-}) {
+}: ResultProgressTooltipProps) {
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
 
@@ -57,11 +69,7 @@ export function PersonResultProgressChart({
   points,
   eventId,
   resultType,
-}: {
-  points: PersonResultProgressPoint[];
-  eventId: string;
-  resultType: RankingType;
-}) {
+}: PersonResultProgressChartProps) {
   const resultDomain = getResultDomain(points);
 
   return (
