@@ -159,6 +159,7 @@
 
 .Jump-resultTypeControl { position: relative; width: var(--result-type-width); min-width: 0; height: var(--rail-control-height); flex: 0 0 var(--result-type-width); border-right: 1px solid var(--border-subtle); }
 .Jump-resultTypeControl:has(+ .Jump-genderPicker) { border-right: 0; }
+.Jump-resultTypeControl:has(+ .Jump-periodPicker) { border-right: 0; }
 .Jump--rankings:has(.Jump-periodPicker) { --rail-period-width: 6.75em; }
 .Jump-periodPicker { width: var(--rail-period-width); min-width: 0; height: var(--rail-control-height); flex: 0 0 var(--rail-period-width); border-left: 1px solid var(--border-subtle); }
 .Jump .Jump-periodPicker .TextDropdown-trigger { width: 100%; height: var(--rail-control-height); min-height: var(--rail-control-height); justify-content: space-between; padding-inline: .65em; border-radius: 0; font-size: .875em; }
