@@ -32,3 +32,19 @@ test("preserves normal five-column grid navigation", () => {
   assert.equal(navigate("Home", 18), 0);
   assert.equal(navigate("End", 0), 18);
 });
+
+test("moves from a leading option into the event grid", () => {
+  const withLeadingOption = (key: string, currentIndex: number) =>
+    nextEventPickerOptionIndex({
+      key,
+      currentIndex,
+      leadingCount: 1,
+      eventCount: 17,
+      additionalCount: 0,
+    });
+
+  assert.equal(withLeadingOption("ArrowDown", 0), 1);
+  assert.equal(withLeadingOption("ArrowUp", 1), 0);
+  assert.equal(withLeadingOption("ArrowRight", 0), undefined);
+  assert.equal(withLeadingOption("End", 0), 17);
+});

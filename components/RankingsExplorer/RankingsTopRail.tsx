@@ -103,10 +103,11 @@ export function RankingsTopRail() {
     ALL_EVENT_RANKING_OPTIONS.find((option) => option.id === filters.eventId) ??
     WCA_EVENTS.find((event) => event.id === filters.eventId)!;
   let eventOptions: readonly EventPickerOption[] = WCA_EVENTS;
+  let eventLeadingOptions: readonly EventPickerOption[] = [];
   if (filters.competitionRanking === "podiums") {
     eventOptions = PODIUM_EVENT_OPTIONS;
   } else if (filters.personMedalRanking) {
-    eventOptions = [ALL_MEDAL_EVENTS_OPTION, ...WCA_EVENTS];
+    eventLeadingOptions = [ALL_MEDAL_EVENTS_OPTION];
   }
   let personRankingPeriod = "";
   if (filters.personCompetitionRanking) personRankingPeriod = "competitions";
@@ -192,6 +193,7 @@ export function RankingsTopRail() {
           controls={{
             event: currentEvent,
             eventOptions,
+            eventLeadingOptions,
             additionalEventOptions:
               !filters.personMedalRanking &&
               options.showAllEventRankingOptions &&

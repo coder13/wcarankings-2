@@ -20,12 +20,14 @@ function isWcaEvent(option: EventPickerOption): option is WcaEvent {
 export function EventPicker<T extends EventPickerOption>({
   event,
   options = WCA_EVENTS as unknown as readonly T[],
+  leadingOptions = [],
   additionalOptions = [],
   onChange,
   onTriggerReady,
 }: {
   event: T;
   options?: readonly T[];
+  leadingOptions?: readonly T[];
   additionalOptions?: readonly T[];
   onChange: (eventId: T["id"]) => void;
   onTriggerReady?: (trigger: HTMLButtonElement | null) => void;
@@ -34,7 +36,7 @@ export function EventPicker<T extends EventPickerOption>({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const allOptions = [...options, ...additionalOptions];
+  const allOptions = [...leadingOptions, ...options, ...additionalOptions];
   const selectedIndex = allOptions.findIndex((option) => option.id === event.id);
 
   useEffect(() => {
@@ -88,6 +90,7 @@ export function EventPicker<T extends EventPickerOption>({
     const nextIndex = nextEventPickerOptionIndex({
       key: keyboardEvent.key,
       currentIndex,
+      leadingCount: leadingOptions.length,
       eventCount: options.length,
       additionalCount: additionalOptions.length,
     });
@@ -157,10 +160,24 @@ export function EventPicker<T extends EventPickerOption>({
         aria-hidden={!open}
         onKeyDown={handleMenuKeyDown}
       >
-        <div className="EventPicker-eventOptions">{options.map(renderOption)}</div>
+        {leadingOptions.length > 0 && (
+          <div className="EventPicker-leadingOptions">
+            {leadingOptions.map(renderOption)}
+          </div>
+        )}
+        <div className="EventPicker-eventOptions">
+          {options.map((option, index) =>
+            renderOption(option, leadingOptions.length + index),
+          )}
+        </div>
         {additionalOptions.length > 0 && (
           <div className="EventPicker-additionalOptions">
-            {additionalOptions.map((option, index) => renderOption(option, options.length + index))}
+            {additionalOptions.map((option, index) =>
+              renderOption(
+                option,
+                leadingOptions.length + options.length + index,
+              ),
+            )}
           </div>
         )}
       </div>

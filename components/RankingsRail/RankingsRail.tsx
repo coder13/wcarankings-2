@@ -260,6 +260,7 @@ function RailSearch({ model }: { model: RankingsRailSearch }) {
 export type RankingsControlsModel<T extends EventPickerOption> = {
   event: T;
   eventOptions?: readonly T[];
+  eventLeadingOptions?: readonly T[];
   additionalEventOptions?: readonly T[];
   onEventChange: (eventId: T["id"]) => void;
   rankingType: "single" | "average";
@@ -297,6 +298,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({
   const {
     event,
     eventOptions,
+    eventLeadingOptions,
     additionalEventOptions,
     onEventChange,
     rankingType,
@@ -324,6 +326,7 @@ export function RankingsControlsRail<T extends EventPickerOption>({
       <EventPicker
         event={event}
         options={eventOptions}
+        leadingOptions={eventLeadingOptions}
         additionalOptions={additionalEventOptions}
         onChange={onEventChange}
         onTriggerReady={onEventPickerTrigger}
