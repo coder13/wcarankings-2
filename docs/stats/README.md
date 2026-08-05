@@ -28,6 +28,7 @@ The files use these status labels:
 
 ## Foundation tables
 
+- [Person activity rankings](person-activity-rankings.md)
 - [Result facts](result-facts.md)
 - [Ranking tables](ranking-tables.md)
 

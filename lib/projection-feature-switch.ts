@@ -21,6 +21,11 @@ const COMPETITION_RANKINGS_TABLES = [
   "competition_event_stats",
   "competition_stats",
 ] as const;
+const PERSON_ACTIVITY_RANKINGS_TABLES = [
+  "person_activity_counts",
+  "person_activity_rankings",
+  "person_activity_ranking_counts",
+] as const;
 const PERSON_COMPETITION_RANKINGS_TABLES = [
   "person_competition_counts",
   "person_competition_year_counts",
@@ -62,6 +67,10 @@ export function featureSwitchFromTables(
     core: allPresent(present, CORE_TABLES),
     resultRankings: allPresent(present, RESULT_RANKINGS_TABLES),
     competitionRankings: allPresent(present, COMPETITION_RANKINGS_TABLES),
+    personActivityRankings: allPresent(
+      present,
+      PERSON_ACTIVITY_RANKINGS_TABLES,
+    ),
     personCompetitionRankings: allPresent(
       present,
       PERSON_COMPETITION_RANKINGS_TABLES,
@@ -97,6 +106,9 @@ async function loadProjectionFeatureSwitch() {
       competitionRankings:
         capabilities.competitionRankings === true ||
         capabilities.competitionRankings === 1,
+      personActivityRankings:
+        capabilities.personActivityRankings === true ||
+        capabilities.personActivityRankings === 1,
       personCompetitionRankings:
         capabilities.personCompetitionRankings === true ||
         capabilities.personCompetitionRankings === 1,

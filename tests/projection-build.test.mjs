@@ -267,6 +267,12 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     assert.ok(projection, `${name} is registered`);
     assert.deepEqual(projection.dependencies, ["result-facts"]);
   }
+  const activity = PROJECTION_REGISTRY.find(
+    (candidate) => candidate.name === "person-activity-rankings",
+  );
+  assert.ok(activity, "person-activity-rankings is registered");
+  assert.deepEqual(activity.dependencies, ["person-competition-rankings"]);
+  assert.equal(activity.enabledByDefault, false);
   for (const name of [
     "ranking-tables-entries-single-source",
     "ranking-tables-entries-average-source",
@@ -277,6 +283,23 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     assert.ok(task, `${name} is registered`);
     assert.deepEqual(task.dependencies, ["projection:result-facts"]);
   }
+});
+
+test("person activity rankings keep only the three new activity metrics", async () => {
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/people/activity-rankings/person_activity_rankings.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(sql, /COUNT\(DISTINCT NULLIF\(competition\.country_id, ''\)\)/);
+  assert.match(sql, /COUNT\(\*\) AS round_count/);
+  assert.match(sql, /WHEN value > 0 THEN 1/);
+  assert.match(sql, /'countries' AS metric/);
+  assert.match(sql, /country_count AS metric_value/);
+  assert.match(sql, /CAST\('' AS CHAR\(16\)\) AS region_id/);
+  assert.doesNotMatch(sql, /competition_count/);
 });
 
 test("medal rankings keep event and medal type as independent dimensions", async () => {

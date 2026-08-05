@@ -54,6 +54,11 @@ const manifest = {
       artifactFingerprint: "person-competition-new",
       artifactDigest: "sha256:person-competition",
     },
+    "person-activity-rankings": {
+      semanticFingerprint: "person-activity-semantic",
+      artifactFingerprint: "person-activity-new",
+      artifactDigest: "sha256:person-activity",
+    },
     "person-medal-rankings": {
       semanticFingerprint: "person-medal-semantic",
       artifactFingerprint: "person-medal-new",
@@ -216,6 +221,7 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
     core: true,
     resultRankings: false,
     competitionRankings: true,
+    personActivityRankings: false,
     personCompetitionRankings: false,
     personMedalRankings: false,
     personEventRankings: false,
