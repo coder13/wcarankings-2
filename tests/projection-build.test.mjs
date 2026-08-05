@@ -296,6 +296,9 @@ test("person activity rankings keep only the three new activity metrics", async 
   assert.match(sql, /COUNT\(DISTINCT NULLIF\(competition\.country_id, ''\)\)/);
   assert.match(sql, /COUNT\(\*\) AS round_count/);
   assert.match(sql, /WHEN value > 0 THEN 1/);
+  assert.match(sql, /'countries' AS metric/);
+  assert.match(sql, /country_count AS metric_value/);
+  assert.match(sql, /CAST\('' AS CHAR\(16\)\) AS region_id/);
   assert.doesNotMatch(sql, /competition_count/);
 });
 

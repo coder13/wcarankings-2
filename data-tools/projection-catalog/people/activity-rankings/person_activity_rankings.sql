@@ -54,22 +54,22 @@ WITH
   metrics AS (
     SELECT
       person_id,
-      'countries',
-      country_count
+      'countries' AS metric,
+      country_count AS metric_value
     FROM
       person_activity_counts
     UNION ALL
     SELECT
       person_id,
-      'rounds',
-      round_count
+      'rounds' AS metric,
+      round_count AS metric_value
     FROM
       person_activity_counts
     UNION ALL
     SELECT
       person_id,
-      'solves',
-      official_solve_count
+      'solves' AS metric,
+      official_solve_count AS metric_value
     FROM
       person_activity_counts
   )
@@ -77,7 +77,7 @@ SELECT
   person_id,
   metric,
   'world' AS scope,
-  '' AS region_id,
+  CAST('' AS CHAR(16)) AS region_id,
   'all' AS gender,
   metric_value,
   RANK() OVER (
