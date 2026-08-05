@@ -105,6 +105,7 @@ function windowKey(
   return JSON.stringify({
     dataVersion,
     ranking: "person-event-results",
+    recordBadges: "current-v1",
     personId: input.personId,
     eventId: input.eventId,
     resultType: input.resultType,

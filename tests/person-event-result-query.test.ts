@@ -20,6 +20,18 @@ test("person event Single results use the stored attempt date for stable ties", 
   assert.match(query, /position >= \?\s+AND position < \?/);
 });
 
+test("person event results show only current record badges", () => {
+  const query = personEventResultRankingsQuery({
+    source: "result_rankings_single",
+    hasStoredDate: true,
+  });
+  assert.match(
+    query,
+    /WHEN ranking\.world_rank = 1 THEN 'WR'[\s\S]*WHEN ranking\.continent_rank = 1 THEN 'CR'[\s\S]*WHEN ranking\.country_rank = 1 THEN 'NR'/,
+  );
+  assert.doesNotMatch(query, /ranking\.record_code/);
+});
+
 test("person event Averages use result ID for stable ties", () => {
   const query = personEventResultRankingsQuery({
     source: "result_rankings_average",

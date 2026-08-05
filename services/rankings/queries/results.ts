@@ -101,7 +101,12 @@ export function personEventResultRankingsQuery({
           ranking.country_id,
           ranking.continent_id,
           ranking.competition_id,
-          ranking.record_code,
+          CASE
+            WHEN ranking.world_rank = 1 THEN 'WR'
+            WHEN ranking.continent_rank = 1 THEN 'CR'
+            WHEN ranking.country_rank = 1 THEN 'NR'
+            ELSE ''
+          END AS record_code,
           ${competitionStartDate} AS competition_start_date,
           RANK() OVER (
             ORDER BY
