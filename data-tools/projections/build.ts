@@ -7,7 +7,6 @@ import {
   ensureIndexes,
   ensureWcaPersonLookupIndex,
   INDEXES,
-  tableExists,
 } from "./database.ts";
 import { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } from "./jobs.ts";
 import {
@@ -246,28 +245,6 @@ export function projectionConcurrency(value) {
     value ?? process.env.WCA_PROJECTION_BUILD_CONCURRENCY ?? 2,
   );
   return Number.isFinite(parsed) && parsed > 1 ? Math.floor(parsed) : 1;
-}
-
-export async function promoteProjectionTables(
-  connection,
-  { projectionSuffix = "_staging", tables = PUBLISHED_PROJECTION_TABLES } = {},
-) {
-  const renames = [];
-  const obsolete = [];
-  for (const published of tables) {
-    const previous = `${published}_previous`;
-    await dropManagedObject(connection, previous);
-    if (await tableExists(connection, published)) {
-      renames.push(`\`${published}\` TO \`${previous}\``);
-      obsolete.push(`\`${previous}\``);
-    }
-    renames.push(`\`${published}${projectionSuffix}\` TO \`${published}\``);
-  }
-  await connection.query(`RENAME TABLE ${renames.join(", ")}`);
-  if (obsolete.length > 0)
-    await connection.query(`DROP TABLE ${obsolete.join(", ")}`);
-  for (const retired of RETIRED_PROJECTION_TABLES)
-    await dropManagedObject(connection, retired);
 }
 
 export async function refreshMysqlSchema(

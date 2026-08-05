@@ -2,11 +2,9 @@ import { argumentPresent, argumentValue } from "../../lib/arguments.ts";
 import { runPool } from "../../lib/async.ts";
 import { databaseOptions } from "../../lib/database.ts";
 import mysql from "mysql2/promise";
-import {
-  DEPLOYMENT_PROJECTION_GROUPS,
-  dropManagedObject,
-  promoteProjectionTables,
-} from "../../../data-tools/projections/build.ts";
+import { DEPLOYMENT_PROJECTION_GROUPS } from "../../../data-tools/projections/jobs.ts";
+import { dropManagedObject } from "../../../data-tools/projections/database.ts";
+import { publishProjectionTables } from "../../../data-tools/projections/publish.ts";
 import { normalizeExportDate } from "../../../data-tools/shared/date.ts";
 
 const selectedNames = argumentValue("groups").split(",").filter(Boolean);
@@ -202,7 +200,7 @@ try {
       renames.push(`\`${table}_transfer\` TO \`${staging}\``);
     }
     await connection.query(`RENAME TABLE ${renames.join(", ")}`);
-    await promoteProjectionTables(connection, { tables: transferTables });
+    await publishProjectionTables(connection, { tables: transferTables });
     for (const table of [...indexesTables, ...manifestTables])
       await dropManagedObject(connection, table);
     process.stdout.write(

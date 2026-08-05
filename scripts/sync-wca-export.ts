@@ -10,9 +10,9 @@ import * as unzipper from "unzipper";
 import {
   dropManagedObject,
   ensureWcaPersonLookupIndex,
-  promoteProjectionTables,
   refreshMysqlSchema,
 } from "../data-tools/projections/build.ts";
+import { publishProjectionTables } from "../data-tools/projections/publish.ts";
 import { enqueueAllListRankingRebuilds } from "./lib/list-ranking-jobs.ts";
 import { refreshBoardList, refreshDelegatesList } from "./lib/board-lists.ts";
 import { refreshSystemLists } from "./lib/system-lists.ts";
@@ -263,7 +263,7 @@ async function promoteRankings() {
         "RENAME TABLE ranking_entries TO ranking_entries_legacy_previous",
       );
     }
-    await promoteProjectionTables(connection);
+    await publishProjectionTables(connection);
     await dropManagedObject(connection, "ranking_entries_legacy_previous");
   } finally {
     await connection.end();

@@ -2,10 +2,8 @@ import { argumentValue } from "../../lib/arguments.ts";
 import { databaseOptions } from "../../lib/database.ts";
 import mysql from "mysql2/promise";
 import type { RowDataPacket } from "mysql2/promise";
-import {
-  DEPLOYMENT_PROJECTION_GROUPS,
-  dropManagedObject,
-} from "../../../data-tools/projections/build.ts";
+import { DEPLOYMENT_PROJECTION_GROUPS } from "../../../data-tools/projections/jobs.ts";
+import { dropManagedObject } from "../../../data-tools/projections/database.ts";
 
 interface DeferredProjectionIndex {
   name: string;
