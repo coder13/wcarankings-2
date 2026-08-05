@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 export const LIST_RANKING_PRIORITY = { lazy: 1, active: 5, system: 10 };
 
 async function dataVersion(connection) {

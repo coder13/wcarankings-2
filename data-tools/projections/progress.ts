@@ -1,13 +1,20 @@
-// @ts-nocheck
-export function elapsedMs(startedAt) {
+import type {
+  BuildStartTime,
+  BuildStep,
+  TableProgress,
+  TimedBuildStepOptions,
+  TimedBuildStepResult,
+} from "./progress-types.ts";
+
+export function elapsedMs(startedAt: BuildStartTime): number {
   return Math.round(performance.now() - startedAt);
 }
 
-export function writeBuildLog(message) {
+export function writeBuildLog(message: string): void {
   process.stdout.write(`[projection-build] ${message}\n`);
 }
 
-export function createTableProgress(total) {
+export function createTableProgress(total: number): TableProgress {
   let started = 0;
   return {
     start() {
@@ -18,10 +25,11 @@ export function createTableProgress(total) {
 }
 
 export async function runTimedBuildStep(
-  label,
-  build,
-  { tableProgress, tableName } = {},
-) {
+  label: string,
+  build: BuildStep,
+  options: TimedBuildStepOptions = {},
+): Promise<TimedBuildStepResult> {
+  const { tableProgress, tableName } = options;
   const startedAt = performance.now();
   const progress =
     tableProgress && tableName ? `${tableProgress.start(tableName)} ` : "";

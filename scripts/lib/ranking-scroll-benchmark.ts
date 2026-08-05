@@ -1,11 +1,26 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import type {
+  BenchmarkConfig,
+  BenchmarkReport,
+  PageResult,
+  RankingResponse,
+  RankingScenario,
+  ReportScenario,
+  RunBenchmarkOptions,
+  ScenarioSummary,
+} from "./ranking-scroll-types.ts";
 
-export function scenarioName(suite, scenario) {
+export function scenarioName(suite: string, scenario: RankingScenario): string {
   return `${scenario.suite ?? suite}-${scenario.id}`;
 }
 
-export function scenarioUrl(target, scenario, page, pageSize) {
+export function scenarioUrl(
+  target: string,
+  scenario: RankingScenario,
+  page: number,
+  pageSize: number,
+): string {
   const params = new URLSearchParams();
   for (const [key, rawValue] of Object.entries(scenario.params)) {
     const values = Array.isArray(rawValue) ? rawValue : [rawValue];
@@ -16,7 +31,7 @@ export function scenarioUrl(target, scenario, page, pageSize) {
   return `${target.replace(/\/$/, "")}${scenario.path}?${params}`;
 }
 
-export function benchmarkHelp(scriptName = "benchmark-ranking-scroll.mjs") {
+export function benchmarkHelp(scriptName = "benchmark-ranking-scroll.ts") {
   return `Usage: node scripts/${scriptName} [options]
 
 Fetch each configured ranking scenario page-by-page, waiting between pages to
@@ -36,7 +51,7 @@ Options:
 `;
 }
 
-function parseArgs(argv) {
+function parseArgs(argv: string[]): Map<string, string> {
   return new Map(
     argv
       .filter((argument) => argument.startsWith("--"))
@@ -47,27 +62,39 @@ function parseArgs(argv) {
   );
 }
 
-function parsePositiveInteger(value, fallback, name) {
+function parsePositiveInteger(
+  value: string | undefined,
+  fallback: number,
+  name: string,
+): number {
   if (value === undefined) return fallback;
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`--${name} must be a positive integer.`);
+  if (!Number.isInteger(parsed) || parsed < 1)
+    throw new Error(`--${name} must be a positive integer.`);
   return parsed;
 }
 
-function sanitizeFilenamePart(value) {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+function sanitizeFilenamePart(value: string): string {
+  return value
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
 }
 
-function sleep(durationMs) {
+function sleep(durationMs: number): Promise<void> {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, durationMs));
 }
 
-function percentile(values, fraction) {
+function percentile(values: number[], fraction: number): number {
   const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * fraction) - 1)] ?? 0;
+  return (
+    sorted[
+      Math.min(sorted.length - 1, Math.ceil(sorted.length * fraction) - 1)
+    ] ?? 0
+  );
 }
 
-function countValues(values) {
+function countValues(values: string[]): Record<string, number> {
   return Object.fromEntries(
     values.reduce((counts, value) => {
       counts.set(value, (counts.get(value) ?? 0) + 1);
@@ -76,7 +103,9 @@ function countValues(values) {
   );
 }
 
-function parseServerTiming(value) {
+function parseServerTiming(
+  value: string | null | undefined,
+): Partial<PageResult> {
   if (!value) return {};
   return Object.fromEntries(
     value
@@ -87,14 +116,36 @@ function parseServerTiming(value) {
   );
 }
 
-async function fetchList(target, suite, scenario, page, config) {
+function rankingResponse(value: unknown): RankingResponse {
+  if (typeof value !== "object" || value === null) return {};
+  const response = value as { entries?: unknown; total?: unknown };
+  return {
+    entries: Array.isArray(response.entries)
+      ? response.entries.filter(
+          (entry): entry is { rank?: number; subRank?: number } =>
+            typeof entry === "object" && entry !== null,
+        )
+      : undefined,
+    total: typeof response.total === "number" ? response.total : undefined,
+  };
+}
+
+async function fetchList(
+  target: string,
+  suite: string,
+  scenario: RankingScenario,
+  page: number,
+  config: BenchmarkConfig,
+): Promise<PageResult> {
   const url = scenarioUrl(target, scenario, page, config.limit);
   const startedAt = performance.now();
   let response;
-  let payload;
-  let error;
+  let payload: unknown;
+  let error: string | undefined;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(config.timeoutMs) });
+    response = await fetch(url, {
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
     const responseText = await response.text();
     try {
       payload = JSON.parse(responseText);
@@ -102,18 +153,22 @@ async function fetchList(target, suite, scenario, page, config) {
       error = `non-JSON response: ${responseText.slice(0, 160)}`;
     }
   } catch (caught) {
-    error = caught instanceof Error ? `${caught.name}: ${caught.message}` : String(caught);
+    error =
+      caught instanceof Error
+        ? `${caught.name}: ${caught.message}`
+        : String(caught);
   }
 
   const elapsedMs = performance.now() - startedAt;
-  const entries = Array.isArray(payload?.entries) ? payload.entries : [];
-  const result = {
+  const responsePayload = rankingResponse(payload);
+  const entries = responsePayload.entries ?? [];
+  const result: PageResult = {
     page: page + 1,
     requestedStart: page * config.limit,
     status: response?.status ?? 0,
     elapsedMs,
     rows: entries.length,
-    total: Number(payload?.total ?? 0),
+    total: Number(responsePayload.total ?? 0),
     firstRank: entries[0]?.rank ?? null,
     lastRank: entries.at(-1)?.rank ?? null,
     firstSubRank: entries[0]?.subRank ?? null,
@@ -132,40 +187,63 @@ async function fetchList(target, suite, scenario, page, config) {
       ` subRanks=${result.firstSubRank ?? "-"}-${result.lastSubRank ?? "-"}` +
       ` total=${result.total}` +
       ` memoryCache=${result.memoryCache} listRankingCache=${result.listRankingCache}` +
-      (result.timing_db !== undefined ? ` db=${result.timing_db.toFixed(1)}ms` : "") +
+      (result.timing_db !== undefined
+        ? ` db=${result.timing_db.toFixed(1)}ms`
+        : "") +
       (result.error ? ` error=${result.error}` : ""),
   );
   return result;
 }
 
-export async function runRankingScrollBenchmark({ suite, scenarios, argv = process.argv.slice(2), scriptName }) {
+export async function runRankingScrollBenchmark({
+  suite,
+  scenarios,
+  argv = process.argv.slice(2),
+  scriptName,
+}: RunBenchmarkOptions): Promise<void> {
   const args = parseArgs(argv);
   if (args.has("help") || args.has("h")) {
     console.log(benchmarkHelp(scriptName));
     return;
   }
 
-  const target = (args.get("target") ?? "http://localhost:3000").replace(/\/$/, "");
+  const target = (args.get("target") ?? "http://localhost:3000").replace(
+    /\/$/,
+    "",
+  );
   const pages = parsePositiveInteger(args.get("pages"), 20, "pages");
   const delayMs = parsePositiveInteger(args.get("delay-ms"), 200, "delay-ms");
   const limit = parsePositiveInteger(args.get("limit"), 50, "limit");
-  const timeoutMs = parsePositiveInteger(args.get("timeout-ms"), 30_000, "timeout-ms");
-  const label = args.get("label") === "true" ? "" : sanitizeFilenamePart(args.get("label") ?? "");
-  const runId = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  const reportPrefix = suite === "all" ? "ranking-scroll" : `ranking-scroll-${suite}`;
+  const timeoutMs = parsePositiveInteger(
+    args.get("timeout-ms"),
+    30_000,
+    "timeout-ms",
+  );
+  const label =
+    args.get("label") === "true"
+      ? ""
+      : sanitizeFilenamePart(args.get("label") || "");
+  const runId = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+  const reportPrefix =
+    suite === "all" ? "ranking-scroll" : `ranking-scroll-${suite}`;
   const outputPath = resolve(
     args.get("output") ??
       `${args.get("report-dir") ?? "benchmark-reports"}/${reportPrefix}-${runId}${label ? `-${label}` : ""}.json`,
   );
 
   if (
-    !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/.test(target) &&
+    !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/.test(
+      target,
+    ) &&
     args.get("allow-remote") !== "true"
   ) {
     throw new Error("Remote targets require --allow-remote=true.");
   }
 
-  const report = {
+  const report: BenchmarkReport = {
     reportVersion: 5,
     suite,
     runId,
@@ -187,7 +265,7 @@ export async function runRankingScrollBenchmark({ suite, scenarios, argv = proce
   }
 
   let stopping = false;
-  async function handleStopSignal(signal) {
+  async function handleStopSignal(signal: NodeJS.Signals): Promise<void> {
     if (stopping) return;
     stopping = true;
     report.interrupted = true;
@@ -195,7 +273,9 @@ export async function runRankingScrollBenchmark({ suite, scenarios, argv = proce
     report.stopSignal = signal;
     try {
       await writeReport();
-      console.log(`\nBenchmark interrupted by ${signal}. Partial report written to ${outputPath}`);
+      console.log(
+        `\nBenchmark interrupted by ${signal}. Partial report written to ${outputPath}`,
+      );
     } finally {
       process.exit(signal === "SIGINT" ? 130 : 143);
     }
@@ -206,18 +286,28 @@ export async function runRankingScrollBenchmark({ suite, scenarios, argv = proce
 
   console.log(
     JSON.stringify(
-      { suite, target, pages, delayMs, limit, timeoutMs, scenarios: scenarios.length, reportPath: outputPath },
+      {
+        suite,
+        target,
+        pages,
+        delayMs,
+        limit,
+        timeoutMs,
+        scenarios: scenarios.length,
+        reportPath: outputPath,
+      },
       null,
       2,
     ),
   );
   await writeReport();
 
-  const allResults = [];
+  const allResults: ScenarioSummary[] = [];
   for (const scenario of scenarios) {
     const name = scenarioName(suite, scenario);
     console.log(`\n=== START ${name}: ${scenario.label} ===`);
-    const reportScenario = {
+    const reportScenario: ReportScenario = {
+      id: scenario.id,
       name,
       label: scenario.label,
       path: scenario.path,
@@ -228,7 +318,7 @@ export async function runRankingScrollBenchmark({ suite, scenarios, argv = proce
     report.scenarios.push(reportScenario);
     await writeReport();
 
-    const scenarioResults = [];
+    const scenarioResults: PageResult[] = [];
     for (let page = 0; page < pages; page += 1) {
       const pageResult = await fetchList(target, suite, scenario, page, {
         pages,
@@ -242,24 +332,32 @@ export async function runRankingScrollBenchmark({ suite, scenarios, argv = proce
       if (page + 1 < pages) await sleep(delayMs);
     }
     const durations = scenarioResults.map(({ elapsedMs }) => elapsedMs);
-    const failures = scenarioResults.filter(({ status, error }) => status !== 200 || error).length;
-    const summary = {
+    const failures = scenarioResults.filter(
+      ({ status, error }) => status !== 200 || error,
+    ).length;
+    const summary: ScenarioSummary = {
       name,
       label: scenario.label,
       pages: scenarioResults.length,
       failures,
-      avgMs: durations.reduce((sum, value) => sum + value, 0) / durations.length,
+      avgMs:
+        durations.reduce((sum, value) => sum + value, 0) / durations.length,
       p50Ms: percentile(durations, 0.5),
       p95Ms: percentile(durations, 0.95),
       maxMs: Math.max(...durations),
       firstPageMs: scenarioResults[0]?.elapsedMs ?? null,
       lastPageMs: scenarioResults.at(-1)?.elapsedMs ?? null,
       totalRows: scenarioResults.reduce((sum, result) => sum + result.rows, 0),
-      memoryCacheCounts: countValues(scenarioResults.map((result) => result.memoryCache)),
-      listRankingCacheCounts: countValues(scenarioResults.map((result) => result.listRankingCache)),
+      memoryCacheCounts: countValues(
+        scenarioResults.map((result) => result.memoryCache),
+      ),
+      listRankingCacheCounts: countValues(
+        scenarioResults.map((result) => result.listRankingCache),
+      ),
     };
     allResults.push(summary);
-    Object.assign(reportScenario, summary, { status: failures ? "failed" : "complete" });
+    reportScenario.status = failures ? "failed" : "complete";
+    reportScenario.summary = summary;
     await writeReport();
     console.log(`=== END ${name} ${JSON.stringify(summary)} ===`);
   }
@@ -275,7 +373,10 @@ export async function runRankingScrollBenchmark({ suite, scenarios, argv = proce
 
   report.completed = true;
   report.finishedAt = new Date().toISOString();
-  report.failureCount = allResults.reduce((sum, result) => sum + result.failures, 0);
+  report.failureCount = allResults.reduce(
+    (sum, result) => sum + result.failures,
+    0,
+  );
   await writeReport();
   console.log(`\nReport written to ${outputPath}`);
   if (report.failureCount > 0) process.exitCode = 1;

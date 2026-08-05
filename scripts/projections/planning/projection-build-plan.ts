@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { argumentValue } from "../../lib/arguments.ts";
 import { projectionBuildPlan } from "../../../data-tools/projections/build.ts";
 

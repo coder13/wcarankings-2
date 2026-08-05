@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { databaseOptions } from "./lib/database.ts";
 import { readdir } from "node:fs/promises";
 import mysql from "mysql2/promise";
-import { databaseOptions } from "./lib/database.mjs";
+import { databaseOptions } from "./lib/database.ts";
 
 const LEGACY_TABLE = "flyway_schema_history";
 const APP_TABLE = "flyway_schema_history_app";

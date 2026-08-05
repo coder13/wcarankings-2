@@ -1,9 +1,12 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import type {
+  ComponentFingerprintOptions,
+  RepositoryPath,
+  ServerComponentFingerprints,
+} from "../server-component-types.ts";
 
 export const SERVER_COMPONENT_PATHS = {
   app: [
@@ -38,14 +41,15 @@ export const SERVER_COMPONENT_PATHS = {
   ],
 };
 
-function sha256(value) {
+function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
 export function componentFingerprint(
-  paths,
-  { repositoryRoot = process.cwd() } = {},
-) {
+  paths: readonly RepositoryPath[],
+  options: ComponentFingerprintOptions = {},
+): string {
+  const { repositoryRoot = process.cwd() } = options;
   const files = execFileSync("git", ["ls-files", "-z", "--", ...paths], {
     cwd: repositoryRoot,
   })
@@ -65,7 +69,9 @@ export function componentFingerprint(
   return sha256(checksums);
 }
 
-export function serverComponentFingerprints(options) {
+export function serverComponentFingerprints(
+  options: ComponentFingerprintOptions = {},
+): ServerComponentFingerprints {
   return {
     app: componentFingerprint(SERVER_COMPONENT_PATHS.app, options),
     flyway: componentFingerprint(SERVER_COMPONENT_PATHS.flyway, options),

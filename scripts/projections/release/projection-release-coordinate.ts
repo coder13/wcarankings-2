@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { argumentValue } from "../../lib/arguments.ts";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
@@ -212,7 +211,7 @@ async function cli() {
     );
     return;
   }
-  throw new Error("Use projection-release-coordinate.mjs create or verify");
+  throw new Error("Use projection-release-coordinate.ts create or verify");
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url)

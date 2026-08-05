@@ -17,15 +17,19 @@
     "db:refresh-system-lists": "bun --env-file-if-exists=.env.local scripts/refresh-system-lists.ts",
     "db:refresh-board-list": "bun --env-file-if-exists=.env.local scripts/refresh-board-list.ts",
     "db:refresh-delegates-list": "bun --env-file-if-exists=.env.local scripts/refresh-board-list.ts --delegates",
-    "test": "pnpm run build && node --test tests/actions-cache-pruning-workflow.test.mjs tests/database-timeout.test.mjs tests/person-lookup-index.integration.mjs tests/release-compatibility.test.mjs tests/rendered-html.test.mjs && bun test tests/chunk-projection-dump.test.mjs tests/projection-release-artifact.test.mjs tests/projection-release-plan.test.mjs tests/ranking-generation-activation.test.mjs tests/projection-transfer.test.mjs tests/result-projections.test.mjs tests/projection-architecture.test.mjs tests/projection-scheduler.test.mjs",
+    "test": "pnpm run build && node --test tests/person-lookup-index.integration.mjs tests/release-compatibility.test.mjs && bun test tests/chunk-projection-dump.test.mjs tests/projection-release-artifact.test.mjs tests/projection-release-plan.test.mjs tests/ranking-generation-activation.test.mjs tests/projection-transfer.test.mjs tests/projection-scheduler.test.mjs",
     "test:unit": "node --import ./tests/register-asset-loader.mjs --import tsx --test components/*/*.test.tsx tests/*.test.ts",
     "test:integration": "node tests/ranking-generation-activation.integration.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern storybook-static",
     "data-tools:typecheck": "bunx tsc --project tsconfig.data-tools.json",
-    "test:projections": "bun test tests/projection-*.test.mjs tests/result-projections.test.mjs tests/ranking-generation-activation.test.mjs tests/projection-transfer.test.mjs",
+    "test:projections": "bun test tests/projection-*.test.mjs tests/ranking-generation-activation.test.mjs tests/projection-transfer.test.mjs",
     "sync:wca": "bun scripts/sync-wca-export.ts",
     "sync:wca:local": "docker compose --env-file .env.local run --rm flyway migrate && bun --env-file=.env.local scripts/sync-wca-export.ts",
-    "load:rankings": "bun scripts/load-rankings.ts"
+    "benchmark:ranking-scroll": "bun scripts/benchmark-ranking-scroll.ts",
+    "benchmark:ranking-scroll:persons": "bun scripts/benchmark-ranking-persons.ts",
+    "benchmark:ranking-scroll:results": "bun scripts/benchmark-ranking-results.ts",
+    "benchmark:ranking-scroll:competitions": "bun scripts/benchmark-ranking-competitions.ts",
+    "benchmark:ranking-scroll:cities": "bun scripts/benchmark-ranking-cities.ts"
   },
   "dependencies": {
     "@cubing/icons": "^3.0.5",

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { argumentList, argumentValue } from "../../lib/arguments.ts";
 import { databaseOptions } from "../../lib/database.ts";
 import mysql from "mysql2/promise";

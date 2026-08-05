@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { databaseOptions } from "./lib/database.ts";
 import { refreshSystemLists } from "./lib/system-lists.ts";
 import { pathToFileURL } from "node:url";

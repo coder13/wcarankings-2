@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 import { enqueueListRankingRebuild } from "./list-ranking-jobs.ts";
 
 const ROLE_LISTS = {

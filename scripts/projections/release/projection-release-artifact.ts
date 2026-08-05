@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { argumentValue } from "../../lib/arguments.ts";
 import { createHash } from "node:crypto";
 import { readFile, stat, writeFile } from "node:fs/promises";
@@ -339,7 +338,7 @@ async function cli() {
     );
     return;
   }
-  throw new Error("Use projection-release-artifact.mjs create or verify");
+  throw new Error("Use projection-release-artifact.ts create or verify");
 }
 
 if (

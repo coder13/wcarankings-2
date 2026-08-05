@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { databaseOptions } from "../../lib/database.ts";
 import mysql from "mysql2/promise";
 import { PUBLISHED_PROJECTION_TABLES } from "../../../data-tools/projections/build.ts";

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { argumentValue } from "../../lib/arguments.ts";
 import { runPool } from "../../lib/async.ts";
 import { databaseOptions } from "../../lib/database.ts";

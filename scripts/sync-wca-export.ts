@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { argumentPresent, argumentValue } from "./lib/arguments.ts";
 import { databaseOptions } from "./lib/database.ts";
 import { spawn } from "node:child_process";

@@ -1,5 +1,6 @@
-// @ts-nocheck
-export function normalizeExportDate(value) {
+export type ExportDateInput = Date | number | string | null | undefined;
+
+export function normalizeExportDate(value: ExportDateInput): string | null {
   if (value instanceof Date) {
     return value.toISOString();
   }

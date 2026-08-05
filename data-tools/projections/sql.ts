@@ -1,8 +1,13 @@
-// @ts-nocheck
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { elapsedMs, writeBuildLog } from "./progress.ts";
+import type { ProjectionConnection } from "./database-types.ts";
+import type { BuildPhase, TableProgress } from "./progress-types.ts";
+
+export interface ExecuteTableStatementsOptions {
+  tableProgress?: TableProgress;
+}
 
 const projectionDirectory = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -10,24 +15,24 @@ const projectionDirectory = join(
   "projection-catalog",
 );
 
-export function statements(sql) {
+export function statements(sql: string): string[] {
   return sql
     .split(/;\s*(?:\n|$)/)
     .map((statement) => statement.trim())
     .filter(Boolean);
 }
 
-export async function projectionSql(file) {
+export async function projectionSql(file: string): Promise<string> {
   return readFile(join(projectionDirectory, file), "utf8");
 }
 
-function createdTableName(statement) {
+function createdTableName(statement: string): string | undefined {
   return statement.match(
     /\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:TEMPORARY\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([a-zA-Z0-9_]+)`?/i,
   )?.[1];
 }
 
-export function createdTables(sql) {
+export function createdTables(sql: string): string[] {
   return statements(sql).flatMap((statement) => {
     const table = createdTableName(statement);
     return table ? [table] : [];
@@ -35,19 +40,21 @@ export function createdTables(sql) {
 }
 
 export async function executeTableStatements(
-  connection,
-  sql,
-  phases = [],
-  { tableProgress } = {},
-) {
-  let activeTable;
-  let activeTableStartedAt;
+  connection: ProjectionConnection,
+  sql: string,
+  phases: BuildPhase[] = [],
+  options: ExecuteTableStatementsOptions = {},
+): Promise<void> {
+  const { tableProgress } = options;
+  let activeTable: string | undefined;
+  let activeTableStartedAt: number | undefined;
 
   function finishActiveTable() {
     if (!activeTable) return;
-    writeBuildLog(
-      `Finished table ${activeTable} in ${elapsedMs(activeTableStartedAt)}ms.`,
-    );
+    if (activeTableStartedAt !== undefined)
+      writeBuildLog(
+        `Finished table ${activeTable} in ${elapsedMs(activeTableStartedAt)}ms.`,
+      );
     activeTable = undefined;
     activeTableStartedAt = undefined;
   }
@@ -70,7 +77,7 @@ export async function executeTableStatements(
     }
     finishActiveTable();
   } catch (error) {
-    if (activeTable)
+    if (activeTable && activeTableStartedAt !== undefined)
       writeBuildLog(
         `Failed table ${activeTable} after ${elapsedMs(activeTableStartedAt)}ms.`,
       );

@@ -1,4 +1,3 @@
-// @ts-nocheck
 const LONG_TASK_THRESHOLD_MS = 60_000;
 
 export async function runDependencyAwareTasks(

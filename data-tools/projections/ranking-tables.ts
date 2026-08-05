@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { runTimedBuildStep } from "./progress.ts";
 import { executeTableStatements, projectionSql, statements } from "./sql.ts";
 

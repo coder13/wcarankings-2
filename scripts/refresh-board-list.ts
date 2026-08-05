@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { argumentPresent } from "./lib/arguments.ts";
 import { refreshBoardList, refreshDelegatesList } from "./lib/board-lists.ts";
 import { databaseOptions } from "./lib/database.ts";

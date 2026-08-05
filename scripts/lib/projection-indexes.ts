@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type {
+  AlterTable,
+  ExtractedProjectionIndex,
+  ProjectionIndexGroup,
+  SecondaryIndex,
+} from "./projection-index-types.ts";
 
 const projectionDirectory = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -10,11 +16,14 @@ const projectionDirectory = join(
   "ranking-projections",
 );
 
-function statements(sql) {
-  return sql.split(/;\s*(?:\n|$)/).map((statement) => statement.trim()).filter(Boolean);
+function statements(sql: string): string[] {
+  return sql
+    .split(/;\s*(?:\n|$)/)
+    .map((statement) => statement.trim())
+    .filter(Boolean);
 }
 
-function splitClauses(sql) {
+function splitClauses(sql: string): string[] {
   const clauses = [];
   let start = 0;
   let depth = 0;
@@ -45,7 +54,7 @@ function splitClauses(sql) {
   return clauses.filter(Boolean);
 }
 
-function alterTable(statement) {
+function alterTable(statement: string): AlterTable | null {
   const match = statement.match(
     /^([\s\S]*?\bALTER\s+TABLE\s+`?([A-Za-z0-9_]+)`?\s+)([\s\S]*)$/i,
   );
@@ -53,7 +62,7 @@ function alterTable(statement) {
   return { prefix: match[1], table: match[2], clauses: splitClauses(match[3]) };
 }
 
-function secondaryIndex(clause) {
+function secondaryIndex(clause: string): SecondaryIndex | null {
   const normalized = clause.replace(/^(?:\s*--[^\n]*(?:\n|$))+/, "").trim();
   const match = normalized.match(
     /^ADD\s+(UNIQUE\s+)?INDEX\s+`?([A-Za-z0-9_]+)`?\s*(\([\s\S]+\))$/i,
@@ -65,13 +74,21 @@ function secondaryIndex(clause) {
   };
 }
 
-export function extractSecondaryIndexes(statement, expectedTable) {
+export function extractSecondaryIndexes(
+  statement: string,
+  expectedTable: string,
+): SecondaryIndex[] {
   const alter = alterTable(statement);
   if (!alter || alter.table !== expectedTable) return [];
-  return alter.clauses.map(secondaryIndex).filter(Boolean);
+  return alter.clauses
+    .map(secondaryIndex)
+    .filter((index): index is SecondaryIndex => index !== null);
 }
 
-export function deferSecondaryIndexes(statement, tableNames) {
+export function deferSecondaryIndexes(
+  statement: string,
+  tableNames: Set<string>,
+): string | null {
   const alter = alterTable(statement);
   if (!alter || !tableNames.has(alter.table)) return statement;
   const retained = alter.clauses.filter((clause) => !secondaryIndex(clause));
@@ -79,20 +96,26 @@ export function deferSecondaryIndexes(statement, tableNames) {
   return retained.length > 0 ? `${alter.prefix}${retained.join(",\n")}` : null;
 }
 
-export async function projectionIndexesForGroup(group) {
-  const indexes = [];
+export async function projectionIndexesForGroup(
+  group: ProjectionIndexGroup,
+): Promise<ExtractedProjectionIndex[]> {
+  const indexes: ExtractedProjectionIndex[] = [];
   const seen = new Set();
   for (const source of group.indexSources ?? []) {
     const sql = await readFile(join(projectionDirectory, source.file), "utf8");
     const sourceTable = source.sourceTable ?? source.table;
     const extracted = statements(sql).flatMap((statement) =>
-      extractSecondaryIndexes(statement, sourceTable));
+      extractSecondaryIndexes(statement, sourceTable),
+    );
     if (extracted.length === 0) {
-      throw new Error(`No secondary indexes found for ${source.table} in ${source.file}`);
+      throw new Error(
+        `No secondary indexes found for ${source.table} in ${source.file}`,
+      );
     }
     for (const index of extracted) {
       const key = `${source.table}.${index.name}`;
-      if (seen.has(key)) throw new Error(`Duplicate projection index definition: ${key}`);
+      if (seen.has(key))
+        throw new Error(`Duplicate projection index definition: ${key}`);
       seen.add(key);
       indexes.push({ table: source.table, ...index });
     }

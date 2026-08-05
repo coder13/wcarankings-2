@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 import { SYSTEM_LIST_DEFINITIONS } from "./system-list-definitions.ts";
 import { enqueueListRankingRebuild } from "./list-ranking-jobs.ts";
 

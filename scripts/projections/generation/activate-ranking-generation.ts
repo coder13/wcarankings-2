@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { argumentValue } from "../../lib/arguments.ts";
 import { databaseOptions } from "../../lib/database.ts";
 import { readFile } from "node:fs/promises";
@@ -54,9 +53,13 @@ function groupTables(groups) {
 
 function groupRetiredTables(groups) {
   const selected = new Set(groups);
-  return [...new Set(DEPLOYMENT_PROJECTION_GROUPS
-    .filter(({ name }) => selected.has(name))
-    .flatMap(({ retiredTables = [] }) => retiredTables))];
+  return [
+    ...new Set(
+      DEPLOYMENT_PROJECTION_GROUPS.filter(({ name }) =>
+        selected.has(name),
+      ).flatMap(({ retiredTables = [] }) => retiredTables),
+    ),
+  ];
 }
 
 export function capabilitiesFromTables(tables) {
@@ -375,8 +378,9 @@ export async function activateGeneration({
         `Candidate generation is missing tables: ${missing.join(", ")}`,
       );
     }
-    const occupied = [...tables, ...retiredTables]
-      .filter((table) => previousTablesPresent.has(table));
+    const occupied = [...tables, ...retiredTables].filter((table) =>
+      previousTablesPresent.has(table),
+    );
     if (occupied.length > 0) {
       throw new Error(
         `Previous-generation schema is not empty: ${occupied.join(", ")}`,
@@ -471,8 +475,9 @@ export async function rollbackGeneration({
       );
     }
     const previous = new Set(current.previousTables);
-    const retired = current.previousTables.filter((table) =>
-      !current.activationTables.includes(table));
+    const retired = current.previousTables.filter(
+      (table) => !current.activationTables.includes(table),
+    );
     const renames = [];
     for (const table of current.activationTables) {
       renames.push(
@@ -566,7 +571,7 @@ async function main() {
       return;
     }
     throw new Error(
-      "Use activate-ranking-generation.mjs activate, verify-active, rollback, state, or bootstrap",
+      "Use activate-ranking-generation.ts activate, verify-active, rollback, state, or bootstrap",
     );
   } finally {
     await connection.end();

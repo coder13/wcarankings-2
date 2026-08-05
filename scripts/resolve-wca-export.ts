@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { resolveWcaExport } from "./lib/wca-export.ts";
 
 const { exportDate, sqlUrl, version } = await resolveWcaExport();

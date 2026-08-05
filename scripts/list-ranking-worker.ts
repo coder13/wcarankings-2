@@ -1,9 +1,8 @@
-// @ts-nocheck
 import { databaseOptions } from "./lib/database.ts";
 import { randomUUID } from "node:crypto";
 import mysql from "mysql2/promise";
-import { hasArgument } from "./lib/cli.mjs";
-import { databaseOptions } from "./lib/database.mjs";
+import type { Connection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { ClaimedRankingRebuildJob, CurrentListVersion } from "./list-ranking-worker-types.ts";
 
 const POLL_MS = Math.max(
   250,
@@ -14,16 +13,16 @@ const LEASE_SECONDS = Math.max(
   Number(process.env.LIST_RANKING_WORKER_LEASE_SECONDS) || 600,
 );
 
-async function claimJob(connection) {
+async function claimJob(connection: Connection): Promise<ClaimedRankingRebuildJob | null> {
   const token = randomUUID();
   await connection.beginTransaction();
   try {
-    const [rows] = await connection.query(
-      `SELECT target_key, list_id, grain, filter_key, membership_version, rankings_data_version, attempts
+    const [rows] = await connection.query<RowDataPacket[]>(
+      `SELECT list_id, membership_version, rankings_data_version, attempts
        FROM list_ranking_rebuild_jobs
        WHERE available_at <= CURRENT_TIMESTAMP(6)
          AND (leased_until IS NULL OR leased_until < CURRENT_TIMESTAMP(6))
-       ORDER BY priority DESC, available_at, target_key
+       ORDER BY priority DESC, available_at, list_id
        LIMIT 1 FOR UPDATE SKIP LOCKED`,
     );
     const job = rows[0];
@@ -32,16 +31,15 @@ async function claimJob(connection) {
       return null;
     }
     await connection.query(
-      `UPDATE list_ranking_rebuild_jobs
-       SET lease_token = ?, leased_until = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL ? SECOND), attempts = attempts + 1
-       WHERE target_key = ? AND grain = ? AND filter_key = ?`,
-      [token, LEASE_SECONDS, job.target_key, job.grain, job.filter_key],
+      "UPDATE list_ranking_rebuild_jobs SET lease_token = ?, leased_until = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL ? SECOND), attempts = attempts + 1 WHERE list_id = ?",
+      [token, LEASE_SECONDS, job.list_id],
     );
     await connection.commit();
     return {
       ...job,
       list_id: Number(job.list_id),
       membership_version: Number(job.membership_version),
+      rankings_data_version: String(job.rankings_data_version),
       lease_token: token,
     };
   } catch (error) {
@@ -50,10 +48,11 @@ async function claimJob(connection) {
   }
 }
 
-async function buildJob(connection, job) {
+async function buildJob(connection: Connection, job: ClaimedRankingRebuildJob): Promise<void> {
+  const token = randomUUID();
   await connection.beginTransaction();
   try {
-    const [created] = await connection.query(
+    const [created] = await connection.query<ResultSetHeader>(
       `INSERT INTO list_ranking_cache_versions (list_id, membership_version, rankings_data_version, build_token, status)
        VALUES (?, ?, ?, ?, 'building')`,
       [job.list_id, job.membership_version, job.rankings_data_version, token],
@@ -84,16 +83,17 @@ async function buildJob(connection, job) {
         [cacheVersionId, resultType, cacheVersionId, resultType],
       );
     }
-    const [current] = await connection.query(
+    const [current] = await connection.query<CurrentListVersion[]>(
       `SELECT list.membership_version, metadata.value AS rankings_data_version
        FROM lists list JOIN export_metadata metadata ON metadata.\`key\` = 'fetched_at'
        WHERE list.id = ? AND list.deleted_at IS NULL FOR UPDATE`,
       [job.list_id],
     );
+    const currentVersion = current[0];
     const valid =
-      current[0] &&
-      Number(current[0].membership_version) === job.membership_version &&
-      current[0].rankings_data_version === job.rankings_data_version;
+      currentVersion !== undefined &&
+      Number(currentVersion.membership_version) === job.membership_version &&
+      currentVersion.rankings_data_version === job.rankings_data_version;
     await connection.query(
       "UPDATE list_ranking_cache_versions SET status = ?, completed_at = CURRENT_TIMESTAMP(6), activated_at = IF(? = 'ready', CURRENT_TIMESTAMP(6), NULL), error_message = NULL WHERE id = ?",
       [valid ? "ready" : "stale", valid ? "ready" : "stale", cacheVersionId],
@@ -114,7 +114,6 @@ async function buildJob(connection, job) {
       [job.list_id, job.lease_token],
     );
     await connection.commit();
-    return { targetKey: job.target_key, grain: job.grain, filterKey: job.filter_key, cacheVersionId, rows: result.rows, complete };
   } catch (error) {
     await connection.rollback();
     await connection.query(
@@ -129,7 +128,7 @@ async function buildJob(connection, job) {
   }
 }
 
-async function main() {
+async function main(): Promise<void> {
   const connection = await mysql.createConnection(databaseOptions());
   try {
     for (;;) {
@@ -150,7 +149,7 @@ async function main() {
     await connection.end();
   }
 }
-main().catch((error) => {
-  process.stderr.write(`${error.stack ?? error}\n`);
+main().catch((error: unknown) => {
+  process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
   process.exitCode = 1;
 });

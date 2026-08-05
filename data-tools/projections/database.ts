@@ -1,5 +1,11 @@
-// @ts-nocheck
-export const INDEXES = [
+import type {
+  IndexDefinition,
+  ProjectionConnection,
+  TableTypeRow,
+} from "./database-types.ts";
+import type { RowDataPacket } from "mysql2/promise";
+
+export const INDEXES: readonly IndexDefinition[] = [
   ["persons", "idx_persons_wca_sub", "(`wca_id`, `sub_id`)", "wca_id,sub_id"],
   ["persons", "idx_persons_name", "(`name`)", "name"],
   [
@@ -82,7 +88,10 @@ export const INDEXES = [
   ],
 ];
 
-export async function ensureIndexes(connection, indexes = INDEXES) {
+export async function ensureIndexes(
+  connection: ProjectionConnection,
+  indexes: readonly IndexDefinition[] = INDEXES,
+): Promise<void> {
   for (const [table, name, columns, columnList] of indexes) {
     if (table === "results" && process.env.WCA_SKIP_LARGE_INDEXES === "1") {
       process.stdout.write(
@@ -90,7 +99,7 @@ export async function ensureIndexes(connection, indexes = INDEXES) {
       );
       continue;
     }
-    const [tables] = await connection.query(
+    const [tables] = await connection.query<RowDataPacket[]>(
       "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
       [table],
     );
@@ -100,7 +109,7 @@ export async function ensureIndexes(connection, indexes = INDEXES) {
       );
       continue;
     }
-    const [existing] = await connection.query(
+    const [existing] = await connection.query<RowDataPacket[]>(
       "SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ? LIMIT 1",
       [table, name],
     );
@@ -113,7 +122,9 @@ export async function ensureIndexes(connection, indexes = INDEXES) {
   }
 }
 
-export async function ensureWcaPersonLookupIndex(connection) {
+export async function ensureWcaPersonLookupIndex(
+  connection: ProjectionConnection,
+): Promise<void> {
   await ensureIndexes(
     connection,
     INDEXES.filter(
@@ -122,8 +133,11 @@ export async function ensureWcaPersonLookupIndex(connection) {
   );
 }
 
-export async function dropManagedObject(connection, name) {
-  const [rows] = await connection.query(
+export async function dropManagedObject(
+  connection: ProjectionConnection,
+  name: string,
+): Promise<void> {
+  const [rows] = await connection.query<TableTypeRow[]>(
     "SELECT TABLE_TYPE AS type FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
     [name],
   );
@@ -132,8 +146,11 @@ export async function dropManagedObject(connection, name) {
     await connection.query(`DROP TABLE \`${name}\``);
 }
 
-export async function tableExists(connection, name) {
-  const [rows] = await connection.query(
+export async function tableExists(
+  connection: ProjectionConnection,
+  name: string,
+): Promise<boolean> {
+  const [rows] = await connection.query<RowDataPacket[]>(
     "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
     [name],
   );

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { argumentPresent, argumentValue } from "../../lib/arguments.ts";
 import { once } from "node:events";
 import { createInterface } from "node:readline";

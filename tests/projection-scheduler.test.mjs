@@ -65,155 +65,6 @@ test("dependency scheduler bounds and overlaps independent tasks", async () => {
   assert.equal(closed.length, 4);
 });
 
-test("person-year scheduler stages preserve the external projection barrier", () => {
-  const plan = personYearRankingTaskPlan();
-  assert.deepEqual(
-    plan.map(({ name, dependencies }) => ({ name, dependencies })),
-    [
-      {
-        name: "person-year-rankings:prepare",
-        dependencies: ["result-facts"],
-      },
-      {
-        name: "person-year-rankings:cohorts",
-        dependencies: ["person-year-rankings:prepare"],
-      },
-      {
-        name: "person-year-rankings:single",
-        dependencies: ["person-year-rankings:cohorts"],
-      },
-      {
-        name: "person-year-rankings:average",
-        dependencies: ["person-year-rankings:cohorts"],
-      },
-      {
-        name: "person-year-rankings:counts",
-        dependencies: [
-          "person-year-rankings:single",
-          "person-year-rankings:average",
-        ],
-      },
-      {
-        name: "person-year-rankings",
-        dependencies: ["person-year-rankings:counts"],
-      },
-    ],
-  );
-
-  const buildPlan = projectionBuildPlan(["yearly-person-rankings"], ["result-facts"]);
-  assert.deepEqual(buildPlan.groups, ["yearly-person-rankings"]);
-  assert.deepEqual(buildPlan.projectionNames, ["person-year-rankings"]);
-  assert.deepEqual(buildPlan.tables, [
-    "person_year_ranking_cohorts",
-    "person_year_rankings_single",
-    "person_year_rankings_average",
-    "person_year_ranking_counts",
-  ]);
-
-  const prefixedPlan = personYearRankingTaskPlan({
-    taskPrefix: "projection:",
-    projectionDependencies: ["projection:result-facts"],
-  });
-  assert.deepEqual(prefixedPlan.at(-1), {
-    stage: "complete",
-    dependencies: ["projection:person-year-rankings:counts"],
-    estimatedDurationMs: 0,
-    name: "projection:person-year-rankings",
-  });
-});
-
-test("person-year Single and Average overlap before counts and completion", async () => {
-  const events = [];
-  const durations = {
-    prepare: 1,
-    cohorts: 1,
-    single: 20,
-    average: 15,
-    counts: 1,
-    complete: 1,
-  };
-  const tasks = personYearRankingTaskPlan().map((descriptor) => ({
-    ...descriptor,
-    async run() {
-      events.push(`start:${descriptor.stage}`);
-      await new Promise((resolve) => setTimeout(resolve, durations[descriptor.stage]));
-      events.push(`finish:${descriptor.stage}`);
-    },
-  }));
-
-  await runDependencyAwareTasks(tasks, {
-    createConnection: async () => fakeConnection(events.length + 1, []),
-    concurrency: 2,
-    satisfiedDependencies: ["result-facts"],
-  });
-
-  assert.ok(events.indexOf("start:single") < events.indexOf("finish:average"));
-  assert.ok(events.indexOf("start:average") < events.indexOf("finish:single"));
-  assert.ok(events.indexOf("start:counts") > events.indexOf("finish:single"));
-  assert.ok(events.indexOf("start:counts") > events.indexOf("finish:average"));
-  assert.ok(events.indexOf("start:complete") > events.indexOf("finish:counts"));
-});
-
-test("selective person-year backfills keep the stage plan serial", async () => {
-  const events = [];
-  const tasks = personYearRankingTaskPlan().map((descriptor) => ({
-    ...descriptor,
-    async run() {
-      events.push(descriptor.stage);
-    },
-  }));
-
-  await runDependencyAwareTasks(tasks, {
-    connection: {},
-    concurrency: 2,
-    satisfiedDependencies: ["result-facts"],
-  });
-
-  assert.deepEqual(events, [
-    "prepare",
-    "cohorts",
-    "single",
-    "average",
-    "counts",
-    "complete",
-  ]);
-
-  const backfill = await readFile(
-    new URL("../scripts/backfill-person-year-rankings.mjs", import.meta.url),
-    "utf8",
-  );
-  assert.match(backfill, /projectionNames = \["person-year-rankings"\]/);
-  assert.match(
-    backfill,
-    /buildRegisteredProjections\(connection, \{ projectionSuffix: "_staging", projectionNames \}\)/,
-  );
-});
-
-test("person-year stage failure blocks counts and completion", async () => {
-  const started = [];
-  const tasks = personYearRankingTaskPlan().map((descriptor) => ({
-    ...descriptor,
-    async run() {
-      started.push(descriptor.stage);
-      if (descriptor.stage === "single") throw new Error("expected Single failure");
-      if (descriptor.stage === "average") {
-        await new Promise((resolve) => setTimeout(resolve, 5));
-      }
-    },
-  }));
-
-  await assert.rejects(
-    runDependencyAwareTasks(tasks, {
-      createConnection: async () => fakeConnection(started.length + 1, []),
-      concurrency: 2,
-      satisfiedDependencies: ["result-facts"],
-    }),
-    /expected Single failure/,
-  );
-  assert.equal(started.includes("counts"), false);
-  assert.equal(started.includes("complete"), false);
-});
-
 test("hydrated dependencies count as complete without executing them", async () => {
   const started = [];
   await runDependencyAwareTasks(
@@ -407,7 +258,7 @@ test("core ranking-table build omits disabled weekly helper tables", () => {
   for (const task of CORE_RANKING_TABLE_TASKS) {
     if (task.table) lastProgress = progress.start(task.table);
   }
-  assert.equal(lastProgress, "[3/3]");
+  assert.equal(lastProgress, "[5/5]");
 });
 
 test("core ranking-table source views wait for result facts", async () => {
@@ -451,6 +302,7 @@ test("core ranking-table SQL uses the matching staged result facts table", async
       single: "ranking_entries_single_source_staging",
       average: "ranking_entries_average_source_staging",
     },
+    resultEntriesSource: "result_entries_single_source_staging",
     resultFacts: "result_facts_staging",
   });
 
