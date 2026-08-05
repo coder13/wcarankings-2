@@ -13,7 +13,7 @@ export const personActivityRankingsJob = {
   releaseOrder: 6,
   releaseSchemaVersion: 1,
   estimatedDurationMs: 180_000,
-  enabledByDefault: true,
+  enabledByDefault: false,
   subject: "people",
   stat: "activity-rankings",
 } as const satisfies ProjectionJob;

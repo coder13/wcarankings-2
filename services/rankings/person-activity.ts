@@ -14,7 +14,7 @@ import {
   rankingsWindowCache,
   RANKINGS_WINDOW_SIZE,
 } from "@/services/rankings/cache";
-import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
+import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 import { loadPersonCompetitionRankings } from "@/services/rankings/person-competitions";
 
 const countFormatter = new Intl.NumberFormat("en-US");
@@ -213,14 +213,17 @@ export async function loadPersonActivityRankings(params: URLSearchParams) {
   if (input.metric === "competitions") {
     return loadPersonCompetitionRankings(params);
   }
+  const featureSwitch = await getProjectionFeatureSwitch();
+  if (!featureSwitch.personActivityRankings || !featureSwitch.generationId) {
+    throw new Error("Person activity rankings are unavailable.");
+  }
   if (input.scope !== "world" || input.gender.length) {
-    const metadata = await getCurrentRankingsMetadata();
     const windowStart =
       Math.floor((input.start - 1) / RANKINGS_WINDOW_SIZE) *
         RANKINGS_WINDOW_SIZE +
       1;
     const cached = (await rankingsWindowCache.getWithStatus(
-      windowKey(input, windowStart, metadata.fetchedAt),
+      windowKey(input, windowStart, featureSwitch.generationId),
       () => loadLazyWindow(input, windowStart),
     )) as {
       value: PersonActivityWindow;

@@ -51,6 +51,9 @@ Region and gender requests rank `person_activity_counts` in a 400-row cached
 window. The cache key includes the generation, metric, scope, region, gender
 set, and window start. Equal cache misses use the shared in-flight cache.
 
+The projection is not in the default build set. Enable it only after the
+pending build, request, query-plan, and storage measurements are complete.
+
 This layout also supports profile highlights. A highlight can query the
 stored World ranking by metric and person ID. It does not scan result facts.
 
@@ -70,12 +73,27 @@ needs one. The lazy path reads one row per person, not raw result rows.
 
 No build or request measurement exists for this projection yet.
 
+On 2026-08-05, local MariaDB 11.8.8 reported these
+`EXPLAIN FORMAT=JSON` plans:
+
+- The solve-count phase used an `ALL` scan of 31,062,285 estimated
+  `result_attempts` rows. It also used a filesort and a temporary table.
+- The base activity aggregate scanned 294,476 estimated `persons` rows.
+  It read `result_facts` by person with `ref` access and 23 estimated rows.
+  The country joins used `eq_ref` access. The group step used a filesort and
+  a temporary table.
+
+The base aggregate plan did not include the unbuilt solve-count table. These
+plans do not contain execution timing. No index decision is measured yet.
+
 ### Pending
 
+- Run the complete aggregate plan after the solve-count stage exists.
 - Run `EXPLAIN FORMAT=JSON` for a World gender page and a continent page.
 - Measure cache miss, cache hit, and coalesced 400-row windows.
 - Measure the temporary attempt-count phase, aggregate phase, ranking phase,
   and complete group duration on the reference export.
 - Record source rows, output rows, table size, and index size.
+- Review the measurements, then decide whether to enable the default build.
 
 No local import, refresh, or projection build ran for this change.
