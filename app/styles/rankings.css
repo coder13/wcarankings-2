@@ -147,29 +147,6 @@
   color: var(--text-disabled);
 }
 
-.rankDelta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.12em;
-  margin-left: 0.35em;
-  color: var(--text-muted);
-  font-size: 0.68em;
-  font-weight: 600;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.rankDelta--up { color: var(--record-world); }
-.rankDelta--down { color: var(--record-national); }
-.rankDelta--new {
-  padding: 0.08em 0.25em;
-  border-radius: 0.25em;
-  background: var(--text-muted);
-  color: var(--surface);
-  font-size: 0.58em;
-  text-transform: uppercase;
-}
-
 .identity {
   display: flex;
   align-items: center;
@@ -326,8 +303,12 @@
 }
 
 @keyframes delayedListMessageReveal {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .listMessage--notice {
@@ -350,14 +331,20 @@
   pointer-events: none;
   box-shadow: 0 -4px 16px var(--shadow);
   backdrop-filter: blur(4px);
-  transition: opacity 160ms var(--cubic-exit), transform 180ms var(--cubic-exit), visibility 0s;
+  transition:
+    opacity 160ms var(--cubic-exit),
+    transform 180ms var(--cubic-exit),
+    visibility 0s;
 }
 
 .siteFooter[data-at-top="false"] {
   visibility: hidden;
   opacity: 0;
   transform: translateY(calc(100% + 0.5rem));
-  transition: opacity 160ms var(--cubic-exit), transform 180ms var(--cubic-exit), visibility 0s linear 180ms;
+  transition:
+    opacity 160ms var(--cubic-exit),
+    transform 180ms var(--cubic-exit),
+    visibility 0s linear 180ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -453,7 +440,9 @@
       transparent
     ),
     color-mix(in srgb, var(--text-strong) 8%, transparent);
-  background-size: 220% 100%, 100% 100%;
+  background-size:
+    220% 100%,
+    100% 100%;
   animation: rowAccordionSkeletonSweep 1200ms ease-in-out infinite;
 }
 
@@ -501,11 +490,15 @@
 
 @keyframes rowAccordionSkeletonSweep {
   from {
-    background-position: 160% 0, 0 0;
+    background-position:
+      160% 0,
+      0 0;
   }
 
   to {
-    background-position: -60% 0, 0 0;
+    background-position:
+      -60% 0,
+      0 0;
   }
 }
 

@@ -174,7 +174,6 @@ wait_for_database_cooldown() {
   exec 8> /srv/wcarankings/production-mutation.lock
   flock -w 360 8
   load_or_measure_database_cpu_baseline
-  dc run --rm data-tools /app/scripts/prepare-flyway-history.ts
   dc run --rm flyway migrate
   dc exec -T db sh -c '
     mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="

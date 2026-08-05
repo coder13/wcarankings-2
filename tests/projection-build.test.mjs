@@ -343,14 +343,6 @@ test("result rankings create and remove their solve stage in one build", async (
 });
 
 test("core ranking-table build contains only active ranking tables", () => {
-  assert.equal(
-    CORE_RANKING_TABLE_TASKS.some(
-      ({ name, table }) =>
-        /weekly-rank-deltas|record-streaks/.test(name) ||
-        /weekly_rank_deltas|record_streaks/.test(table ?? ""),
-    ),
-    false,
-  );
   const source = CORE_RANKING_TABLE_TASKS.find(
     ({ name }) => name === "ranking-tables-entries-single-source",
   );

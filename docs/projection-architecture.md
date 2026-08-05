@@ -523,49 +523,6 @@ cohorts to numeric IDs; `person_year_ranking_counts` supplies available years
 and page totals without scanning raw results. Public rank uses `RANK()` and
 the deterministic internal position is never exposed in the UI.
 
-### `result_year_rankings`
-
-List row:
-
-```text
-year + official result + result type
-```
-
-This represents every valid result during a year.
-
-### `person_event_weekly_bests`
-
-List row:
-
-```text
-competition week + person + event + result type
-```
-
-Columns should include the retained `result_id` and `result_value`.
-
-### `person_event_rank_changes`
-
-List row:
-
-```text
-latest competition week + person + event + result type
-```
-
-This stores current and pre-week ranks or deltas for World, continent, and
-country scopes. It must reconstruct prior standings after excluding the entire
-latest week for every person.
-
-### `record_week_streaks`
-
-List row:
-
-```text
-result type + event + scope + region + record holder
-```
-
-This should remain separate from rank changes because record possession and
-ranking movement have different semantics.
-
 ## Competition and city statistics
 
 ### `competition_stats`
@@ -864,5 +821,4 @@ not make the current contract provisional:
 - #18: all-time result leaderboards
 - #19: yearly rankings
 - #25: caching and resilience
-- #39: weekly deltas and record streaks
 - #43: competition, podium, city, and geographic rankings

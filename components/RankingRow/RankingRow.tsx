@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { RANKING_ENTRY_ENHANCEMENTS_ENABLED } from "@/lib/ranking-entry-enhancements";
 import { formatWcaResult, flagEmoji, RECORD_BADGE_LABELS } from "@/lib/wca";
 import { useEffect, useRef, type CSSProperties } from "react";
-import { formatRankingNumber, type RankingEntry } from "../RankingsExplorer/types";
+import {
+  formatRankingNumber,
+  type RankingEntry,
+} from "../RankingsExplorer/types";
 import type { PersonEventDetails } from "@/lib/person-event-details";
 import { RankingDetailsPanel } from "./RankingDetailsPanel";
 
@@ -23,7 +25,10 @@ type RankingRowInteraction = {
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelected?: (personId: string) => void;
-  onMemberContextMenu?: (entry: RankingEntry, position: { x: number; y: number }) => void;
+  onMemberContextMenu?: (
+    entry: RankingEntry,
+    position: { x: number; y: number },
+  ) => void;
 };
 
 type RankingRowDetails = {
@@ -86,11 +91,14 @@ export function RankingRow({
     window.clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = null;
   };
-  useEffect(() => () => {
-    if (longPressTimerRef.current !== null) {
-      window.clearTimeout(longPressTimerRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current);
+      }
+    },
+    [],
+  );
   const style = {
     "--t-animation-delay": `${animationIndex * 10}ms`,
     minHeight: "65px",
@@ -100,33 +108,14 @@ export function RankingRow({
   const id = entry.personId;
   const countryName = entry.countryName || "Country unavailable";
   const recordBadge = entry.recordBadges[0];
-  const recordStreakWeeks = RANKING_ENTRY_ENHANCEMENTS_ENABLED && entry.recordStreakWeeks && entry.recordStreakWeeks > 0
-    ? entry.recordStreakWeeks
-    : null;
   const recordBadgeLabel = recordBadge
-    ? `${RECORD_BADGE_LABELS[recordBadge]}${recordStreakWeeks ? `, unbeaten for ${recordStreakWeeks} competition weeks` : ""}`
+    ? RECORD_BADGE_LABELS[recordBadge]
     : null;
-  let rankDeltaLabel: string | null = null;
-  let rankDeltaIcon: string | null = null;
-  let rankDeltaClass = "";
-  if (RANKING_ENTRY_ENHANCEMENTS_ENABLED) {
-    if (entry.rankDeltaState === "new") {
-      rankDeltaLabel = "new ranking";
-      rankDeltaIcon = "New";
-      rankDeltaClass = "new";
-    } else if (entry.rankDelta && entry.rankDelta > 0) {
-      rankDeltaLabel = `up ${Math.abs(entry.rankDelta)} places`;
-      rankDeltaIcon = "↑";
-      rankDeltaClass = "up";
-    } else if (entry.rankDelta && entry.rankDelta < 0) {
-      rankDeltaLabel = `down ${Math.abs(entry.rankDelta)} places`;
-      rankDeltaIcon = "↓";
-      rankDeltaClass = "down";
-    }
-  }
-  const formattedResult = entry.formattedValue ??
-    formatWcaResult(eventId, entry.best, rankingType);
-  const inferredProfileHref = /^\d{4}[A-Z]{4}\d{2}$/.test(id) ? `/person/${id}` : "";
+  const formattedResult =
+    entry.formattedValue ?? formatWcaResult(eventId, entry.best, rankingType);
+  const inferredProfileHref = /^\d{4}[A-Z]{4}\d{2}$/.test(id)
+    ? `/person/${id}`
+    : "";
   const accordionVisible = expanded || closing;
   const identityContent = (
     <>
@@ -156,11 +145,18 @@ export function RankingRow({
       data-global-index={rowIndex}
       style={style}
       tabIndex={0}
-      aria-label={`Rank ${formatRankingNumber(rank)}: ${name}, ${formattedResult}${rankDeltaLabel ? `, ${rankDeltaLabel}` : ""}`}
+      aria-label={`Rank ${formatRankingNumber(rank)}: ${name}, ${formattedResult}`}
       onKeyDown={(keyboardEvent) => {
-        if (keyboardEvent.altKey || keyboardEvent.ctrlKey || keyboardEvent.metaKey)
+        if (
+          keyboardEvent.altKey ||
+          keyboardEvent.ctrlKey ||
+          keyboardEvent.metaKey
+        )
           return;
-        if (onToggle && (keyboardEvent.key === "Enter" || keyboardEvent.key === " ")) {
+        if (
+          onToggle &&
+          (keyboardEvent.key === "Enter" || keyboardEvent.key === " ")
+        ) {
           keyboardEvent.preventDefault();
           onToggle();
           return;
@@ -174,11 +170,9 @@ export function RankingRow({
       }}
     >
       <div
-          className={`row${alternate ? " row--alternate" : ""}${
+        className={`row${alternate ? " row--alternate" : ""}${
           searchMatched ? " row--searchResult" : ""
-        }${
-          highlighted ? " row--searchMatch" : ""
-        }${
+        }${highlighted ? " row--searchMatch" : ""}${
           onMemberContextMenu ? " row--contextMenu" : ""
         }${accordionVisible ? " row--expanded" : ""}`}
       >
@@ -208,28 +202,44 @@ export function RankingRow({
           }}
           onPointerDown={(event) => {
             if (!onMemberContextMenu || event.pointerType !== "touch") return;
-            const { left, top, width, height } = event.currentTarget.getBoundingClientRect();
+            const { left, top, width, height } =
+              event.currentTarget.getBoundingClientRect();
             longPressHandledRef.current = false;
             longPressTimerRef.current = window.setTimeout(() => {
               longPressHandledRef.current = true;
-              onMemberContextMenu(entry, { x: left + width / 2, y: top + height / 2 });
+              onMemberContextMenu(entry, {
+                x: left + width / 2,
+                y: top + height / 2,
+              });
             }, 500);
           }}
           onPointerUp={clearLongPress}
           onPointerCancel={clearLongPress}
           onPointerMove={clearLongPress}
         >
-          {selectionMode && <button className="memberSelectionToggle" type="button" aria-label={`Select ${name}`} aria-pressed={selected} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onToggleSelected?.(entry.personId); }}>{selected ? "✓" : ""}</button>}
+          {selectionMode && (
+            <button
+              className="memberSelectionToggle"
+              type="button"
+              aria-label={`Select ${name}`}
+              aria-pressed={selected}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleSelected?.(entry.personId);
+              }}
+            >
+              {selected ? "✓" : ""}
+            </button>
+          )}
           <span className={`rank${rankIsDuplicate ? " rank--duplicate" : ""}`}>
             {formatRankingNumber(rank)}
-            {rankDeltaIcon && rankDeltaLabel && (
-              <span className={`rankDelta rankDelta--${rankDeltaClass}`} aria-label={rankDeltaLabel} title={rankDeltaLabel}>
-                <span aria-hidden="true">{rankDeltaIcon}</span>{entry.rankDeltaState === "new" ? null : Math.abs(entry.rankDelta ?? 0)}
-              </span>
-            )}
           </span>
           {(entry.profileHref || inferredProfileHref) && !onToggle ? (
-            <Link className="identity identity--link" href={entry.profileHref || inferredProfileHref}>
+            <Link
+              className="identity identity--link"
+              href={entry.profileHref || inferredProfileHref}
+            >
               {identityContent}
             </Link>
           ) : (
@@ -249,13 +259,11 @@ export function RankingRow({
                     aria-label={recordBadgeLabel ?? undefined}
                     title={recordBadgeLabel ?? undefined}
                   >
-                    {recordBadge}{recordStreakWeeks ? ` · ${recordStreakWeeks}w` : ""}
+                    {recordBadge}
                   </span>
                 )}
               </span>
-              <span className="best">
-                {formattedResult}
-              </span>
+              <span className="best">{formattedResult}</span>
             </span>
             {resultContext && (
               <span className="competitionName" title={resultContext}>

@@ -14,7 +14,7 @@ import {
   requiredRankingIndexesQuery,
   requiredRankingTablesQuery,
   yearCountsQuery,
-} from "@/services/rankings/queries";
+} from "@/services/rankings/queries/metadata";
 import type {
   CountRow,
   MetadataRow,

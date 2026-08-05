@@ -15,20 +15,6 @@ export interface SyncWcaOptions {
   suppliedPath?: string;
 }
 
-type ImportRunFieldValue = Date | number | string | null;
-export type ImportRunFields = Record<string, ImportRunFieldValue>;
-
-export interface ImportCoverageRow extends RowDataPacket {
-  aggregates: number | string;
-  events: number | string;
-  people: number | string;
-  rankings: number | string;
-  regions: number | string;
-  result_aggregates: number | string;
-  result_entries: number | string;
-  results: number | string;
-}
-
 export interface ExportMetadataRow extends RowDataPacket {
   value: string;
 }

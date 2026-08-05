@@ -1,5 +1,6 @@
 import type { RankingType, RegionScope, GenderFilter } from "@/lib/wca";
 import type { LRUCache } from "lru-cache";
+import type { MedalRankingType } from "@/lib/medal-rankings";
 
 export type RankingRow = {
   rank: number;
@@ -17,13 +18,6 @@ export type RankingRow = {
   is_world_record: number;
   is_continent_record: number;
   is_country_record: number;
-  world_rank_delta: number | null;
-  world_rank_delta_state: "changed" | "new" | null;
-  continent_rank_delta: number | null;
-  continent_rank_delta_state: "changed" | "new" | null;
-  country_rank_delta: number | null;
-  country_rank_delta_state: "changed" | "new" | null;
-  record_streak_weeks: number | null;
 };
 
 type KinchOrder = "regional" | "continent";
@@ -72,6 +66,26 @@ export type PersonCompetitionRankingRow = {
   rank: number;
   position: number;
 };
+
+export interface PersonCompetitionRankingInput {
+  scope: RegionScope;
+  regionId: string;
+  gender: readonly GenderFilter[];
+  year: number | null;
+  start: number;
+  limit: number;
+}
+
+export interface MedalRankingInput {
+  eventId: string | null;
+  medalType: MedalRankingType;
+  scope: RegionScope;
+  regionId: string;
+  gender: readonly GenderFilter[];
+  year: number | null;
+  start: number;
+  limit: number;
+}
 
 export type ResultRankingRow = {
   result_id: number;

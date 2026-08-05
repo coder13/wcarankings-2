@@ -14,28 +14,16 @@ import {
   rankingsWindowCache,
   RANKINGS_WINDOW_SIZE,
 } from "@/services/rankings/cache";
-import { sqlFragment } from "@/lib/helpers/database/sql";
-import {
-  isMedalRankingType,
-  type MedalRankingType,
-} from "@/lib/medal-rankings";
-import type { GenderFilter, RegionScope } from "@/lib/wca";
+import { isMedalRankingType } from "@/lib/medal-rankings";
 import type { QueryTimings } from "@/lib/api/projection";
+import {
+  buildLazyMedalQueryPlan,
+  eagerMedalCountQuery,
+  eagerMedalRowsQuery,
+} from "@/services/rankings/queries/medals";
+import type { MedalRankingInput } from "@/services/rankings/types";
 
 const medalCountFormatter = new Intl.NumberFormat("en-US");
-
-type MedalType = MedalRankingType;
-
-type MedalInput = {
-  eventId: string | null;
-  medalType: MedalType;
-  scope: RegionScope;
-  regionId: string;
-  gender: readonly GenderFilter[];
-  year: number | null;
-  start: number;
-  limit: number;
-};
 
 type MedalRow = {
   rank: number;
@@ -50,18 +38,38 @@ type MedalRow = {
 };
 
 type MedalEntry = ReturnType<typeof toEntry>;
-type MedalWindow = {
-  data: { entries: MedalEntry[]; total: number };
+
+interface MedalWindowData {
+  entries: MedalEntry[];
+  total: number;
+}
+
+interface MedalWindow extends Record<string, unknown> {
+  data: MedalWindowData;
   timings: QueryTimings;
   queryCount: number;
   returnedRows: number;
-};
+}
 
-function isMedalType(value: string | null): value is MedalType {
+function isMedalWindow(value: Record<string, unknown>): value is MedalWindow {
+  if (typeof value.data !== "object" || value.data === null) return false;
+  return (
+    "entries" in value.data &&
+    Array.isArray(value.data.entries) &&
+    "total" in value.data &&
+    Number.isFinite(Number(value.data.total))
+  );
+}
+
+function isMedalType(
+  value: string | null,
+): value is MedalRankingInput["medalType"] {
   return value !== null && isMedalRankingType(value);
 }
 
-function parseMedalType(params: URLSearchParams): MedalType {
+function parseMedalType(
+  params: URLSearchParams,
+): MedalRankingInput["medalType"] {
   const value = params.get("medal") ?? params.get("stat") ?? "overall";
   if (!isMedalType(value)) {
     throw new ApiInputError("medal must be overall, gold, silver, or bronze.");
@@ -69,7 +77,7 @@ function parseMedalType(params: URLSearchParams): MedalType {
   return value;
 }
 
-function parseInput(params: URLSearchParams): MedalInput {
+function parseInput(params: URLSearchParams): MedalRankingInput {
   const { scope, regionId } = parseScope(params);
   if (scope !== "world" && !regionId) {
     throw new ApiInputError("Choose a region before loading medal rankings.");
@@ -84,110 +92,6 @@ function parseInput(params: URLSearchParams): MedalInput {
     start: parseStart(params),
     limit: parseLimit(params),
   };
-}
-
-function medalColumn(medalType: MedalType) {
-  if (medalType === "gold") return "gold_count";
-  if (medalType === "silver") return "silver_count";
-  if (medalType === "bronze") return "bronze_count";
-  return "gold_count + silver_count + bronze_count";
-}
-
-function scoreConditions(input: MedalInput) {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
-  if (input.eventId !== null) {
-    conditions.push("score.event_id = ?");
-    values.push(input.eventId);
-  }
-  if (input.year !== null) {
-    conditions.push("score.year = ?");
-    values.push(input.year);
-  }
-  if (input.scope === "continent") {
-    conditions.push("score.continent_id = ?");
-    values.push(input.regionId);
-  }
-  if (input.scope === "country") {
-    conditions.push("score.country_id = ?");
-    values.push(input.regionId);
-  }
-  if (input.gender.length) {
-    conditions.push(
-      `score.person_gender IN (${input.gender.map(() => "?").join(", ")})`,
-    );
-    values.push(...input.gender);
-  }
-  return { conditions, values };
-}
-
-function eagerMedalRowsQuery() {
-  return sqlFragment`WITH page AS (
-      SELECT ranking.person_id, ranking.medal_count, ranking.rank, ranking.position
-      FROM person_medal_rankings ranking
-      WHERE ranking.event_id = ? AND ranking.medal_type = ?
-        AND ranking.scope = ? AND ranking.region_id = ?
-        AND ranking.position >= ? AND ranking.position < ?
-      ORDER BY ranking.position, ranking.person_id
-    )
-    SELECT page.*, COALESCE(person.name, page.person_id) AS person_name,
-      COALESCE(person.country_id, '') AS country_id,
-      COALESCE(country.name, person.country_id, '') AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2
-    FROM page
-    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-    LEFT JOIN countries country ON country.id = person.country_id
-    ORDER BY page.position, page.person_id`;
-}
-
-function eagerMedalCountQuery() {
-  return sqlFragment`SELECT count FROM person_medal_ranking_counts
-    WHERE event_id = ? AND medal_type = ? AND scope = ? AND region_id = ?`;
-}
-
-function lazyMedalRowsQuery(input: MedalInput) {
-  const { conditions } = scoreConditions(input);
-  const predicate = conditions.length ? conditions.join(" AND ") : "1 = 1";
-  const countColumn = medalColumn(input.medalType);
-  return sqlFragment`WITH totals AS (
-      SELECT score.person_id, SUM(${countColumn}) AS medal_count
-      FROM person_medal_scores score
-      WHERE ${predicate}
-      GROUP BY score.person_id
-      HAVING SUM(${countColumn}) > 0
-    ), ranked AS (
-      SELECT totals.*,
-        RANK() OVER (ORDER BY medal_count DESC) AS rank,
-        ROW_NUMBER() OVER (ORDER BY medal_count DESC, person_id) AS position,
-        COUNT(*) OVER () AS total_count
-      FROM totals
-    ), page AS (
-      SELECT * FROM ranked
-      WHERE position >= ? AND position < ?
-      ORDER BY position
-    )
-    SELECT page.*, COALESCE(person.name, page.person_id) AS person_name,
-      COALESCE(person.country_id, '') AS country_id,
-      COALESCE(country.name, person.country_id, '') AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2
-    FROM page
-    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-    LEFT JOIN countries country ON country.id = person.country_id
-    ORDER BY page.position, page.person_id`;
-}
-
-function lazyMedalCountQuery(input: MedalInput) {
-  const { conditions } = scoreConditions(input);
-  const predicate = conditions.length ? conditions.join(" AND ") : "1 = 1";
-  const countColumn = medalColumn(input.medalType);
-  return sqlFragment`SELECT COUNT(*) AS count
-    FROM (
-      SELECT score.person_id
-      FROM person_medal_scores score
-      WHERE ${predicate}
-      GROUP BY score.person_id
-      HAVING SUM(${countColumn}) > 0
-    ) totals`;
 }
 
 function toEntry(row: MedalRow) {
@@ -208,7 +112,7 @@ function toEntry(row: MedalRow) {
   };
 }
 
-async function loadMedalWindow(input: MedalInput, windowStart: number) {
+async function loadMedalWindow(input: MedalRankingInput, windowStart: number) {
   const windowEnd = windowStart + RANKINGS_WINDOW_SIZE;
   if (input.year === null && input.gender.length === 0) {
     const eventId = input.eventId ?? "";
@@ -238,14 +142,10 @@ async function loadMedalWindow(input: MedalInput, windowStart: number) {
       returnedRows: rows.rows.length + counts.rows.length,
     };
   }
-  const { values } = scoreConditions(input);
+  const plan = buildLazyMedalQueryPlan(input);
   const [rows, counts] = await Promise.all([
-    query<MedalRow>(lazyMedalRowsQuery(input), [
-      ...values,
-      windowStart,
-      windowEnd,
-    ]),
-    query<{ count: number }>(lazyMedalCountQuery(input), values),
+    query<MedalRow>(plan.rowsQuery, [...plan.values, windowStart, windowEnd]),
+    query<{ count: number }>(plan.countQuery, plan.values),
   ]);
   return {
     data: {
@@ -259,7 +159,7 @@ async function loadMedalWindow(input: MedalInput, windowStart: number) {
 }
 
 function windowKey(
-  input: MedalInput,
+  input: MedalRankingInput,
   windowStart: number,
   dataVersion: string,
 ) {
@@ -282,13 +182,13 @@ export async function loadPersonMedalRankings(params: URLSearchParams) {
     Math.floor((input.start - 1) / RANKINGS_WINDOW_SIZE) *
       RANKINGS_WINDOW_SIZE +
     1;
-  const cached = (await rankingsWindowCache.getWithStatus(
+  const cached = await rankingsWindowCache.getWithStatus(
     windowKey(input, windowStart, metadata.fetchedAt),
     () => loadMedalWindow(input, windowStart),
-  )) as {
-    value: MedalWindow;
-    outcome: "hit" | "miss" | "coalesced";
-  };
+  );
+  if (!isMedalWindow(cached.value)) {
+    throw new Error("The medal ranking window cache returned invalid data.");
+  }
   const offset = input.start - windowStart;
   const allEntries = cached.value.data.entries;
   const entries = allEntries.slice(offset, offset + input.limit);
