@@ -47,12 +47,24 @@ type PersonActivityRankingRow = {
   position: number;
 };
 
-type PersonActivityWindow = {
+interface PersonActivityWindow extends Record<string, unknown> {
   data: { entries: ReturnType<typeof toEntry>[]; total: number };
   timings: QueryTimings;
   queryCount: number;
   returnedRows: number;
-};
+}
+
+function isPersonActivityWindow(
+  value: Record<string, unknown>,
+): value is PersonActivityWindow {
+  if (typeof value.data !== "object" || value.data === null) return false;
+  return (
+    "entries" in value.data &&
+    Array.isArray(value.data.entries) &&
+    "total" in value.data &&
+    Number.isFinite(Number(value.data.total))
+  );
+}
 
 const metricColumn: Record<PersonActivityMetric, string> = {
   competitions: "competition_count",
@@ -222,13 +234,15 @@ export async function loadPersonActivityRankings(params: URLSearchParams) {
       Math.floor((input.start - 1) / RANKINGS_WINDOW_SIZE) *
         RANKINGS_WINDOW_SIZE +
       1;
-    const cached = (await rankingsWindowCache.getWithStatus(
+    const cached = await rankingsWindowCache.getWithStatus(
       windowKey(input, windowStart, featureSwitch.generationId),
       () => loadLazyWindow(input, windowStart),
-    )) as {
-      value: PersonActivityWindow;
-      outcome: "hit" | "miss" | "coalesced";
-    };
+    );
+    if (!isPersonActivityWindow(cached.value)) {
+      throw new Error(
+        "The person activity window cache returned invalid data.",
+      );
+    }
     const offset = input.start - windowStart;
     const entries = cached.value.data.entries.slice(
       offset,
