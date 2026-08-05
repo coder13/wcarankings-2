@@ -52,6 +52,20 @@ type PersonEventResultWindow = {
   returnedRows: number;
 };
 
+function isPersonEventResultWindow(
+  value: Record<string, unknown>,
+): value is PersonEventResultWindow {
+  if (!("data" in value) || typeof value.data !== "object" || !value.data) {
+    return false;
+  }
+  return (
+    "entries" in value.data &&
+    Array.isArray(value.data.entries) &&
+    "total" in value.data &&
+    Number.isFinite(Number(value.data.total))
+  );
+}
+
 function parseInput(
   personId: string,
   eventId: string,
@@ -158,13 +172,13 @@ export async function loadPersonEventResultRankings(
     Math.floor((input.start - 1) / RANKINGS_WINDOW_SIZE) *
       RANKINGS_WINDOW_SIZE +
     1;
-  const cached = (await rankingsWindowCache.getWithStatus(
+  const cached = await rankingsWindowCache.getWithStatus(
     windowKey(input, windowStart, metadata.fetchedAt),
     () => loadWindow(input, windowStart),
-  )) as {
-    value: PersonEventResultWindow;
-    outcome: "hit" | "miss" | "coalesced";
-  };
+  );
+  if (!isPersonEventResultWindow(cached.value)) {
+    throw new Error("The person result cache returned invalid data.");
+  }
   const offset = input.start - windowStart;
   const entries = cached.value.data.entries.slice(offset, offset + input.limit);
   const total = cached.value.data.total;

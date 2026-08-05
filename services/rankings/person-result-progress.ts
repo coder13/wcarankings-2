@@ -39,6 +39,15 @@ type PersonResultProgressCacheValue = {
   returnedRows: number;
 };
 
+function isPersonResultProgressCacheValue(
+  value: Record<string, unknown>,
+): value is PersonResultProgressCacheValue {
+  if (!("data" in value) || typeof value.data !== "object" || !value.data) {
+    return false;
+  }
+  return "points" in value.data && Array.isArray(value.data.points);
+}
+
 function parseInput(
   personId: string,
   eventId: string,
@@ -112,13 +121,13 @@ export async function loadPersonEventResultProgress(
 ) {
   const input = parseInput(personId, eventId, params);
   const metadata = await getCurrentRankingsMetadata();
-  const cached = (await rankingsWindowCache.getWithStatus(
+  const cached = await rankingsWindowCache.getWithStatus(
     progressCacheKey(input, metadata.fetchedAt),
     () => loadProgress(input),
-  )) as {
-    value: PersonResultProgressCacheValue;
-    outcome: "hit" | "miss" | "coalesced";
-  };
+  );
+  if (!isPersonResultProgressCacheValue(cached.value)) {
+    throw new Error("The result progress cache returned invalid data.");
+  }
 
   return {
     data: {
