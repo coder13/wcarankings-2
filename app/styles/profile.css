@@ -205,6 +205,14 @@
   height: var(--profile-preview-table-height);
 }
 
+.profileRankingHighlightPreviewTable {
+  height: var(--profile-preview-table-height);
+}
+
+.profileRankingHighlightPreviewTable .profilePreviewHeading {
+  justify-content: flex-end;
+}
+
 .profilePreviewTable:has(.Dropdown-menu[data-open="true"]) {
   overflow: visible;
 }
@@ -345,6 +353,27 @@
   height: var(--profile-preview-results-height);
   margin: 0;
   overflow-y: auto;
+}
+
+.profileRankingHighlights {
+  display: grid;
+  gap: var(--profile-section-space);
+}
+
+.profileRankingHighlights > .profilePreview + .profilePreview {
+  padding-top: var(--profile-section-space);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.profileRankingHighlightRows .listItem,
+.profileRankingHighlightRows .rowHeader {
+  min-height: 64px !important;
+}
+
+.profileRankingHighlightsLoading {
+  display: grid;
+  min-height: 4rem;
+  place-items: center;
 }
 
 .profileMedalPreview {

@@ -5,12 +5,14 @@ export function StatPreviewTable({
   labelAction,
   controls,
   action,
+  surfaceClassName,
   children,
 }: {
   tableName?: string;
   labelAction?: ReactNode;
   controls?: ReactNode;
   action?: ReactNode;
+  surfaceClassName?: string;
   children: ReactNode;
 }) {
   return (
@@ -21,7 +23,7 @@ export function StatPreviewTable({
           {labelAction}
         </div>
       )}
-      <div className="profilePreviewTable">
+      <div className={`profilePreviewTable ${surfaceClassName ?? ""}`}>
         {(controls || action) && (
           <div className="profilePreviewHeading">
             {controls}
