@@ -1,10 +1,56 @@
 import { argumentValue } from "../../lib/arguments.ts";
 import { databaseOptions } from "../../lib/database.ts";
 import mysql from "mysql2/promise";
+import type { RowDataPacket } from "mysql2/promise";
 import {
   DEPLOYMENT_PROJECTION_GROUPS,
   dropManagedObject,
 } from "../../../data-tools/projections/build.ts";
+
+interface DeferredProjectionIndex {
+  name: string;
+  sql: string;
+}
+
+interface ExportDateRow extends RowDataPacket {
+  value: string;
+}
+
+interface ProjectionIndexRow extends RowDataPacket {
+  Collation: "A" | "D" | null;
+  Column_name: string;
+  Key_name: string;
+  Non_unique: number;
+  Seq_in_index: number;
+  Sub_part: number | null;
+}
+
+function deferredProjectionIndexes(
+  rows: ProjectionIndexRow[],
+): DeferredProjectionIndex[] {
+  const rowsByName = new Map<string, ProjectionIndexRow[]>();
+  for (const row of rows) {
+    if (row.Key_name === "PRIMARY") continue;
+    const indexRows = rowsByName.get(row.Key_name) ?? [];
+    indexRows.push(row);
+    rowsByName.set(row.Key_name, indexRows);
+  }
+  return [...rowsByName.entries()].map(([name, indexRows]) => {
+    const orderedRows = [...indexRows].sort(
+      (left, right) => left.Seq_in_index - right.Seq_in_index,
+    );
+    const columns = orderedRows.map((row) => {
+      const prefix = row.Sub_part ? `(${row.Sub_part})` : "";
+      const direction = row.Collation === "D" ? " DESC" : "";
+      return `\`${row.Column_name}\`${prefix}${direction}`;
+    });
+    const unique = Number(orderedRows[0]?.Non_unique) === 0 ? "UNIQUE " : "";
+    return {
+      name,
+      sql: `ADD ${unique}INDEX \`${name}\` (${columns.join(", ")})`,
+    };
+  });
+}
 
 const groupName = argumentValue("group");
 const group = DEPLOYMENT_PROJECTION_GROUPS.find(
@@ -19,8 +65,7 @@ const indexesTable = `projection_transfer_indexes_${group.name.replaceAll("-", "
 
 const connection = await mysql.createConnection(databaseOptions());
 try {
-  const desiredIndexes = await projectionIndexesForGroup(group);
-  const [metadata] = await connection.query(
+  const [metadata] = await connection.query<ExportDateRow[]>(
     "SELECT value FROM export_metadata WHERE `key` = 'export_date' LIMIT 1",
   );
   const exportDate = metadata[0]?.value;
@@ -59,43 +104,24 @@ try {
   let deferredIndexCount = 0;
   for (const table of group.tables) {
     const transfer = `${table}_transfer`;
-    const [indexRows] = await connection.query(
+    const [indexRows] = await connection.query<ProjectionIndexRow[]>(
       `SHOW INDEX FROM \`${transfer}\``,
     );
-    const indexes = new Map();
-    for (const row of indexRows) {
-      if (row.Key_name === "PRIMARY") continue;
-      const index = existingIndexes.get(row.Key_name) ?? {
-        name: row.Key_name,
-      };
-      existingIndexes.set(row.Key_name, index);
-    }
-
-    const tableIndexes = desiredIndexes.filter((index) => index.table === table);
-    const desiredNames = new Set(tableIndexes.map(({ name }) => name));
-    const unexpected = [...existingIndexes.keys()].filter((name) => !desiredNames.has(name));
-    if (unexpected.length > 0) {
-      throw new Error(`Undeclared projection indexes on ${table}: ${unexpected.join(", ")}`);
-    }
-    if (existingIndexes.size > 0) {
-      const missing = tableIndexes.filter(({ name }) => !existingIndexes.has(name));
-      if (missing.length > 0) {
-        throw new Error(`Partially built projection indexes on ${table}: ${missing.map(({ name }) => name).join(", ")}`);
-      }
-    }
-
-    for (const index of tableIndexes) {
+    const indexes = deferredProjectionIndexes(indexRows);
+    for (const index of indexes) {
       await connection.query(
         `INSERT INTO \`${indexesTable}\`
           (table_name, index_name, index_sql)
          VALUES (?, ?, ?)`,
         [transfer, index.name, index.sql],
       );
-      deferredIndexCount += 1;
     }
-    if (existingIndexes.size > 0) {
+    deferredIndexCount += indexes.length;
+    if (indexes.length > 0) {
       await connection.query(
-        `ALTER TABLE \`${transfer}\` ${[...existingIndexes.keys()].map((name) => `DROP INDEX \`${name}\``).join(", ")}`,
+        `ALTER TABLE \`${transfer}\` ${indexes
+          .map((index) => `DROP INDEX \`${index.name}\``)
+          .join(", ")}`,
       );
     }
   }

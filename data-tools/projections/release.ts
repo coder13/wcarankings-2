@@ -10,6 +10,7 @@ import {
   projectionGroup,
 } from "./jobs.ts";
 import { normalizeExportDate } from "../shared/date.ts";
+import { argumentValue } from "../../scripts/lib/arguments.ts";
 
 const SEMANTIC_FINGERPRINT_FORMAT_VERSION = 3;
 const ARTIFACT_FINGERPRINT_FORMAT_VERSION = 3;

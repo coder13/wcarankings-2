@@ -1,4 +1,4 @@
-import { argumentValue } from "../../lib/arguments.ts";
+import { argumentList, argumentValue } from "../../lib/arguments.ts";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -168,7 +168,7 @@ export async function verifyProjectionReleaseCoordinate({
 async function cli() {
   const command = process.argv[2];
   const directory = resolve(argumentValue("directory") || ".");
-  const groups = listArgument("groups");
+  const groups = argumentList("groups");
   if (command === "create") {
     const fingerprints = JSON.parse(
       await readFile(argumentValue("fingerprints-file"), "utf8"),
