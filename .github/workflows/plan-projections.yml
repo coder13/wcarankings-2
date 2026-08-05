@@ -104,8 +104,7 @@ jobs:
         id: production
         run: |
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_IP" \
-            'cd /srv/wcarankings && docker compose run --rm -T data-tools \
-              /app/scripts/projections/generation/activate-ranking-generation.ts state' \
+            'sh -s' < deploy/remote/read-active-projection-state.sh \
             > /tmp/production-projection-state.json
           if ! jq -e 'type == "object"' /tmp/production-projection-state.json >/dev/null; then
             printf '{}\n' > /tmp/production-projection-state.json
