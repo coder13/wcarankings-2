@@ -7,7 +7,7 @@ import {
 } from "@/lib/list-ranking-cache";
 import { getRecordBadges } from "@/lib/wca";
 import { searchPersonIds } from "@/services/people/service";
-import { filteredResultRankingsQuery } from "@/services/rankings/queries";
+import { filteredResultRankingsQuery } from "@/services/rankings/queries/results";
 import type { ResultRankingRow } from "@/services/rankings/types";
 import type { ListSummary } from "@/services/lists/types";
 import { parseListRankingInput } from "@/services/lists/input";

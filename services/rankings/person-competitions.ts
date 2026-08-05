@@ -8,39 +8,49 @@ import {
   parseStart,
   parseYear,
 } from "@/lib/api/projection";
-import { sqlFragment } from "@/lib/helpers/database/sql";
 import type { QueryTimings } from "@/lib/api/projection";
-import type { GenderFilter, RegionScope } from "@/lib/wca";
 import {
   rankingsWindowCache,
   RANKINGS_WINDOW_SIZE,
 } from "@/services/rankings/cache";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import {
+  buildLazyPersonCompetitionQueryPlan,
   personCompetitionRankingCountQuery,
   personCompetitionRankingRowsQuery,
-} from "@/services/rankings/queries";
-import type { PersonCompetitionRankingRow } from "@/services/rankings/types";
+} from "@/services/rankings/queries/person-competitions";
+import type {
+  PersonCompetitionRankingInput,
+  PersonCompetitionRankingRow,
+} from "@/services/rankings/types";
 
 const countFormatter = new Intl.NumberFormat("en-US");
 
-type CompetitionInput = {
-  scope: RegionScope;
-  regionId: string;
-  gender: readonly GenderFilter[];
-  year: number | null;
-  start: number;
-  limit: number;
-};
+interface CompetitionWindowData {
+  entries: ReturnType<typeof toEntry>[];
+  total: number;
+}
 
-type CompetitionWindow = {
-  data: { entries: ReturnType<typeof toEntry>[]; total: number };
+interface CompetitionWindow extends Record<string, unknown> {
+  data: CompetitionWindowData;
   timings: QueryTimings;
   queryCount: number;
   returnedRows: number;
-};
+}
 
-function parseInput(params: URLSearchParams): CompetitionInput {
+function isCompetitionWindow(
+  value: Record<string, unknown>,
+): value is CompetitionWindow {
+  if (typeof value.data !== "object" || value.data === null) return false;
+  return (
+    "entries" in value.data &&
+    Array.isArray(value.data.entries) &&
+    "total" in value.data &&
+    Number.isFinite(Number(value.data.total))
+  );
+}
+
+function parseInput(params: URLSearchParams): PersonCompetitionRankingInput {
   const { scope, regionId } = parseScope(params);
   if (scope !== "world" && !regionId) {
     throw new ApiInputError(
@@ -74,97 +84,18 @@ function toEntry(row: PersonCompetitionRankingRow) {
   };
 }
 
-function lazyConditions(input: CompetitionInput) {
-  const conditions = ["counts.competition_count > 0"];
-  const values: unknown[] = [];
-  if (input.year !== null) {
-    conditions.push("counts.year = ?");
-    values.push(input.year);
-  }
-  if (input.scope === "continent") {
-    conditions.push("country.continent_id = ?");
-    values.push(input.regionId);
-  }
-  if (input.scope === "country") {
-    conditions.push("person.country_id = ?");
-    values.push(input.regionId);
-  }
-  if (input.gender.length) {
-    conditions.push(
-      `counts.person_gender IN (${input.gender.map(() => "?").join(", ")})`,
-    );
-    values.push(...input.gender);
-  }
-  return { conditions, values };
-}
-
-function lazyDimensionJoins(input: CompetitionInput) {
-  if (input.scope === "continent") {
-    return `INNER JOIN persons person ON person.wca_id = counts.person_id
-        AND person.sub_id = 1
-      INNER JOIN countries country ON country.id = person.country_id`;
-  }
-  if (input.scope === "country") {
-    return `INNER JOIN persons person ON person.wca_id = counts.person_id
-        AND person.sub_id = 1`;
-  }
-  return "";
-}
-
-function lazySource(input: CompetitionInput) {
-  return input.year === null
-    ? "person_competition_counts"
-    : "person_competition_year_counts";
-}
-
-function lazyRowsQuery(input: CompetitionInput) {
-  const { conditions } = lazyConditions(input);
-  return sqlFragment`WITH filtered AS (
-      SELECT counts.person_id, counts.competition_count
-      FROM ${lazySource(input)} counts
-      ${lazyDimensionJoins(input)}
-      WHERE ${conditions.join(" AND ")}
-    ), ranked AS (
-      SELECT filtered.*,
-        RANK() OVER (ORDER BY competition_count DESC) AS rank,
-        ROW_NUMBER() OVER (
-          ORDER BY competition_count DESC, person_id
-        ) AS position
-      FROM filtered
-    ), page AS (
-      SELECT * FROM ranked
-      WHERE position >= ? AND position < ?
-      ORDER BY position
-    )
-    SELECT page.*, COALESCE(person.name, page.person_id) AS person_name,
-      COALESCE(country.name, person.country_id, '') AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2
-    FROM page
-    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-    LEFT JOIN countries country ON country.id = person.country_id
-    ORDER BY page.position, page.person_id`;
-}
-
-function lazyCountQuery(input: CompetitionInput) {
-  const { conditions } = lazyConditions(input);
-  return sqlFragment`SELECT COUNT(*) AS count
-    FROM ${lazySource(input)} counts
-    ${lazyDimensionJoins(input)}
-    WHERE ${conditions.join(" AND ")}`;
-}
-
 async function loadLazyWindow(
-  input: CompetitionInput,
+  input: PersonCompetitionRankingInput,
   windowStart: number,
 ): Promise<CompetitionWindow> {
-  const { values } = lazyConditions(input);
+  const plan = buildLazyPersonCompetitionQueryPlan(input);
   const [rows, counts] = await Promise.all([
-    query<PersonCompetitionRankingRow>(lazyRowsQuery(input), [
-      ...values,
+    query<PersonCompetitionRankingRow>(plan.rowsQuery, [
+      ...plan.values,
       windowStart,
       windowStart + RANKINGS_WINDOW_SIZE,
     ]),
-    query<{ count: number }>(lazyCountQuery(input), values),
+    query<{ count: number }>(plan.countQuery, plan.values),
   ]);
   return {
     data: {
@@ -178,7 +109,7 @@ async function loadLazyWindow(
 }
 
 function windowKey(
-  input: CompetitionInput,
+  input: PersonCompetitionRankingInput,
   windowStart: number,
   dataVersion: string,
 ) {
@@ -200,13 +131,15 @@ export async function loadPersonCompetitionRankings(params: URLSearchParams) {
       Math.floor((input.start - 1) / RANKINGS_WINDOW_SIZE) *
         RANKINGS_WINDOW_SIZE +
       1;
-    const cached = (await rankingsWindowCache.getWithStatus(
+    const cached = await rankingsWindowCache.getWithStatus(
       windowKey(input, windowStart, metadata.fetchedAt),
       () => loadLazyWindow(input, windowStart),
-    )) as {
-      value: CompetitionWindow;
-      outcome: "hit" | "miss" | "coalesced";
-    };
+    );
+    if (!isCompetitionWindow(cached.value)) {
+      throw new Error(
+        "The competition ranking window cache returned invalid data.",
+      );
+    }
     const offset = input.start - windowStart;
     const entries = cached.value.data.entries.slice(
       offset,

@@ -1,5 +1,6 @@
 import type { RankingType, RegionScope, GenderFilter } from "@/lib/wca";
 import type { LRUCache } from "lru-cache";
+import type { MedalRankingType } from "@/lib/medal-rankings";
 
 export type RankingRow = {
   rank: number;
@@ -65,6 +66,26 @@ export type PersonCompetitionRankingRow = {
   rank: number;
   position: number;
 };
+
+export interface PersonCompetitionRankingInput {
+  scope: RegionScope;
+  regionId: string;
+  gender: readonly GenderFilter[];
+  year: number | null;
+  start: number;
+  limit: number;
+}
+
+export interface MedalRankingInput {
+  eventId: string | null;
+  medalType: MedalRankingType;
+  scope: RegionScope;
+  regionId: string;
+  gender: readonly GenderFilter[];
+  year: number | null;
+  start: number;
+  limit: number;
+}
 
 export type ResultRankingRow = {
   result_id: number;
