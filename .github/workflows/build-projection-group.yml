@@ -156,8 +156,10 @@ jobs:
           mkdir -p "$directory"
           prefix="$GROUP"
           if [ "$GROUP" = yearly-person-rankings ]; then prefix=yearly; fi
-          metadata="$directory/${prefix}-projection-transfer.json"
-          archive="$directory/${prefix}-projection-transfer.tar.gz"
+          metadata_file="${prefix}-projection-transfer.json"
+          archive_file="${prefix}-projection-transfer.tar.gz"
+          metadata="$directory/$metadata_file"
+          archive="$directory/$archive_file"
           bun scripts/projections/transfer/prepare-projection-transfer.ts --group="$GROUP" > "$metadata"
           bun scripts/projections/transfer/export-projection-transfer.ts --metadata="$metadata" --output="$archive"
 
@@ -181,8 +183,8 @@ jobs:
             --annotation "io.wcarankings.artifact-fingerprint=$fingerprint" \
             --annotation "io.wcarankings.format-version=4" \
             "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json" \
-            "$archive:application/vnd.cuberanks.projection.tables.v1+gzip" \
-            "$metadata:application/vnd.cuberanks.projection.transfer.v4+json"
+            "$archive_file:application/vnd.cuberanks.projection.tables.v1+gzip" \
+            "$metadata_file:application/vnd.cuberanks.projection.transfer.v4+json"
           popd >/dev/null
           digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
           {
