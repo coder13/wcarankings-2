@@ -28,36 +28,37 @@ Use plural snake-case table names:
 
 Kinds have specific meanings:
 
-| Suffix | Meaning |
-| --- | --- |
-| `_facts` | Reusable normalized rows close to source data |
+| Suffix      | Meaning                                                        |
+| ----------- | -------------------------------------------------------------- |
+| `_facts`    | Reusable normalized rows close to source data                  |
 | `_rankings` | Rows with a displayed rank and deterministic internal position |
-| `_scores` | One aggregate score per ranked entity |
-| `_values` | Auditable component values contributing to a score |
-| `_stats` | Aggregate attributes that may support several sorts |
-| `_members` | Child or membership rows belonging to another entity |
-| `_counts` | Precomputed totals for a defined leaderboard scope |
+| `_scores`   | One aggregate score per ranked entity                          |
+| `_values`   | Auditable component values contributing to a score             |
+| `_stats`    | Aggregate attributes that may support several sorts            |
+| `_members`  | Child or membership rows belonging to another entity           |
+| `_counts`   | Precomputed totals for a defined leaderboard scope             |
 
 Use these column names consistently:
 
-| Concept | Name |
-| --- | --- |
-| Public tied rank | `rank` or `{scope}_rank` |
-| Internal deterministic position | `position` or `{scope}_position` |
-| Result mode | `result_type` with `single` or `average` |
-| Geographic ranking level | `scope` with `world`, `continent`, or `country` |
-| Scope identity | `region_id`, with an empty value for World |
-| Source result | `result_id` |
-| Projection generation | `generation_id` if generation identity becomes explicit |
-| Metric definition version | `metric_version` |
-| Product event-set version | `event_set_version` |
+| Concept                         | Name                                                    |
+| ------------------------------- | ------------------------------------------------------- |
+| Public tied rank                | `rank` or `{scope}_rank`                                |
+| Internal deterministic position | `position` or `{scope}_position`                        |
+| Result mode                     | `result_type` with `single` or `average`                |
+| Geographic ranking level        | `scope` with `world`, `continent`, or `country`         |
+| Scope identity                  | `region_id`, with an empty value for World              |
+| Source result                   | `result_id`                                             |
+| Projection generation           | `generation_id` if generation identity becomes explicit |
+| Metric definition version       | `metric_version`                                        |
+| Product event-set version       | `event_set_version`                                     |
 
 `sub_rank` is an existing internal name, but new schemas should prefer
 `position`. If existing tables are renamed, perform that change as an explicit
 migration rather than exposing either name in the UI.
 
-Do not include `_entries` in new table names. It does not identify a list or stat or
-purpose. Existing `_entries` tables can remain temporarily for compatibility.
+Do not include `_entries` in new table names. It does not identify a list or
+stat purpose. A rename of a published table needs an explicit migration in the
+same change.
 
 ## Active projection graph
 
@@ -301,12 +302,6 @@ two exposed result views:
 (person_id, event_id, world_position, result_id[, attempt_number])
 ```
 
-The compatibility result projection retains its equivalent ranked access path:
-
-```text
-(person_id, event_id, world_sub_rank, result_id)
-```
-
 No result-ranking query should apply `LIKE`, `REGEXP`, or another name search to
 projection display columns.
 
@@ -391,7 +386,7 @@ person-event ranking projections. Names and countries are joined only after
 selecting a score page. Counts use the score browse index rather than another
 persisted stat row.
 
-### Legacy local Sum of Ranks refresh benchmark
+### Earlier persistent-intermediate Sum of Ranks benchmark
 
 Before event values became temporary, the targeted persistent-database refresh
 on 2026-07-28 completed in 738.9
@@ -429,17 +424,17 @@ compared with the 738.9-second persistent-event-value baseline.
 
 Measured phases were:
 
-| Phase | Duration |
-| --- | ---: |
-| Aggregate historical Single and Average bests | 86.8 s |
-| Unpivot historical bests | 1.3 s |
-| Load World Single event values | 1.5 s |
-| Load World Average event values | 1.4 s |
-| Rank country event values | 11.1 s |
-| Rank continent event values | 63.8 s |
-| Calculate event penalties and Kinch references | 3.6 s |
-| Aggregate and rank person scores | 132.6 s |
-| Index person scores | 12.3 s |
+| Phase                                          | Duration |
+| ---------------------------------------------- | -------: |
+| Aggregate historical Single and Average bests  |   86.8 s |
+| Unpivot historical bests                       |    1.3 s |
+| Load World Single event values                 |    1.5 s |
+| Load World Average event values                |    1.4 s |
+| Rank country event values                      |   11.1 s |
+| Rank continent event values                    |   63.8 s |
+| Calculate event penalties and Kinch references |    3.6 s |
+| Aggregate and rank person scores               |  132.6 s |
+| Index person scores                            |   12.3 s |
 
 ### GitHub Actions transfer experiment
 
@@ -453,7 +448,7 @@ The raw export import took approximately 2 minutes 54 seconds. Required raw
 indexes took approximately 1 minute 23 seconds. The optimized Sum of Ranks
 projection itself took 317.8 seconds and produced 1,737,062 rows. Competition
 podium members, event statistics, and competition statistics took 52.3, 42.0,
-and 59.9 seconds respectively. Compatibility projection work accounted for
+and 59.9 seconds respectively. Ranking projection work accounted for
 most of the remaining time. The first generation reached validation after
 approximately 25 minutes 16 seconds. A later complete build and dump took
 22 minutes 23 seconds; a repeat took 23 minutes 38 seconds and produced a
@@ -465,7 +460,7 @@ included secondary indexes in each table definition, causing MariaDB to
 maintain those indexes while loading millions of rows.
 
 Caching only the compressed WCA archive therefore does not remove the dominant
-cost: importing raw data and rebuilding compatibility projections and indexes
+cost: importing raw data and rebuilding all selected projections and indexes
 inside a cold MariaDB instance. Transfer artifacts are now cached by export
 date and projection-schema hash so unchanged deploys can reuse a validated
 generation. Daily Actions builds omit secondary indexes from leaf projections.
@@ -488,13 +483,11 @@ The 22 deferred indexes took approximately 171 seconds on the successful
 cache-hit run. The five `result_entries_single` indexes accounted for 125.6
 seconds; Sum of Ranks indexes took 15.6 seconds, person-event single and average
 indexes took 14.4 and 12.3 seconds, and competition indexes took less than three
-seconds. No application query used the compatibility result table; result
-browsing uses `result_rankings`. Its unused indexes were first removed, and the
-table and its count table were later retired entirely. The next cold build and
-dump after the index removal completed in 24 minutes 15 seconds, a 42.9%
-reduction, and production transfer and publication completed in 5 minutes 08
-seconds, a 27.2% reduction. Deferred-index work fell to 17 indexes and
-approximately 43 seconds.
+seconds. Result browsing uses `result_rankings`. Removing unused result-table
+indexes reduced the next cold build and dump to 24 minutes 15 seconds, a 42.9%
+reduction. Production transfer and publication completed in 5 minutes 08
+seconds, a 27.2% reduction. Deferred-index work fell to 17 indexes and about 43
+seconds.
 
 Deployment projection builds use the export date already published on
 production, not the newest export advertised by the WCA API. This keeps raw
@@ -513,17 +506,9 @@ people under both SOR and Kinch ordering. Local HTTP observations returned the
 first 50-row SOR page in 6 ms, a page around position 250,000 in 21 ms, and the
 first Kinch page in 8 ms.
 
-### Metric detail reads
-
-`person_metric_values`, `person_metric_scores`, and `person_metric_counts` are
-retired. No list or ranking API read them, and their 5.7 million transferred
-rows duplicated data already present in the canonical projections.
-
 Overall Sum of Ranks and Kinch pages and profile totals read
-`person_sum_of_ranks_scores`. A profile's bounded per-event Kinch detail joins
-the selected person's `person_event_rankings` rows to the corresponding World
-position-1 rows and calculates the ratios at request time. This adds a small
-indexed lookup to a person profile while avoiding a global daily materialization.
+`person_sum_of_ranks_scores`. A profile calculates its per-event Kinch details
+from indexed rows in `person_event_rankings`.
 
 ## Time-based rankings
 
@@ -799,38 +784,41 @@ score page has been selected.
 
 ## Publication
 
-Default full-import build order:
+Projection release order:
 
 ```text
-1. Import raw WCA tables
-2. Build compatibility person and result projections
-3. Build Sum of Ranks event values and scores
-4. Add browse indexes and validate row counts
-5. Atomically publish the active generation
-6. Remove the previous generation
+1. Read the active generation and calculate the semantic plan
+2. Calculate the release plan for the selected WCA export
+3. Hydrate exact cached dependencies
+4. Build the missing groups in dependency waves
+5. Prepare transfer tables, export them, and create the release coordinate
+6. Validate the deployment plan and import the transfer tables
+7. Build deferred indexes and publish the candidate generation
+8. Atomically activate and verify the candidate generation
 ```
 
-The declarative registry should define:
+Each job in the declarative catalog defines:
 
-```js
+```ts
 {
-  name,
+  id,
   dependencies,
+  sqlFiles,
   tables,
-  build,
-  validate,
+  releaseGroup,
+  releaseOrder,
+  releaseSchemaVersion,
 }
 ```
 
-The registry supports dependency ordering, selective backfills, per-projection
-timing, row counts, validation, and controlled concurrency. Its explicit
-default set is the activation boundary. A targeted Sum of Ranks backfill
-stages and swaps only its two tables; failures leave the previously published
-group intact.
+The catalog supports dependency ordering, selective builds, per-projection
+timing, row counts, validation, and controlled concurrency. The release plan
+defines the activation boundary. A group build publishes only its owned tables.
+Failures leave the active generation intact.
 
 Projection builds log a start and finish record for every physical table,
-including temporary build tables, with elapsed milliseconds. Compatibility
-tables include their indexes in the table duration. Registered projections
+including temporary build tables, with elapsed milliseconds. Physical tables
+include their indexes in the table duration. Registered projections
 also retain their projection-level duration and validated row counts. A failed
 table and its containing projection both log their elapsed time before the
 error aborts publication.
@@ -841,11 +829,11 @@ The first targeted all-results backfill ran on 2026-07-29 against 6,750,045 raw
 `results` rows. The logical projection was split into physical Single and
 Average tables to bound peak window-sort space:
 
-| Table | Rows | Data | Indexes | Build time |
-| --- | ---: | ---: | ---: | ---: |
-| `result_rankings_single` | 6,564,373 | 911.0 MiB | 888.8 MiB | about 4m 15s observed |
-| `result_rankings_average` | 5,890,382 | 818.0 MiB | 797.8 MiB | 3m 40.4s |
-| `result_ranking_counts` | scope counts | 0.3 MiB | negligible | 8.2s |
+| Table                     |         Rows |      Data |    Indexes |            Build time |
+| ------------------------- | -----------: | --------: | ---------: | --------------------: |
+| `result_rankings_single`  |    6,564,373 | 911.0 MiB |  888.8 MiB | about 4m 15s observed |
+| `result_rankings_average` |    5,890,382 | 818.0 MiB |  797.8 MiB |              3m 40.4s |
+| `result_ranking_counts`   | scope counts |   0.3 MiB | negligible |                  8.2s |
 
 The first Single timer wrapper exited after the SQL succeeded because it used a
 reserved zsh variable, so its duration is an observed approximation; subsequent
@@ -870,14 +858,12 @@ person-event best staging, and sort-free metric reference joins.
 These decisions affect future migrations or planned projection layers; they do
 not make the current contract provisional:
 
-1. When the remaining person-ranking compatibility `_entries` tables can be
-   retired after all consumers move to unified semantic ranking tables.
-2. Whether a future metric version should use different event sets or Kinch
+1. Whether a future metric version should use different event sets or Kinch
    aggregation semantics.
-3. Whether yearly source indexes justify their storage cost.
-4. Whether competition-wide pages need another event-normalized list.
-5. Which system cohorts are large or frequent enough to materialize.
-6. Whether explicit `generation_id` columns add value beyond atomic table
+2. Whether yearly source indexes justify their storage cost.
+3. Whether competition-wide pages need another event-normalized list.
+4. Which system cohorts are large or frequent enough to materialize.
+5. Whether explicit `generation_id` columns add value beyond atomic table
    publication and export metadata.
 
 ## Related roadmap issues

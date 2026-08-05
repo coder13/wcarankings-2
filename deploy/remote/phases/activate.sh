@@ -396,7 +396,7 @@ if [ "$phase" = raw_prepared ]; then
     data-tools /app/scripts/projections/transfer/publish-projection-transfer.ts \
     --groups="$PROJECTION_GROUPS" &
   wait_for_candidate_work "$!"
-  if [ "$PROJECTION_GROUPS" = "compatibility,result-facts,result-rankings,competition-rankings,person-competition-rankings,city-rankings,sum-of-ranks,yearly-person-rankings" ]; then
+  if [ "$PROJECTION_GROUPS" = "ranking-tables,result-facts,result-rankings,person-event-rankings,competition-rankings,person-competition-rankings,city-rankings,sum-of-ranks,yearly-person-rankings" ]; then
     dc run --rm --label "$candidate_work_label" \
       -e DATABASE_NAME_OVERRIDE="$candidate" \
       data-tools /app/scripts/projections/verification/check-ranking-projections.ts &

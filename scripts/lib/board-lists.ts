@@ -1,7 +1,13 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
+import type { Connection, ResultSetHeader } from "mysql2/promise";
 import { enqueueListRankingRebuild } from "./list-ranking-jobs.ts";
+import type {
+  ListRow,
+  PersonIdRow,
+  RoleListDefinition,
+  WcaRole,
+} from "./list-types.ts";
 
-const ROLE_LISTS = {
+const ROLE_LISTS: Record<string, RoleListDefinition> = {
   board: {
     key: "wca-board",
     alias: "board",
@@ -23,22 +29,40 @@ const ROLE_LISTS = {
 };
 const WCA_ID_PATTERN = /^\d{4}[A-Z0-9]{4}\d{2}$/;
 
-export function roleMemberIds(payload) {
-  const roles = Array.isArray(payload) ? payload : (payload?.user_roles ?? []);
+function rolePayload(value: unknown): WcaRole[] {
+  if (Array.isArray(value)) return value.filter(isWcaRole);
+  if (!isRecord(value) || !Array.isArray(value.user_roles)) return [];
+  return value.user_roles.filter(isWcaRole);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isWcaRole(value: unknown): value is WcaRole {
+  if (!isRecord(value)) return false;
+  return value.user === undefined || isRecord(value.user);
+}
+
+export function roleMemberIds(payload: unknown): string[] {
+  const roles = rolePayload(payload);
   return [
     ...new Set(
       roles
-        .map((role) =>
+        .map((role: WcaRole) =>
           String(role?.user?.wca_id ?? "")
             .trim()
             .toUpperCase(),
         )
-        .filter((wcaId) => WCA_ID_PATTERN.test(wcaId)),
+        .filter((wcaId: string) => WCA_ID_PATTERN.test(wcaId)),
     ),
   ];
 }
 
-async function fetchRoleMemberIds(roleList, fetchImpl = fetch) {
+async function fetchRoleMemberIds(
+  roleList: RoleListDefinition,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string[]> {
   const response = await fetchImpl(roleList.rolesUrl, {
     headers: {
       Accept: "application/json",
@@ -52,7 +76,11 @@ async function fetchRoleMemberIds(roleList, fetchImpl = fetch) {
   return roleMemberIds(await response.json());
 }
 
-async function refreshRoleList(connection, roleList, fetchImpl = fetch) {
+async function refreshRoleList(
+  connection: Connection,
+  roleList: RoleListDefinition,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
   const memberIds = await fetchRoleMemberIds(roleList, fetchImpl);
   await connection.beginTransaction();
   try {
@@ -73,7 +101,7 @@ async function refreshRoleList(connection, roleList, fetchImpl = fetch) {
         roleList.description,
       ],
     );
-    const [listRows] = await connection.query(
+    const [listRows] = await connection.query<ListRow[]>(
       `SELECT id, system_definition_version, membership_version
        FROM lists
        WHERE kind = 'system' AND system_key = ? AND system_alias = ? AND deleted_at IS NULL
@@ -84,46 +112,49 @@ async function refreshRoleList(connection, roleList, fetchImpl = fetch) {
     if (!listId)
       throw new Error(`${roleList.name} system list could not be created.`);
     const memberPlaceholders = memberIds.map(() => "?").join(", ");
-    const [blockedRows] =
-      memberIds.length > 0
-        ? await connection.query(
-            `SELECT wca_id AS person_id
+    let blockedRows: PersonIdRow[] = [];
+    if (memberIds.length > 0) {
+      [blockedRows] = await connection.query<PersonIdRow[]>(
+        `SELECT wca_id AS person_id
          FROM app_users
          WHERE allow_list_inclusion = FALSE AND wca_id IN (${memberPlaceholders})
          UNION
          SELECT person_id
          FROM list_exclusions
          WHERE list_id = ? AND person_id IN (${memberPlaceholders})`,
-            [...memberIds, listId, ...memberIds],
-          )
-        : [[]];
-    const blocked = new Set(blockedRows.map((row) => row.person_id));
+        [...memberIds, listId, ...memberIds],
+      );
+    }
+    const blocked = new Set(
+      blockedRows.map((row: PersonIdRow) => row.person_id),
+    );
     const eligibleMemberIds = memberIds.filter(
       (memberId) => !blocked.has(memberId),
     );
     const placeholders = eligibleMemberIds.map(() => "?").join(", ");
     const [removed] =
       eligibleMemberIds.length > 0
-        ? await connection.query(
+        ? await connection.query<ResultSetHeader>(
             `DELETE FROM list_members
          WHERE list_id = ? AND source = 'system_rule' AND person_id NOT IN (${placeholders})`,
             [listId, ...eligibleMemberIds],
           )
-        : await connection.query(
+        : await connection.query<ResultSetHeader>(
             "DELETE FROM list_members WHERE list_id = ? AND source = 'system_rule'",
             [listId],
           );
-    const [inserted] =
-      eligibleMemberIds.length > 0
-        ? await connection.query(
-            `INSERT IGNORE INTO list_members (list_id, person_id, added_by_user_id, source)
+    let insertedCount = 0;
+    if (eligibleMemberIds.length > 0) {
+      const [inserted] = await connection.query<ResultSetHeader>(
+        `INSERT IGNORE INTO list_members (list_id, person_id, added_by_user_id, source)
          VALUES ${eligibleMemberIds.map(() => "(?, ?, NULL, 'system_rule')").join(", ")}`,
-            eligibleMemberIds.flatMap((memberId) => [listId, memberId]),
-          )
-        : [{ affectedRows: 0 }];
+        eligibleMemberIds.flatMap((memberId) => [listId, memberId]),
+      );
+      insertedCount = inserted.affectedRows;
+    }
     const changed =
       removed.affectedRows > 0 ||
-      inserted.affectedRows > 0 ||
+      insertedCount > 0 ||
       Number(listRows[0].system_definition_version) !== roleList.version;
     await connection.query(
       `UPDATE lists
@@ -157,10 +188,16 @@ async function refreshRoleList(connection, roleList, fetchImpl = fetch) {
   }
 }
 
-export async function refreshBoardList(connection, fetchImpl = fetch) {
+export async function refreshBoardList(
+  connection: Connection,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
   return refreshRoleList(connection, ROLE_LISTS.board, fetchImpl);
 }
 
-export async function refreshDelegatesList(connection, fetchImpl = fetch) {
+export async function refreshDelegatesList(
+  connection: Connection,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
   return refreshRoleList(connection, ROLE_LISTS.delegates, fetchImpl);
 }

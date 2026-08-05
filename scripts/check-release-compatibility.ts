@@ -1,20 +1,36 @@
-import { checkServerDatasetCompatibility } from "./lib/release-compatibility.ts";
 import { readFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
+import { checkServerDatasetCompatibility } from "../data-tools/projections/deployment/compatibility.ts";
+import type { ServerDatasetCompatibility } from "../data-tools/projections/deployment/types.ts";
 import { argumentValue } from "./lib/cli.ts";
 
 interface CompatibilityFile {
-  server?: {
-    maximumDatasetSchemaVersion?: number;
-    minimumDatasetSchemaVersion?: number;
-  };
+  server?: ServerDatasetCompatibility;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isServerDatasetCompatibility(
+  value: unknown,
+): value is ServerDatasetCompatibility {
+  if (!isRecord(value)) return false;
+  const minimum = value.minimumDatasetSchemaVersion;
+  const maximum = value.maximumDatasetSchemaVersion;
+  return (
+    (minimum === undefined || typeof minimum === "number") &&
+    (maximum === undefined || typeof maximum === "number")
+  );
 }
 
 function isCompatibilityFile(value: unknown): value is CompatibilityFile {
-  return typeof value === "object" && value !== null;
+  if (!isRecord(value)) return false;
+  return (
+    value.server === undefined || isServerDatasetCompatibility(value.server)
+  );
 }
 
-async function main() {
+async function main(): Promise<void> {
   const parsedCompatibility: unknown = JSON.parse(
     await readFile(argumentValue("compatibility-file"), "utf8"),
   );
@@ -28,9 +44,4 @@ async function main() {
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
-if (
-  process.argv[1] &&
-  pathToFileURL(process.argv[1]).href === import.meta.url
-) {
-  await main();
-}
+if (import.meta.main) await main();

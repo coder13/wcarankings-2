@@ -4,7 +4,7 @@ import {
   deploymentInput,
   validateArtifactMetadata,
   validateRawRequirement,
-} from "../scripts/projections/planning/plan-projection-deployment.ts";
+} from "../data-tools/projections/deployment/plan.ts";
 
 function environment(overrides = {}) {
   return {

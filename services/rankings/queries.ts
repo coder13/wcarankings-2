@@ -5,7 +5,6 @@ import type {
   GenderRankingQueryInput,
   LatitudeQueryInput,
   PersonMetricQueryInput,
-  PersonRankingsQueryInput,
   PodiumEntityQueryInput,
   RankingCursorQueryInput,
   RankingPageQueryInput,
@@ -90,35 +89,6 @@ export function requiredRankingIndexesQuery(
   indexes: string[],
 ) {
   return sqlFragment`SELECT table_name, index_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")}) AND index_name IN (${indexes.map(() => "?").join(", ")})`;
-}
-
-export function personRankingsQuery(input: PersonRankingsQueryInput) {
-  return sqlFragment`WITH page AS (
-      SELECT ranking.person_id, ranking.result_id, ranking.result_value,
-        ranking.country_id, ranking.continent_id,
-        ranking.${input.rankColumn} AS rank, ranking.${input.positionColumn} AS page_position
-      FROM person_event_rankings ranking
-      WHERE ${input.conditions.join(" AND ")}
-      ORDER BY ranking.${input.positionColumn}, ranking.person_id
-      LIMIT ?
-    )
-    SELECT page.person_id, COALESCE(person.name, page.person_id) AS person_name,
-      page.country_id, COALESCE(country.name, page.country_id) AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2, page.continent_id,
-      page.rank, page.result_id, page.result_value,
-      facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name,
-      facts.competition_start_date, facts.round_type_id
-    FROM page
-    INNER JOIN result_facts facts ON facts.result_id = page.result_id
-    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-    LEFT JOIN countries country ON country.id = page.country_id
-    LEFT JOIN competitions competition ON competition.id = facts.competition_id
-    ORDER BY page.page_position, page.person_id`;
-}
-
-export function personRankingCountsQuery() {
-  return sqlFragment`SELECT count FROM person_ranking_counts
-     WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?`;
 }
 
 export function personCompetitionRankingRowsQuery() {

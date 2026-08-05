@@ -6,7 +6,7 @@ export const competitionPodiumMembersJob = {
   sqlFiles: ["competitions/podium-members/competition_podium_members.sql"],
   tables: ["competition_podium_members"],
   releaseGroup: "competition-rankings",
-  releaseOrder: 3,
+  releaseOrder: 4,
   releaseSchemaVersion: 1,
   estimatedDurationMs: 30_000,
   enabledByDefault: true,

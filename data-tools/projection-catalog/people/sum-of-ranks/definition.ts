@@ -6,7 +6,7 @@ export const sumOfRanksJob = {
   sqlFiles: ["people/sum-of-ranks/person_sum_of_ranks_scores.sql"],
   tables: ["person_sum_of_ranks_scores"],
   releaseGroup: "sum-of-ranks",
-  releaseOrder: 6,
+  releaseOrder: 7,
   releaseSchemaVersion: 2,
   estimatedDurationMs: 180_000,
   enabledByDefault: true,

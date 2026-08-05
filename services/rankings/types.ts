@@ -63,22 +63,6 @@ export type FilteredPersonMetricRow = PersonMetricRow & {
   total_count?: number;
 };
 
-export type PersonRankingRow = {
-  person_id: string;
-  person_name: string;
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  continent_id: string;
-  rank: number;
-  result_id: number;
-  result_value: number;
-  competition_id: string;
-  competition_name: string;
-  competition_start_date: string;
-  round_type_id: string;
-};
-
 export type PersonCompetitionRankingRow = {
   person_id: string;
   person_name: string;
@@ -200,16 +184,6 @@ export type CachePool<T extends object> = {
   misses: number;
   coalesced: number;
   evictions: number;
-};
-
-export type PersonRankingsQueryInput = {
-  eventId: string;
-  resultType: string;
-  scope: string;
-  regionId: string;
-  rankColumn: string;
-  positionColumn: string;
-  conditions: string[];
 };
 
 export type ResultRankingsQueryInput = {

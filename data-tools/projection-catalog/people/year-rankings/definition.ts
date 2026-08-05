@@ -16,7 +16,7 @@ export const personYearRankingsJob = {
     "person_year_ranking_counts",
   ],
   releaseGroup: "yearly-person-rankings",
-  releaseOrder: 7,
+  releaseOrder: 8,
   releaseSchemaVersion: 1,
   estimatedDurationMs: 150_000,
   enabledByDefault: true,

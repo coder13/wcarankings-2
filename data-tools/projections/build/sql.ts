@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { elapsedMs, writeBuildLog } from "./progress.ts";
-import type { ProjectionConnection } from "./database-types.ts";
+import type { ProjectionConnection } from "../shared/database-types.ts";
 import type { BuildPhase, TableProgress } from "./progress-types.ts";
 
 export interface ExecuteTableStatementsOptions {
@@ -11,6 +11,7 @@ export interface ExecuteTableStatementsOptions {
 
 const projectionDirectory = join(
   dirname(fileURLToPath(import.meta.url)),
+  "..",
   "..",
   "projection-catalog",
 );

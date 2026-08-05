@@ -18,10 +18,10 @@ yearly ranking by available year and cohort.
 Each build reads its matching completed ranking table. It must not read raw
 `results` or `result_facts` for a normal count request.
 
-Relevant SQL files include [result ranking counts](../../sql/ranking-projections/result_ranking_counts.sql),
-[ranking counts](../../sql/ranking-projections/ranking_counts.sql),
-[projection counts](../../sql/ranking-projections/projection_counts.sql), and
-[entity ranking counts](../../sql/ranking-projections/entity_ranking_counts.sql).
+Relevant SQL files include [result ranking counts](../../data-tools/projection-catalog/people/result-rankings/result_ranking_counts.sql),
+[ranking counts](../../data-tools/projection-catalog/core/ranking-tables/ranking_counts.sql),
+[projection counts](../../data-tools/projection-catalog/people/event-rankings/projection_counts.sql), and
+[entity ranking counts](../../data-tools/projection-catalog/core/entity-ranking-counts/entity_ranking_counts.sql).
 
 ## Indexes
 
@@ -30,17 +30,10 @@ The source ranking must have a browse index matching the count grouping, or the
 count must be produced during the same build phase as the ranking.
 
 `result_ranking_counts` is produced from the canonical result-ranking tables.
-The retired `result_counts` compatibility projection is not built or read.
 
 ## Build evidence
 
-Measured result counts:
-
-- `21.600 s` (`00:21.60`) for the now-retired `result_counts`;
-- `39.093 s` (`00:39.09`) for `result_ranking_counts`;
-- `97.258 s` (`01:37.26`) for the earlier gender count table.
-
-The gender count table is removed with the eager gender projections. Lazy
+The measured `result_ranking_counts` build took `39.093 s` (`00:39.09`). Lazy
 gender result windows derive their bounded count in the generation-aware cached
 request path.
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { checkServerDatasetCompatibility } from "../scripts/lib/release-compatibility.ts";
+import { checkServerDatasetCompatibility } from "../data-tools/projections/deployment/compatibility.ts";
 
 const server = {
   minimumDatasetSchemaVersion: 1,

@@ -35,7 +35,7 @@ The current definition creates:
 - covering Single and Average ranking indexes.
 
 The index list is in
-[result_facts.sql](../../sql/ranking-projections/result_facts.sql).
+[result_facts.sql](../../data-tools/projection-catalog/core/result-facts/result_facts.sql).
 
 ## EXPLAIN summary
 

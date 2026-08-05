@@ -6,7 +6,7 @@ import { test } from "bun:test";
 import {
   createProjectionReleaseManifest,
   verifyProjectionReleaseManifest,
-} from "../scripts/projections/release/projection-release-artifact.ts";
+} from "../data-tools/projections/artifacts/manifest.ts";
 
 async function fixture({ raw = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "projection-artifact-"));

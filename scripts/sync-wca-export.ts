@@ -6,38 +6,65 @@ import { access, mkdir, rename, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import mysql from "mysql2/promise";
+import type {
+  Connection,
+  ResultSetHeader,
+  RowDataPacket,
+} from "mysql2/promise";
 import * as unzipper from "unzipper";
 import {
   dropManagedObject,
   ensureWcaPersonLookupIndex,
-  refreshMysqlSchema,
-} from "../data-tools/projections/build.ts";
-import { publishProjectionTables } from "../data-tools/projections/publish.ts";
+} from "../data-tools/projections/shared/database.ts";
+import { refreshMysqlSchema } from "../data-tools/projections/build/runner.ts";
+import { publishProjectionTables } from "../data-tools/projections/build/publish.ts";
 import { enqueueAllListRankingRebuilds } from "./lib/list-ranking-jobs.ts";
 import { refreshBoardList, refreshDelegatesList } from "./lib/board-lists.ts";
 import { refreshSystemLists } from "./lib/system-lists.ts";
 import { resolveWcaExport } from "./lib/wca-export.ts";
-const force = argumentPresent("force");
-const dryRun = argumentPresent("dry-run");
-const rawOnly = argumentPresent("raw-only");
+import type {
+  ExportMetadataRow,
+  ImportCoverageRow,
+  ImportRunFields,
+  MariaDbImportResult,
+  SyncWcaOptions,
+  WcaExportMetadata,
+} from "./lib/wca-sync-types.ts";
 
-const selectedProjectionNames = argumentValue("projection-names")
-  .split(",")
-  .map((name) => name.trim())
-  .filter(Boolean);
-const canonicalExportDate =
-  argumentValue("canonical-export-date") ||
-  process.env.CANONICAL_EXPORT_DATE ||
-  "";
+function syncWcaOptions(): SyncWcaOptions {
+  return {
+    force: argumentPresent("force"),
+    dryRun: argumentPresent("dry-run"),
+    rawOnly: argumentPresent("raw-only"),
+    selectedProjectionNames: argumentValue("projection-names")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean),
+    canonicalExportDate:
+      argumentValue("canonical-export-date") ||
+      process.env.CANONICAL_EXPORT_DATE ||
+      "",
+    suppliedPath: argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH,
+  };
+}
 
-async function getSuppliedExportMetadata(path) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function getSuppliedExportMetadata(
+  path: string,
+): Promise<WcaExportMetadata> {
   const archive = await unzipper.Open.file(path);
   const entry = archive.files.find(
     (file) => basename(file.path).toLowerCase() === "metadata.json",
   );
   if (!entry)
     throw new Error("The supplied WCA SQL export is missing metadata.json.");
-  const metadata = JSON.parse((await entry.buffer()).toString("utf8"));
+  const metadata: unknown = JSON.parse((await entry.buffer()).toString("utf8"));
+  if (!isRecord(metadata)) {
+    throw new Error("The supplied WCA SQL export metadata is invalid.");
+  }
   const exportDate = metadata.export_date ?? metadata.exportDate;
   const version =
     metadata.export_format_version ?? metadata.exportFormatVersion ?? "2";
@@ -45,24 +72,46 @@ async function getSuppliedExportMetadata(path) {
     throw new Error(
       "The supplied WCA SQL export metadata is missing export_date.",
     );
-  return { exportDate, sqlUrl: "", version };
+  return {
+    exportDate: String(exportDate),
+    sqlUrl: "",
+    version: String(version),
+  };
 }
 
-async function download(url, destination) {
+async function download(url: string, destination: string): Promise<void> {
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok || !response.body)
     throw new Error(`Export download returned ${response.status}.`);
   const output = createWriteStream(destination);
-  await pipeline(response.body, output);
+  await pipeline(responseChunks(response.body), output);
 }
 
-async function getCachedExport(latest) {
-  const suppliedPath =
-    argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH;
-  if (suppliedPath) {
-    await access(suppliedPath);
-    process.stdout.write(`Using supplied WCA SQL export: ${suppliedPath}\n`);
-    return suppliedPath;
+async function* responseChunks(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<Uint8Array> {
+  const reader = body.getReader();
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) return;
+      yield result.value;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function getCachedExport(
+  latest: WcaExportMetadata,
+  options: SyncWcaOptions,
+): Promise<string> {
+  if (options.suppliedPath) {
+    await access(options.suppliedPath);
+    process.stdout.write(
+      `Using supplied WCA SQL export: ${options.suppliedPath}\n`,
+    );
+    return options.suppliedPath;
   }
 
   const cacheDirectory =
@@ -89,7 +138,7 @@ async function getCachedExport(latest) {
   }
 }
 
-async function getCachedExportForToday() {
+async function getCachedExportForToday(): Promise<string | null> {
   const cacheDirectory =
     process.env.WCA_EXPORT_CACHE_DIR || "/var/cache/wcarankings";
   const cachePath = join(
@@ -104,7 +153,7 @@ async function getCachedExportForToday() {
   }
 }
 
-function sqlEntry(archive) {
+function sqlEntry(archive: unzipper.CentralDirectory): unzipper.File {
   const entry = archive.files.find(
     (file) => basename(file.path).toLowerCase() === "wca_export.sql",
   );
@@ -113,7 +162,7 @@ function sqlEntry(archive) {
   return entry;
 }
 
-async function dropRankingViews() {
+async function dropRankingViews(): Promise<void> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
       databaseName: process.env.DATABASE_NAME_OVERRIDE,
@@ -135,22 +184,25 @@ async function dropRankingViews() {
   }
 }
 
-function now() {
+function now(): Date {
   return new Date();
 }
 
-function elapsedMilliseconds(startedAt, completedAt = now()) {
+function elapsedMilliseconds(startedAt: Date, completedAt = now()): number {
   return Math.max(0, completedAt.getTime() - startedAt.getTime());
 }
 
-function safeFailureMessage(error) {
+function safeFailureMessage(error: unknown): string {
   return String(error instanceof Error ? error.message : error)
     .replace(/mysql:\/\/[^\s]+/gi, "mysql://[redacted]")
     .replace(/MYSQL_PWD\s*[=:]\s*[^\s]+/gi, "MYSQL_PWD=[redacted]")
     .slice(0, 2000);
 }
 
-async function updateImportRun(id, fields) {
+async function updateImportRun(
+  id: number,
+  fields: ImportRunFields,
+): Promise<void> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
       databaseName: process.env.DATABASE_NAME_OVERRIDE,
@@ -170,14 +222,17 @@ async function updateImportRun(id, fields) {
   }
 }
 
-async function createImportRun(latest, startedAt) {
+async function createImportRun(
+  latest: WcaExportMetadata,
+  startedAt: Date,
+): Promise<number> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
       databaseName: process.env.DATABASE_NAME_OVERRIDE,
     }),
   );
   try {
-    const [result] = await connection.query(
+    const [result] = await connection.query<ResultSetHeader>(
       `INSERT INTO import_runs
         (export_date, export_format_version, export_url, status, started_at, fetch_started_at)
        VALUES (?, ?, ?, 'running', ?, ?)`,
@@ -195,14 +250,14 @@ async function createImportRun(latest, startedAt) {
   }
 }
 
-async function collectImportCounts() {
+async function collectImportCounts(): Promise<ImportRunFields> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
       databaseName: process.env.DATABASE_NAME_OVERRIDE,
     }),
   );
   try {
-    const [coverage] = await connection.query(`
+    const [coverage] = await connection.query<ImportCoverageRow[]>(`
       SELECT
         (SELECT COUNT(*) FROM persons WHERE sub_id = 1) AS people,
         (SELECT COUNT(*) FROM results) AS results,
@@ -238,15 +293,18 @@ async function collectImportCounts() {
   }
 }
 
-async function tableExists(connection, name) {
-  const [rows] = await connection.query(
+async function tableExists(
+  connection: Connection,
+  name: string,
+): Promise<boolean> {
+  const [rows] = await connection.query<RowDataPacket[]>(
     "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
     [name],
   );
   return rows.length > 0;
 }
 
-async function promoteRankings() {
+async function promoteRankings(): Promise<void> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
       databaseName: process.env.DATABASE_NAME_OVERRIDE,
@@ -270,7 +328,7 @@ async function promoteRankings() {
   }
 }
 
-async function importSqlExport(zipPath) {
+async function importSqlExport(zipPath: string): Promise<void> {
   const archive = await unzipper.Open.file(zipPath);
   const entry = sqlEntry(archive);
   const options = databaseOptions(undefined, {
@@ -296,7 +354,7 @@ async function importSqlExport(zipPath) {
     },
   );
   child.stderr.on("data", (chunk) => process.stderr.write(chunk));
-  const exit = new Promise((resolve, reject) => {
+  const exit = new Promise<MariaDbImportResult>((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (code, signal) => resolve({ code, signal }));
   });
@@ -308,26 +366,30 @@ async function importSqlExport(zipPath) {
     );
 }
 
-async function getImportedDate() {
+function hasMariaDbCode(value: unknown): value is { code: string } {
+  return isRecord(value) && typeof value.code === "string";
+}
+
+async function getImportedDate(): Promise<string | null> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
       databaseName: process.env.DATABASE_NAME_OVERRIDE,
     }),
   );
   try {
-    const [rows] = await connection.query(
+    const [rows] = await connection.query<ExportMetadataRow[]>(
       "SELECT value FROM export_metadata WHERE `key` = 'export_date' LIMIT 1",
     );
     return rows[0]?.value ?? null;
   } catch (error) {
-    if (error?.code === "ER_NO_SUCH_TABLE") return null;
+    if (hasMariaDbCode(error) && error.code === "ER_NO_SUCH_TABLE") return null;
     throw error;
   } finally {
     await connection.end();
   }
 }
 
-async function writeExportMetadata(latest) {
+async function writeExportMetadata(latest: WcaExportMetadata): Promise<void> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
       databaseName: process.env.DATABASE_NAME_OVERRIDE,
@@ -350,7 +412,9 @@ async function writeExportMetadata(latest) {
   }
 }
 
-async function refreshRankingsSchema() {
+async function refreshRankingsSchema(
+  selectedProjectionNames: readonly string[],
+): Promise<void> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
       databaseName: process.env.DATABASE_NAME_OVERRIDE,
@@ -375,7 +439,7 @@ async function refreshRankingsSchema() {
   }
 }
 
-async function refreshRawPersonLookupIndex() {
+async function refreshRawPersonLookupIndex(): Promise<void> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
       databaseName: process.env.DATABASE_NAME_OVERRIDE,
@@ -388,35 +452,38 @@ async function refreshRawPersonLookupIndex() {
   }
 }
 
-async function main() {
-  if (dryRun && rawOnly)
+async function main(): Promise<void> {
+  const options = syncWcaOptions();
+  if (options.dryRun && options.rawOnly)
     throw new Error("--dry-run and --raw-only cannot be used together.");
-  const suppliedPath =
-    argumentValue("sql-path") || process.env.WCA_SQL_EXPORT_PATH;
-  let latest;
-  if (suppliedPath) {
-    latest = await getSuppliedExportMetadata(suppliedPath);
+  let latest: WcaExportMetadata;
+  if (options.suppliedPath) {
+    latest = await getSuppliedExportMetadata(options.suppliedPath);
   } else {
     const cachedPath = await getCachedExportForToday();
     latest = cachedPath
       ? await getSuppliedExportMetadata(cachedPath)
       : await resolveWcaExport();
   }
-  if (canonicalExportDate)
-    latest = { ...latest, exportDate: canonicalExportDate };
+  if (options.canonicalExportDate) {
+    latest = { ...latest, exportDate: options.canonicalExportDate };
+  }
   process.stdout.write(
     `Latest WCA export: ${latest.exportDate} (v${String(latest.version).replace(/^v/i, "")})\n`,
   );
 
-  if (dryRun) {
-    await getCachedExport(latest);
+  if (options.dryRun) {
+    await getCachedExport(latest, options);
     process.stdout.write(
       "Dry run complete. The cached SQL export is available for import.\n",
     );
     return;
   }
 
-  if (!force && (await getImportedDate()) === String(latest.exportDate)) {
+  if (
+    !options.force &&
+    (await getImportedDate()) === String(latest.exportDate)
+  ) {
     process.stdout.write("Database is already current. Nothing to do.\n");
     return;
   }
@@ -425,11 +492,11 @@ async function main() {
   const runId = await createImportRun(latest, startedAt);
   try {
     await updateImportRun(runId, { fetch_started_at: startedAt });
-    const zipPath = await getCachedExport(latest);
+    const zipPath = await getCachedExport(latest, options);
     await dropRankingViews();
     process.stdout.write("Importing WCA SQL tables into MariaDB…\n");
     await importSqlExport(zipPath);
-    if (rawOnly) {
+    if (options.rawOnly) {
       await refreshRawPersonLookupIndex();
       const completedAt = now();
       await writeExportMetadata(latest);
@@ -451,7 +518,7 @@ async function main() {
       projection_swap_status: "building",
     });
     process.stdout.write("Refreshing staging ranking projections…\n");
-    await refreshRankingsSchema();
+    await refreshRankingsSchema(options.selectedProjectionNames);
     const counts = await collectImportCounts();
     const projectionBuiltAt = now();
     await updateImportRun(runId, {
@@ -501,7 +568,11 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.stack : error}\n`);
-  process.exitCode = 1;
-});
+if (import.meta.main) {
+  await main().catch((error: unknown) => {
+    process.stderr.write(
+      `${error instanceof Error ? error.stack : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  });
+}

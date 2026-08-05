@@ -22,7 +22,7 @@ Single and Average bests and represented region, and `ranks_single` and
 cohort, event-value, penalty, and Kinch tables.
 
 The only published score table is
-[person_sum_of_ranks_scores.sql](../../sql/ranking-projections/person_sum_of_ranks_scores.sql).
+[person_sum_of_ranks_scores.sql](../../data-tools/projection-catalog/people/sum-of-ranks/person_sum_of_ranks_scores.sql).
 The event-value stages are dropped after the build.
 
 ## Indexes

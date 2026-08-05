@@ -27,7 +27,7 @@ The files use these status labels:
 ## Foundation and planned work
 
 - [Result facts](result-facts.md)
-- [WCA best and compatibility lists](wca-best-and-compatibility.md)
+- [Ranking tables](ranking-tables.md)
 - [Weekly rank changes and record streaks](weekly-rank-changes-and-record-streaks.md)
 
 The canonical architecture document gives the shared contracts and naming rules.

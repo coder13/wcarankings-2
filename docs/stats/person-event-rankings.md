@@ -18,7 +18,7 @@ The build reads `ranks_single` and `ranks_average` for official best values and
 gender.
 
 The SQL is in
-[person_event_rankings.sql](../../sql/ranking-projections/person_event_rankings.sql).
+[person_event_rankings.sql](../../data-tools/projection-catalog/people/event-rankings/person_event_rankings.sql).
 
 ## Indexes
 

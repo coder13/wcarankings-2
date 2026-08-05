@@ -4,10 +4,10 @@ import mysql from "mysql2/promise";
 import { test } from "bun:test";
 import {
   activateGeneration,
-  activationTables,
   bootstrapGenerationState,
   rollbackGeneration,
-} from "../scripts/projections/generation/activate-ranking-generation.ts";
+} from "../data-tools/projections/deployment/generation/activate.ts";
+import { activationTables } from "../data-tools/projections/deployment/generation/catalog.ts";
 
 const applicationUrl = process.env.DATABASE_URL;
 const adminUrl = process.env.INTEGRATION_ADMIN_DATABASE_URL;
@@ -59,6 +59,7 @@ if (!applicationUrl && !adminUrl) {
       "ranking-tables": release("ranking-tables", "new"),
       "result-facts": release("result-facts", "new"),
       "result-rankings": release("result-rankings", "new"),
+      "person-event-rankings": release("person-event-rankings", "new"),
       "competition-rankings": release("competition-rankings", "new"),
       "person-competition-rankings": release(
         "person-competition-rankings",

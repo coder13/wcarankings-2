@@ -27,12 +27,12 @@ reference MariaDB version.
 
 Use these targets for a page request:
 
-| Request type | Target | Required behavior when it is slower |
-| --- | ---: | --- |
-| Warm, precomputed page | p95 below 200 ms | Improve the query or add a measured index. |
-| First lazy page | Preferably below 200 ms | Cache the result and coalesce equal requests. |
-| Repeated lazy page | p95 below 200 ms | Keep the window in the process cache or durable cache. |
-| Search or locate request | Preferably below 200 ms | Limit the candidate set before ranking it. |
+| Request type             |                  Target | Required behavior when it is slower                    |
+| ------------------------ | ----------------------: | ------------------------------------------------------ |
+| Warm, precomputed page   |        p95 below 200 ms | Improve the query or add a measured index.             |
+| First lazy page          | Preferably below 200 ms | Cache the result and coalesce equal requests.          |
+| Repeated lazy page       |        p95 below 200 ms | Keep the window in the process cache or durable cache. |
+| Search or locate request | Preferably below 200 ms | Limit the candidate set before ranking it.             |
 
 Use p95 for the decision. Do not use one fast local request as proof that a
 query meets the target.
@@ -58,12 +58,12 @@ materialization phase, index phase, validation phase, and complete projection.
 
 Use these bands as a starting point:
 
-| Eager build time for one statistic | Default decision |
-| --- | --- |
-| Below 2 minutes | Eager build is normally acceptable when usage is clear. |
-| 2 to 10 minutes | Add usage evidence and compare the lazy design. |
-| More than 10 minutes | Use lazy loading or split the statistic into common cohorts. |
-| More than 30 minutes | Do not add it to the default eager build without explicit approval. |
+| Eager build time for one statistic | Default decision                                                    |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| Below 2 minutes                    | Eager build is normally acceptable when usage is clear.             |
+| 2 to 10 minutes                    | Add usage evidence and compare the lazy design.                     |
+| More than 10 minutes               | Use lazy loading or split the statistic into common cohorts.        |
+| More than 30 minutes               | Do not add it to the default eager build without explicit approval. |
 
 The build time is not the only cost. Record these values too:
 
@@ -303,8 +303,8 @@ A release must not publish a statistic that its readiness checks cannot find.
 A release must not require a table that its selected projection group does not
 build or restore.
 
-When a table becomes obsolete, add it to the retired-table path. Test that the
-active generation removes the old table without changing raw WCA data.
+When a table becomes obsolete, remove its definition, SQL, and consumers in one
+change. Do not add a separate path for retired tables.
 
 Reuse an exact projection artifact only when its export identity, semantic
 fingerprint, schema version, and source fingerprint match the requested build.

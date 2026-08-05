@@ -1,14 +1,14 @@
-type DatabaseOptions = {
+export interface DatabaseOptions {
   host: string;
   port: number;
   user: string;
   password: string;
   database: string;
-};
+}
 
-type DatabaseOptionsInput = {
+export interface DatabaseOptionsInput {
   databaseName?: string;
-};
+}
 
 export function databaseOptions(
   connectionString = process.env.DATABASE_URL,

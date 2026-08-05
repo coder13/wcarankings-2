@@ -14,14 +14,9 @@ streak measures ownership duration.
 
 ## Source data
 
-The current SQL prototypes read historical result facts, ranking inputs, and
-competition dates. The files are [weekly Single](../../sql/ranking-projections/weekly_rank_deltas_single.sql),
-[weekly Average](../../sql/ranking-projections/weekly_rank_deltas_average.sql),
-[record Single](../../sql/ranking-projections/record_streaks_single.sql), and
-[record Average](../../sql/ranking-projections/record_streaks_average.sql).
-
-These files are not in the active deployment group. Their presence does not
-make the product available.
+No SQL for these statistics exists in the active projection catalog. A future
+implementation will read historical result facts, ranking inputs, and
+competition dates.
 
 ## Indexes
 

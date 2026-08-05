@@ -5,10 +5,10 @@ import { dirname, join } from "node:path";
 import { test } from "bun:test";
 import {
   projectionFingerprints,
-  projectionReleasePlan,
-  projectionSemanticPlan,
   semanticProjectionFingerprints,
-} from "../scripts/projections/planning/projection-release-plan.ts";
+} from "../data-tools/projections/release/fingerprints.ts";
+import { projectionReleasePlan } from "../data-tools/projections/release/plan.ts";
+import { projectionSemanticPlan } from "../data-tools/projections/release/semantic-plan.ts";
 
 const repositoryRoot = join(import.meta.dirname, "..");
 const exportId = "2026-07-30T00:00:30Z";
@@ -115,6 +115,7 @@ test("a result-facts semantic change selects only its downstream closure", async
     "result-facts",
     "ranking-tables",
     "result-rankings",
+    "person-event-rankings",
     "person-competition-rankings",
     "city-rankings",
     "sum-of-ranks",

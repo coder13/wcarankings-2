@@ -10,7 +10,7 @@ export const personCompetitionRankingsJob = {
     "person_competition_ranking_counts",
   ],
   releaseGroup: "person-competition-rankings",
-  releaseOrder: 4,
+  releaseOrder: 5,
   releaseSchemaVersion: 2,
   estimatedDurationMs: 90_000,
   enabledByDefault: true,

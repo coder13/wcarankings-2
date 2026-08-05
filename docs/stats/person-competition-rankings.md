@@ -17,7 +17,7 @@ The build reads `result_facts` and `persons`, then counts distinct
 supported geographic and gender cohorts.
 
 The SQL is in
-[person_competition_rankings.sql](../../sql/ranking-projections/person_competition_rankings.sql).
+[person_competition_rankings.sql](../../data-tools/projection-catalog/people/competition-rankings/person_competition_rankings.sql).
 
 ## Indexes
 

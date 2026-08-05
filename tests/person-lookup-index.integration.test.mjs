@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "bun:test";
 import mysql from "mysql2/promise";
-import { ensureWcaPersonLookupIndex } from "../data-tools/projections/build.ts";
+import { ensureWcaPersonLookupIndex } from "../data-tools/projections/shared/database.ts";
 
 const adminDatabaseUrl = process.env.INTEGRATION_ADMIN_DATABASE_URL;
 const integrationTest = adminDatabaseUrl ? test : test.skip;

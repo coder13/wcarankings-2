@@ -1,7 +1,7 @@
 import { databaseOptions } from "./lib/database.ts";
 import { readdir } from "node:fs/promises";
 import mysql from "mysql2/promise";
-import { databaseOptions } from "./lib/database.ts";
+import type { Connection, RowDataPacket } from "mysql2/promise";
 
 const LEGACY_TABLE = "flyway_schema_history";
 const APP_TABLE = "flyway_schema_history_app";
@@ -9,28 +9,40 @@ const RESULTS_TABLE = "flyway_schema_history_results";
 const MIGRATIONS_ROOT =
   process.env.FLYWAY_MIGRATIONS_ROOT || "/app/migrations/mysql";
 
-function identifier(value) {
+interface LaneMigration {
+  script: string;
+  version: string;
+}
+
+function identifier(value: string): string {
   if (!/^[a-z][a-z0-9_]{0,63}$/.test(value))
     throw new Error(`Unsafe table identifier: ${value}`);
   return `\`${value}\``;
 }
 
-async function migrations(directory) {
+async function migrations(directory: string): Promise<LaneMigration[]> {
   return (await readdir(directory)).flatMap((script) => {
     const match = script.match(/^V([^_]+)__.+\.sql$/);
     return match ? [{ version: match[1], script }] : [];
   });
 }
 
-async function tableExists(connection, table) {
-  const [rows] = await connection.query(
+async function tableExists(
+  connection: Connection,
+  table: string,
+): Promise<boolean> {
+  const [rows] = await connection.query<RowDataPacket[]>(
     "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
     [table],
   );
   return rows.length > 0;
 }
 
-async function copyLane(connection, target, laneMigrations) {
+async function copyLane(
+  connection: Connection,
+  target: string,
+  laneMigrations: readonly LaneMigration[],
+): Promise<void> {
   const versions = laneMigrations.map(({ version }) => version);
   const scripts = laneMigrations.map(({ script }) => script);
   const versionPlaceholders = versions.map(() => "?").join(", ");
@@ -66,23 +78,27 @@ async function copyLane(connection, target, laneMigrations) {
   );
 }
 
-const connection = await mysql.createConnection(databaseOptions());
-try {
-  if (!(await tableExists(connection, LEGACY_TABLE))) {
-    process.stdout.write(
-      "No legacy Flyway history table found; fresh databases need no transition.\n",
-    );
-  } else {
-    const [appMigrations, resultMigrations] = await Promise.all([
-      migrations(`${MIGRATIONS_ROOT}/app`),
-      migrations(`${MIGRATIONS_ROOT}/results`),
-    ]);
-    await copyLane(connection, APP_TABLE, appMigrations);
-    await copyLane(connection, RESULTS_TABLE, resultMigrations);
-    process.stdout.write(
-      `Prepared ${APP_TABLE} and ${RESULTS_TABLE} from ${LEGACY_TABLE}.\n`,
-    );
+async function main(): Promise<void> {
+  const connection = await mysql.createConnection(databaseOptions());
+  try {
+    if (!(await tableExists(connection, LEGACY_TABLE))) {
+      process.stdout.write(
+        "No legacy Flyway history table found; fresh databases need no transition.\n",
+      );
+    } else {
+      const [appMigrations, resultMigrations] = await Promise.all([
+        migrations(`${MIGRATIONS_ROOT}/app`),
+        migrations(`${MIGRATIONS_ROOT}/results`),
+      ]);
+      await copyLane(connection, APP_TABLE, appMigrations);
+      await copyLane(connection, RESULTS_TABLE, resultMigrations);
+      process.stdout.write(
+        `Prepared ${APP_TABLE} and ${RESULTS_TABLE} from ${LEGACY_TABLE}.\n`,
+      );
+    }
+  } finally {
+    await connection.end();
   }
-} finally {
-  await connection.end();
 }
+
+if (import.meta.main) await main();

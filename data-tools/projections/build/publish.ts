@@ -1,6 +1,6 @@
-import { PUBLISHED_PROJECTION_TABLES, RETIRED_PROJECTION_TABLES } from "./build.ts";
-import { dropManagedObject, tableExists } from "./database.ts";
-import type { ProjectionConnection } from "./database-types.ts";
+import { PUBLISHED_PROJECTION_TABLES } from "../../projection-catalog/tables.ts";
+import { dropManagedObject, tableExists } from "../shared/database.ts";
+import type { ProjectionConnection } from "../shared/database-types.ts";
 
 export interface PublishProjectionTablesOptions {
   projectionSuffix?: string;
@@ -29,6 +29,4 @@ export async function publishProjectionTables(
   await connection.query(`RENAME TABLE ${renames.join(", ")}`);
   if (obsolete.length > 0)
     await connection.query(`DROP TABLE ${obsolete.join(", ")}`);
-  for (const retired of RETIRED_PROJECTION_TABLES)
-    await dropManagedObject(connection, retired);
 }

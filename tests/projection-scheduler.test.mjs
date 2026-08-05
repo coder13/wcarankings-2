@@ -3,17 +3,19 @@ import { readFile } from "node:fs/promises";
 import { test } from "bun:test";
 
 import {
-  DEFAULT_PROJECTION_NAMES,
   CORE_RANKING_TABLE_TASKS,
   CORE_RANKING_TABLE_TASK_COUNT,
-  PROJECTION_REGISTRY,
-  createTableProgress,
-  projectionBuildPlan,
-  projectionConcurrency,
-  projectionNamesForRefresh,
   renameRankingTableSql,
-  runDependencyAwareTasks,
-} from "../data-tools/projections/build.ts";
+} from "../data-tools/projections/build/ranking-tables.ts";
+import { DEFAULT_PROJECTION_NAMES } from "../data-tools/projection-catalog/tables.ts";
+import { PROJECTION_REGISTRY } from "../data-tools/projections/build/registry.ts";
+import { createTableProgress } from "../data-tools/projections/build/progress.ts";
+import {
+  projectionBuildPlan,
+  projectionNamesForRefresh,
+} from "../data-tools/projections/build/plan.ts";
+import { projectionConcurrency } from "../data-tools/projections/build/runner.ts";
+import { runDependencyAwareTasks } from "../data-tools/projections/build/scheduler.ts";
 
 function fakeConnection(id, closed) {
   return {
@@ -216,7 +218,11 @@ test("a full schema refresh keeps the default semantic projections when selectio
 });
 
 test("result-fact consumers never start from raw WCA tables alone", () => {
-  for (const name of ["sum-of-ranks", "person-competition-rankings"]) {
+  for (const name of [
+    "sum-of-ranks",
+    "person-competition-rankings",
+    "person-event-rankings",
+  ]) {
     const projection = PROJECTION_REGISTRY.find(
       (candidate) => candidate.name === name,
     );

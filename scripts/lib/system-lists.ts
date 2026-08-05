@@ -1,12 +1,15 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
+import type { Connection, ResultSetHeader } from "mysql2/promise";
 import { SYSTEM_LIST_DEFINITIONS } from "./system-list-definitions.ts";
 import { enqueueListRankingRebuild } from "./list-ranking-jobs.ts";
+import type { ListRow } from "./list-types.ts";
 
-export async function refreshSystemLists(connection) {
+export async function refreshSystemLists(
+  connection: Connection,
+): Promise<void> {
   await connection.beginTransaction();
   try {
     for (const definition of SYSTEM_LIST_DEFINITIONS) {
-      const [listRows] = await connection.query(
+      const [listRows] = await connection.query<ListRow[]>(
         `SELECT id, system_definition_version, membership_version
          FROM lists
          WHERE kind = 'system'
@@ -24,7 +27,7 @@ export async function refreshSystemLists(connection) {
         );
       }
 
-      const [removed] = await connection.query(
+      const [removed] = await connection.query<ResultSetHeader>(
         `DELETE member
          FROM list_members AS member
          LEFT JOIN persons AS person
@@ -51,7 +54,7 @@ export async function refreshSystemLists(connection) {
            )`,
         [listId, definition.token],
       );
-      const [inserted] = await connection.query(
+      const [inserted] = await connection.query<ResultSetHeader>(
         `INSERT IGNORE INTO list_members (list_id, person_id, added_by_user_id, source)
          SELECT ?, person.wca_id, NULL, 'system_rule'
          FROM persons AS person
