@@ -1,11 +1,11 @@
 import {
-  CORE_RANKING_TABLE_TASK_COUNT,
-  createRankingTableSource,
+  createRankingSource,
   rankingTableTasks,
 } from "./ranking-tables.ts";
 import {
   dropManagedObject,
   ensureIndexes,
+  ensureWcaPersonLookupIndex,
   INDEXES,
   tableExists,
 } from "./database.ts";
@@ -13,11 +13,16 @@ import { DEPLOYMENT_PROJECTION_GROUPS, PROJECTION_JOBS } from "./jobs.ts";
 import {
   elapsedMs,
   createTableProgress,
-  startBuildHeartbeat,
+  runTimedBuildStep,
   writeBuildLog,
 } from "./progress.ts";
 import { runDependencyAwareTasks } from "./scheduler.ts";
-import { createdTables, executeTableStatements, projectionSql } from "./sql.ts";
+import {
+  createdTables,
+  executeTableStatements,
+  projectionSql,
+  statements,
+} from "./sql.ts";
 
 export { DEPLOYMENT_PROJECTION_GROUPS } from "./jobs.ts";
 export { ensureWcaPersonLookupIndex, dropManagedObject } from "./database.ts";
@@ -213,10 +218,6 @@ async function buildProjection(
 ) {
   const startedAt = performance.now();
   writeBuildLog(`Starting projection ${projection.name}…`);
-  const stopHeartbeat = startBuildHeartbeat(
-    `projection ${projection.name}`,
-    startedAt,
-  );
   try {
     for (const table of projection.tables)
       await dropManagedObject(connection, `${table}${projectionSuffix}`);
@@ -228,13 +229,11 @@ async function buildProjection(
     const rowCounts = await projection.validate(connection, projectionSuffix);
     const durationMs = elapsedMs(startedAt);
     const timing = { name: projection.name, durationMs, rowCounts, phases };
-    stopHeartbeat();
     writeBuildLog(
       `Finished projection ${projection.name} in ${durationMs}ms (${JSON.stringify(rowCounts)}).`,
     );
     return timing;
   } catch (error) {
-    stopHeartbeat();
     writeBuildLog(
       `Failed projection ${projection.name} after ${elapsedMs(startedAt)}ms.`,
     );
@@ -247,66 +246,6 @@ export function projectionConcurrency(value) {
     value ?? process.env.WCA_PROJECTION_BUILD_CONCURRENCY ?? 2,
   );
   return Number.isFinite(parsed) && parsed > 1 ? Math.floor(parsed) : 1;
-}
-
-async function buildRegisteredProjectionsConcurrently(
-  projections,
-  {
-    connection,
-    projectionSuffix,
-    createConnection,
-    concurrency,
-    tableProgress,
-    satisfiedProjectionNames = [],
-  },
-) {
-  const tasks = projections.map((projection) => ({
-    name: projection.name,
-    dependencies: projection.dependencies,
-    estimatedDurationMs: projection.estimatedDurationMs,
-    run: async (connection) =>
-      buildProjection(connection, projection, projectionSuffix, tableProgress),
-  }));
-  return runDependencyAwareTasks(tasks, {
-    connection,
-    createConnection,
-    concurrency,
-    satisfiedDependencies: ["raw-wca", ...satisfiedProjectionNames],
-  });
-}
-
-export async function buildRegisteredProjections(
-  connection,
-  {
-    projectionSuffix = "",
-    projectionNames: selectedNames,
-    satisfiedProjectionNames = [],
-    createConnection,
-    concurrency,
-  } = {},
-) {
-  const projections = orderedProjections(
-    selectedNames,
-    satisfiedProjectionNames,
-  );
-  const tableProgress = createTableProgress(
-    await countProjectionTables(projections),
-  );
-  const maxConcurrency = projectionConcurrency(concurrency);
-  if (createConnection && maxConcurrency > 1 && projections.length > 1) {
-    writeBuildLog(
-      `Building registered projections with concurrency ${maxConcurrency}.`,
-    );
-  }
-  return buildRegisteredProjectionsConcurrently(projections, {
-    connection,
-    projectionSuffix,
-    createConnection:
-      createConnection && maxConcurrency > 1 ? createConnection : undefined,
-    concurrency: maxConcurrency,
-    tableProgress,
-    satisfiedProjectionNames,
-  });
 }
 
 export async function promoteProjectionTables(
@@ -331,35 +270,6 @@ export async function promoteProjectionTables(
     await dropManagedObject(connection, retired);
 }
 
-export async function promoteRegisteredProjections(
-  connection,
-  {
-    projectionSuffix = "_staging",
-    projectionNames: selectedNames = DEFAULT_PROJECTION_NAMES,
-  } = {},
-) {
-  const tables = orderedProjections(selectedNames).flatMap(
-    ({ tables: projectionTables }) => projectionTables,
-  );
-  const renames = [];
-  const obsolete = [];
-  for (const table of tables) {
-    const previous = `${table}_previous`;
-    await dropManagedObject(connection, previous);
-    if (await tableExists(connection, table)) {
-      renames.push(`\`${table}\` TO \`${previous}\``);
-      obsolete.push(`\`${previous}\``);
-    }
-    renames.push(`\`${table}${projectionSuffix}\` TO \`${table}\``);
-  }
-  if (renames.length > 0)
-    await connection.query(`RENAME TABLE ${renames.join(", ")}`);
-  if (obsolete.length > 0)
-    await connection.query(`DROP TABLE ${obsolete.join(", ")}`);
-  for (const retired of RETIRED_PROJECTION_TABLES)
-    await dropManagedObject(connection, retired);
-}
-
 export async function refreshMysqlSchema(
   connection,
   {
@@ -376,9 +286,6 @@ export async function refreshMysqlSchema(
     average: `ranking_entries_average${projectionSuffix}`,
   };
   const countsTable = `ranking_counts${projectionSuffix}`;
-  const resultEntriesTable = `result_entries_single${projectionSuffix}`;
-  const resultCountsTable = `result_counts${projectionSuffix}`;
-  const resultEntriesSource = `result_entries_single_source${projectionSuffix}`;
   const bestSingle = `wca_best_single${projectionSuffix}`;
   const bestAverage = `wca_best_average${projectionSuffix}`;
   const resultFacts = `result_facts${projectionSuffix}`;
@@ -392,13 +299,10 @@ export async function refreshMysqlSchema(
   if (includeRankingTables) {
     for (const name of [
       countsTable,
-      resultEntriesTable,
-      resultCountsTable,
       entriesTables.single,
       entriesTables.average,
       entriesSources.single,
       entriesSources.average,
-      resultEntriesSource,
       bestSingle,
       bestAverage,
     ]) {
@@ -419,7 +323,7 @@ export async function refreshMysqlSchema(
       "core/ranking-tables/wca_best_single.sql",
       "core/ranking-tables/wca_best_average.sql",
     ]) {
-      await createRankingTableSource(connection, file, names);
+      await createRankingSource(connection, file, names);
     }
   }
 
@@ -446,9 +350,6 @@ export async function refreshMysqlSchema(
         entriesTables,
         entriesSources,
         countsTable,
-        resultEntriesTable,
-        resultCountsTable,
-        resultEntriesSource,
         bestSingle,
         bestAverage,
         resultFacts,

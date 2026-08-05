@@ -147,8 +147,6 @@ test("bootstrap fails closed without complete, valid export metadata", async () 
     "ranking_entries_single",
     "ranking_entries_average",
     "ranking_counts",
-    "result_entries_single",
-    "result_counts",
   ];
   for (const exportRows of [
     [],
@@ -185,8 +183,6 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
     "ranking_entries_single",
     "ranking_entries_average",
     "ranking_counts",
-    "result_entries_single",
-    "result_counts",
     "competition_podium_members",
     "competition_event_stats",
     "competition_stats",
@@ -328,7 +324,7 @@ test("activated-phase recovery verifies the exact release identity and fingerpri
 
 test("activation renames raw data, projections, export metadata, and state atomically", async () => {
   const tables = activationTables(manifest);
-  const retired = ["result_entries_single", "result_counts", "person_metric_values"];
+  const retired = ["person_metric_values"];
   const connection = fakeConnection({
     schemas: {
       wcarankings: [...tables, ...retired],
@@ -369,7 +365,7 @@ test("rollback restores projection tables retired by the active generation", asy
   const activeRow = stateRow({
     artifactId: 30,
     activation: tables,
-    previous: [...tables, "result_entries_single"],
+    previous: [...tables, "person_metric_values"],
   });
   const connection = fakeConnection({
     activeRow,
@@ -386,7 +382,7 @@ test("rollback restores projection tables retired by the active generation", asy
   });
   assert.equal(result.rolledBack, true);
   const rename = connection.statements.find(({ sql }) => sql.startsWith("RENAME TABLE"));
-  assert.match(rename.sql, /`wcarankings_candidate_30_previous`\.`result_entries_single` TO `wcarankings`\.`result_entries_single`/);
+  assert.match(rename.sql, /`wcarankings_candidate_30_previous`\.`person_metric_values` TO `wcarankings`\.`person_metric_values`/);
 });
 
 test("failure before state staging cannot change active production tables", async () => {

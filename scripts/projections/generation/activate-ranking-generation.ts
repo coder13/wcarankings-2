@@ -366,9 +366,7 @@ export async function activateGeneration({
     }
 
     const tables = activationTables(manifest);
-    const retiredTables = groupRetiredTables(
-      Object.keys(manifest.groups || {}),
-    );
+    const retiredTables = groupRetiredTables(Object.keys(manifest.groups));
     const [candidateTables, productionTables, previousTablesPresent] =
       await Promise.all([
         tableNames(connection, candidateSchema),

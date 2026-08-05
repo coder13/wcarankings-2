@@ -235,36 +235,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
   }
 });
 
-test("result rankings create and remove their solve stage in one build", async () => {
-  const projection = PROJECTION_REGISTRY.find(
-    (candidate) => candidate.name === "result-rankings",
-  );
-  assert.ok(projection);
-  const executedStatements = [];
-  const connection = {
-    async query(sql) {
-      executedStatements.push(sql);
-      return [[]];
-    },
-  };
-
-  await projection.build(connection, "", createTableProgress(5));
-
-  const createIndex = executedStatements.findIndex((statement) =>
-    /CREATE TEMPORARY TABLE solve_facts_stage/.test(statement),
-  );
-  const useIndex = executedStatements.findIndex((statement) =>
-    /FROM\s+solve_facts_stage solve/.test(statement),
-  );
-  const cleanupIndex = executedStatements.findLastIndex((statement) =>
-    /DROP TEMPORARY TABLE solve_facts_stage/.test(statement),
-  );
-  assert.ok(createIndex >= 0);
-  assert.ok(useIndex > createIndex);
-  assert.ok(cleanupIndex > useIndex);
-});
-
-test("core ranking-table build omits disabled weekly helper tables", () => {
+test("core ranking-table build contains only active ranking tables", () => {
   assert.equal(
     CORE_RANKING_TABLE_TASKS.some(
       ({ name, table }) =>
@@ -281,13 +252,13 @@ test("core ranking-table build omits disabled weekly helper tables", () => {
     ({ name }) => name === "ranking-tables-entries-average-source",
   );
   assert.deepEqual(averageSource.dependencies, ["projection:result-facts"]);
-  assert.equal(CORE_RANKING_TABLE_TASK_COUNT, 5);
+  assert.equal(CORE_RANKING_TABLE_TASK_COUNT, 3);
   const progress = createTableProgress(CORE_RANKING_TABLE_TASK_COUNT);
   let lastProgress;
   for (const task of CORE_RANKING_TABLE_TASKS) {
     if (task.table) lastProgress = progress.start(task.table);
   }
-  assert.equal(lastProgress, "[5/5]");
+  assert.equal(lastProgress, "[3/3]");
 });
 
 test("core ranking-table source views wait for result facts", async () => {
@@ -331,7 +302,6 @@ test("core ranking-table SQL uses the matching staged result facts table", async
       single: "ranking_entries_single_source_staging",
       average: "ranking_entries_average_source_staging",
     },
-    resultEntriesSource: "result_entries_single_source_staging",
     resultFacts: "result_facts_staging",
   });
 

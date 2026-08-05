@@ -14,8 +14,6 @@ async function fixture({ raw = false } = {}) {
     "ranking_entries_single_transfer",
     "ranking_entries_average_transfer",
     "ranking_counts_transfer",
-    "result_entries_single_transfer",
-    "result_counts_transfer",
     "projection_transfer_manifest_ranking_tables",
     "projection_transfer_indexes_ranking_tables",
   ];
@@ -118,8 +116,6 @@ test("rejects transfer metadata from a different WCA export", async () => {
         "ranking_entries_single_transfer",
         "ranking_entries_average_transfer",
         "ranking_counts_transfer",
-        "result_entries_single_transfer",
-        "result_counts_transfer",
         "projection_transfer_manifest_ranking_tables",
         "projection_transfer_indexes_ranking_tables",
       ],

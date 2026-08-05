@@ -8,8 +8,6 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
       "ranking_entries_single",
       "ranking_entries_average",
       "ranking_counts",
-      "result_entries_single",
-      "result_counts",
       "result_rankings_single",
       "result_rankings_average",
       "result_gender_rankings_single",
@@ -50,8 +48,6 @@ test("keeps core ranking tables available without semantic projections", () => {
     "ranking_entries_single",
     "ranking_entries_average",
     "ranking_counts",
-    "result_entries_single",
-    "result_counts",
   ]);
   assert.equal(featureSwitch.core, true);
   assert.equal(featureSwitch.resultRankings, false);
