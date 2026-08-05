@@ -42,11 +42,9 @@ export function RankingsExplorerHeader() {
         return featureSwitch.personCompetitionRankings;
       return true;
     });
-    const personRankingValue = filters.personCompetitionRanking
-      ? "competitions"
-      : filters.personMedalRanking
-        ? "medals"
-        : "rankings";
+    let personRankingValue = "rankings";
+    if (filters.personCompetitionRanking) personRankingValue = "competitions";
+    else if (filters.personMedalRanking) personRankingValue = "medals";
     contextualControl = (
       <TextDropdown
         options={personRankingOptions}
