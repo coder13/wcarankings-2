@@ -164,6 +164,14 @@ export function useRankingsState() {
       },
       changeYear(nextYear: number | null) {
         if (nextYear === filters.year) return;
+        if (filters.personCompetitionRanking) {
+          patchFilters(
+            { year: nextYear },
+            { history: "push", pathname: "/persons/competitions" },
+            { search: "", wcaId: "", focusMe: false },
+          );
+          return;
+        }
         patchFilters(
           {
             year: nextYear,

@@ -23,6 +23,7 @@ const COMPETITION_RANKINGS_TABLES = [
 ] as const;
 const PERSON_COMPETITION_RANKINGS_TABLES = [
   "person_competition_counts",
+  "person_competition_year_counts",
   "person_competition_rankings",
   "person_competition_ranking_counts",
 ] as const;

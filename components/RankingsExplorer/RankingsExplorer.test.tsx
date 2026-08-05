@@ -35,6 +35,7 @@ function pathnameForFilters(filters: RankingsFilterState) {
     return `/competitions/${filters.competitionRanking}`;
   }
   if (filters.subject === "cities") return `/cities/${filters.cityRanking}`;
+  if (filters.personCompetitionRanking) return "/persons/competitions";
   if (filters.personMedalRanking) return "/persons/medals";
   if (filters.year) return `/persons/year/${filters.year}`;
   return "/";
@@ -201,4 +202,37 @@ test("renders a separate person ranking picker", () => {
     markup,
     /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button><button[^>]*>Competitions<\/button>/,
   );
+});
+
+test("keeps a competition-ranking year in its query string", () => {
+  const filters: RankingsUrlState = {
+    subject: "people",
+    competitionRanking: "best-result",
+    cityRanking: "fastest-single",
+    personCompetitionRanking: true,
+    personMedalRanking: false,
+    medalType: "overall",
+    year: 2023,
+    eventId: "333",
+    rankingType: "single",
+    regionSelection: { scope: "world", regionId: "" },
+    gender: ["f", "o"],
+    latitudeHemisphere: "north",
+    search: "",
+    regexSearch: false,
+    wcaId: "",
+    focusMe: false,
+    kinchOrder: "regional",
+  };
+  assert.equal(
+    serializeRankingsUrl("/persons/competitions", filters).toString(),
+    "gender=f%2Co&year=2023",
+  );
+  const markup = renderExplorerMarkup(
+    { options: { showSubjectSwitch: true } },
+    { personCompetitionRanking: true, year: 2023 },
+  );
+  assert.match(markup, /aria-label="Person ranking period"/);
+  assert.match(markup, />All time</);
+  assert.match(markup, />2023</);
 });

@@ -21,6 +21,7 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
       "person_year_rankings_average",
       "person_year_ranking_counts",
       "person_competition_counts",
+      "person_competition_year_counts",
       "person_competition_rankings",
       "person_competition_ranking_counts",
       "person_medal_scores",

@@ -80,6 +80,7 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     filters.regionSelection.regionId,
     filters.gender.join(","),
     filters.resource === "people" ||
+    filters.resource === "person-competition-count" ||
     filters.resource === "person-medal-rankings"
       ? (filters.year ?? "all")
       : "all",
@@ -117,6 +118,7 @@ function addRankingFilterParams(
   }
   if (
     (filters.resource === "people" ||
+      filters.resource === "person-competition-count" ||
       filters.resource === "person-medal-rankings") &&
     filters.year
   ) {

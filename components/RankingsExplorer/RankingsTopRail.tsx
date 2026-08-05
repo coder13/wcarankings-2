@@ -110,7 +110,8 @@ export function RankingsTopRail() {
     eventLeadingOptions = [ALL_MEDAL_EVENTS_OPTION];
   }
   let personRankingPeriod = "";
-  if (filters.personCompetitionRanking) personRankingPeriod = "competitions";
+  if (filters.personCompetitionRanking)
+    personRankingPeriod = filters.year ? String(filters.year) : "competitions";
   else if (filters.personMedalRanking) personRankingPeriod = filters.medalType;
   else if (filters.year) personRankingPeriod = String(filters.year);
   let personRankingYears = rankings.availableYears;
@@ -119,24 +120,35 @@ export function RankingsTopRail() {
   }
   const personRankingPeriodOptions = filters.personMedalRanking
     ? MEDAL_RANKING_OPTIONS
-    : [
-        ...(featureSwitch.personCompetitionRankings
-          ? [
-              {
-                value: "competitions",
-                label: t("rankingsRail.period.competitionCount"),
-              },
-            ]
-          : []),
-        ...(featureSwitch.personMedalRankings
-          ? [{ value: "medals", label: "Medal rankings" }]
-          : []),
-        { value: "", label: t("rankingsRail.period.allTime") },
-        ...personRankingYears.map((year) => ({
-          value: String(year),
-          label: String(year),
-        })),
-      ];
+    : filters.personCompetitionRanking
+      ? [
+          {
+            value: "competitions",
+            label: t("rankingsRail.period.allTime"),
+          },
+          ...personRankingYears.map((year) => ({
+            value: String(year),
+            label: String(year),
+          })),
+        ]
+      : [
+          ...(featureSwitch.personCompetitionRankings
+            ? [
+                {
+                  value: "competitions",
+                  label: t("rankingsRail.period.competitionCount"),
+                },
+              ]
+            : []),
+          ...(featureSwitch.personMedalRankings
+            ? [{ value: "medals", label: "Medal rankings" }]
+            : []),
+          { value: "", label: t("rankingsRail.period.allTime") },
+          ...personRankingYears.map((year) => ({
+            value: String(year),
+            label: String(year),
+          })),
+        ];
   const showPersonRankingPeriod =
     !source &&
     options.showSubjectSwitch &&
@@ -209,9 +221,11 @@ export function RankingsTopRail() {
                   options: personRankingPeriodOptions,
                   value: personRankingPeriod,
                   onChange: (value) => {
-                    if (value === "competitions")
-                      actions.changePersonCompetitionRanking(true);
-                    else if (value === "medals")
+                    if (value === "competitions") {
+                      if (filters.personCompetitionRanking)
+                        actions.changeYear(null);
+                      else actions.changePersonCompetitionRanking(true);
+                    } else if (value === "medals")
                       actions.changePersonMedalRanking(true);
                     else if (filters.personMedalRanking)
                       actions.changeMedalType(

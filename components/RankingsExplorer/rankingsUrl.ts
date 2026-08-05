@@ -216,7 +216,7 @@ function normalizeState(
     medalType: isMedalRankingType(state.medalType)
       ? state.medalType
       : "overall",
-    year: subject === "people" && !personCompetitionRanking ? state.year : null,
+    year: subject === "people" ? state.year : null,
     eventId: podiumEventId,
     rankingType: rankingTypeForSubject(
       subject,

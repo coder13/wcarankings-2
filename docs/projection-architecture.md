@@ -79,6 +79,19 @@ Registration alone does not activate a future projection. Only the explicit
 default set is built, published, required by readiness checks, and exposed
 through public route handlers.
 
+## Person-competition rankings
+
+### `person_competition_counts` and `person_competition_year_counts`
+
+The all-time count table has one row per person. The yearly count table has one
+row per person and competition year. Both tables store normalized gender and
+count distinct competition IDs from `result_facts`.
+
+The all-time ranking table stores common scope and single-gender cohorts.
+Yearly and multi-gender requests rank the compact count tables in cached,
+bounded windows. The public rank uses `RANK()` by competition count. The stable
+position orders tied rows by `person_id`.
+
 ## Core fact table
 
 ### `result_facts`
