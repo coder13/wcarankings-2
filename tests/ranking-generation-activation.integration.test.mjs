@@ -230,6 +230,7 @@ if (!applicationUrl && !adminUrl) {
         resultRankings: true,
         competitionRankings: true,
         personCompetitionRankings: true,
+        personEventRankings: true,
         cityEventStats: true,
         sumOfRanks: true,
         yearlyPersonRankings: true,
