@@ -7,6 +7,7 @@ export const resultRankingsJobs = [
     sqlFiles: [
       "people/result-rankings/solve_facts.sql",
       "people/result-rankings/result_rankings_single.sql",
+      "people/result-rankings/solve_facts_cleanup.sql",
       "people/result-rankings/result_rankings_average.sql",
       "people/result-rankings/result_gender_rankings_single.sql",
       "people/result-rankings/result_gender_rankings_average.sql",

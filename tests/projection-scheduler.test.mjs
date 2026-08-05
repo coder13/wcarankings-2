@@ -241,6 +241,35 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
   }
 });
 
+test("result rankings create and remove their solve stage in one build", async () => {
+  const projection = PROJECTION_REGISTRY.find(
+    (candidate) => candidate.name === "result-rankings",
+  );
+  assert.ok(projection);
+  const statements = [];
+  const connection = {
+    async query(sql) {
+      statements.push(sql);
+      return [[]];
+    },
+  };
+
+  await projection.build(connection, "", createTableProgress(5));
+
+  const createIndex = statements.findIndex((statement) =>
+    /CREATE TEMPORARY TABLE solve_facts_stage/.test(statement),
+  );
+  const useIndex = statements.findIndex((statement) =>
+    /FROM\s+solve_facts_stage solve/.test(statement),
+  );
+  const cleanupIndex = statements.findLastIndex((statement) =>
+    /DROP TEMPORARY TABLE solve_facts_stage/.test(statement),
+  );
+  assert.ok(createIndex >= 0);
+  assert.ok(useIndex > createIndex);
+  assert.ok(cleanupIndex > useIndex);
+});
+
 test("core ranking-table build contains only active ranking tables", () => {
   assert.equal(
     CORE_RANKING_TABLE_TASKS.some(
