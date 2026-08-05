@@ -29,6 +29,9 @@ export type RankingEntry = {
   competitionId: string;
   competitionName: string;
   recordBadges: RecordBadgeCode[];
+  rankDelta?: number | null;
+  rankDeltaState?: "changed" | "new" | null;
+  recordStreakWeeks?: number | null;
 };
 
 export const WCA_EVENTS = [

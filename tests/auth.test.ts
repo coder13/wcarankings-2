@@ -14,6 +14,10 @@ import {
 import { getLogoutDestination } from "@/app/api/auth/wca/logout/route";
 import { GET as startWcaAuth } from "@/app/api/auth/wca/route";
 
+type MutableEnvironment = Record<string, string | undefined>;
+
+const environment: MutableEnvironment = process.env;
+
 test("creates high-entropy opaque session tokens", () => {
   const first = generateSessionToken();
   const second = generateSessionToken();
@@ -35,14 +39,14 @@ test("uses the configured WCA OAuth origin", () => {
 });
 
 test("uses the WCA staging example application only for local development", () => {
-  const previousNodeEnv = process.env.NODE_ENV;
+  const previousNodeEnv = environment.NODE_ENV;
   const previousClientId = process.env.WCA_CLIENT_ID;
   const previousClientSecret = process.env.WCA_CLIENT_SECRET;
   const previousOrigin = process.env.WCA_ORIGIN;
   delete process.env.WCA_CLIENT_ID;
   delete process.env.WCA_CLIENT_SECRET;
   delete process.env.WCA_ORIGIN;
-  process.env.NODE_ENV = "development";
+  environment.NODE_ENV = "development";
   try {
     const config = getWcaAuthConfig(
       new Request("http://localhost:3000/api/auth/wca"),
@@ -61,8 +65,8 @@ test("uses the WCA staging example application only for local development", () =
       },
     );
   } finally {
-    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = previousNodeEnv;
+    if (previousNodeEnv === undefined) delete environment.NODE_ENV;
+    else environment.NODE_ENV = previousNodeEnv;
     if (previousClientId === undefined) delete process.env.WCA_CLIENT_ID;
     else process.env.WCA_CLIENT_ID = previousClientId;
     if (previousClientSecret === undefined)
@@ -74,11 +78,11 @@ test("uses the WCA staging example application only for local development", () =
 });
 
 test("does not allow the WCA staging example configuration in production", () => {
-  const previousNodeEnv = process.env.NODE_ENV;
+  const previousNodeEnv = environment.NODE_ENV;
   const previousClientId = process.env.WCA_CLIENT_ID;
   const previousClientSecret = process.env.WCA_CLIENT_SECRET;
   const previousOrigin = process.env.WCA_ORIGIN;
-  process.env.NODE_ENV = "production";
+  environment.NODE_ENV = "production";
   process.env.WCA_CLIENT_ID = "example-application-id";
   process.env.WCA_CLIENT_SECRET = "example-secret";
   process.env.WCA_ORIGIN = "https://staging.worldcubeassociation.org";
@@ -90,8 +94,8 @@ test("does not allow the WCA staging example configuration in production", () =>
     assert.equal(config.clientSecret, undefined);
     assert.equal(config.wcaOrigin, "https://www.worldcubeassociation.org");
   } finally {
-    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = previousNodeEnv;
+    if (previousNodeEnv === undefined) delete environment.NODE_ENV;
+    else environment.NODE_ENV = previousNodeEnv;
     if (previousClientId === undefined) delete process.env.WCA_CLIENT_ID;
     else process.env.WCA_CLIENT_ID = previousClientId;
     if (previousClientSecret === undefined)
@@ -157,8 +161,8 @@ test("only uses a same-origin OAuth return destination", () => {
 });
 
 test("stores the initiating page for the OAuth callback", async () => {
-  const previousNodeEnv = process.env.NODE_ENV;
-  process.env.NODE_ENV = "development";
+  const previousNodeEnv = environment.NODE_ENV;
+  environment.NODE_ENV = "development";
   try {
     const response = await startWcaAuth(
       new Request("http://localhost:3000/api/auth/wca", {
@@ -178,8 +182,8 @@ test("stores the initiating page for the OAuth callback", async () => {
         ),
     );
   } finally {
-    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = previousNodeEnv;
+    if (previousNodeEnv === undefined) delete environment.NODE_ENV;
+    else environment.NODE_ENV = previousNodeEnv;
   }
 });
 

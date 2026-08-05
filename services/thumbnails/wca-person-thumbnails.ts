@@ -4,14 +4,16 @@ import type {
   WcaPersonSearchResponse,
 } from "@/lib/data/types";
 import type {
+  CachedPersonThumbnail,
   PersonThumbnail,
   PersonThumbnailMap,
 } from "@/services/thumbnails/types";
 
-const thumbUrlCache = new LRUCache<string, PersonThumbnail>({
+const thumbUrlCache = new LRUCache<string, CachedPersonThumbnail>({
   maxSize: 64 * 1024 * 1024,
   sizeCalculation: (value, key) =>
-    Buffer.byteLength(key) + (value ? Buffer.byteLength(value) : 0),
+    Buffer.byteLength(key) +
+    (value.thumbnail ? Buffer.byteLength(value.thumbnail) : 0),
 });
 
 export async function fetchPersonThumbnailsFromWca(
@@ -39,7 +41,7 @@ export async function fetchPersonThumbnailsFromWca(
     const thumb = user.avatar?.is_default
       ? null
       : (user.avatar?.thumb_url ?? user.avatar?.url ?? null);
-    thumbUrlCache.set(id, thumb);
+    thumbUrlCache.set(id, { thumbnail: thumb });
     thumbs.set(id, thumb);
   }
   const missingIds = personIds.filter(
@@ -65,7 +67,7 @@ export async function fetchPersonThumbnailsFromWca(
         : (detail.person?.avatar?.thumb_url ??
           detail.person?.avatar?.url ??
           null);
-      thumbUrlCache.set(id, thumb);
+      thumbUrlCache.set(id, { thumbnail: thumb });
       thumbs.set(id, thumb);
     }
   };
@@ -76,5 +78,5 @@ export async function fetchPersonThumbnailsFromWca(
 }
 
 export function getCachedPersonThumbnail(personId: string) {
-  return thumbUrlCache.get(personId);
+  return thumbUrlCache.get(personId)?.thumbnail;
 }

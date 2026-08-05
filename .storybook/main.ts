@@ -13,9 +13,6 @@ const config: StorybookConfig = {
     name: "@storybook/nextjs-vite",
     options: {},
   },
-  docs: {
-    autodocs: "tag",
-  },
   viteFinal(config) {
     config.plugins = [...(config.plugins ?? []), svgr()];
     config.server ??= {};

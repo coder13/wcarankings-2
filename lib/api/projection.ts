@@ -29,7 +29,7 @@ export type ApiDiagnostics = {
   cacheLayer?: "memory" | "list-ranking";
 };
 
-type QueryParamGuard<T> = (value: string) => value is T;
+type QueryParamGuard<T extends string> = (value: string) => value is T;
 type NumericQueryParamGuard = (value: number) => boolean;
 
 function getQueryParam(params: URLSearchParams, name: string) {
@@ -47,7 +47,7 @@ function getQueryParamWithAliases(
   return null;
 }
 
-function validateQueryParam<T>(
+function validateQueryParam<T extends string>(
   value: string | null,
   guard: QueryParamGuard<T>,
   errorMessage: string,
@@ -56,7 +56,7 @@ function validateQueryParam<T>(
   return value;
 }
 
-function parseOptionalQueryParam<T>(
+function parseOptionalQueryParam<T extends string>(
   params: URLSearchParams,
   name: string,
   guard: QueryParamGuard<T>,

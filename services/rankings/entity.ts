@@ -1,4 +1,5 @@
 import { query } from "@/db";
+import type { RankingEntry } from "@/components/RankingsExplorer/types";
 import { stripMarkdownLinks } from "@/lib/helpers/text/display-text";
 import { formatWcaResult } from "@/lib/wca";
 import {
@@ -356,7 +357,7 @@ export async function loadCityRankings(params: URLSearchParams) {
       LEFT JOIN countries country ON country.id = stats.country_id
       WHERE stats.${valueColumn} IS NOT NULL${filters.sql}
     )`;
-  const rows = await query<CityRankingRow>(
+  const rows = await query<CityResultRankingRow>(
     `
     ${cityRankingSql}, page AS (
       SELECT * FROM ranked WHERE position > ? ORDER BY position LIMIT ?
@@ -409,6 +410,22 @@ type CityRankingRow = {
   stat_value?: number;
 };
 
+type CityResultRankingRow = CityRankingRow & {
+  person_name: string;
+  competition_id: string;
+  competition_name: string;
+};
+
+type CityPageEntry = Pick<
+  RankingEntry,
+  | "personName"
+  | "identitySubtitle"
+  | "best"
+  | "formattedValue"
+  | "competitionId"
+  | "competitionName"
+>;
+
 function cityStart(params: URLSearchParams) {
   const start = Number(params.get("start") ?? "0");
   if (!Number.isInteger(start) || start < 0) {
@@ -444,22 +461,12 @@ function cityFilters(
   };
 }
 
-function cityPage(
-  rows: Awaited<ReturnType<typeof query<CityRankingRow>>>,
+function cityPage<Row extends CityRankingRow>(
+  rows: Awaited<ReturnType<typeof query<Row>>>,
   counts: Awaited<ReturnType<typeof query<{ count: number }>>>,
   limit: number,
   start: number,
-  entry: (
-    row: CityRankingRow,
-  ) => Pick<
-    import("@/components/RankingsExplorer/types").RankingEntry,
-    | "personName"
-    | "identitySubtitle"
-    | "best"
-    | "formattedValue"
-    | "competitionId"
-    | "competitionName"
-  >,
+  entry: (row: Row) => CityPageEntry,
 ) {
   const pageRows = rows.rows.slice(0, limit);
   const last = pageRows.at(-1);

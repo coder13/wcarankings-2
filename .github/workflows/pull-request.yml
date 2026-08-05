@@ -39,8 +39,17 @@ jobs:
       - name: Run lint checks
         run: pnpm run lint
 
-      - name: Run unit tests
+      - name: Check application types
+        run: pnpm run typecheck
+
+      - name: Check data-tool types
+        run: pnpm run data-tools:typecheck
+
+      - name: Build application and run projection tests
         run: pnpm test
+
+      - name: Run TypeScript unit tests
+        run: pnpm run test:unit
 
   validate:
     name: Database and Application Validation
@@ -373,7 +382,6 @@ jobs:
         run: pnpm exec playwright test --config=playwright.visual-smoke.config.mjs
 
       - name: Run List Browser Tests
-        if: always()
         run: pnpm exec playwright test --config=playwright.list-e2e.config.mjs
 
       - name: Show Database State After Browser Test Failure
