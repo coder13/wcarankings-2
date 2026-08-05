@@ -5,6 +5,7 @@ import { PersonMedalPreview } from "@/components/ProfileStatPreviews/PersonMedal
 import { PersonalBestsPreview } from "@/components/ProfileStatPreviews/PersonalBestsPreview";
 import { PersonResultProgressPreview } from "@/components/ProfileStatPreviews/PersonResultProgressPreview";
 import { PersonResultsPreview } from "@/components/ProfileStatPreviews/PersonResultsPreview";
+import { PersonTopRankingHighlights } from "@/components/ProfileStatPreviews/PersonTopRankingHighlights";
 import { StatPageLayout } from "@/components/StatPageLayout/StatPageLayout";
 import {
   loadPersonProfileHeader,
@@ -114,6 +115,7 @@ export default async function PersonProfilePage({ params }: PageProps) {
           <PersonMedalPreview personId={person.id} />
           <PersonResultsPreview personId={person.id} />
           <PersonResultProgressPreview personId={person.id} />
+          <PersonTopRankingHighlights personId={person.id} />
         </section>
       </main>
     </StatPageLayout>
