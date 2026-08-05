@@ -193,12 +193,10 @@ test("renders medal event and statistic controls", () => {
   assert.doesNotMatch(markup, /Switch to average rankings/);
 });
 
-test("links to rankings and medals in the Persons header group", () => {
-  const markup = renderExplorerMarkup({
-    options: { showSubjectSwitch: true },
-  });
+test("renders a separate person ranking picker", () => {
+  const markup = renderExplorerMarkup({ options: { showSubjectSwitch: true } });
 
-  assert.match(markup, /aria-label="Persons"/);
+  assert.match(markup, /aria-label="Person ranking"/);
   assert.match(markup, />Rankings</);
   assert.match(markup, />Medals</);
   assert.ok(markup.indexOf(">Rankings<") < markup.indexOf(">Medals<"));

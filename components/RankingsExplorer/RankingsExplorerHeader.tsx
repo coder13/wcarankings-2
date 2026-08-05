@@ -2,12 +2,16 @@
 
 import { AppHeader } from "../AppHeader/AppHeader";
 import { TextDropdown } from "../Dropdown/TextDropdown";
-import type { NavigationSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import {
   CITY_RANKING_OPTIONS,
   COMPETITION_RANKING_OPTIONS,
 } from "./helpers/rankingModes";
 import { useRankingsExplorer } from "./RankingsExplorerContext";
+
+const PERSON_RANKING_OPTIONS = [
+  { value: "rankings", label: "Rankings" },
+  { value: "medals", label: "Medals" },
+] as const;
 
 export function RankingsExplorerHeader() {
   const {
@@ -20,16 +24,25 @@ export function RankingsExplorerHeader() {
     competitionRanking,
     cityRanking,
   } = filters;
-  let headerSubject: NavigationSubject | undefined;
+  let headerSubject;
   if (source) headerSubject = "lists" as const;
-  else if (showSubjectSwitch)
-    headerSubject = filters.personMedalRanking ? "medals" : subject;
+  else if (showSubjectSwitch) headerSubject = subject;
   let changeHeaderSubject;
   if (source) changeHeaderSubject = actions.leaveList;
   else if (showSubjectSwitch) changeHeaderSubject = actions.changeSubject;
 
   let contextualControl = null;
-  if (!source && showSubjectSwitch && subject === "competitions") {
+  if (!source && showSubjectSwitch && subject === "people") {
+    contextualControl = (
+      <TextDropdown
+        options={PERSON_RANKING_OPTIONS}
+        value={filters.personMedalRanking ? "medals" : "rankings"}
+        onChange={(value) => actions.changePersonMedalRanking(value === "medals")}
+        ariaLabel="Person ranking"
+        className="personRankingDropdown"
+      />
+    );
+  } else if (!source && showSubjectSwitch && subject === "competitions") {
     contextualControl = (
       <TextDropdown
         options={COMPETITION_RANKING_OPTIONS}

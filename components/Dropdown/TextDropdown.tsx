@@ -10,11 +10,6 @@ export type TextDropdownOption<T extends string> = {
   label: string;
 };
 
-export type TextDropdownOptionGroup<T extends string> = {
-  label?: string;
-  options: readonly TextDropdownOption<T>[];
-};
-
 export function TextDropdown<T extends string>({
   options,
   value,
@@ -23,7 +18,6 @@ export function TextDropdown<T extends string>({
   className = "",
   triggerPrefix,
   hideSelectedOption = false,
-  optionGroups,
 }: {
   options: readonly TextDropdownOption<T>[];
   value: T;
@@ -32,20 +26,13 @@ export function TextDropdown<T extends string>({
   className?: string;
   triggerPrefix?: ReactNode;
   hideSelectedOption?: boolean;
-  optionGroups?: readonly TextDropdownOptionGroup<T>[];
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const visibleOptionGroups = (optionGroups ?? [{ options }])
-    .map((group) => ({
-      ...group,
-      options: group.options.filter(
-        (option) => !hideSelectedOption || option.value !== value,
-      ),
-    }))
-    .filter((group) => group.options.length > 0);
-  const visibleOptions = visibleOptionGroups.flatMap((group) => group.options);
+  const visibleOptions = options.filter(
+    (option) => !hideSelectedOption || option.value !== value,
+  );
   const selectedOptionIndex = visibleOptions.findIndex(
     (option) => option.value === value,
   );
@@ -115,37 +102,24 @@ export function TextDropdown<T extends string>({
         <SelectChevronIcon />
       </button>
       <div className="TextDropdown-options Dropdown-menu" data-open={open} role="listbox" aria-label={ariaLabel} onKeyDown={handleMenuKeyDown}>
-        {visibleOptionGroups.map((group) => (
-          <div
-            className="TextDropdown-optionGroup"
-            key={group.label ?? group.options[0]?.value}
-            role={group.label ? "group" : undefined}
-            aria-label={group.label}
+        {visibleOptions.map((option, index) => (
+          <button
+            ref={(element) => {
+              optionRefs.current[index] = element;
+            }}
+            key={option.value}
+            type="button"
+            role="option"
+            tabIndex={open && index === initialFocusIndex ? 0 : -1}
+            aria-selected={option.value === value}
+            className={option.value === value ? "isSelected" : ""}
+            onClick={() => {
+              onChange(option.value);
+              close();
+            }}
           >
-            {group.label && <div className="TextDropdown-optionGroupLabel">{group.label}</div>}
-            {group.options.map((option) => {
-              const index = visibleOptions.indexOf(option);
-              return (
-                <button
-                  ref={(element) => {
-                    optionRefs.current[index] = element;
-                  }}
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  tabIndex={open && index === initialFocusIndex ? 0 : -1}
-                  aria-selected={option.value === value}
-                  className={option.value === value ? "isSelected" : ""}
-                  onClick={() => {
-                    onChange(option.value);
-                    close();
-                  }}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
+            {option.label}
+          </button>
         ))}
       </div>
     </Dropdown>

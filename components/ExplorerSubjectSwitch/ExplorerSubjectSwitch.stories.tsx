@@ -21,8 +21,7 @@ function InteractiveSwitch({
   return (
     <div style={{ display: "grid", gap: "1rem", minWidth: "min(100%, 30rem)" }}>
       <ExplorerSubjectSwitch subject={subject} onChange={(nextSubject) => {
-        if (nextSubject !== "lists" && nextSubject !== "medals")
-          setSubject(nextSubject);
+        if (nextSubject !== "lists") setSubject(nextSubject);
       }} variant={variant} />
       <p style={{ margin: 0, color: "var(--text-muted)" }}>{description[subject]}</p>
     </div>
