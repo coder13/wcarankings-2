@@ -7,7 +7,7 @@ export interface RankingRebuildJob extends RowDataPacket {
   lease_token: string;
 }
 
-export interface ClaimedRankingRebuildJob extends RankingRebuildJob {}
+export type ClaimedRankingRebuildJob = RankingRebuildJob;
 
 export interface CacheVersionInsert {
   insertId: number;

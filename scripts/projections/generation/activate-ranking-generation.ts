@@ -366,6 +366,9 @@ export async function activateGeneration({
     }
 
     const tables = activationTables(manifest);
+    const retiredTables = groupRetiredTables(
+      Object.keys(manifest.groups || {}),
+    );
     const [candidateTables, productionTables, previousTablesPresent] =
       await Promise.all([
         tableNames(connection, candidateSchema),
@@ -386,9 +389,10 @@ export async function activateGeneration({
         `Previous-generation schema is not empty: ${occupied.join(", ")}`,
       );
     }
-    const previousTables = tables.filter((table) =>
-      productionTables.has(table),
-    );
+    const previousTables = [
+      ...tables.filter((table) => productionTables.has(table)),
+      ...retiredTables.filter((table) => productionTables.has(table)),
+    ];
 
     await connection.query(
       `DELETE FROM ${qualified(candidateSchema, "ranking_generation_state")} WHERE id = 1`,
