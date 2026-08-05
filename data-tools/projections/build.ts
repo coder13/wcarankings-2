@@ -1,4 +1,7 @@
-import { rankingTableTasks } from "./ranking-tables.ts";
+import {
+  createRankingTableSource,
+  rankingTableTasks,
+} from "./ranking-tables.ts";
 import {
   dropManagedObject,
   ensureIndexes,
@@ -92,11 +95,14 @@ async function buildSqlProjection(
   tableProgress,
 ) {
   const phases = [];
-  const deferredIndexTables = process.env.WCA_DEFER_PROJECTION_INDEXES === "1"
-    ? new Set(definition.tables
-        .filter((table) => DEFERRED_PROJECTION_INDEX_TABLES.has(table))
-        .map((table) => `${table}${suffix}`))
-    : undefined;
+  const deferredIndexTables =
+    process.env.WCA_DEFER_PROJECTION_INDEXES === "1"
+      ? new Set(
+          definition.tables
+            .filter((table) => DEFERRED_PROJECTION_INDEX_TABLES.has(table))
+            .map((table) => `${table}${suffix}`),
+        )
+      : undefined;
   for (const file of definition.files) {
     const sql = projectionNames(await projectionSql(file), suffix);
     await executeTableStatements(connection, sql, phases, {
@@ -223,7 +229,10 @@ async function buildProjection(
 ) {
   const startedAt = performance.now();
   writeBuildLog(`Starting projection ${projection.name}…`);
-  const stopHeartbeat = startBuildHeartbeat(`projection ${projection.name}`, startedAt);
+  const stopHeartbeat = startBuildHeartbeat(
+    `projection ${projection.name}`,
+    startedAt,
+  );
   try {
     for (const table of projection.tables)
       await dropManagedObject(connection, `${table}${projectionSuffix}`);
@@ -247,12 +256,15 @@ async function buildProjection(
   }
 }
 
-function personYearRankingTasks(projection, {
-  projectionSuffix,
-  tableProgress,
-  taskPrefix = "",
-  projectionDependencies = projection.dependencies,
-}) {
+function personYearRankingTasks(
+  projection,
+  {
+    projectionSuffix,
+    tableProgress,
+    taskPrefix = "",
+    projectionDependencies = projection.dependencies,
+  },
+) {
   const state = {
     startedAt: undefined,
     stopHeartbeat: undefined,
@@ -274,7 +286,10 @@ function personYearRankingTasks(projection, {
       if (descriptor.stage === "prepare") {
         state.startedAt = performance.now();
         writeBuildLog(`Starting projection ${projection.name}…`);
-        state.stopHeartbeat = startBuildHeartbeat(`projection ${projection.name}`, state.startedAt);
+        state.stopHeartbeat = startBuildHeartbeat(
+          `projection ${projection.name}`,
+          state.startedAt,
+        );
         for (const table of projection.tables) {
           await dropManagedObject(connection, `${table}${projectionSuffix}`);
         }
@@ -282,10 +297,14 @@ function personYearRankingTasks(projection, {
       }
 
       if (descriptor.stage === "complete") {
-        const rowCounts = await projection.validate(connection, projectionSuffix);
+        const rowCounts = await projection.validate(
+          connection,
+          projectionSuffix,
+        );
         const durationMs = elapsedMs(state.startedAt);
-        const phases = PERSON_YEAR_RANKING_STAGE_DEFINITIONS
-          .flatMap(({ stage }) => state.phases.get(stage) ?? []);
+        const phases = PERSON_YEAR_RANKING_STAGE_DEFINITIONS.flatMap(
+          ({ stage }) => state.phases.get(stage) ?? [],
+        );
         const timing = { name: projection.name, durationMs, rowCounts, phases };
         state.finished = true;
         state.stopHeartbeat?.();
@@ -297,7 +316,10 @@ function personYearRankingTasks(projection, {
 
       const phases = [];
       state.phases.set(descriptor.stage, phases);
-      const sql = projectionNames(await projectionSql(descriptor.file), projectionSuffix);
+      const sql = projectionNames(
+        await projectionSql(descriptor.file),
+        projectionSuffix,
+      );
       await executeTableStatements(connection, sql, phases, { tableProgress });
       return undefined;
     } catch (error) {
@@ -306,20 +328,25 @@ function personYearRankingTasks(projection, {
     }
   }
 
-  return personYearRankingTaskPlan({ taskPrefix, projectionDependencies }).map((descriptor) => ({
-    name: descriptor.name,
-    dependencies: descriptor.dependencies,
-    estimatedDurationMs: descriptor.estimatedDurationMs,
-    run: (connection) => runStage(descriptor, connection),
-  }));
+  return personYearRankingTaskPlan({ taskPrefix, projectionDependencies }).map(
+    (descriptor) => ({
+      name: descriptor.name,
+      dependencies: descriptor.dependencies,
+      estimatedDurationMs: descriptor.estimatedDurationMs,
+      run: (connection) => runStage(descriptor, connection),
+    }),
+  );
 }
 
-function projectionSchedulerTasks(projections, {
-  projectionSuffix,
-  tableProgress,
-  taskPrefix = "",
-  dependencyName = (dependency) => dependency,
-}) {
+function projectionSchedulerTasks(
+  projections,
+  {
+    projectionSuffix,
+    tableProgress,
+    taskPrefix = "",
+    dependencyName = (dependency) => dependency,
+  },
+) {
   return projections.flatMap((projection) => {
     const dependencies = projection.dependencies.map(dependencyName);
     if (projection.name === PERSON_YEAR_RANKING_PROJECTION) {
@@ -330,12 +357,20 @@ function projectionSchedulerTasks(projections, {
         projectionDependencies: dependencies,
       });
     }
-    return [{
-      name: `${taskPrefix}${projection.name}`,
-      dependencies,
-      estimatedDurationMs: projectionDurationEstimate(projection.name),
-      run: (connection) => buildProjection(connection, projection, projectionSuffix, tableProgress),
-    }];
+    return [
+      {
+        name: `${taskPrefix}${projection.name}`,
+        dependencies,
+        estimatedDurationMs: projectionDurationEstimate(projection.name),
+        run: (connection) =>
+          buildProjection(
+            connection,
+            projection,
+            projectionSuffix,
+            tableProgress,
+          ),
+      },
+    ];
   });
 }
 
@@ -522,7 +557,7 @@ export async function refreshMysqlSchema(
       "core/ranking-tables/wca_best_single.sql",
       "core/ranking-tables/wca_best_average.sql",
     ]) {
-      await createCompatibilitySource(connection, file, names);
+      await createRankingTableSource(connection, file, names);
     }
   }
 

@@ -97,7 +97,7 @@ export function renameRankingTableSql(
     .replaceAll("result_facts", resultFacts);
 }
 
-async function createCompatibilitySource(connection, file, names) {
+export async function createRankingTableSource(connection, file, names) {
   await connection.query(
     renameRankingTableSql(await projectionSql(file), names),
   );
@@ -124,19 +124,19 @@ export function rankingTableTasks({
   };
   const runners = {
     "ranking-tables-entries-single-source": (connection) =>
-      createCompatibilitySource(
+      createRankingTableSource(
         connection,
         "core/ranking-tables/ranking_entries_single_source.sql",
         names,
       ),
     "ranking-tables-entries-average-source": (connection) =>
-      createCompatibilitySource(
+      createRankingTableSource(
         connection,
         "core/ranking-tables/ranking_entries_average_source.sql",
         names,
       ),
     "ranking-tables-result-entries-single-source": (connection) =>
-      createCompatibilitySource(
+      createRankingTableSource(
         connection,
         "core/ranking-tables/result_entries_single_source.sql",
         names,
