@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { PersonMedalPreview } from "@/components/ProfileStatPreviews/PersonMedalPreview";
-import { PersonalBestsPreviewMock } from "@/components/ProfileStatPreviews/PersonalBestsPreviewMock";
+import { PersonalBestsPreview } from "@/components/ProfileStatPreviews/PersonalBestsPreview";
+import { PersonResultProgressPreview } from "@/components/ProfileStatPreviews/PersonResultProgressPreview";
 import { PersonResultsPreview } from "@/components/ProfileStatPreviews/PersonResultsPreview";
 import { StatPageLayout } from "@/components/StatPageLayout/StatPageLayout";
 import {
@@ -19,6 +20,13 @@ type PageProps = {
 
 function formatCount(value: number) {
   return new Intl.NumberFormat().format(value);
+}
+
+function formatKinchScore(value: number | null) {
+  if (value === null) return "—";
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 export async function generateMetadata({
@@ -95,12 +103,17 @@ export default async function PersonProfilePage({ params }: PageProps) {
             <strong>{formatCount(profile.countryCount)}</strong>
             <span>countries</span>
           </div>
+          <div>
+            <strong>{formatKinchScore(profile.kinchScore)}</strong>
+            <span>Kinch</span>
+          </div>
         </section>
 
         <section className="profileHubStats" aria-label="Profile statistics">
-          <PersonalBestsPreviewMock />
+          <PersonalBestsPreview personId={person.id} />
           <PersonMedalPreview personId={person.id} />
           <PersonResultsPreview personId={person.id} />
+          <PersonResultProgressPreview personId={person.id} />
         </section>
       </main>
     </StatPageLayout>

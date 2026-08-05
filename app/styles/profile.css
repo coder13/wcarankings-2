@@ -95,7 +95,7 @@
 
 .profileHubCounts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 0;
   padding: var(--profile-section-space) 0;
   border-bottom: 1px solid var(--border-subtle);
@@ -140,6 +140,11 @@
 }
 
 .profilePreview {
+  --profile-preview-table-height: 370px;
+  --profile-preview-results-height: calc(
+    var(--profile-preview-table-height) - 3rem - 2px
+  );
+
   min-width: 0;
 }
 
@@ -158,11 +163,54 @@
   margin-bottom: 0.45rem;
 }
 
+.profilePreviewViewToggle {
+  display: inline-flex;
+  padding: 0.15rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+
+.profilePreviewViewToggle button {
+  min-height: 1.75rem;
+  padding-inline: 0.5rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.profilePreviewViewToggle button[aria-pressed="true"] {
+  background: var(--surface-selected);
+  color: var(--text-strong);
+}
+
+.profilePreviewViewToggle button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
 .profilePreviewTable {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: 0.75rem;
   background: var(--surface);
+}
+
+.profilePreviewTable:has(.profilePreviewSelectors) {
+  height: var(--profile-preview-table-height);
+}
+
+.profilePreviewTable:has(.Dropdown-menu[data-open="true"]) {
+  overflow: visible;
+}
+
+.profilePreviewTable:has(.profileResultProgressChart) {
+  overflow: visible;
 }
 
 .profilePreviewHeading {
@@ -237,7 +285,10 @@
 }
 
 .profilePreview .profilePreviewYearPicker .TextDropdown-options {
-  z-index: 3;
+  z-index: 30;
+  max-height: min(28rem, 70vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .profilePreviewExplore {
@@ -291,7 +342,14 @@
 }
 
 .profilePreviewRows {
+  height: var(--profile-preview-results-height);
   margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.profileMedalPreview {
+  min-width: 0;
 }
 
 .profileMedalSummary {
@@ -307,7 +365,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
-  padding: 1rem 1.1rem;
+  padding: 0.7rem 1.1rem;
   background: var(--surface-selected);
 }
 
@@ -319,7 +377,8 @@
 .profileMedalSummaryBreakdown > div {
   display: grid;
   gap: 0.2rem;
-  padding: 0.8rem 0.7rem;
+  padding: 0.6rem 0.7rem;
+  text-align: center;
 }
 
 .profileMedalSummaryBreakdown > div + div {
@@ -353,61 +412,69 @@
   font-size: 1.1rem;
 }
 
-.profilePersonalBestsMock {
-  --personal-best-result-row-height: 1.55rem;
-  --personal-best-result-row-gap: 0.2rem;
-  --personal-best-rank-column-width: 5rem;
+.profileMedalSummaryBreakdown > [data-medal="gold"] dt,
+.profileMedalSummaryBreakdown > [data-medal="gold"] dd {
+  color: #9a7100;
+}
+
+.profileMedalSummaryBreakdown > [data-medal="silver"] dt,
+.profileMedalSummaryBreakdown > [data-medal="silver"] dd {
+  color: #5c6877;
+}
+
+.profileMedalSummaryBreakdown > [data-medal="bronze"] dt,
+.profileMedalSummaryBreakdown > [data-medal="bronze"] dd {
+  color: #814326;
+}
+
+.profilePersonalBests {
+  --personal-best-rank-column-width: 2.65rem;
+  --personal-best-result-column-width: 4.5rem;
 
   margin: 0;
+  overflow-x: auto;
 }
 
 .profilePersonalBestColumnHeaders {
   display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  grid-template-columns: 13rem 8.35rem 4.5rem 4.5rem 8.35rem;
   column-gap: 0.5rem;
   gap: 0.2rem;
+  min-width: 43rem;
   padding: 0.4rem 1rem 0.15rem;
   color: var(--text-subtle);
   font-size: 0.68rem;
 }
 
-.profilePersonalBestResultHeaders,
-.profilePersonalBestValues {
-  display: grid;
-  grid-template-columns: repeat(2, 3rem);
-  justify-content: start;
-  gap: 0.2rem;
-}
-
-.profilePersonalBestResultHeaders {
+.profilePersonalBestResultHeader {
   text-align: right;
 }
 
-.profilePersonalBestRankHeaders,
-.profilePersonalBestRanks {
+.profilePersonalBestSingleRankHeaders,
+.profilePersonalBestAverageRankHeaders,
+.profilePersonalBestSingleRanks,
+.profilePersonalBestAverageRanks {
   display: grid;
   grid-template-columns: repeat(3, var(--personal-best-rank-column-width));
   gap: 0.2rem;
-  justify-content: end;
 }
 
-.profilePersonalBestRankHeaders {
+.profilePersonalBestSingleRankHeaders,
+.profilePersonalBestAverageRankHeaders {
   text-align: right;
 }
 
-.profilePersonalBestRankHeaders > span {
+.profilePersonalBestSingleRankHeaders > span,
+.profilePersonalBestAverageRankHeaders > span {
   justify-self: end;
 }
 
 .profilePersonalBestRow {
   display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  grid-template-columns: 13rem 8.35rem 4.5rem 4.5rem 8.35rem;
   column-gap: 0.5rem;
-  padding: 0.8rem 1rem;
-}
-
-.profilePersonalBestRow + .profilePersonalBestRow {
-  border-top: 1px solid var(--border-subtle);
+  min-width: 43rem;
+  padding: 0.45rem 1rem;
 }
 
 .profilePersonalBestRow h3 {
@@ -417,7 +484,7 @@
   align-self: center;
   margin: 0;
   color: var(--text-strong);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 500;
 }
 
@@ -426,37 +493,50 @@
   font-size: 1.15rem;
 }
 
-.profilePersonalBestValues {
-  align-items: center;
-  align-self: start;
-  grid-template-rows: repeat(2, var(--personal-best-result-row-height));
-  row-gap: var(--personal-best-result-row-gap);
+.profilePersonalBestRow h3 > .profilePersonalBestEventName {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.profilePersonalBestValues > strong {
+.profilePersonalBestEventName--short {
+  display: none;
+}
+
+.profilePersonalBestResultGroup > strong {
   color: var(--text-strong);
   font-size: 0.92rem;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
-.profilePersonalBestValues > strong:first-child {
-  grid-column: 1;
+.profilePersonalBestSingleGroup,
+.profilePersonalBestAverageGroup {
+  display: contents;
+}
+
+.profilePersonalBestSingleGroup > *,
+.profilePersonalBestAverageGroup > * {
   grid-row: 1;
 }
 
-.profilePersonalBestValues > strong:nth-child(2) {
-  grid-column: 2;
-  grid-row: 2;
+.profilePersonalBestSingleGroup > strong {
+  grid-column: 3;
 }
 
-.profilePersonalBestRankColumn {
-  display: grid;
-  grid-template-rows: repeat(2, var(--personal-best-result-row-height));
-  align-items: center;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  row-gap: var(--personal-best-result-row-gap);
+.profilePersonalBestSingleGroup > .profilePersonalBestSingleRanks {
+  grid-column: 2;
+}
+
+.profilePersonalBestAverageGroup > strong {
+  grid-column: 4;
+}
+
+.profilePersonalBestAverageGroup > .profilePersonalBestAverageRanks {
+  grid-column: 5;
 }
 
 .profilePersonalBestRank {
@@ -493,6 +573,7 @@
 .profilePreview .rowHeader {
   display: grid;
   grid-template-columns: 3ch minmax(0, 1fr) auto;
+  padding-left: 1rem;
 }
 
 .profilePreview .rank {
@@ -528,6 +609,82 @@
   white-space: normal;
 }
 
+.profilePreview .profileStatsLoading,
+.profilePreview .profileStatsMessage {
+  min-height: var(--profile-preview-results-height);
+}
+
+.profileResultProgressChart {
+  height: var(--profile-preview-results-height);
+  min-width: 0;
+  padding: 0.35rem 0.2rem 0.15rem 0;
+}
+
+.profileResultProgressChart .recharts-tooltip-wrapper {
+  z-index: 10;
+}
+
+.profileResultProgressTooltip {
+  display: grid;
+  max-width: min(16rem, calc(100vw - 2rem));
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  box-shadow: 0 4px 16px var(--shadow);
+}
+
+.profileResultProgressTooltip strong {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.profileResultProgressTooltip span,
+.profileResultProgressTooltip time {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.profileResultProgressRows {
+  height: var(--profile-preview-results-height);
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0;
+  list-style: none;
+}
+
+.profileResultProgressRow {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr) auto;
+  min-height: 3.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 1rem;
+}
+
+.profileResultProgressRow--alternate {
+  background: var(--surface-selected);
+}
+
+.profileResultProgressRow time {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.profileResultProgressRow > span {
+  overflow: hidden;
+  color: var(--text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileResultProgressRow strong {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (min-width: 640px) {
   .profileHub {
     padding-top: 0.75rem;
@@ -536,10 +693,6 @@
   .profileHubAvatar {
     width: 5rem;
     height: 5rem;
-  }
-
-  .profileHubCounts {
-    max-width: 44rem;
   }
 
   .profileHubCounts > div {
@@ -556,26 +709,105 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
+  .profilePersonalBests {
+    overflow: hidden;
+  }
+
+  .profilePersonalBestColumnHeaders,
   .profilePersonalBestRow {
-    grid-template-columns: 1.8rem minmax(0, 1fr) auto;
-    column-gap: 0.3rem;
+    grid-template-columns: 5rem repeat(2, minmax(0, 1fr));
+    column-gap: 0.5rem;
+    min-width: 0;
+    padding-inline: 0.7rem;
   }
 
   .profilePersonalBestColumnHeaders {
-    grid-template-columns: 1.8rem minmax(0, 1fr) auto;
-    column-gap: 0.3rem;
+    grid-template-rows: auto auto;
+    align-items: end;
+    row-gap: 0.1rem;
   }
 
-  .profilePersonalBestRankHeaders,
-  .profilePersonalBestRanks {
-    --personal-best-rank-column-width: 3rem;
+  .profilePersonalBestColumnHeaders > :first-child {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .profilePersonalBestSingleResultHeader,
+  .profilePersonalBestSingleRankHeaders {
+    grid-column: 2;
+  }
+
+  .profilePersonalBestAverageResultHeader,
+  .profilePersonalBestAverageRankHeaders {
+    grid-column: 3;
+  }
+
+  .profilePersonalBestSingleResultHeader,
+  .profilePersonalBestAverageResultHeader {
+    grid-row: 1;
+  }
+
+  .profilePersonalBestSingleRankHeaders,
+  .profilePersonalBestAverageRankHeaders {
+    grid-row: 2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.15rem;
+    font-size: 0.6rem;
+  }
+
+  .profilePersonalBestRow {
+    align-items: center;
+    padding-block: 0.35rem;
+  }
+
+  .profilePersonalBestResultGroup {
+    display: grid;
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  .profilePersonalBestSingleGroup {
+    grid-column: 2;
+  }
+
+  .profilePersonalBestAverageGroup {
+    grid-column: 3;
+  }
+
+  .profilePersonalBestResultGroup > strong {
+    grid-column: auto;
+    grid-row: auto;
+    font-size: 0.84rem;
+  }
+
+  .profilePersonalBestResultGroup > .profilePersonalBestSingleRanks,
+  .profilePersonalBestResultGroup > .profilePersonalBestAverageRanks {
+    display: grid;
+    grid-column: auto;
+    grid-row: auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.15rem;
+  }
+
+  .profilePersonalBestRank {
+    font-size: 0.67rem;
   }
 
   .profilePersonalBestRow h3 {
-    justify-content: center;
+    justify-content: flex-start;
   }
 
-  .profilePersonalBestEventName {
+  .profilePersonalBestRow h3 > .cubing-icon {
+    font-size: 1rem;
+  }
+
+  .profilePersonalBestEventName--full {
     display: none;
+  }
+
+  .profilePersonalBestRow h3 > .profilePersonalBestEventName--short {
+    display: block;
   }
 }

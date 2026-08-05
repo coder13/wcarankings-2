@@ -12,6 +12,7 @@ export type PersonProfileHeader = {
   competitionCount: number;
   countryCount: number;
   solveCount: number;
+  kinchScore: number | null;
 };
 
 type PersonProfileHeaderRow = {
@@ -24,6 +25,7 @@ type PersonProfileHeaderRow = {
   competition_count: number;
   country_count: number;
   solve_count: number;
+  kinch_score: number | null;
 };
 
 const WCA_ID_PATTERN = /^\d{4}[A-Z]{4}\d{2}$/;
@@ -47,13 +49,21 @@ export async function loadPersonProfileHeader(
        app_user.avatar_url,
        COALESCE(competition_counts.competition_count, 0) AS competition_count,
        COALESCE(profile_stats.country_count, 0) AS country_count,
-       COALESCE(solves.solve_count, 0) AS solve_count
+       COALESCE(solves.solve_count, 0) AS solve_count,
+       kinch.kinch_score / 17.0 AS kinch_score
      FROM persons person
      LEFT JOIN countries country ON country.id = person.country_id
      LEFT JOIN continents continent ON continent.id = country.continent_id
      LEFT JOIN app_users app_user ON app_user.wca_id = person.wca_id
      LEFT JOIN person_competition_counts competition_counts
        ON competition_counts.person_id = person.wca_id
+     LEFT JOIN person_sum_of_ranks_scores kinch
+       ON kinch.metric_version = 1
+       AND kinch.event_set_version = 1
+       AND kinch.result_type = 'single'
+       AND kinch.scope = 'world'
+       AND kinch.region_id = ''
+       AND kinch.person_id = person.wca_id
      LEFT JOIN (
        SELECT
          facts.person_id,
@@ -89,5 +99,6 @@ export async function loadPersonProfileHeader(
     competitionCount: Number(person.competition_count),
     countryCount: Number(person.country_count),
     solveCount: Number(person.solve_count),
+    kinchScore: person.kinch_score === null ? null : Number(person.kinch_score),
   };
 }

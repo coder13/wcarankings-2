@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { personEventResultRankingsQuery } from "../services/rankings/queries/results";
+import { personEventResultRankingsQuery } from "../services/rankings/queries/person-results";
 
 test("person event Single results use the stored attempt date for stable ties", () => {
   const query = personEventResultRankingsQuery({

@@ -54,3 +54,19 @@ compare candidate rows before the window functions.
 Use position indexes for pages. Resolve a person search before reading the
 ranking table. Join names, countries, and result display fields only after the
 page is bounded.
+
+## Profile preview
+
+The profile Personal Bests preview reads the existing all-time rows for one
+person from `person_event_rankings`. It returns at most 34 rows, groups Single
+and Average values by the fixed WCA event order, and does not re-rank data.
+World, continent, and country ranks use the represented region stored with the
+personal best.
+
+This preview uses the primary-key prefix `(person_id)` and has no extra
+pre-computation table. The extra pre-computation duration is 0 seconds. It has
+no scroll request because it returns one bounded profile payload.
+
+On 2026-08-05, 31 warm local requests for `2021ZAJD03` returned in 5.5 ms at
+p50 and 7.5 ms at p95. The request returns 28 stored result-type rows for this
+person.

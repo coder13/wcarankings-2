@@ -32,13 +32,18 @@ export function PersonMedalPreview({ personId }: { personId: string }) {
     return () => controller.abort();
   }, [personId]);
 
-  if (error) return <p className="profileStatsMessage">{error}</p>;
-  if (!counts) {
-    return (
+  let content;
+  if (error) {
+    content = <p className="profileStatsMessage">{error}</p>;
+  } else if (!counts) {
+    content = (
       <div className="profileStatsLoading">
         <LoadingSpinner label="Loading medals" />
       </div>
     );
+  } else {
+    content = <PersonMedalPreviewCounts counts={counts} />;
   }
-  return <PersonMedalPreviewCounts counts={counts} />;
+
+  return <section className="profileMedalPreview">{content}</section>;
 }

@@ -67,3 +67,25 @@ rows. Its cache-miss p95 was 20 ms. Its cache-hit p95 was 4 ms. The miss and
 hit timings include the local HTTP request.
 
 Calvin's WCA ID is `2014NIEL03`. The source name uses the spelling Nielson.
+
+## PR History preview
+
+The profile PR History preview shows a person's result improvements by
+competition. It supports one event, result type, and optional year. Its Chart
+and Table views use the same data. The chart tooltip shows the result,
+competition, and date.
+
+The endpoint reads the existing `result_rankings_single` or
+`result_rankings_average` projection. It groups one person's event results by
+competition, then keeps only the new running best values in date order. Average
+results join `result_facts` for competition dates. The endpoint does not read
+the raw `results` table.
+
+This preview has no new pre-computation. The pre-computation duration is 0
+seconds. Its memory cache key includes data version, person, event, result
+type, and year. Equal requests share an in-flight load.
+
+On 2026-08-05, 31 warm local requests for Teodor Zajder's all-time 3x3 Single
+history returned in 5.4 ms at p50 and 6.3 ms at p95. The response had 16
+improvement points. One local cache miss took 10.4 ms. Query-plan review is
+pending because this prototype uses the existing person-event projection index.

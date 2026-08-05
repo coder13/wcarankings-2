@@ -46,6 +46,7 @@
     "react-dom": "19.2.6",
     "react-ga4": "^3.0.1",
     "react-i18next": "^17.0.11",
+    "recharts": "^3.10.1",
     "sql-template-tag": "^5.2.1",
     "unzipper": "^0.12.5"
   },

@@ -14,7 +14,7 @@ import {
   RANKINGS_WINDOW_SIZE,
 } from "@/services/rankings/cache";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
-import { personEventResultRankingsQuery } from "@/services/rankings/queries/results";
+import { personEventResultRankingsQuery } from "@/services/rankings/queries/person-results";
 
 type PersonEventResultInput = {
   personId: string;

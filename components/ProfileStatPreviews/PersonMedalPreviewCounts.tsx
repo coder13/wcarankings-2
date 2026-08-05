@@ -17,15 +17,15 @@ export function PersonMedalPreviewCounts({ counts }: { counts: MedalCounts }) {
         <dd>{formatCount(counts.total)}</dd>
       </div>
       <div className="profileMedalSummaryBreakdown">
-        <div>
+        <div data-medal="gold">
           <dt>Gold</dt>
           <dd>{formatCount(counts.gold)}</dd>
         </div>
-        <div>
+        <div data-medal="silver">
           <dt>Silver</dt>
           <dd>{formatCount(counts.silver)}</dd>
         </div>
-        <div>
+        <div data-medal="bronze">
           <dt>Bronze</dt>
           <dd>{formatCount(counts.bronze)}</dd>
         </div>
