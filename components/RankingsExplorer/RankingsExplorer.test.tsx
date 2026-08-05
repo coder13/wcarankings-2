@@ -197,7 +197,8 @@ test("renders a separate person ranking picker", () => {
   const markup = renderExplorerMarkup({ options: { showSubjectSwitch: true } });
 
   assert.match(markup, /aria-label="Person ranking"/);
-  assert.match(markup, />Rankings</);
-  assert.match(markup, />Medals</);
-  assert.ok(markup.indexOf(">Rankings<") < markup.indexOf(">Medals<"));
+  assert.match(
+    markup,
+    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button><button[^>]*>Competitions<\/button>/,
+  );
 });

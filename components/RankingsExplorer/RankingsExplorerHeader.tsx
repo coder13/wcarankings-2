@@ -2,6 +2,7 @@
 
 import { AppHeader } from "../AppHeader/AppHeader";
 import { TextDropdown } from "../Dropdown/TextDropdown";
+import { useProjectionFeatureSwitch } from "../ProjectionFeatureSwitchProvider";
 import {
   CITY_RANKING_OPTIONS,
   COMPETITION_RANKING_OPTIONS,
@@ -11,6 +12,7 @@ import { useRankingsExplorer } from "./RankingsExplorerContext";
 const PERSON_RANKING_OPTIONS = [
   { value: "rankings", label: "Rankings" },
   { value: "medals", label: "Medals" },
+  { value: "competitions", label: "Competitions" },
 ] as const;
 
 export function RankingsExplorerHeader() {
@@ -19,6 +21,7 @@ export function RankingsExplorerHeader() {
     filters,
     filterActions: actions,
   } = useRankingsExplorer();
+  const featureSwitch = useProjectionFeatureSwitch();
   const {
     subject,
     competitionRanking,
@@ -33,11 +36,32 @@ export function RankingsExplorerHeader() {
 
   let contextualControl = null;
   if (!source && showSubjectSwitch && subject === "people") {
+    const personRankingOptions = PERSON_RANKING_OPTIONS.filter((option) => {
+      if (option.value === "medals") return featureSwitch.personMedalRankings;
+      if (option.value === "competitions")
+        return featureSwitch.personCompetitionRankings;
+      return true;
+    });
+    const personRankingValue = filters.personCompetitionRanking
+      ? "competitions"
+      : filters.personMedalRanking
+        ? "medals"
+        : "rankings";
     contextualControl = (
       <TextDropdown
-        options={PERSON_RANKING_OPTIONS}
-        value={filters.personMedalRanking ? "medals" : "rankings"}
-        onChange={(value) => actions.changePersonMedalRanking(value === "medals")}
+        options={personRankingOptions}
+        value={personRankingValue}
+        onChange={(value) => {
+          if (value === "competitions") {
+            actions.changePersonCompetitionRanking(true);
+          } else if (value === "medals") {
+            actions.changePersonMedalRanking(true);
+          } else if (filters.personCompetitionRanking) {
+            actions.changePersonCompetitionRanking(false);
+          } else {
+            actions.changePersonMedalRanking(false);
+          }
+        }}
         ariaLabel="Person ranking"
         className="personRankingDropdown"
       />
