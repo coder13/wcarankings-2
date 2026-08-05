@@ -21,7 +21,7 @@ export type PersonProfileResult = {
   competitionStartDate: string;
 };
 
-export type PersonProfileMetricValue = {
+type PersonProfileMetricValue = {
   resultType: RankingType;
   eventId: string;
   eventRank: number;

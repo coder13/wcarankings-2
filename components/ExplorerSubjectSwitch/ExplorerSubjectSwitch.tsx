@@ -9,7 +9,7 @@ export const EXPLORER_SUBJECTS = [
   { id: "competitions", label: "Competitions" },
   { id: "cities", label: "Cities" },
 ] as const;
-export const NAVIGATION_SUBJECTS = [
+const NAVIGATION_SUBJECTS = [
   ...EXPLORER_SUBJECTS,
   { id: "lists", label: "Lists" },
 ] as const;

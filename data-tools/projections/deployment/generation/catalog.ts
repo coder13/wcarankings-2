@@ -4,7 +4,7 @@ import {
 } from "../../../projection-catalog/groups.ts";
 import type { GenerationManifest } from "./types.ts";
 
-export const WCA_RAW_TABLES = [
+const WCA_RAW_TABLES = [
   "persons",
   "competitions",
   "events",

@@ -1,7 +1,4 @@
-import type {
-  ListLookupQueryInput,
-  ListRankingQueryInput,
-} from "@/services/lists/types";
+import type { ListLookupQueryInput } from "@/services/lists/types";
 import { sqlFragment } from "@/lib/helpers/database/sql";
 
 export const LIST_COLUMNS = `
@@ -129,9 +126,6 @@ export function removeUserListMembersQuery() {
 }
 export function cancelUserMembershipRequestsQuery() {
   return "UPDATE list_membership_requests SET status = 'cancelled', resolved_at = CURRENT_TIMESTAMP(6), resolved_by_user_id = ? WHERE person_id = ? AND status = 'pending'";
-}
-export function listRankingsQuery(input: ListRankingQueryInput) {
-  return sqlFragment`WITH scoped_rankings AS (SELECT RANK() OVER (ORDER BY ranking.best) AS rank, ROW_NUMBER() OVER (ORDER BY ranking.best, ranking.person_name, ranking.person_id) AS sub_rank, COUNT(*) OVER () AS total, ranking.person_id, ranking.person_name, ranking.country_id, ranking.country_name, ranking.country_iso2, ranking.continent_id, ranking.best, ranking.competition_id, ranking.competition_name, ranking.is_world_record, ranking.is_continent_record, ranking.is_country_record FROM ${input.source} JOIN persons AS person_gender ON person_gender.wca_id = ranking.person_id AND person_gender.sub_id = 1 WHERE ${input.scopedConditions.join("\n AND ")}) SELECT * FROM scoped_rankings WHERE ${input.conditions.join(" AND ")} ORDER BY sub_rank LIMIT ?`;
 }
 export function listRegionsQuery() {
   return sqlFragment`SELECT DISTINCT country.id AS country_id, country.name AS country_name, country.iso2 AS country_iso2, country.continent_id FROM list_members AS member JOIN persons AS person ON person.wca_id = member.person_id AND person.sub_id = 1 JOIN countries AS country ON country.id = person.country_id WHERE member.list_id = ? ORDER BY country.name, country.id`;

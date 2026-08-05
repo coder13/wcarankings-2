@@ -56,7 +56,7 @@ export function seedSavedListVersionWindow(
   });
 }
 
-export function rankingPageStart(subRank: number) {
+function rankingPageStart(subRank: number) {
   return Math.floor((Math.max(1, subRank) - 1) / PAGE_SIZE) * PAGE_SIZE;
 }
 

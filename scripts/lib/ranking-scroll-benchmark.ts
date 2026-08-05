@@ -31,7 +31,7 @@ export function scenarioUrl(
   return `${target.replace(/\/$/, "")}${scenario.path}?${params}`;
 }
 
-export function benchmarkHelp(scriptName = "benchmark-ranking-scroll.ts") {
+function benchmarkHelp(scriptName = "benchmark-ranking-scroll.ts") {
   return `Usage: node scripts/${scriptName} [options]
 
 Fetch each configured ranking scenario page-by-page, waiting between pages to

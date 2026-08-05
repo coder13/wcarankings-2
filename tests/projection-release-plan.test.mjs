@@ -78,18 +78,12 @@ test("a new city group hydrates cached dependencies and builds only city-owned t
     exportId,
     productionExportId: exportId,
     productionState: state,
-    availableArtifacts: availableArtifacts(desired, [
-      "result-facts",
-      "competition-rankings",
-    ]),
+    availableArtifacts: availableArtifacts(desired, ["result-facts"]),
     repositoryRoot,
   });
   assert.deepEqual(plan.releaseGroups, ["city-rankings"]);
   assert.deepEqual(plan.buildGroups, ["city-rankings"]);
-  assert.deepEqual(plan.hydrateGroups, [
-    "result-facts",
-    "competition-rankings",
-  ]);
+  assert.deepEqual(plan.hydrateGroups, ["result-facts"]);
 });
 
 test("a result-facts semantic change selects only its downstream closure", async () => {

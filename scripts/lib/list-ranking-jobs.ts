@@ -1,7 +1,7 @@
 import type { Connection } from "mysql2/promise";
 import type { ExportDataVersionRow, ListRankingTarget } from "./list-types.ts";
 
-export const LIST_RANKING_PRIORITY = { lazy: 1, active: 5, system: 10 };
+const LIST_RANKING_PRIORITY = { lazy: 1, active: 5, system: 10 };
 
 async function dataVersion(connection: Connection): Promise<string | null> {
   const [rows] = await connection.query<ExportDataVersionRow[]>(

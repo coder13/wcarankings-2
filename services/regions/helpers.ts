@@ -2,7 +2,7 @@ import type { WcaCountry } from "@/lib/data/types";
 
 let countriesRequest: Promise<WcaCountry[]> | null = null;
 
-export function isWcaCountry(value: unknown): value is WcaCountry {
+function isWcaCountry(value: unknown): value is WcaCountry {
   return (
     typeof value === "object" &&
     value !== null &&

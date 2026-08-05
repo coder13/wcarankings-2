@@ -38,7 +38,7 @@ export type {
   MembershipDecisionRouteContext,
 } from "@/services/lists/types";
 
-function privateResponse<T>(body: T, status?: number) {
+function privateResponse(body: unknown, status?: number) {
   return buildApiJsonResponse(body, {
     ...(status === undefined ? {} : { status }),
     headers: { "Cache-Control": "private, no-store" },

@@ -1,7 +1,7 @@
 import type { ProjectionConnection } from "../shared/database-types.ts";
 import type { TableProgress } from "./progress-types.ts";
 
-export interface RankingTablePair {
+interface RankingTablePair {
   average: string;
   single: string;
 }

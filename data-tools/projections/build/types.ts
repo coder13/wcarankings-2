@@ -19,7 +19,7 @@ export interface ProjectionBuildMatrixInput {
   wave: number;
 }
 
-export interface ProjectionBuildMatrixEntry {
+interface ProjectionBuildMatrixEntry {
   group: string;
   hydrate_groups: string;
 }
@@ -45,12 +45,12 @@ export interface ProjectionTaskExecutionResult {
   result: unknown;
 }
 
-export interface CompletedProjectionTask {
+interface CompletedProjectionTask {
   result: unknown;
   task: ProjectionTask;
 }
 
-export interface FailedProjectionTask {
+interface FailedProjectionTask {
   error: unknown;
   task: ProjectionTask;
 }
@@ -88,7 +88,7 @@ export interface ProjectionRegistryEntry {
   ): Promise<Record<string, number>>;
 }
 
-export type ProjectionConnectionFactory = () => Promise<ProjectionConnection>;
+type ProjectionConnectionFactory = () => Promise<ProjectionConnection>;
 
 export interface ProjectionTaskExecutionOptions {
   concurrency?: number;

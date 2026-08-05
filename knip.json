@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "playwright.list-e2e.config.mjs",
+    "playwright.visual-smoke.config.mjs",
+    "public/sw.js",
+    "scripts/list-ranking-worker.ts",
+    "scripts/prepare-flyway-history.ts",
+    "scripts/projections/generation/activate-ranking-generation.ts",
+    "scripts/projections/planning/plan-projection-deployment.ts",
+    "scripts/projections/transfer/chunk-projection-dump.ts",
+    "scripts/projections/verification/check-ranking-projections.ts"
+  ],
+  "ignoreBinaries": ["mariadb"],
+  "ignoreDependencies": ["tailwindcss"]
+}

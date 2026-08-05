@@ -9,9 +9,8 @@ They do not define a new ranking. They prevent a request from counting a large
 ranking table or raw fact set before returning a page.
 
 The support tables cover result rankings by event, result type, scope, and
-region; person lists by event and scope; person-competition lists by scope,
-region, and gender; entity lists by ranking kind, event, and result type; and
-yearly ranking by available year and cohort.
+region. They also cover person lists, person-competition lists, and yearly
+rankings.
 
 ## Source data
 
@@ -19,9 +18,7 @@ Each build reads its matching completed ranking table. It must not read raw
 `results` or `result_facts` for a normal count request.
 
 Relevant SQL files include [result ranking counts](../../data-tools/projection-catalog/people/result-rankings/result_ranking_counts.sql),
-[ranking counts](../../data-tools/projection-catalog/core/ranking-tables/ranking_counts.sql),
-[projection counts](../../data-tools/projection-catalog/people/event-rankings/projection_counts.sql), and
-[entity ranking counts](../../data-tools/projection-catalog/core/entity-ranking-counts/entity_ranking_counts.sql).
+and [ranking counts](../../data-tools/projection-catalog/core/ranking-tables/ranking_counts.sql).
 
 ## Indexes
 

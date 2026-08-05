@@ -223,7 +223,7 @@ async function loadFastestCompetitions(params: URLSearchParams, limit: number) {
   };
 }
 
-export async function loadPodiumRankings(
+async function loadPodiumRankings(
   params: URLSearchParams,
   limit = parseLimit(params),
 ) {

@@ -74,7 +74,7 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
   return { ...state, loadingMore: action.value };
 }
 
-export function isPersonSearchReady(value: string) {
+function isPersonSearchReady(value: string) {
   const trimmed = value.trim();
   const looksLikeWcaId = /^\d/.test(trimmed);
   const readyWcaId = /^\d{4}[A-Za-z]{2}/.test(trimmed);

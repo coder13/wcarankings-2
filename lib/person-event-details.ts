@@ -7,7 +7,7 @@ import {
 } from "@/lib/wca";
 import { normalizeProfileWcaId } from "@/lib/person-profile";
 
-export type PersonEventAttempt = {
+type PersonEventAttempt = {
   index: number;
   value: number;
   formatted: string;

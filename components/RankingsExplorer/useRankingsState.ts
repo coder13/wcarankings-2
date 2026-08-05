@@ -20,8 +20,6 @@ import {
 } from "./rankingsUrl";
 import type { RegionOption } from "./types";
 
-export type { RankingsFilterState } from "./rankingsUrl";
-
 export type PatchRankingsFilters = (
   patch: Partial<RankingsFilterState>,
   navigation?: RankingsUrlNavigation,
@@ -32,7 +30,7 @@ export function competitionRankingPath(ranking: CompetitionRanking) {
   return `/competitions/${ranking}`;
 }
 
-export function cityRankingPath(ranking: CityRanking) {
+function cityRankingPath(ranking: CityRanking) {
   return `/cities/${ranking}`;
 }
 

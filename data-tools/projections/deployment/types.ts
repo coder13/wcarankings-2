@@ -19,7 +19,7 @@ export interface GitHubArtifactMetadata {
   workflow_run?: GitHubWorkflowRun;
 }
 
-export interface GitHubWorkflowRun {
+interface GitHubWorkflowRun {
   id?: number;
 }
 

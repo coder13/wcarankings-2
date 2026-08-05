@@ -16,7 +16,7 @@ import type { AuthUser, AuthUserRow, WcaProfile } from "@/services/auth/types";
 
 export { generateSessionToken } from "@/services/auth/helpers";
 
-export const AUTH_SESSION_COOKIE = "wca_session";
+const AUTH_SESSION_COOKIE = "wca_session";
 export const AUTH_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 function toAuthUser(row: AuthUserRow): AuthUser {

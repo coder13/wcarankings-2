@@ -4,7 +4,6 @@ import {
   type ProjectionFeatureSwitch,
 } from "@/lib/projection-feature-switch-types";
 
-export { DEFAULT_PROJECTION_FEATURE_SWITCH } from "@/lib/projection-feature-switch-types";
 export type { ProjectionFeatureSwitch } from "@/lib/projection-feature-switch-types";
 
 const CORE_TABLES = [
@@ -27,10 +26,7 @@ const PERSON_COMPETITION_RANKINGS_TABLES = [
   "person_competition_rankings",
   "person_competition_ranking_counts",
 ] as const;
-const CITY_EVENT_STATS_TABLES = [
-  "city_event_stats",
-  "entity_ranking_counts",
-] as const;
+const CITY_EVENT_STATS_TABLES = ["city_event_stats"] as const;
 const SUM_OF_RANKS_TABLES = ["person_sum_of_ranks_scores"] as const;
 const YEARLY_TABLES = [
   "person_year_ranking_cohorts",
@@ -127,9 +123,4 @@ export async function getProjectionFeatureSwitch() {
       });
   }
   return loading;
-}
-
-export function resetProjectionFeatureSwitchForTests() {
-  cached = null;
-  loading = null;
 }

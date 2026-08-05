@@ -1,6 +1,6 @@
 import ReactGA from "react-ga4";
 
-export const GOOGLE_ANALYTICS_MEASUREMENT_ID = "G-83F787NWS9";
+const GOOGLE_ANALYTICS_MEASUREMENT_ID = "G-83F787NWS9";
 export const ANALYTICS_NAVIGATION_EVENT = "wcarankings:navigation";
 
 const ANALYTICS_QUERY_PARAMETERS = ["eventId", "result", "region"] as const;

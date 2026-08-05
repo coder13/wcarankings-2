@@ -74,6 +74,6 @@ test("publishes result facts as an independent dependency artifact", async () =>
   assert.deepEqual(
     DEPLOYMENT_PROJECTION_GROUPS.find((group) => group.name === "city-rankings")
       ?.dependencies,
-    ["result-facts", "competition-rankings"],
+    ["result-facts"],
   );
 });

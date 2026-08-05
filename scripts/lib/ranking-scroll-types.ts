@@ -15,7 +15,7 @@ export interface BenchmarkConfig {
   timeoutMs: number;
 }
 
-export interface RankingEntry {
+interface RankingEntry {
   rank?: number;
   subRank?: number;
 }

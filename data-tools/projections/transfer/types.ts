@@ -46,9 +46,9 @@ export interface DeferredIndexRow extends RowDataPacket {
 
 export type ProjectionTransferPublishMode = "hydrate" | "prepare" | "publish";
 
-export type TransferConnectionFactory = () => Promise<ProjectionConnection>;
+type TransferConnectionFactory = () => Promise<ProjectionConnection>;
 
-export type TransferLogger = (message: string) => void;
+type TransferLogger = (message: string) => void;
 
 export interface PublishProjectionTransferInput {
   connection: ProjectionConnection;

@@ -206,24 +206,6 @@ After resolving the selected `person_id`, query this projection through:
 `person_id` is the canonical WCA identifier in projections; do not duplicate it
 as a separate `wca_id` column.
 
-### `person_ranking_counts`
-
-Stat row:
-
-```text
-event + result type + scope + region
-```
-
-Columns:
-
-```text
-event_id
-result_type
-scope
-region_id
-count
-```
-
 ## Individual-result rankings
 
 ### `result_rankings`
@@ -717,19 +699,6 @@ fastest_average_rank
 
 The first version must not merge aliases, metro areas, or identically named
 cities in different countries.
-
-### `entity_ranking_counts`
-
-Stat row:
-
-```text
-ranking kind + event + result type
-```
-
-This small metadata projection stores totals for competition-result, podium,
-city, competition-size, and latitude leaderboards. It avoids counting a full
-leaderboard during page requests and is published with the same generation as
-the projections it describes.
 
 ## Cohorts and persisted lists
 

@@ -6,9 +6,9 @@ export const RANKINGS_CACHE_REFRESH_MS = 60_000;
 export const RANKINGS_CACHE_CAPACITY_333 = 512;
 export const RANKINGS_CACHE_CAPACITY_DEFAULT = 128;
 export const RANKINGS_WINDOW_SIZE = 400;
-export const RANKINGS_WINDOW_CACHE_CAPACITY = 128;
+const RANKINGS_WINDOW_CACHE_CAPACITY = 128;
 
-export type RankingsCachePoolSnapshot = {
+type RankingsCachePoolSnapshot = {
   eventId: string;
   capacity: number;
   entries: number;
@@ -238,7 +238,3 @@ export class RankingsWindowCache<T extends object> {
 export const rankingsWindowCache = new RankingsWindowCache<
   Record<string, unknown>
 >();
-
-export function normalPageKey(input: RankingsPageKey) {
-  return { ...input, startRank: Math.max(1, Math.floor(input.startRank)) };
-}

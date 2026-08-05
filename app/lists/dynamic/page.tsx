@@ -12,6 +12,11 @@ import { isEventId, isRankingType, normalizeGenderFilters, parseRegionQuery, typ
 
 export const dynamic = "force-dynamic";
 
+interface DynamicListResolution {
+  notice: string;
+  personIds: string[];
+}
+
 function messageFor(invalidIds: string[], unknownIds: string[]) {
   const parts = [
     invalidIds.length ? `${invalidIds.length} invalid WCA ${invalidIds.length === 1 ? "ID was" : "IDs were"} ignored` : "",
@@ -38,17 +43,22 @@ export default async function DynamicListPage({ searchParams }: {
     genderValues.flatMap((value) => value.split(","))
       .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
   );
-  let personIds: string[] = [];
-  let notice = "";
+  let listResolution: DynamicListResolution;
   try {
     const parsed = parseDynamicListIds(query.wca_ids);
     const resolved = await resolveDynamicList(parsed.personIds);
-    personIds = resolved.personIds;
-    notice = messageFor(parsed.invalidIds, resolved.unknownIds);
+    listResolution = {
+      personIds: resolved.personIds,
+      notice: messageFor(parsed.invalidIds, resolved.unknownIds),
+    };
   } catch (error) {
-    notice = error instanceof DynamicListInputError ? error.message : "Could not read this dynamic list.";
+    listResolution = {
+      personIds: [],
+      notice: error instanceof DynamicListInputError ? error.message : "Could not read this dynamic list.",
+    };
   }
-  const [regions, rankings, user] = await Promise.all([
+  const { notice, personIds } = listResolution;
+  const [regions, baseRankings, user] = await Promise.all([
     getDynamicListRegions(personIds),
     loadDynamicListRankings(personIds, new URLSearchParams({ eventId, result: rankingType, limit: "50", ...(gender.length ? { gender: gender.join(",") } : {}) })),
     getAuthUser(new Request("http://localhost", { headers: await headers() })),
@@ -57,13 +67,9 @@ export default async function DynamicListPage({ searchParams }: {
     parseRegionQuery(typeof query.region === "string" ? query.region : null),
     regions,
   );
-  if (regionSelection.scope !== "world") {
-    const filtered = await loadDynamicListRankings(personIds, new URLSearchParams({ eventId, result: rankingType, region: regionSelection.regionId, limit: "50", ...(gender.length ? { gender: gender.join(",") } : {}) }));
-    rankings.entries = filtered.entries;
-    rankings.hasMore = filtered.hasMore;
-    rankings.nextStart = filtered.nextStart;
-    rankings.total = filtered.total;
-  }
+  const rankings = regionSelection.scope === "world"
+    ? baseRankings
+    : await loadDynamicListRankings(personIds, new URLSearchParams({ eventId, result: rankingType, region: regionSelection.regionId, limit: "50", ...(gender.length ? { gender: gender.join(",") } : {}) }));
   return (
     <RankingsExplorer
         initial={{

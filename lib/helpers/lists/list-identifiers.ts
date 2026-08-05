@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-export const LIST_PUBLIC_ID_LENGTH = 8;
+const LIST_PUBLIC_ID_LENGTH = 8;
 export const LIST_PUBLIC_ID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 export const RESERVED_LIST_ALIASES = new Set([

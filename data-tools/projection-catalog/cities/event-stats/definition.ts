@@ -7,6 +7,6 @@ export const cityEventStatsJob = {
   tables: ["city_event_stats"],
   releaseGroup: "city-rankings",
   releaseOrder: 6,
-  releaseSchemaVersion: 2,
+  releaseSchemaVersion: 3,
   estimatedDurationMs: 90_000,
 } as const satisfies ProjectionJob;

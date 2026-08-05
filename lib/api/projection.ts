@@ -10,8 +10,8 @@ import {
   type RegionScope,
 } from "@/lib/wca";
 
-export const DEFAULT_PAGE_SIZE = 50;
-export const MAX_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
 
 export class ApiInputError extends Error {
   constructor(message: string) {

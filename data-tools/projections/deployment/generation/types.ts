@@ -3,7 +3,7 @@ import type { ProjectionConnection } from "../../shared/database-types.ts";
 
 export type GenerationConnection = ProjectionConnection;
 
-export interface GenerationManifestCompatibility {
+interface GenerationManifestCompatibility {
   artifactFormatVersion: number;
   datasetSchemaVersion: number;
 }
@@ -39,7 +39,7 @@ export interface GenerationState {
   sourceSha: string;
 }
 
-export interface GenerationStateSeed {
+interface GenerationStateSeed {
   activationTables?: string[];
   artifactDigests?: Record<string, string | null>;
   artifactFingerprints?: Record<string, string>;

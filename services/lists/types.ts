@@ -2,10 +2,10 @@ import type { RegionScope } from "@/lib/wca";
 
 export type ListVisibility = "public" | "private";
 export type ListJoinPolicy = "open" | "closed";
-export type ListKind = "user" | "system";
+type ListKind = "user" | "system";
 export type ListMembershipState = "member" | "pending" | "not_member";
 
-export type ListOwnerSummary = { id: number; name: string; wcaId: string };
+type ListOwnerSummary = { id: number; name: string; wcaId: string };
 
 export type ListSummary = {
   id: number;
@@ -69,8 +69,8 @@ export type PublicListSummary = Pick<
   "publicId" | "systemAlias" | "slug" | "name" | "memberCount" | "kind"
 > & { createdBy: string | null };
 
-export type ListRegion = { id: string; name: string };
-export type ListCountryRegion = ListRegion & { iso2: string };
+type ListRegion = { id: string; name: string };
+type ListCountryRegion = ListRegion & { iso2: string };
 export type ListRegions = {
   continents: ListRegion[];
   countries: ListCountryRegion[];
@@ -120,9 +120,4 @@ export type ListLookupQueryInput = {
   listColumns: string;
   byPublicId: boolean;
   forUpdate?: boolean;
-};
-export type ListRankingQueryInput = {
-  source: string;
-  scopedConditions: string[];
-  conditions: string[];
 };

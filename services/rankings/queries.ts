@@ -1,5 +1,4 @@
 import type {
-  CityEntityQueryInput,
   CompetitionEntityQueryInput,
   FilteredPersonMetricQueryInput,
   GenderRankingQueryInput,
@@ -13,9 +12,6 @@ import type {
 } from "@/services/rankings/types";
 import { escapeSqlIdentifier, sqlFragment } from "@/lib/helpers/database/sql";
 
-export function entityCountQuery() {
-  return "SELECT count FROM entity_ranking_counts WHERE ranking_kind = ? AND event_id = ? AND result_type = ?";
-}
 export function competitorCountRowsQuery() {
   return sqlFragment`WITH page AS (SELECT stats.competition_id, stats.competitor_count, stats.competitor_count_rank AS rank, stats.competitor_count_position AS position FROM competition_stats stats WHERE stats.competitor_count_position > ? ORDER BY stats.competitor_count_position LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(competition.venue, '') AS venue, COALESCE(competition.city_name, '') AS city_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2 FROM page LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position`;
 }
@@ -51,10 +47,6 @@ export function podiumEntityRowsQuery(input: PodiumEntityQueryInput) {
 export function podiumEntityCountQuery(input: PodiumEntityQueryInput) {
   return sqlFragment`SELECT COUNT(*) AS count FROM competition_event_stats WHERE event_id = ? AND ${escapeSqlIdentifier(input.positionColumn)} IS NOT NULL`;
 }
-export function cityEntityRowsQuery(input: CityEntityQueryInput) {
-  return sqlFragment`WITH page AS (SELECT stats.city_name, stats.country_id, stats.${input.valueColumn} AS result_value, stats.${input.resultIdColumn} AS result_id, stats.${input.rankColumn} AS rank FROM city_event_stats stats WHERE stats.event_id = ? AND stats.${input.valueColumn} IS NOT NULL${input.cursor} ORDER BY stats.${input.valueColumn}, stats.country_id, stats.city_name LIMIT ?) SELECT page.*, COALESCE(country.name, page.country_id) AS country_name, COALESCE(country.iso2, '') AS country_iso2, facts.person_id, COALESCE(person.name, facts.person_id) AS person_name, facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name, facts.competition_start_date, facts.round_type_id FROM page INNER JOIN result_facts facts ON facts.result_id = page.result_id LEFT JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = facts.competition_id LEFT JOIN countries country ON country.id = page.country_id ORDER BY page.result_value, page.country_id, page.city_name`;
-}
-
 export function yearCountsQuery() {
   return sqlFragment`SELECT counts.year, counts.event_id, counts.ranking_type, counts.cohort_id, cohorts.scope, cohorts.region_id, counts.count
       FROM person_year_ranking_counts counts

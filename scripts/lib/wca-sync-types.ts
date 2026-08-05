@@ -15,7 +15,7 @@ export interface SyncWcaOptions {
   suppliedPath?: string;
 }
 
-export type ImportRunFieldValue = Date | number | string | null;
+type ImportRunFieldValue = Date | number | string | null;
 export type ImportRunFields = Record<string, ImportRunFieldValue>;
 
 export interface ImportCoverageRow extends RowDataPacket {

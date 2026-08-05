@@ -26,7 +26,7 @@ export const DEFAULT_PROJECTION_NAMES = SEMANTIC_PROJECTION_DEFINITIONS.filter(
   (definition) => definition.enabledByDefault,
 ).map((definition) => definition.name);
 
-export const ACTIVE_SEMANTIC_PROJECTION_TABLES =
+const ACTIVE_SEMANTIC_PROJECTION_TABLES =
   SEMANTIC_PROJECTION_DEFINITIONS.filter(
     (definition) => definition.enabledByDefault,
   ).flatMap((definition) => definition.tables);

@@ -4,8 +4,6 @@ import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import { getRegions } from "@/services/regions/service";
 
-export const dynamic = "force-dynamic";
-
 const LIVE_COMMIT_SHA =
   process.env.APP_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "development";
 

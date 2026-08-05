@@ -1,6 +1,6 @@
 import type { ExportDateInput } from "../../shared/date.ts";
 
-export interface SemanticFingerprintGroup {
+interface SemanticFingerprintGroup {
   inputs: string[];
   semanticDigest: string;
   semanticFingerprint: string;

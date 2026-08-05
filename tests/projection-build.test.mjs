@@ -96,13 +96,10 @@ test("a city-only build plans only owned tasks and reports hydrated projections 
     ["result-facts", "competition-rankings"],
   );
   assert.deepEqual(plan.groups, ["city-rankings"]);
-  assert.deepEqual(plan.projectionNames, [
-    "city-event-stats",
-    "entity-ranking-counts",
-  ]);
+  assert.deepEqual(plan.projectionNames, ["city-event-stats"]);
   assert.ok(plan.satisfiedProjectionNames.includes("result-facts"));
   assert.ok(plan.satisfiedProjectionNames.includes("competition-event-stats"));
-  assert.equal(plan.tables.length, 2);
+  assert.equal(plan.tables.length, 1);
   assert.equal(plan.includeRankingTables, false);
 });
 

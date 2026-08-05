@@ -29,7 +29,7 @@ export interface RoleListDefinition {
   version: number;
 }
 
-export interface WcaRoleUser {
+interface WcaRoleUser {
   wca_id?: unknown;
 }
 

@@ -8,7 +8,7 @@ import type {
   ServerComponentFingerprints,
 } from "../server-component-types.ts";
 
-export const SERVER_COMPONENT_PATHS = {
+const SERVER_COMPONENT_PATHS = {
   app: [
     "Dockerfile",
     "docker-entrypoint.sh",
@@ -45,7 +45,7 @@ function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-export function componentFingerprint(
+function componentFingerprint(
   paths: readonly RepositoryPath[],
   options: ComponentFingerprintOptions = {},
 ): string {

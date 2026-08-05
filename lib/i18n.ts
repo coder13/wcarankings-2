@@ -2,7 +2,7 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { en } from "@/translations/en";
 
-export const defaultLocale = "en";
+const defaultLocale = "en";
 
 if (i18n.isInitialized) {
   i18n.services.resourceStore.addResourceBundle(

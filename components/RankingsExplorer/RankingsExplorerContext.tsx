@@ -11,7 +11,7 @@ import type { useVimNavigation } from "./useVimNavigation";
 import type { useVirtualRankings } from "./useVirtualRankings";
 import type { RankingsExplorerConfig } from "./types";
 
-export type RankingNavigation = {
+type RankingNavigation = {
   toRank: (rank: number, animate?: boolean) => void;
   toTop: () => void;
   toEnd: () => void;

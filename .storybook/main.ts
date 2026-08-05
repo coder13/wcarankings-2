@@ -2,9 +2,6 @@ import { realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { StorybookConfig } from "@storybook/nextjs-vite";
-import { realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import svgr from "vite-plugin-svgr";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");

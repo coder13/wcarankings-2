@@ -31,11 +31,6 @@ export type RankingEntry = {
   recordBadges: RecordBadgeCode[];
 };
 
-export type RankingCursor = {
-  rank: number;
-  personId: string;
-};
-
 export const WCA_EVENTS = [
   { id: "333", name: "3x3x3 Cube", shortName: "3x3" },
   { id: "222", name: "2x2x2 Cube", shortName: "2x2" },
@@ -111,10 +106,6 @@ export function genderLabel(value: GenderFilter | null) {
   if (value === "f") return "Women";
   if (value === "o") return "Other";
   return "All";
-}
-
-export function isRegionScope(value: string | null): value is RegionScope {
-  return value === "world" || value === "continent" || value === "country";
 }
 
 export function parseRegionQuery(value: string | null): {

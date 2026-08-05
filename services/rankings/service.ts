@@ -463,7 +463,7 @@ async function queryNormalPage(
   };
 }
 
-export async function queryMysql(input: QueryInput) {
+async function queryMysql(input: QueryInput) {
   if (input.eventId === "SOR" || input.eventId === "sor-kinch")
     return queryPersonMetric(input);
   if (input.gender.length && input.year === null) return queryGenderPage(input);
@@ -1116,8 +1116,4 @@ export async function loadRankingsWithDiagnostics(
     cacheLayer: "memory" as const,
     dataVersion: metadata.fetchedAt,
   };
-}
-
-export async function loadRankings(searchParams: URLSearchParams) {
-  return (await loadRankingsWithDiagnostics(searchParams)).data;
 }

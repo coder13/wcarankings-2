@@ -80,7 +80,7 @@ async function loadSnapshot() {
   };
 }
 
-export async function getRankingsMetadata() {
+async function getRankingsMetadata() {
   if (snapshot) return snapshot;
   if (!loading)
     loading = loadSnapshot()
@@ -95,7 +95,7 @@ export async function getRankingsMetadata() {
   return loading;
 }
 
-export async function refreshRankingsMetadata() {
+async function refreshRankingsMetadata() {
   const now = Date.now();
   if (!snapshot || now - lastVersionCheck >= RANKINGS_CACHE_REFRESH_MS) {
     lastVersionCheck = now;
@@ -226,12 +226,4 @@ export async function assertRankingsReady() {
       throw error;
     });
   return readiness;
-}
-
-export function resetRankingsMetadataForTests() {
-  snapshot = null;
-  loading = null;
-  refreshing = null;
-  readiness = null;
-  lastVersionCheck = 0;
 }

@@ -1,6 +1,6 @@
 import type { ExplorerSubject } from "../../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 
-export const SUBJECT_PATHS: Record<ExplorerSubject, string> = {
+const SUBJECT_PATHS: Record<ExplorerSubject, string> = {
   people: "/",
   results: "/results",
   competitions: "/competitions/best-result",

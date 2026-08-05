@@ -213,7 +213,7 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
     competitionRankings: true,
     personCompetitionRankings: false,
     personEventRankings: false,
-    cityEventStats: false,
+    cityEventStats: true,
     sumOfRanks: false,
     yearlyPersonRankings: false,
   });
@@ -250,7 +250,6 @@ test("capability table mapping keeps city and competition ownership independent"
     "competition_event_stats",
     "competition_stats",
     "city_event_stats",
-    "entity_ranking_counts",
   ]);
   assert.equal(capabilities.competitionRankings, true);
   assert.equal(capabilities.cityEventStats, true);

@@ -1,5 +1,5 @@
-export type ProjectionSubject = "people" | "competitions" | "countries";
-export type ProjectionJobKind = "semantic" | "core";
+type ProjectionSubject = "people" | "competitions" | "countries";
+type ProjectionJobKind = "semantic" | "core";
 
 export interface ProjectionJob {
   id: string;

@@ -39,7 +39,7 @@ const ROW_EXPANSION_EASE = [0.2, 0.7, 0.2, 1] as const;
 
 const subscribeHydration = () => () => {};
 
-export type RankingRange = {
+type RankingRange = {
   rows: Record<number, RankingEntry>;
   total: number;
   dataVersion: string;
