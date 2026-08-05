@@ -3,10 +3,7 @@
 import { AppHeader } from "../AppHeader/AppHeader";
 import { TextDropdown } from "../Dropdown/TextDropdown";
 import { useProjectionFeatureSwitch } from "../ProjectionFeatureSwitchProvider";
-import {
-  ShareButton,
-  shouldShowListShare,
-} from "../ShareButton/ShareButton";
+import { ShareButton, shouldShowListShare } from "../ShareButton/ShareButton";
 import {
   CITY_RANKING_OPTIONS,
   COMPETITION_RANKING_OPTIONS,
@@ -21,17 +18,16 @@ const PERSON_RANKING_OPTIONS = [
 
 export function RankingsExplorerHeader() {
   const {
-    config: { source, options: { showSubjectSwitch } },
+    config: {
+      source,
+      options: { showSubjectSwitch },
+    },
     filters,
     filterActions: actions,
     search,
   } = useRankingsExplorer();
   const featureSwitch = useProjectionFeatureSwitch();
-  const {
-    subject,
-    competitionRanking,
-    cityRanking,
-  } = filters;
+  const { subject, competitionRanking, cityRanking } = filters;
   let headerSubject;
   if (source) headerSubject = "lists" as const;
   else if (showSubjectSwitch) headerSubject = subject;
@@ -84,7 +80,9 @@ export function RankingsExplorerHeader() {
       <TextDropdown
         options={CITY_RANKING_OPTIONS}
         value={cityRanking}
-        onChange={(value) => actions.changeCityRanking(value as typeof cityRanking)}
+        onChange={(value) =>
+          actions.changeCityRanking(value as typeof cityRanking)
+        }
         ariaLabel="City ranking"
         className="competitionRankingDropdown"
       />
@@ -102,11 +100,17 @@ export function RankingsExplorerHeader() {
     <AppHeader
       subject={headerSubject}
       onSubjectChange={changeHeaderSubject}
-      actions={showShare && source ? <ShareButton title={source.listName} /> : undefined}
+      actions={
+        showShare && source ? (
+          <ShareButton title={source.listName} />
+        ) : undefined
+      }
     >
-      {source
-        ? <span className="listRankingName">{source.listName}</span>
-        : contextualControl}
+      {source ? (
+        <span className="listRankingName">{source.listName}</span>
+      ) : (
+        contextualControl
+      )}
     </AppHeader>
   );
 }

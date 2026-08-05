@@ -23,7 +23,9 @@ export function AppHeader({
   onSubjectChange?: (subject: NavigationSubject) => void;
 }) {
   return (
-    <header className={`header header--subjectMenu${className ? ` ${className}` : ""}`}>
+    <header
+      className={`header header--subjectMenu${className ? ` ${className}` : ""}`}
+    >
       <div className="headerTopRow">
         <div className="headerTitle">
           <h1 className="title">

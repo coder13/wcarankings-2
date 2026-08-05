@@ -1,13 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import {
-  ShareButton,
-  shareListUrl,
-  shouldShowListShare,
-} from "./ShareButton";
+import { ShareButton, shareListUrl, shouldShowListShare } from "./ShareButton";
 
-const exactUrl = "https://wcarankings.com/lists/favorites?eventId=333&result=average&region=US&page=4";
+const exactUrl =
+  "https://wcarankings.com/lists/favorites?eventId=333&result=average&region=US&page=4";
 
 test("shares the exact current list URL and query string", async () => {
   let sharedData: { title?: string; url?: string } | undefined;
@@ -81,36 +78,51 @@ test("does not copy after the user cancels native sharing", async () => {
 });
 
 test("only exposes list sharing outside the search experience", () => {
-  assert.equal(shouldShowListShare({
-    hasList: true,
-    searchOpen: false,
-    searchQuery: "",
-    regexSearch: false,
-  }), true);
-  assert.equal(shouldShowListShare({
-    hasList: false,
-    searchOpen: false,
-    searchQuery: "",
-    regexSearch: false,
-  }), false);
-  assert.equal(shouldShowListShare({
-    hasList: true,
-    searchOpen: true,
-    searchQuery: "",
-    regexSearch: false,
-  }), false);
-  assert.equal(shouldShowListShare({
-    hasList: true,
-    searchOpen: false,
-    searchQuery: "Max Park",
-    regexSearch: false,
-  }), false);
-  assert.equal(shouldShowListShare({
-    hasList: true,
-    searchOpen: false,
-    searchQuery: "MAX.*",
-    regexSearch: true,
-  }), false);
+  assert.equal(
+    shouldShowListShare({
+      hasList: true,
+      searchOpen: false,
+      searchQuery: "",
+      regexSearch: false,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldShowListShare({
+      hasList: false,
+      searchOpen: false,
+      searchQuery: "",
+      regexSearch: false,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldShowListShare({
+      hasList: true,
+      searchOpen: true,
+      searchQuery: "",
+      regexSearch: false,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldShowListShare({
+      hasList: true,
+      searchOpen: false,
+      searchQuery: "Max Park",
+      regexSearch: false,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldShowListShare({
+      hasList: true,
+      searchOpen: false,
+      searchQuery: "MAX.*",
+      regexSearch: true,
+    }),
+    false,
+  );
 });
 
 test("renders an accessible share action and status region", () => {

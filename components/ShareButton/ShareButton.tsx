@@ -24,10 +24,10 @@ export function shouldShowListShare({
 
 function isAbortError(error: unknown) {
   return Boolean(
-    error
-      && typeof error === "object"
-      && "name" in error
-      && error.name === "AbortError",
+    error &&
+    typeof error === "object" &&
+    "name" in error &&
+    error.name === "AbortError",
   );
 }
 
@@ -72,9 +72,12 @@ export function ShareButton({ title }: { title: string }) {
   const [status, setStatus] = useState("");
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => {
-    if (statusTimer.current) clearTimeout(statusTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (statusTimer.current) clearTimeout(statusTimer.current);
+    },
+    [],
+  );
 
   const announce = (message: string) => {
     setStatus(message);
@@ -89,12 +92,14 @@ export function ShareButton({ title }: { title: string }) {
       const result = await shareListUrl({
         url: window.location.href,
         title,
-        share: typeof navigator.share === "function"
-          ? navigator.share.bind(navigator)
-          : undefined,
-        writeText: typeof navigator.clipboard?.writeText === "function"
-          ? navigator.clipboard.writeText.bind(navigator.clipboard)
-          : undefined,
+        share:
+          typeof navigator.share === "function"
+            ? navigator.share.bind(navigator)
+            : undefined,
+        writeText:
+          typeof navigator.clipboard?.writeText === "function"
+            ? navigator.clipboard.writeText.bind(navigator.clipboard)
+            : undefined,
       });
       if (result === "shared") announce("List shared.");
       if (result === "copied") announce("List link copied.");
