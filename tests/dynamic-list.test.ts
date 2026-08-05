@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DynamicListInputError, MAX_DYNAMIC_LIST_MEMBERS, parseDynamicListIds } from "@/services/lists/dynamic-list";
+import {
+  DynamicListInputError,
+  MAX_DYNAMIC_LIST_MEMBERS,
+  parseDynamicListIds,
+} from "@/services/lists/dynamic-list";
 
 test("parses dynamic list IDs in canonical comma-separated URLs", () => {
   assert.deepEqual(
@@ -10,6 +14,12 @@ test("parses dynamic list IDs in canonical comma-separated URLs", () => {
 });
 
 test("rejects dynamic lists above the supported size", () => {
-  const ids = Array.from({ length: MAX_DYNAMIC_LIST_MEMBERS + 1 }, (_, index) => `${2000 + index}TEST01`);
-  assert.throws(() => parseDynamicListIds(ids.join(",")), DynamicListInputError);
+  const ids = Array.from(
+    { length: MAX_DYNAMIC_LIST_MEMBERS + 1 },
+    (_, index) => `${2000 + index}TEST01`,
+  );
+  assert.throws(
+    () => parseDynamicListIds(ids.join(",")),
+    DynamicListInputError,
+  );
 });

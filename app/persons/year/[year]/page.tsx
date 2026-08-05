@@ -34,10 +34,5 @@ export default async function YearlyPersonsPage({
 }) {
   const { year } = await params;
   if (!/^\d{4}$/.test(year)) notFound();
-  return (
-    <RankingsPage
-      searchParams={searchParams}
-      requiresYearlyRankings
-    />
-  );
+  return <RankingsPage searchParams={searchParams} requiresYearlyRankings />;
 }

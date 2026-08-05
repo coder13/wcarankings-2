@@ -71,14 +71,6 @@ host mutation lock coordinates only Compose changes, migrations, activation,
 smoke checks, and rollback; projection generation and candidate staging do not
 block server releases. Database activation also uses a MariaDB advisory lock.
 
-The included `ops/wcarankings-sync.service` and `.timer` files are deprecated
-stubs. They are retained only to prevent older operational notes from silently
-installing a live server-side data updater. Do not enable them for production DB
-refreshes.
-
-If an older production host has the timer installed, disable it as part of host
-maintenance and rely on the daily GitHub Actions schedule instead.
-
 ## GitHub Actions deployment
 
 `.github/workflows/server-production.yml` deploys the server after pushes to
@@ -160,9 +152,9 @@ bulk transfer before index construction, and the 22 deferred indexes took about
 125.6s; every other table's indexes together took about 45s.
 
 The cache is therefore the main steady-state optimization. The five
-`result_entries_single` secondary indexes had no runtime readers. They were removed after this
-benchmark, leaving the compatibility table's primary key and eliminating its
-125-second deferred-index phase.
+`result_entries_single` secondary indexes had no runtime readers. They were
+removed after this benchmark, eliminating the 125-second deferred-index phase.
+The table and its unused count table are now retired entirely.
 
 The first cold run without those indexes built and dumped the generation in
 24m 15s, 42.9% faster than the 42m 27s indexed run. Production transfer and
@@ -172,46 +164,21 @@ indexes and about 43 seconds. The compressed artifact remained approximately
 432.3 MB because secondary indexes were already omitted from the logical dump;
 the improvement comes from avoiding their initial and production construction.
 
-The next transfer optimization target is the compatibility table's data build
-and replay cost, or a physical backup/restore format that avoids row-by-row
-logical replay.
-
-## Ranking performance verification
-
-`GET /api/health/live` checks process liveness and `GET /api/health/ready`
-checks database and projection readiness. Both are `no-store`; deployment waits
-for readiness before rendering the page.
-
-Run the repeatable local traffic mix after starting the app:
-
-```bash
-pnpm run load:rankings
-```
-
-It covers normal browsing, distant pages, incremental search typing, and unique
-queries. It defaults to localhost; a remote target requires
-`--target=https://example.com --allow-remote`. Its JSON report includes request
-and status counts, p50/p95 latency, cache outcomes, and Server-Timing samples.
-
-Inspect an indexed production path without changing data (use a representative
-cohort):
-
-```sql
-EXPLAIN ANALYZE SELECT world_rank, world_sub_rank, person_id
-FROM ranking_entries_single
-WHERE event_id = '333' AND world_rank > 0
-  AND world_sub_rank >= 5001 AND world_sub_rank < 5051
-ORDER BY world_sub_rank;
-```
+Daily group builds defer leaf secondary indexes and package their exact desired
+definitions in transfer metadata. Production constructs those indexes once,
+after bulk loading. Builder-side `result_facts` indexes remain because downstream
+groups depend on them. Benchmark builds retain all indexes and run before
+packaging so request measurements reflect the production schema.
 
 The result-level single projection is paged with the same keyset pattern. Do not
 query or offset-scan the raw `results` table for the top-results page:
 
 ```sql
-SELECT result_id, world_rank, person_id, person_name, best, competition_id
-FROM result_entries_single
-WHERE event_id = '333' AND world_sub_rank > 5000
-ORDER BY world_sub_rank
+SELECT result_id, attempt_number, world_rank, person_id, result_value,
+       competition_id
+FROM result_rankings_single
+WHERE event_id = '333' AND world_position > 5000
+ORDER BY world_position
 LIMIT 50;
 ```
 

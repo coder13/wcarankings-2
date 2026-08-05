@@ -28,7 +28,12 @@ export async function generateMetadata({
     subject: "cities",
     competitionRanking: "best-result",
     cityRanking: CITY_RANKINGS.has(ranking)
-      ? ranking as "fastest-single" | "fastest-average" | "competitors" | "competitions" | "solves"
+      ? (ranking as
+          | "fastest-single"
+          | "fastest-average"
+          | "competitors"
+          | "competitions"
+          | "solves")
       : "fastest-single",
     year: null,
     personCompetitionRanking: false,

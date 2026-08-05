@@ -15,22 +15,28 @@ export function renderWithProviders(
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return renderToStaticMarkup(
-    <QueryClientProvider client={queryClient}>
-      <PathnameContext.Provider value={pathname}>
-        <SearchParamsContext.Provider value={searchParams}>
-          <AppRouterContext.Provider value={{
-            back() {},
-            forward() {},
-            refresh() {},
-            push() {},
-            replace() {},
-            prefetch() {},
-          }}>
-            {children}
-          </AppRouterContext.Provider>
-        </SearchParamsContext.Provider>
-      </PathnameContext.Provider>
-    </QueryClientProvider>,
-  );
+  try {
+    return renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <PathnameContext.Provider value={pathname}>
+          <SearchParamsContext.Provider value={searchParams}>
+            <AppRouterContext.Provider
+              value={{
+                back() {},
+                forward() {},
+                refresh() {},
+                push() {},
+                replace() {},
+                prefetch() {},
+              }}
+            >
+              {children}
+            </AppRouterContext.Provider>
+          </SearchParamsContext.Provider>
+        </PathnameContext.Provider>
+      </QueryClientProvider>,
+    );
+  } finally {
+    queryClient.clear();
+  }
 }

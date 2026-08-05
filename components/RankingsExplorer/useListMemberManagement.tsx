@@ -178,7 +178,7 @@ export function useListMemberManagement({
 }
 
 export function ListMemberManagementOverlays() {
-  const { data: { listMembers: controller } } = useRankingsExplorer();
+  const { listMembers: controller } = useRankingsExplorer();
   const { selection, contextMenu, removal } = controller;
 
   return (

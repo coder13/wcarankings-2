@@ -99,10 +99,19 @@ async function applyStatementTimeout(connection: PoolConnection) {
   await connection.query(`SET SESSION max_statement_time = ${timeoutSeconds}`);
 }
 
+interface QueryResult<Row> {
+  rowCount: number;
+  rows: Row[];
+  timings: {
+    queueMs: number;
+    statementMs: number;
+  };
+}
+
 export async function query<T extends Record<string, unknown>>(
   text: string,
   values: unknown[] = [],
-) {
+): Promise<QueryResult<T>> {
   const releaseQueue = await getQueue().acquire();
   const queuedAt = performance.now();
   let connection: Awaited<ReturnType<Pool["getConnection"]>> | undefined;
@@ -123,7 +132,9 @@ export async function query<T extends Record<string, unknown>>(
   }
 }
 
-export async function withTransaction<T>(callback: (connection: PoolConnection) => Promise<T>) {
+export async function withTransaction<T>(
+  callback: (connection: PoolConnection) => Promise<T>,
+) {
   const releaseQueue = await getQueue().acquire();
   let connection: PoolConnection | undefined;
   try {

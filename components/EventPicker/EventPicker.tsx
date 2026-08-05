@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { WCA_EVENTS } from "@/lib/wca";
+import { nextEventPickerOptionIndex } from "./eventPickerNavigation";
 
 type WcaEvent = (typeof WCA_EVENTS)[number];
 
@@ -19,12 +20,14 @@ function isWcaEvent(option: EventPickerOption): option is WcaEvent {
 export function EventPicker<T extends EventPickerOption>({
   event,
   options = WCA_EVENTS as unknown as readonly T[],
+  leadingOptions = [],
   additionalOptions = [],
   onChange,
   onTriggerReady,
 }: {
   event: T;
   options?: readonly T[];
+  leadingOptions?: readonly T[];
   additionalOptions?: readonly T[];
   onChange: (eventId: T["id"]) => void;
   onTriggerReady?: (trigger: HTMLButtonElement | null) => void;
@@ -33,7 +36,7 @@ export function EventPicker<T extends EventPickerOption>({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const allOptions = [...options, ...additionalOptions];
+  const allOptions = [...leadingOptions, ...options, ...additionalOptions];
   const selectedIndex = allOptions.findIndex((option) => option.id === event.id);
 
   useEffect(() => {
@@ -78,33 +81,19 @@ export function EventPicker<T extends EventPickerOption>({
       (option) => option === document.activeElement,
     );
     const currentIndex = focusedIndex === -1 ? selectedIndex : focusedIndex;
-    const columnCount = 5;
-    let nextIndex: number | undefined;
-
-    if (
-      keyboardEvent.key === "ArrowRight" &&
-      currentIndex % columnCount < columnCount - 1 &&
-      currentIndex + 1 < allOptions.length
-    ) {
-      nextIndex = currentIndex + 1;
-    } else if (keyboardEvent.key === "ArrowLeft" && currentIndex % columnCount > 0) {
-      nextIndex = currentIndex - 1;
-    } else if (
-      keyboardEvent.key === "ArrowDown" &&
-      currentIndex + columnCount < allOptions.length
-    ) {
-      nextIndex = currentIndex + columnCount;
-    } else if (keyboardEvent.key === "ArrowUp" && currentIndex >= columnCount) {
-      nextIndex = currentIndex - columnCount;
-    } else if (keyboardEvent.key === "Home") {
-      nextIndex = 0;
-    } else if (keyboardEvent.key === "End") {
-      nextIndex = allOptions.length - 1;
-    } else if (keyboardEvent.key === "Escape") {
+    if (keyboardEvent.key === "Escape") {
       keyboardEvent.preventDefault();
       close();
       return;
     }
+
+    const nextIndex = nextEventPickerOptionIndex({
+      key: keyboardEvent.key,
+      currentIndex,
+      leadingCount: leadingOptions.length,
+      eventCount: options.length,
+      additionalCount: additionalOptions.length,
+    });
 
     if (keyboardEvent.key.startsWith("Arrow")) {
       keyboardEvent.preventDefault();
@@ -171,10 +160,24 @@ export function EventPicker<T extends EventPickerOption>({
         aria-hidden={!open}
         onKeyDown={handleMenuKeyDown}
       >
-        <div className="EventPicker-eventOptions">{options.map(renderOption)}</div>
+        {leadingOptions.length > 0 && (
+          <div className="EventPicker-leadingOptions">
+            {leadingOptions.map(renderOption)}
+          </div>
+        )}
+        <div className="EventPicker-eventOptions">
+          {options.map((option, index) =>
+            renderOption(option, leadingOptions.length + index),
+          )}
+        </div>
         {additionalOptions.length > 0 && (
           <div className="EventPicker-additionalOptions">
-            {additionalOptions.map((option, index) => renderOption(option, options.length + index))}
+            {additionalOptions.map((option, index) =>
+              renderOption(
+                option,
+                leadingOptions.length + options.length + index,
+              ),
+            )}
           </div>
         )}
       </div>

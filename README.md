@@ -43,10 +43,15 @@ Useful checks:
 pnpm run build
 pnpm test
 pnpm run lint
+pnpm run format:sql
+pnpm run format:sql:check
 pnpm run test:unit
 pnpm run storybook
 pnpm run build-storybook
 ```
+
+Run `pnpm run format:sql` to format SQL files. Run `pnpm run format:sql:check`
+to check SQL files without changing them.
 
 Storybook runs the client-side rankings explorer with deterministic preview data
 at `http://localhost:6006`, so it does not require MariaDB or a WCA export.
@@ -59,9 +64,7 @@ virtualized row or accordion motion. It documents the shared geometry contract,
 cached-detail behavior, and regression checks.
 
 See [docs/deployment.md](docs/deployment.md) for Docker Compose setup, server
-prerequisites, the GitHub Actions-owned WCA refresh flow, and deployment flow. See
-[docs/cloudflare-cache.md](docs/cloudflare-cache.md) for the source-controlled
-public API edge-cache policy and setup.
+prerequisites, the GitHub Actions-owned WCA refresh flow, and deployment flow.
 
 ## WCA sign-in
 
@@ -85,7 +88,7 @@ db/                          MySQL connection pool
 migrations/mysql/            Flyway versioned MariaDB migrations
 sql/ranking-projections/     Readable SQL for daily derived ranking projections
 Dockerfile.flyway             Pinned Flyway migration image
-scripts/sync-wca-export.mjs  WCA SQL export downloader and importer
+scripts/sync-wca-export.ts  WCA SQL export downloader and importer
 Dockerfile                   Multi-stage production image
 docker-compose.yml           MariaDB + app services
 ```

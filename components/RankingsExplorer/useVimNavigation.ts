@@ -43,25 +43,32 @@ export function useVimNavigation({
     setCommand(":");
   }, [resetSearch, setSearchOpen]);
 
-  const execute = useCallback((rawCommand: string) => {
-    const commandValue = rawCommand.trim();
-    const lowerCommand = commandValue.toLocaleLowerCase();
-    const currentRank = getCurrentRank();
+  const execute = useCallback(
+    (rawCommand: string) => {
+      const commandValue = rawCommand.trim();
+      const lowerCommand = commandValue.toLocaleLowerCase();
+      const currentRank = getCurrentRank();
 
-    if (commandValue === "G" || commandValue === "$" || lowerCommand === "end") {
-      goToEnd();
-    } else if (commandValue === "gg" || lowerCommand === "top") {
-      goToRank(1);
-    } else if (["j", "d", "down", "pagedown"].includes(lowerCommand)) {
-      goToRank(currentRank + jumpSize);
-    } else if (["k", "u", "up", "pageup"].includes(lowerCommand)) {
-      goToRank(currentRank - jumpSize);
-    } else if (/^[+-]\d+$/.test(commandValue)) {
-      goToRank(currentRank + Number(commandValue));
-    } else if (/^\d[\d,]*$/.test(commandValue)) {
-      goToRank(Number(commandValue.replaceAll(",", "")));
-    }
-  }, [getCurrentRank, goToEnd, goToRank, jumpSize]);
+      if (
+        commandValue === "G" ||
+        commandValue === "$" ||
+        lowerCommand === "end"
+      ) {
+        goToEnd();
+      } else if (commandValue === "gg" || lowerCommand === "top") {
+        goToRank(1);
+      } else if (["j", "d", "down", "pagedown"].includes(lowerCommand)) {
+        goToRank(currentRank + jumpSize);
+      } else if (["k", "u", "up", "pageup"].includes(lowerCommand)) {
+        goToRank(currentRank - jumpSize);
+      } else if (/^[+-]\d+$/.test(commandValue)) {
+        goToRank(currentRank + Number(commandValue));
+      } else if (/^\d[\d,]*$/.test(commandValue)) {
+        goToRank(Number(commandValue.replaceAll(",", "")));
+      }
+    },
+    [getCurrentRank, goToEnd, goToRank, jumpSize],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -114,12 +121,14 @@ export function useVimNavigation({
       }
 
       const editingSearch = isEditable && command.startsWith("/");
-      if (editingSearch && event.key !== "Enter" && event.key !== "Escape") return;
+      if (editingSearch && event.key !== "Enter" && event.key !== "Escape")
+        return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (
         event.key.length !== 1 &&
         !["Enter", "Escape", "Backspace"].includes(event.key)
-      ) return;
+      )
+        return;
 
       event.preventDefault();
       if (command.startsWith("/")) {
@@ -129,15 +138,21 @@ export function useVimNavigation({
           setMode(false);
           setCommand(":");
         } else if (event.key === "Backspace") {
-          setCommand((current) => current.length > 1 ? current.slice(0, -1) : current);
+          setCommand((current) =>
+            current.length > 1 ? current.slice(0, -1) : current,
+          );
         } else if (event.key.length === 1) {
           setCommand((current) => current + event.key);
         }
         return;
       }
 
-      const directCommand = event.key === "G" ? "G" : event.key.toLocaleLowerCase();
-      if (command === ":" && ["j", "k", "d", "u", "G"].includes(directCommand)) {
+      const directCommand =
+        event.key === "G" ? "G" : event.key.toLocaleLowerCase();
+      if (
+        command === ":" &&
+        ["j", "k", "d", "u", "G"].includes(directCommand)
+      ) {
         execute(directCommand);
         setCommand(":");
       } else if (command === ":g" && event.key === "g") {
@@ -152,7 +167,9 @@ export function useVimNavigation({
         setMode(false);
         setCommand(":");
       } else if (event.key === "Backspace") {
-        setCommand((current) => current.length > 1 ? current.slice(0, -1) : current);
+        setCommand((current) =>
+          current.length > 1 ? current.slice(0, -1) : current,
+        );
       } else if (event.key.length === 1) {
         setCommand((current) => current + event.key);
       }

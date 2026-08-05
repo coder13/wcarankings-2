@@ -5,7 +5,7 @@
 @import "../components/ExplorerSubjectSwitch/ExplorerSubjectSwitch.css";
 @import "../components/RankingsRail/RankingsRail.css";
 @import "../components/JumpControlsVisibility/JumpControlsVisibility.css";
-@import "../components/PwaUpdatePrompt/PwaUpdatePrompt.css";
+@import "../components/LoadingSpinner/LoadingSpinner.css";
 @import "../components/PlaceholderPage/PlaceholderPage.css";
 @import "../components/ListBrowse/ListBrowse.css";
 @import "../components/ListMine/ListMine.css";
@@ -412,11 +412,11 @@ ul {
 }
 
 .app.app--searching {
-  padding-bottom: calc(3.5em + 50vh);
+  padding-bottom: calc(3.5em + 195px);
 }
 
 .app.app--searching.app--vimMode {
-  padding-bottom: calc(6em + 50vh);
+  padding-bottom: calc(6em + 195px);
 }
 
 .app,

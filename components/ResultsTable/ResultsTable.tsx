@@ -1,39 +1,22 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { RankingRow } from "../RankingRow/RankingRow";
-import { rankingEntryKey, type RankingEntry } from "../RankingsExplorer/types";
-import type { Key, ReactNode, Ref } from "react";
+import type { RankingEntry } from "../RankingsExplorer/types";
+import type { VirtualRankingItem } from "../RankingsExplorer/useVirtualRankings";
 import { usePersonRowDetails } from "./usePersonRowDetails";
 
-type RenderedTableRow = {
-  index: number;
-  key: Key;
-  start: number;
-  size?: number;
-};
-
 export type ResultsTableData = {
-  entries: RankingEntry[];
+  items: VirtualRankingItem[];
   eventId: string;
   rankingType: "single" | "average";
   hideIdentityIds?: boolean;
-  hasMore: boolean;
   emptyState?: ReactNode;
 };
 
 export type ResultsTableVirtualization = {
-  listRef?: Ref<HTMLOListElement>;
-  renderedRows: RenderedTableRow[];
-  renderedListHeight: number;
+  totalHeight: number;
   listOffset: number;
-  measureElement: (element: Element | null) => void;
-  resizeRow?: (index: number, size: number) => void;
-};
-
-export type ResultsTableStatus = {
-  loading: boolean;
-  preserveListDuringLoad: boolean;
-  loadingMore: boolean;
 };
 
 export type ResultsTableSearch = {
@@ -42,163 +25,143 @@ export type ResultsTableSearch = {
 };
 
 export type ResultsTableInteraction = {
-  onRowNavigate: (rowIndex: number, direction: -1 | 1) => void;
+  onRowNavigate: (globalIndex: number, direction: -1 | 1) => void;
+  onToggleExpanded: (globalIndex: number) => void;
   memberSelectionMode?: boolean;
   selectedMemberIds?: ReadonlySet<string>;
   onMemberToggle?: (personId: string) => void;
-  onMemberContextMenu?: (entry: RankingEntry, position: { x: number; y: number }) => void;
+  onMemberContextMenu?: (
+    entry: RankingEntry,
+    position: { x: number; y: number },
+  ) => void;
   enablePersonDetails?: boolean;
-  initialExpandedPersonId?: string;
   onFocusedPersonChange?: (personId: string | null) => void;
 };
 
 export function ResultsTable({
   data,
   virtualization,
-  status,
   search,
   interaction,
 }: {
   data: ResultsTableData;
   virtualization: ResultsTableVirtualization;
-  status: ResultsTableStatus;
   search: ResultsTableSearch;
   interaction: ResultsTableInteraction;
 }) {
   const {
-    entries,
+    items,
     eventId,
     rankingType,
     hideIdentityIds = false,
-    hasMore,
     emptyState,
   } = data;
   const {
-    listRef,
-    renderedRows,
-    renderedListHeight,
-    listOffset,
-    measureElement,
-    resizeRow,
-  } = virtualization;
-  const { loading, preserveListDuringLoad, loadingMore } = status;
-  const { highlightedPersonId, searchMatchPersonIds } = search;
-  const {
     onRowNavigate,
+    onToggleExpanded,
     memberSelectionMode,
     selectedMemberIds,
     onMemberToggle,
     onMemberContextMenu,
     enablePersonDetails = false,
-    initialExpandedPersonId = "",
     onFocusedPersonChange,
   } = interaction;
+  const activeEntry = items.find((item) => item.expanded)?.entry ?? null;
   const rowDetails = usePersonRowDetails({
-    entries,
+    activeEntry,
     eventId,
-    rankingType,
     enabled: enablePersonDetails,
-    initialExpandedPersonId,
-    onFocusedPersonChange,
-    resizeRow,
   });
 
-  if (loading && !preserveListDuringLoad && entries.length === 0) {
-    return <div className="listMessage listMessage--delayed">Loading rankings…</div>;
+  if (items.length === 0) {
+    return emptyState ?? null;
   }
 
   return (
     <ol
-      ref={listRef}
       className="list"
-      style={{ height: `${renderedListHeight}px` }}
+      data-rankings-list
+      style={{ height: `${virtualization.totalHeight}px` }}
     >
-      {renderedRows.map((virtualRow) => {
-        const entry = entries[virtualRow.index] ?? null;
-        let content;
-
-        if (entry) {
-          const key = rankingEntryKey(entry);
-          content = (
-            <RankingRow
-              entry={entry}
-              display={{
-                eventId,
-                rankingType,
-                hideIdentityId: hideIdentityIds,
-                animationIndex: virtualRow.index,
-                searchMatched: searchMatchPersonIds?.has(entry.personId),
-                highlighted: entry.personId === highlightedPersonId,
-                rankIsDuplicate:
-                  virtualRow.index > 0 &&
-                  entries[virtualRow.index - 1]?.rank === entry.rank,
-              }}
-              interaction={{
-                rowIndex: virtualRow.index,
-                onNavigate: onRowNavigate,
-                selectionMode: memberSelectionMode,
-                selected: selectedMemberIds?.has(entry.personId),
-                onToggleSelected: onMemberToggle,
-                onMemberContextMenu,
-              }}
-              details={{
-                expanded: rowDetails.activeExpandedKey === key,
-                closing: rowDetails.closingKeys.has(key),
-                skipAccordionAnimation: Boolean(
-                  initialExpandedPersonId &&
-                  rowDetails.focusedExpansionKey === key
-                ),
-                eventDetails: key === rowDetails.activeExpandedKey
-                  ? rowDetails.details
-                  : null,
-                onPrefetchDetails: enablePersonDetails
-                  ? rowDetails.prefetch
-                  : undefined,
-                onCancelPrefetchDetails: enablePersonDetails
-                  ? rowDetails.cancelPrefetch
-                  : undefined,
-                detailsError: key === rowDetails.activeExpandedKey
-                  ? rowDetails.error
-                  : "",
-                onToggle: enablePersonDetails && !memberSelectionMode
-                  ? () => rowDetails.toggle(entry)
-                  : undefined,
-              }}
-            />
-          );
-        } else if (hasMore) {
-          content = (
-            <div className="listMessage">
-              {loadingMore ? "Loading more results…" : "Keep scrolling…"}
-            </div>
-          );
-        } else {
-          content = emptyState ?? <div className="listMessage">That’s all, folks</div>;
-        }
+      {items.map((virtualRow, mountedIndex) => {
+        const entry = virtualRow.entry;
+        const accordionVisible = virtualRow.expandedContentHeight > 0;
+        const detailsForRow = virtualRow.expanded ? rowDetails.details : null;
 
         return (
           <div
-            ref={measureElement}
             className="virtualRow"
             key={virtualRow.key}
             data-index={virtualRow.index}
-            data-expanded={entry
-              ? rowDetails.activeExpandedKey === rankingEntryKey(entry) ||
-                rowDetails.closingKeys.has(rankingEntryKey(entry))
+            data-global-index={virtualRow.globalIndex}
+            data-expanded={accordionVisible}
+            data-highlighted={entry
+              ? entry.personId === search.highlightedPersonId
               : false}
-            data-highlighted={entry ? entry.personId === highlightedPersonId : false}
-            data-alternate={entry ? virtualRow.index % 2 === 1 : false}
-            data-accordion-measure-lock={entry && rowDetails.animatedKeys.has(rankingEntryKey(entry)) ? "true" : undefined}
-            data-details-loading={entry
-              ? rowDetails.pending &&
-                rowDetails.activeExpandedKey === rankingEntryKey(entry)
-              : false}
+            data-alternate={virtualRow.globalIndex % 2 === 1}
+            data-loading={!entry || undefined}
+            data-details-loading={Boolean(
+              entry && virtualRow.expanded && rowDetails.pending,
+            )}
             style={{
-              height: virtualRow.size === undefined ? undefined : `${virtualRow.size}px`,
-              transform: `translateY(${virtualRow.start - listOffset}px)`,
+              height: `${virtualRow.size}px`,
+              transform: `translateY(${
+                virtualRow.start - virtualization.listOffset
+              }px)`,
             }}
           >
-            {content}
+            {entry ? (
+              <RankingRow
+                entry={entry}
+                display={{
+                  eventId,
+                  rankingType,
+                  hideIdentityId: hideIdentityIds,
+                  animationIndex: mountedIndex,
+                  alternate: virtualRow.globalIndex % 2 === 1,
+                  searchMatched: search.searchMatchPersonIds?.has(entry.personId),
+                  highlighted: entry.personId === search.highlightedPersonId,
+                  rankIsDuplicate: virtualRow.rankIsDuplicate,
+                }}
+                interaction={{
+                  rowIndex: virtualRow.globalIndex,
+                  onNavigate: onRowNavigate,
+                  selectionMode: memberSelectionMode,
+                  selected: selectedMemberIds?.has(entry.personId),
+                  onToggleSelected: onMemberToggle,
+                  onMemberContextMenu,
+                }}
+                details={{
+                  expanded: virtualRow.expanded,
+                  closing: accordionVisible && !virtualRow.expanded,
+                  height: virtualRow.expandedContentHeight,
+                  progress: virtualRow.expansionProgress,
+                  eventDetails: detailsForRow,
+                  onPrefetchDetails: enablePersonDetails
+                    ? rowDetails.prefetch
+                    : undefined,
+                  onCancelPrefetchDetails: enablePersonDetails
+                    ? rowDetails.cancelPrefetch
+                    : undefined,
+                  detailsError: virtualRow.expanded ? rowDetails.error : "",
+                  onToggle: enablePersonDetails && !memberSelectionMode
+                    ? () => {
+                        onToggleExpanded(virtualRow.globalIndex);
+                        onFocusedPersonChange?.(
+                          virtualRow.expanded ? null : entry.personId,
+                        );
+                      }
+                    : undefined,
+                }}
+              />
+            ) : (
+              <div
+                className={`row row--loading${
+                  virtualRow.globalIndex % 2 === 1 ? " row--alternate" : ""
+                }`}
+                aria-hidden="true"
+              />
+            )}
           </div>
         );
       })}

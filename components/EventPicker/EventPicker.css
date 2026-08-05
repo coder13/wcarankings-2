@@ -26,9 +26,8 @@
   display: none;
 }
 
-.EventPicker-preview--named,
-.EventPicker-option--named {
-  font-weight: 700;
+.EventPicker-preview--named {
+  font-weight: 400;
 }
 
 .EventPicker-symbol {
@@ -61,6 +60,20 @@
   grid-template-columns: repeat(5, 40px);
 }
 
+.EventPicker-leadingOptions {
+  display: grid;
+  grid-template-columns: repeat(5, 40px);
+  margin-bottom: 0.35em;
+  padding-bottom: 0.35em;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.EventPicker-leadingOptions .EventPicker-option {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+}
+
 .EventPicker-additionalOptions {
   display: grid;
   margin-top: 0.35em;
@@ -79,7 +92,7 @@
 
 .EventPicker-option {
   font-size: 1.25em;
-  border-radius: 0;
+  border-radius: 0.65rem;
 }
 
 .EventPicker-option--named {

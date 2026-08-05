@@ -1,11 +1,9 @@
 import type {
-  CityEntityQueryInput,
   CompetitionEntityQueryInput,
   FilteredPersonMetricQueryInput,
   GenderRankingQueryInput,
   LatitudeQueryInput,
   PersonMetricQueryInput,
-  PersonRankingsQueryInput,
   PodiumEntityQueryInput,
   RankingCursorQueryInput,
   RankingPageQueryInput,
@@ -14,9 +12,6 @@ import type {
 } from "@/services/rankings/types";
 import { escapeSqlIdentifier, sqlFragment } from "@/lib/helpers/database/sql";
 
-export function entityCountQuery() {
-  return "SELECT count FROM entity_ranking_counts WHERE ranking_kind = ? AND event_id = ? AND result_type = ?";
-}
 export function competitorCountRowsQuery() {
   return sqlFragment`WITH page AS (SELECT stats.competition_id, stats.competitor_count, stats.competitor_count_rank AS rank, stats.competitor_count_position AS position FROM competition_stats stats WHERE stats.competitor_count_position > ? ORDER BY stats.competitor_count_position LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(competition.venue, '') AS venue, COALESCE(competition.city_name, '') AS city_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2 FROM page LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position`;
 }
@@ -40,7 +35,9 @@ export function competitionEntityRowsQuery(input: CompetitionEntityQueryInput) {
   const positionColumn = escapeSqlIdentifier(input.positionColumn);
   return sqlFragment`WITH page AS (SELECT stats.competition_id, stats.start_date, stats.${valueColumn} AS result_value, stats.${resultIdColumn} AS result_id, stats.${rankColumn} AS rank, stats.${positionColumn} AS position FROM competition_event_stats stats WHERE stats.event_id = ? AND stats.${positionColumn} > ? ORDER BY stats.${positionColumn} LIMIT ?) SELECT page.*, COALESCE(competition.name, page.competition_id) AS competition_name, COALESCE(country.name, competition.country_id, '') AS country_name, COALESCE(country.iso2, '') AS country_iso2, result.person_id, COALESCE(person.name, result.person_id) AS person_name FROM page INNER JOIN results result ON result.id = page.result_id LEFT JOIN persons person ON person.wca_id = result.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = page.competition_id LEFT JOIN countries country ON country.id = competition.country_id ORDER BY page.position`;
 }
-export function competitionEntityCountQuery(input: CompetitionEntityQueryInput) {
+export function competitionEntityCountQuery(
+  input: CompetitionEntityQueryInput,
+) {
   return sqlFragment`SELECT COUNT(*) AS count FROM competition_event_stats WHERE event_id = ? AND ${escapeSqlIdentifier(input.positionColumn)} IS NOT NULL`;
 }
 export function podiumEntityRowsQuery(input: PodiumEntityQueryInput) {
@@ -50,10 +47,6 @@ export function podiumEntityRowsQuery(input: PodiumEntityQueryInput) {
 export function podiumEntityCountQuery(input: PodiumEntityQueryInput) {
   return sqlFragment`SELECT COUNT(*) AS count FROM competition_event_stats WHERE event_id = ? AND ${escapeSqlIdentifier(input.positionColumn)} IS NOT NULL`;
 }
-export function cityEntityRowsQuery(input: CityEntityQueryInput) {
-  return sqlFragment`WITH page AS (SELECT stats.city_name, stats.country_id, stats.${input.valueColumn} AS result_value, stats.${input.resultIdColumn} AS result_id, stats.${input.rankColumn} AS rank FROM city_event_stats stats WHERE stats.event_id = ? AND stats.${input.valueColumn} IS NOT NULL${input.cursor} ORDER BY stats.${input.valueColumn}, stats.country_id, stats.city_name LIMIT ?) SELECT page.*, COALESCE(country.name, page.country_id) AS country_name, COALESCE(country.iso2, '') AS country_iso2, facts.person_id, COALESCE(person.name, facts.person_id) AS person_name, facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name, facts.competition_start_date, facts.round_type_id FROM page INNER JOIN result_facts facts ON facts.result_id = page.result_id LEFT JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1 LEFT JOIN competitions competition ON competition.id = facts.competition_id LEFT JOIN countries country ON country.id = page.country_id ORDER BY page.result_value, page.country_id, page.city_name`;
-}
-
 export function yearCountsQuery() {
   return sqlFragment`SELECT counts.year, counts.event_id, counts.ranking_type, counts.cohort_id, cohorts.scope, cohorts.region_id, counts.count
       FROM person_year_ranking_counts counts
@@ -76,41 +69,18 @@ export function requiredRankingTablesQuery(tables: string[]) {
   return sqlFragment`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")})`;
 }
 
-export function requiredRankingColumnsQuery(tables: string[], columns: string[]) {
+export function requiredRankingColumnsQuery(
+  tables: string[],
+  columns: string[],
+) {
   return sqlFragment`SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")}) AND column_name IN (${columns.map(() => "?").join(", ")})`;
 }
 
-export function requiredRankingIndexesQuery(tables: string[], indexes: string[]) {
+export function requiredRankingIndexesQuery(
+  tables: string[],
+  indexes: string[],
+) {
   return sqlFragment`SELECT table_name, index_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name IN (${tables.map(() => "?").join(", ")}) AND index_name IN (${indexes.map(() => "?").join(", ")})`;
-}
-
-export function personRankingsQuery(input: PersonRankingsQueryInput) {
-  return sqlFragment`WITH page AS (
-      SELECT ranking.person_id, ranking.result_id, ranking.result_value,
-        ranking.country_id, ranking.continent_id,
-        ranking.${input.rankColumn} AS rank, ranking.${input.positionColumn} AS page_position
-      FROM person_event_rankings ranking
-      WHERE ${input.conditions.join(" AND ")}
-      ORDER BY ranking.${input.positionColumn}, ranking.person_id
-      LIMIT ?
-    )
-    SELECT page.person_id, COALESCE(person.name, page.person_id) AS person_name,
-      page.country_id, COALESCE(country.name, page.country_id) AS country_name,
-      COALESCE(country.iso2, '') AS country_iso2, page.continent_id,
-      page.rank, page.result_id, page.result_value,
-      facts.competition_id, COALESCE(competition.name, facts.competition_id) AS competition_name,
-      facts.competition_start_date, facts.round_type_id
-    FROM page
-    INNER JOIN result_facts facts ON facts.result_id = page.result_id
-    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-    LEFT JOIN countries country ON country.id = page.country_id
-    LEFT JOIN competitions competition ON competition.id = facts.competition_id
-    ORDER BY page.page_position, page.person_id`;
-}
-
-export function personRankingCountsQuery() {
-  return sqlFragment`SELECT count FROM person_ranking_counts
-     WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?`;
 }
 
 export function personCompetitionRankingRowsQuery() {
@@ -140,6 +110,7 @@ export function resultRankingsQuery(input: ResultRankingsQueryInput) {
   return sqlFragment`WITH page AS (
       SELECT
         ranking.result_id,
+        ranking.attempt_number,
         ranking.result_value,
         ranking.${input.rankColumn} AS rank,
         ranking.${input.positionColumn} AS position,
@@ -166,10 +137,33 @@ export function resultRankingsQuery(input: ResultRankingsQueryInput) {
     ORDER BY page.position`;
 }
 
-export function resultRankingCountsQuery(gender = false) {
-  return gender
-    ? "SELECT count FROM result_gender_ranking_counts WHERE event_id = ? AND result_type = ? AND gender_set = ? AND scope = ? AND region_id = ?"
-    : "SELECT count FROM result_ranking_counts WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?";
+export function resultRankingCountsQuery() {
+  return "SELECT count FROM result_ranking_counts WHERE event_id = ? AND result_type = ? AND scope = ? AND region_id = ?";
+}
+
+export function lazySingleResultRankingsQuery(conditions: string[]) {
+  return sqlFragment`WITH scoped AS (
+      SELECT solve.*,
+        RANK() OVER (ORDER BY solve.result_value) AS rank,
+        ROW_NUMBER() OVER (
+          ORDER BY solve.result_value, solve.competition_start_date, solve.competition_id,
+            solve.result_id, solve.attempt_number
+        ) AS position,
+        COUNT(*) OVER () AS total_count
+      FROM result_rankings_single solve
+      WHERE ${conditions.join(" AND ")}
+    ), page AS (
+      SELECT * FROM scoped WHERE position > ? ORDER BY position LIMIT ?
+    )
+    SELECT page.*, COALESCE(person.name, page.person_id) AS person_name,
+      COALESCE(country.name, page.country_id) AS country_name,
+      COALESCE(country.iso2, '') AS country_iso2,
+      COALESCE(competition.name, page.competition_id) AS competition_name
+    FROM page
+    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
+    LEFT JOIN countries country ON country.id = page.country_id
+    LEFT JOIN competitions competition ON competition.id = page.competition_id
+    ORDER BY page.position`;
 }
 
 export function genderRankingPageQuery(input: GenderRankingQueryInput) {
@@ -179,14 +173,92 @@ export function genderRankingPageQuery(input: GenderRankingQueryInput) {
       ROW_NUMBER() OVER (ORDER BY ranking.best, ranking.person_name, ranking.person_id) AS filtered_position,
       COUNT(*) OVER () AS total_count
     FROM ${input.source} ranking
-    JOIN persons gender_person ON gender_person.wca_id = ranking.person_id AND gender_person.sub_id = 1
     WHERE ${input.baseConditions.join(" AND ")}
   ) SELECT ${input.selectColumns}, total_count
     FROM filtered ${input.conditions.length ? `WHERE ${input.conditions.join(" AND ")}` : ""}
     ORDER BY filtered_position LIMIT ?`;
 }
 
-export function yearlyRankingPageQuery(table: string, columns: string, conditions: string[]) {
+export function genderPersonRankingRowsQuery({
+  genderCount,
+  recordColumn,
+  positionColumn,
+  regionColumn,
+}: {
+  genderCount: number;
+  recordColumn: string;
+  positionColumn: string;
+  regionColumn: string | null;
+}) {
+  const genderPlaceholders = Array.from(
+    { length: genderCount },
+    () => "?",
+  ).join(", ");
+  const regionCondition = regionColumn
+    ? ` AND ranking.${regionColumn} = ?`
+    : "";
+  return sqlFragment`WITH page AS (
+      SELECT ranking.person_id, ranking.result_id, ranking.result_value,
+        ranking.country_id, ranking.continent_id, ranking.world_rank,
+        ranking.${positionColumn} AS page_position
+      FROM person_event_rankings ranking
+      WHERE ranking.event_id = ? AND ranking.result_type = ?
+        AND ranking.gender IN (${genderPlaceholders})${regionCondition}
+      ORDER BY ranking.${positionColumn}, ranking.person_id
+      LIMIT ? OFFSET ?
+    )
+    SELECT page.person_id, page.result_id, page.result_value,
+      page.country_id, page.continent_id, page.world_rank,
+      COALESCE(person.name, page.person_id) AS person_name,
+      COALESCE(country.name, page.country_id, '') AS country_name,
+      COALESCE(country.iso2, '') AS country_iso2,
+      COALESCE(facts.competition_id, '') AS competition_id,
+      COALESCE(competition.name, '') AS competition_name,
+      ${recordColumn} = 'WR' AS is_world_record,
+      ${recordColumn} IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
+      ${recordColumn} = 'NR' AS is_country_record
+    FROM page
+    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
+    LEFT JOIN result_facts facts ON facts.result_id = page.result_id
+    LEFT JOIN countries country ON country.id = page.country_id
+    LEFT JOIN competitions competition ON competition.id = facts.competition_id
+    ORDER BY page.page_position, page.person_id`;
+}
+
+export function genderPersonRankingCountQuery(
+  genderCount: number,
+  regionColumn: string | null,
+) {
+  const genderPlaceholders = Array.from(
+    { length: genderCount },
+    () => "?",
+  ).join(", ");
+  return sqlFragment`SELECT COUNT(*) AS count
+    FROM person_event_rankings ranking
+    WHERE ranking.event_id = ? AND ranking.result_type = ?
+      AND ranking.gender IN (${genderPlaceholders})${regionColumn ? ` AND ranking.${regionColumn} = ?` : ""}`;
+}
+
+export function genderPersonRankingPrefixCountQuery(
+  genderCount: number,
+  regionColumn: string | null,
+) {
+  const genderPlaceholders = Array.from(
+    { length: genderCount },
+    () => "?",
+  ).join(", ");
+  return sqlFragment`SELECT COUNT(*) AS count
+    FROM person_event_rankings ranking
+    WHERE ranking.event_id = ? AND ranking.result_type = ?
+      AND ranking.gender IN (${genderPlaceholders})
+      AND ranking.result_value < ?${regionColumn ? ` AND ranking.${regionColumn} = ?` : ""}`;
+}
+
+export function yearlyRankingPageQuery(
+  table: string,
+  columns: string,
+  conditions: string[],
+) {
   return sqlFragment`SELECT ${columns}
       FROM ${table} ranking
       LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
@@ -195,6 +267,88 @@ export function yearlyRankingPageQuery(table: string, columns: string, condition
       LEFT JOIN competitions competition ON competition.id = facts.competition_id
       WHERE ${conditions.join(" AND ")} AND ranking.position >= ? AND ranking.position < ?
       ORDER BY ranking.position`;
+}
+
+export function filteredYearlyRankingPageQuery(
+  table: string,
+  conditions: string[],
+) {
+  return sqlFragment`WITH candidates AS (
+      SELECT ranking.person_id, ranking.result_id, ranking.result_value,
+        COALESCE(person.name, ranking.person_id) AS person_name,
+        COALESCE(country.id, '') AS country_id, COALESCE(country.name, country.id, '') AS country_name,
+        COALESCE(country.iso2, '') AS country_iso2, COALESCE(country.continent_id, '') AS continent_id,
+        COALESCE(facts.competition_id, '') AS competition_id,
+        COALESCE(competition.name, '') AS competition_name,
+        facts.competition_start_date,
+        COALESCE(facts.round_type_id, '') AS round_type_id,
+        facts.regional_single_record,
+        facts.regional_average_record
+      FROM ${table} ranking
+      JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
+      LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id
+      LEFT JOIN countries country ON country.id = facts.person_country_id
+      LEFT JOIN competitions competition ON competition.id = facts.competition_id
+      WHERE ${conditions.join(" AND ")}
+    ), ranked AS (
+      SELECT candidates.*,
+        RANK() OVER (ORDER BY result_value) AS rank,
+        ROW_NUMBER() OVER (ORDER BY result_value, person_id) AS sub_rank,
+        COUNT(*) OVER () AS total_count
+      FROM candidates
+    )
+    SELECT rank, sub_rank, total_count, person_id, person_name, country_id, country_name,
+      country_iso2, continent_id, result_value AS best, competition_id, competition_name,
+      regional_single_record = 'WR' OR regional_average_record = 'WR' AS is_world_record,
+      regional_single_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR')
+        OR regional_average_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
+      regional_single_record = 'NR' OR regional_average_record = 'NR' AS is_country_record,
+      NULL AS world_rank_delta, NULL AS world_rank_delta_state,
+      NULL AS continent_rank_delta, NULL AS continent_rank_delta_state,
+      NULL AS country_rank_delta, NULL AS country_rank_delta_state,
+      NULL AS record_streak_weeks
+    FROM ranked
+    WHERE sub_rank >= ? AND sub_rank < ?
+    ORDER BY sub_rank`;
+}
+
+export function filteredResultRankingsQuery({
+  source,
+  joins = "",
+  candidateColumns,
+  conditions,
+}: {
+  source: string;
+  joins?: string;
+  candidateColumns: string;
+  conditions: string[];
+}) {
+  return sqlFragment`WITH candidates AS (
+      SELECT ${candidateColumns}
+      FROM ${source}
+      ${joins}
+      WHERE ${conditions.join(" AND ")}
+    ), ranked AS (
+      SELECT candidates.*,
+        RANK() OVER (ORDER BY result_value) AS rank,
+        ROW_NUMBER() OVER (
+          ORDER BY result_value, competition_start_date, competition_id, result_id,
+            COALESCE(attempt_number, 0)
+        ) AS position,
+        COUNT(*) OVER () AS total_count
+      FROM candidates
+    )
+    SELECT page.*, COALESCE(person.name, page.person_id) AS person_name,
+      COALESCE(country.name, page.country_id) AS country_name,
+      COALESCE(country.iso2, '') AS country_iso2,
+      COALESCE(competition.name, page.competition_id) AS competition_name
+    FROM ranked page
+    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
+    LEFT JOIN countries country ON country.id = page.country_id
+    LEFT JOIN competitions competition ON competition.id = page.competition_id
+    WHERE page.position > ?
+    ORDER BY page.position
+    LIMIT ?`;
 }
 
 export function rankingPageQuery(
@@ -250,32 +404,36 @@ export function personMetricEndQuery(positionColumn: string) {
      LIMIT 1`;
 }
 
-export function filteredPersonMetricQuery(input: FilteredPersonMetricQueryInput) {
+export function filteredPersonMetricQuery(
+  input: FilteredPersonMetricQueryInput,
+) {
   return sqlFragment`WITH filtered AS (
        SELECT score.person_id, ${input.scoreValue} AS best,
-         person.name AS person_name, person.country_id AS current_country_id,
          DENSE_RANK() OVER (ORDER BY ${input.scoreOrder}) AS filtered_rank,
          ROW_NUMBER() OVER (ORDER BY ${input.scoreOrder}, score.person_id) AS filtered_position,
          COUNT(*) OVER () AS total_count
        FROM person_sum_of_ranks_scores score
-       LEFT JOIN persons person ON person.wca_id = score.person_id AND person.sub_id = 1
        WHERE ${input.conditions.join(" AND ")}
+     ), page AS (
+       SELECT * FROM filtered
+       WHERE ${input.pageConditions.join(" AND ")}
+       ORDER BY filtered_position
+       LIMIT ?
      )
-     SELECT filtered.filtered_rank AS rank, filtered.filtered_position AS sub_rank, filtered.total_count,
-       filtered.person_id, COALESCE(filtered.person_name, filtered.person_id) AS person_name,
+     SELECT page.filtered_rank AS rank, page.filtered_position AS sub_rank, page.total_count,
+       page.person_id, COALESCE(person.name, page.person_id) AS person_name,
        COALESCE(display_country.id, '') AS country_id,
        COALESCE(display_country.name, display_country.id, '') AS country_name,
        COALESCE(display_country.iso2, '') AS country_iso2,
        COALESCE(display_country.continent_id, '') AS continent_id,
-       filtered.best
-     FROM filtered
-     LEFT JOIN countries current_country ON current_country.id = filtered.current_country_id
+       page.best
+     FROM page
+     LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
+     LEFT JOIN countries current_country ON current_country.id = person.country_id
      LEFT JOIN countries display_country ON display_country.id = CASE
        WHEN ? = 'country' THEN ?
        WHEN ? = 'continent' AND current_country.continent_id <> ? THEN NULL
-       ELSE filtered.current_country_id
+       ELSE person.country_id
      END
-     WHERE ${input.pageConditions.join(" AND ")}
-     ORDER BY filtered.filtered_position
-     LIMIT ?`;
+     ORDER BY page.filtered_position`;
 }

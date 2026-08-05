@@ -26,5 +26,7 @@ export default function CompetitionPodiumsPage({
 }: {
   searchParams: Promise<RankingsSearchParams>;
 }) {
-  return <RankingsPage searchParams={searchParams} requiresCompetitionRankings />;
+  return (
+    <RankingsPage searchParams={searchParams} requiresCompetitionRankings />
+  );
 }

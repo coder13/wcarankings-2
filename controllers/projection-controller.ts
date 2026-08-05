@@ -1,6 +1,10 @@
 import { DatabaseOverloadedError } from "@/db";
 import { buildApiJsonResponse } from "@/lib/api";
-import { ApiInputError, projectionEnvelope, type ApiDiagnostics } from "@/lib/api/projection";
+import {
+  ApiInputError,
+  projectionEnvelope,
+  type ApiDiagnostics,
+} from "@/lib/api/projection";
 
 type ProjectionResult = {
   data: Record<string, unknown>;
@@ -20,6 +24,11 @@ async function buildProjectionResponse(
   const enveloped = await projectionEnvelope(loaded.data, loaded.diagnostics);
   const totalMs = performance.now() - startedAt;
   const { queueMs, statementMs } = loaded.diagnostics.timings;
+  const cacheOutcome = loaded.diagnostics.cacheOutcome ?? "bypass";
+  const memoryCache =
+    loaded.diagnostics.cacheLayer === "memory" ? cacheOutcome : "bypass";
+  const listRankingCache =
+    loaded.diagnostics.cacheLayer === "list-ranking" ? cacheOutcome : "bypass";
   console.info(
     JSON.stringify({
       operation,
@@ -27,25 +36,36 @@ async function buildProjectionResponse(
       timings: { db_queue_ms: queueMs, db_ms: statementMs, total_ms: totalMs },
       query_count: loaded.diagnostics.queryCount,
       returned_rows: loaded.diagnostics.returnedRows,
+      cache: cacheOutcome,
       data_version: enveloped.dataVersion,
     }),
   );
   return buildApiJsonResponse(
     {
       ...enveloped.data,
-      snapshot: { exportDate: enveloped.exportDate, dataVersion: enveloped.dataVersion },
+      snapshot: {
+        exportDate: enveloped.exportDate,
+        dataVersion: enveloped.dataVersion,
+      },
     },
     {
       headers: {
         "Cache-Control": "public, max-age=60, s-maxage=3600",
         "Server-Timing": `db-queue;dur=${queueMs.toFixed(1)}, db;dur=${statementMs.toFixed(1)}, total;dur=${totalMs.toFixed(1)}`,
         "X-Rankings-Data-Version": enveloped.dataVersion,
+        "X-Rankings-Cache": cacheOutcome,
+        "X-Rankings-Memory-Cache": memoryCache,
+        "X-List-Ranking-Cache": listRankingCache,
       },
     },
   );
 }
 
-function buildProjectionErrorResponse(operation: string, startedAt: number, error: unknown) {
+function buildProjectionErrorResponse(
+  operation: string,
+  startedAt: number,
+  error: unknown,
+) {
   const inputError = error instanceof ApiInputError;
   const status = inputError ? 400 : 503;
   console.error(
@@ -62,7 +82,9 @@ function buildProjectionErrorResponse(operation: string, startedAt: number, erro
       status,
       headers: {
         "Cache-Control": "no-store",
-        ...(error instanceof DatabaseOverloadedError ? { "Retry-After": "1" } : {}),
+        ...(error instanceof DatabaseOverloadedError
+          ? { "Retry-After": "1" }
+          : {}),
       },
     },
   );

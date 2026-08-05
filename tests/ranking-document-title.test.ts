@@ -27,12 +27,30 @@ test("formats titles for non-person ranking views and saved lists", () => {
       ...defaults,
       subject: "competitions",
       competitionRanking: "podiums",
-      rankingType: "average",
     }),
     "3x3x3 Cube Average Competition Podiums | WCA Rankings",
   );
   assert.equal(
+    formatRankingDocumentTitle({
+      ...defaults,
+      subject: "competitions",
+      eventId: "333bf",
+      competitionRanking: "podiums",
+      rankingType: "average",
+    }),
+    "3x3x3 Blindfolded Single Competition Podiums | WCA Rankings",
+  );
+  assert.equal(
     formatRankingDocumentTitle({ ...defaults, listName: "PNW Cubers" }),
     "PNW Cubers | WCA Rankings",
+  );
+  assert.equal(
+    formatRankingDocumentTitle({
+      ...defaults,
+      eventId: "all",
+      personMedalRanking: true,
+      medalType: "gold",
+    }),
+    "Gold Medal Rankings | WCA Rankings",
   );
 });

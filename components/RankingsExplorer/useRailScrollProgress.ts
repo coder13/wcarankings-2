@@ -6,7 +6,11 @@ export function getTopRailScrollProgress(
   scrollY: number,
   transformDistance: number,
 ) {
-  if (!Number.isFinite(scrollY) || !Number.isFinite(transformDistance) || transformDistance <= 0) {
+  if (
+    !Number.isFinite(scrollY) ||
+    !Number.isFinite(transformDistance) ||
+    transformDistance <= 0
+  ) {
     return 0;
   }
 
@@ -40,10 +44,11 @@ export function useHasScrolled() {
   const [hasScrolled, setHasScrolled] = useState(false);
 
   useEffect(() => {
-    const update = () => setHasScrolled((current) => {
-      const next = window.scrollY > 1;
-      return next === current ? current : next;
-    });
+    const update = () =>
+      setHasScrolled((current) => {
+        const next = window.scrollY > 1;
+        return next === current ? current : next;
+      });
     const frame = window.requestAnimationFrame(update);
     window.addEventListener("scroll", update, { passive: true });
     return () => {

@@ -77,11 +77,12 @@ restored instead of regenerated.
 
 ## Build, staging, and activation safety
 
-Projection SQL runs only in runner-local MariaDB. The scheduler has a default
-`WCA_PROJECTION_BUILD_CONCURRENCY=2`, gives workers separate connections, and
-starts a dependent only after its prerequisites built or hydrated successfully.
-It favors long ready work while pairing it with short independent work. Cached
-and hydrated tables are not counted as pending work.
+Projection SQL runs only in runner-local MariaDB. The planner checks task names,
+dependencies, and cycles. It then returns tasks in dependency order. The builder
+has a default `WCA_PROJECTION_BUILD_CONCURRENCY=2` and gives each worker a
+separate connection. It starts a dependent task only after its prerequisites
+finish. It favors long ready work and pairs it with short independent work.
+Cached and hydrated tables are not pending work.
 
 Production imports are deliberately sequential. Each artifact is prepared in a
 unique candidate schema; active tables continue serving throughout upload,
@@ -110,6 +111,12 @@ candidate retagging, records staged configuration state under lock, and can
 restore the exact prior image/configuration if a release fails or is cancelled.
 It never removes explicitly protected current/previous service tags or
 artifact-scoped data-tools/Flyway tags during cleanup.
+
+The first release after the Flyway history split repairs both copied history
+tables before migration. It writes
+`/srv/wcarankings/flyway-history-repair-v1.complete` only after both migration
+lanes finish. Later releases skip repair and fail if Flyway detects new history
+drift.
 
 The release verifies local readiness and core rankings, retries the SSR root
 request and its extracted CSS asset with bounded diagnostics, then verifies the

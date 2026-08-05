@@ -11,7 +11,8 @@ function createClient() {
   return {
     calls,
     client: {
-      initialize: (...value: unknown[]) => calls.push({ name: "initialize", value }),
+      initialize: (...value: unknown[]) =>
+        calls.push({ name: "initialize", value }),
       send: (value: unknown) => calls.push({ name: "send", value }),
       event: (...value: unknown[]) => calls.push({ name: "event", value }),
     },
@@ -63,10 +64,7 @@ test("initializes once and sends one page view for each safe path", () => {
     tracker.pageView("https://wcarankings.com/?eventId=333oh&search=second"),
     false,
   );
-  assert.equal(
-    tracker.pageView("https://wcarankings.com/?eventId=444"),
-    true,
-  );
+  assert.equal(tracker.pageView("https://wcarankings.com/?eventId=444"), true);
 
   assert.equal(calls.filter((call) => call.name === "initialize").length, 1);
   assert.deepEqual(

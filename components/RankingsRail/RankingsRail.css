@@ -19,7 +19,8 @@
   --rail-shrink-progress: clamp(0, calc((var(--rail-scroll-progress-clamped) - 0.5) * 2), 1);
   --rail-control-height: calc(52px - (12px * var(--rail-shrink-progress)));
   --rail-icon-slot-width: 44px;
-  --rail-event-width: calc(44px + ((9em - 44px) * (1 - var(--rail-shrink-progress))));
+  --rail-event-icon-slot-width: 48px;
+  --rail-event-width: calc(var(--rail-event-icon-slot-width) + ((9em - var(--rail-event-icon-slot-width)) * (1 - var(--rail-shrink-progress))));
   --rail-select-width: calc(9.25em - (1.5em * var(--rail-shrink-progress)));
   --rail-gender-width: 5.25em;
   --rail-period-width: 0px;
@@ -96,10 +97,29 @@
   width: var(--rail-event-width);
   height: var(--rail-control-height);
   flex: 0 0 var(--rail-event-width);
+  position: relative;
+  display: block;
+  padding: 0;
   border-radius: calc(var(--rail-control-height) / 2) 0 0 calc(var(--rail-control-height) / 2);
+  font-size: 1em;
 }
 
-.Jump-railSettings > .EventPicker-preview:focus-visible {
+.Jump-railSettings > .EventPicker-preview::before,
+.Jump-railSettings > .EventPicker-preview .EventPicker-symbol {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: var(--rail-icon-slot-width);
+  color: var(--text-strong);
+  font-size: 1.25em;
+  line-height: 1;
+  opacity: 1;
+  text-align: center;
+  transform: translateY(-50%);
+}
+
+.Jump-railSettings > .EventPicker-preview:focus-visible,
+.Jump-railSettings > .EventPicker-preview[aria-expanded="true"] {
   box-shadow: inset 0 0 0 2px var(--focus-ring);
 }
 
@@ -134,9 +154,7 @@
 }
 
 @media only screen and (min-width: 601px) {
-  .Jump-railSettings > .EventPicker-preview { position: relative; display: block; padding: 0; font-size: 1em; }
-  .Jump-railSettings > .EventPicker-preview::before, .Jump-railSettings > .EventPicker-preview .EventPicker-symbol { position: absolute; top: 50%; left: 0; width: var(--rail-icon-slot-width); color: var(--text-strong); font-size: 1.25em; line-height: 1; opacity: 1; text-align: center; transform: translateY(-50%); }
-  .Jump-railSettings > .EventPicker-preview .EventPicker-name { position: absolute; top: 50%; right: 0; left: var(--rail-icon-slot-width); display: block; min-width: 0; overflow: hidden; color: var(--text-muted); font-size: .875em; opacity: calc(1 - var(--rail-shrink-progress)); text-align: left; text-overflow: ellipsis; white-space: nowrap; transform: translateY(-50%); }
+  .Jump-railSettings > .EventPicker-preview .EventPicker-name { position: absolute; top: 50%; right: 0; left: var(--rail-event-icon-slot-width); display: block; min-width: 0; overflow: hidden; color: var(--text-muted); font-size: .875em; opacity: calc(1 - var(--rail-shrink-progress)); text-align: left; text-overflow: ellipsis; white-space: nowrap; transform: translateY(-50%); }
 }
 
 .Jump-resultTypeControl { position: relative; width: var(--result-type-width); min-width: 0; height: var(--rail-control-height); flex: 0 0 var(--result-type-width); border-right: 1px solid var(--border-subtle); }
@@ -144,24 +162,31 @@
 .Jump--rankings:has(.Jump-periodPicker) { --rail-period-width: 6.75em; }
 .Jump-periodPicker { width: var(--rail-period-width); min-width: 0; height: var(--rail-control-height); flex: 0 0 var(--rail-period-width); border-left: 1px solid var(--border-subtle); }
 .Jump .Jump-periodPicker .TextDropdown-trigger { width: 100%; height: var(--rail-control-height); min-height: var(--rail-control-height); justify-content: space-between; padding-inline: .65em; border-radius: 0; font-size: .875em; }
+.Jump .Jump-periodPicker .TextDropdown-trigger:focus-visible,
+.Jump .Jump-periodPicker .TextDropdown-trigger[aria-expanded="true"] { background: transparent; box-shadow: inset 0 0 0 2px var(--focus-ring); outline: none; }
 .Jump .Jump-periodPicker .TextDropdown-options { z-index: 3; }
+.Jump .Jump-periodPicker .TextDropdown-options button { border-radius: .65rem; transition: color 150ms ease; }
+.Jump .Jump-periodPicker .TextDropdown-options button:hover { background: transparent; color: var(--focus); }
+.Jump .Jump-periodPicker .TextDropdown-options button.isSelected { background: var(--surface-selected); color: var(--text-strong); }
+.Jump .Jump-periodPicker .TextDropdown-options button:focus-visible { color: var(--text-strong); box-shadow: inset 0 0 0 2px var(--focus-ring); outline: none; }
 .Jump-resultTypeToggle, .Jump-pagerButton, .Jump-searchNavigationButton {
   display: flex; min-width: 40px; min-height: 40px; align-items: center; justify-content: center; gap: .5em; padding: .5em .75em; border: 0; background: transparent; color: var(--text-strong); cursor: pointer; font: inherit; white-space: nowrap; transition: background 150ms var(--cubic-move), color 150ms var(--cubic-move);
 }
 .Jump-resultTypeToggle { position: absolute; inset: 0; width: 100%; min-width: 0; flex: none; justify-content: flex-start; padding-inline: .75em; color: var(--text-muted); font-size: .875em; font-weight: 500; }
-.Jump-resultTypeToggle:hover, .Jump-resultTypeToggle:focus-visible { background: transparent; color: var(--focus); outline: none; }
-.Jump-resultTypeToggle:focus-visible { box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.Jump-resultTypeToggle:focus-visible { background: transparent; color: var(--text-muted); box-shadow: inset 0 0 0 2px var(--focus-ring); outline: none; }
+.Jump-resultTypeToggle:hover { background: transparent; color: var(--focus); outline: none; }
 .Jump-resultTypeToggle:disabled { cursor: not-allowed; opacity: .45; }
 
 .genderPicker { position: relative; min-width: var(--rail-gender-width); }
 .genderPicker svg { position: absolute; top: 50%; right: .55em; width: 1em; height: 1em; pointer-events: none; transform: translateY(-50%); }
-.Jump .genderPickerTrigger { height: var(--rail-control-height); min-height: var(--rail-control-height); padding: .5em 1.8em .5em .65em; border: 0; border-left: 1px solid var(--border-subtle); border-right: 1px solid var(--border-subtle); border-radius: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .875em; text-align: left; }
+.Jump .genderPickerTrigger { height: var(--rail-control-height); min-height: var(--rail-control-height); padding: .5em 1.8em .5em .65em; border: 0; border-left: 1px solid var(--border-subtle); border-right: 1px solid var(--border-subtle); border-radius: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .875em; text-align: left; transition: color 150ms ease; }
 .genderPickerMenu { z-index: 3; min-width: 8em; }
 .Jump-genderPicker { width: var(--rail-gender-width); flex: 0 0 var(--rail-gender-width); }
-.Jump .genderPickerTrigger:focus-visible { background: transparent; box-shadow: inset 0 0 0 2px var(--focus-ring); color: var(--text-muted); outline: none; }
+.Jump .genderPickerTrigger:focus-visible,
+.Jump .genderPickerTrigger[aria-expanded="true"] { border-color: var(--border-subtle); background: transparent; box-shadow: inset 0 0 0 2px var(--focus-ring); color: var(--text-muted); outline: none; }
 
 .Jump-regionPicker { width: var(--rail-select-width); min-width: 0; flex: 1 1 var(--rail-select-width); }
-.Jump .Jump-regionPicker .regionPickerTrigger { height: var(--rail-control-height); min-height: var(--rail-control-height); padding: .5em 2.5em .5em .75em; border: 0; border-radius: 0; background: transparent; color: var(--text-muted); cursor: text; font-size: .875em; text-align: left; text-overflow: ellipsis; }
+.Jump .Jump-regionPicker .regionPickerTrigger { height: var(--rail-control-height); min-height: var(--rail-control-height); padding: .5em 2.5em .5em .75em; border: 0; border-radius: 0; background: transparent; color: var(--text-muted); cursor: text; font-size: .875em; text-align: left; text-overflow: ellipsis; transition: color 150ms ease; }
 .Jump-regionPicker > svg { right: .75em; }
 .Jump-regionPicker .regionPickerTrigger[aria-expanded="true"] { background: transparent; border-color: transparent; box-shadow: none; color: var(--text-muted); }
 .Jump-regionPicker .regionPickerTrigger:focus-visible { background: transparent; box-shadow: inset 0 0 0 2px var(--focus-ring); color: var(--text-muted); outline: none; }
@@ -179,9 +204,12 @@
 .Jump--rankings:has(.findBar--rail:is([data-has-text="true"], [data-open="true"])) { background: transparent; box-shadow: none; }
 .Jump--rankings:has(.findBar--rail:is([data-has-text="true"], [data-open="true"])) .Jump-railSettings { opacity: 0; pointer-events: none; }
 .Jump .findBar--rail .findIcon, .Jump .findBar--rail .findClose { position: relative; display: grid; width: var(--rail-icon-slot-width); height: var(--rail-control-height); min-width: var(--rail-icon-slot-width); min-height: var(--rail-control-height); flex: 0 0 var(--rail-icon-slot-width); padding: 0; place-items: center; border: 0; background: transparent; color: var(--text-strong); cursor: pointer; transition: color 150ms var(--cubic-move); }
+.Jump .findBar--rail .findIcon { padding-right: 4px; }
+.Jump .findBar--rail:is([data-has-text="true"], [data-open="true"]) .findIcon { padding-right: 0; padding-left: 4px; }
 .Jump .findBar--rail .findIcon:hover, .Jump .findBar--rail .findClose:hover, .Jump .findBar--rail .findIcon:focus-visible, .Jump .findBar--rail .findClose:focus-visible { color: var(--focus); outline: none; }
 .Jump .findBar--rail .findClose svg { width: 20px; height: 20px; }
 .Jump .findBar--rail[data-open="false"][data-has-text="false"] .findClose { display: none; }
+.Jump .findBar--rail[data-open="false"][data-has-text="false"] .findInput { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; opacity: 0; pointer-events: none; }
 .Jump .findBar--rail .findInput, .Jump .findBar--rail .findStatus { padding-inline: .25em; }
 .Jump .findBar--rail .findStatus { padding-right: 0; }
 
@@ -190,6 +218,8 @@
 .Jump-pagerActions { grid-area: 1 / 1; width: max-content; max-width: calc(100vw - 2em); opacity: 1; }
 .Jump-searchNavigationContent { width: 100%; }
 .Jump-pagerButton { flex: 0 0 auto; }
+.Jump-pagerActions > .Jump-pagerButton:first-child { padding-left: calc(.75em + 4px); }
+.Jump-pagerActions > .Jump-pagerButton:last-child { padding-right: calc(.75em + 4px); }
 .Jump-pagerButton--up { box-sizing: border-box; width: 9.5em; min-width: 40px; overflow: hidden; padding: 0; }
 .Jump-pagerButtonContent { display: flex; width: 9.5em; height: 100%; flex: 0 0 9.5em; align-items: center; justify-content: center; gap: .5em; }
 .Jump-searchNavigationButton { flex: 1; }
@@ -203,8 +233,10 @@
 .Jump--pager[data-search-navigation="true"] .Jump-searchNavigation { opacity: 1; pointer-events: auto; }
 
 @media only screen and (max-width: 600px) {
-  .Jump--rankings { --rail-control-height: calc(48px - (4px * var(--rail-shrink-progress))); --rail-event-width: 44px; --rail-gender-width: 5em; --rail-select-width: min(8.5em, calc((100vw - 88px - var(--rail-gender-width) - var(--result-type-width) - var(--rail-period-width)) / 1)); font-size: 1rem; }
+  .Jump--rankings { --rail-control-height: calc(48px - (4px * var(--rail-shrink-progress))); --rail-event-width: var(--rail-event-icon-slot-width); --rail-gender-width: 5em; --rail-select-width: min(8.5em, calc((100vw - 92px - var(--rail-gender-width) - var(--result-type-width) - var(--rail-period-width)) / 1)); font-size: 1rem; }
   .Jump--rankings:has(.Jump-periodPicker) { --rail-period-width: 5.75em; }
   .Jump-pagerButton, .Jump-searchNavigationButton { padding-inline: .5em; }
+  .Jump-pagerActions > .Jump-pagerButton:first-child { padding-left: calc(.5em + 4px); }
+  .Jump-pagerActions > .Jump-pagerButton:last-child { padding-right: calc(.5em + 4px); }
   .Jump--rankings.Jump--withHemisphere { --rail-event-width: min(7.25em, calc(100vw - 88px)); }
 }

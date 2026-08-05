@@ -5,20 +5,11 @@ import {
 } from "@/services/rankings/cache";
 
 export const capabilityTables = {
-  core: [
-    "ranking_entries_single",
-    "ranking_entries_average",
-    "ranking_counts",
-    "result_entries_single",
-    "result_counts",
-  ],
+  core: ["ranking_entries_single", "ranking_entries_average", "ranking_counts"],
   resultRankings: [
     "result_rankings_single",
     "result_rankings_average",
-    "result_gender_rankings_single",
-    "result_gender_rankings_average",
     "result_ranking_counts",
-    "result_gender_ranking_counts",
   ],
   competitionRankings: [
     "competition_podium_members",
@@ -27,10 +18,16 @@ export const capabilityTables = {
   ],
   personCompetitionRankings: [
     "person_competition_counts",
+    "person_competition_year_counts",
     "person_competition_rankings",
     "person_competition_ranking_counts",
   ],
-  cityEventStats: ["city_event_stats", "entity_ranking_counts"],
+  personMedalRankings: [
+    "person_medal_scores",
+    "person_medal_rankings",
+    "person_medal_ranking_counts",
+  ],
+  cityEventStats: ["city_event_stats"],
   sumOfRanks: ["person_sum_of_ranks_scores"],
   yearlyPersonRankings: [
     "person_year_ranking_cohorts",

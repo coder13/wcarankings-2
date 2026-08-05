@@ -1,10 +1,10 @@
-export type WcaAvatar = {
+type WcaAvatar = {
   thumb_url?: string;
   url?: string;
   is_default?: boolean;
 };
 
-export type WcaPersonSearchResult = {
+type WcaPersonSearchResult = {
   wca_id?: string;
   class?: string;
   avatar?: WcaAvatar;

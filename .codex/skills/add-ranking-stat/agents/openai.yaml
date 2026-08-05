@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Ranking Stat"
+  short_description: "Add a fast, documented ranking statistic"
+  default_prompt: "Use $add-ranking-stat to design and implement a new ranking statistic with measured performance."

@@ -75,40 +75,134 @@ CREATE TABLE results (
   regional_average_record VARCHAR(100) NOT NULL
 );
 
-INSERT INTO countries (id, name, iso2, continent_id)
-VALUES ('USA', 'United States', 'US', '_North America');
+INSERT INTO
+  countries (id, name, iso2, continent_id)
+VALUES
+  ('USA', 'United States', 'US', '_North America');
 
-INSERT INTO persons (wca_id, sub_id, name, country_id, gender)
-VALUES ('2026TEST01', 1, 'Visual Test Cuber', 'USA', 'm');
+INSERT INTO
+  persons (wca_id, sub_id, name, country_id, gender)
+VALUES
+  ('2026TEST01', 1, 'Visual Test Cuber', 'USA', 'm'),
+  ('2026MAX01', 1, 'Max Test Cuber', 'USA', 'm');
 
-INSERT INTO formats (id, expected_solve_count) VALUES ('a', 5);
-INSERT INTO round_types (id, rank, final) VALUES ('f', 1, 1);
+INSERT INTO
+  formats (id, expected_solve_count)
+VALUES
+  ('a', 5);
 
-INSERT INTO competitions (
-  id, name, city_name, country_id, year, month, day,
-  end_year, end_month, end_day, latitude_microdegrees, longitude_microdegrees
-)
-VALUES (
-  'VisualSmoke2026', 'Visual Smoke Test 2026', 'Portland', 'USA',
-  2026, 1, 1, 2026, 1, 2, 45520000, -122681900
-);
+INSERT INTO
+  round_types (id, rank, final)
+VALUES
+  ('f', 1, 1);
 
-INSERT INTO ranks_single (event_id, person_id, best, world_rank, continent_rank, country_rank)
-VALUES ('333', '2026TEST01', 1234, 1, 1, 1);
+INSERT INTO
+  competitions (
+    id,
+    name,
+    city_name,
+    country_id,
+    year,
+    month,
+    day,
+    end_year,
+    end_month,
+    end_day,
+    latitude_microdegrees,
+    longitude_microdegrees
+  )
+VALUES
+  (
+    'VisualSmoke2026',
+    'Visual Smoke Test 2026',
+    'Portland',
+    'USA',
+    2026,
+    1,
+    1,
+    2026,
+    1,
+    2,
+    45520000,
+    -122681900
+  );
 
-INSERT INTO ranks_average (event_id, person_id, best, world_rank, continent_rank, country_rank)
-VALUES ('333', '2026TEST01', 1500, 1, 1, 1);
+INSERT INTO
+  ranks_single (
+    event_id,
+    person_id,
+    best,
+    world_rank,
+    continent_rank,
+    country_rank
+  )
+VALUES
+  ('333', '2026TEST01', 1234, 1, 1, 1),
+  ('333', '2026MAX01', 2345, 2, 2, 2);
 
-INSERT INTO results (
-  id, person_id, event_id, best, average, competition_id, person_name,
-  person_country_id, format_id, pos, round_type_id,
-  regional_single_record, regional_average_record
-)
-VALUES (
-  1, '2026TEST01', '333', 1234, 1500, 'VisualSmoke2026', 'Visual Test Cuber',
-  'USA', 'a', 1, 'f', '', ''
-);
+INSERT INTO
+  ranks_average (
+    event_id,
+    person_id,
+    best,
+    world_rank,
+    continent_rank,
+    country_rank
+  )
+VALUES
+  ('333', '2026TEST01', 1500, 1, 1, 1),
+  ('333', '2026MAX01', 2600, 2, 2, 2);
 
-INSERT INTO export_metadata (`key`, `value`) VALUES
+INSERT INTO
+  results (
+    id,
+    person_id,
+    event_id,
+    best,
+    average,
+    competition_id,
+    person_name,
+    person_country_id,
+    format_id,
+    pos,
+    round_type_id,
+    regional_single_record,
+    regional_average_record
+  )
+VALUES
+  (
+    1,
+    '2026TEST01',
+    '333',
+    1234,
+    1500,
+    'VisualSmoke2026',
+    'Visual Test Cuber',
+    'USA',
+    'a',
+    1,
+    'f',
+    '',
+    ''
+  ),
+  (
+    2,
+    '2026MAX01',
+    '333',
+    2345,
+    2600,
+    'VisualSmoke2026',
+    'Max Test Cuber',
+    'USA',
+    'a',
+    2,
+    'f',
+    '',
+    ''
+  );
+
+INSERT INTO
+  export_metadata (`key`, `value`)
+VALUES
   ('export_date', '2026-01-01'),
   ('fetched_at', '2026-01-01T00:00:00.000Z');

@@ -4,8 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { I18nextProvider } from "react-i18next";
 import { i18n } from "@/lib/i18n";
+import { usePwaRegistration } from "./usePwaRegistration";
 
 export function AppProviders({ children }: { children: ReactNode }) {
+  usePwaRegistration();
+
   const [queryClient] = useState(
     () =>
       new QueryClient({

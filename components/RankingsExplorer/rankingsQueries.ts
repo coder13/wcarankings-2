@@ -1,18 +1,10 @@
 "use client";
 
-import {
-  keepPreviousData,
-  queryOptions,
-  useInfiniteQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import type { GenderFilter } from "@/lib/wca";
-import {
-  getNavigationWindowPageStarts,
-  getSearchBridgePageStarts,
-} from "./scrollEngine";
+import type { MedalRankingType } from "@/lib/medal-rankings";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
   InitialRankingData,
@@ -21,12 +13,9 @@ import type {
   RankingSource,
   RegionSelection,
 } from "./types";
-import { rankingEntryKey } from "./types";
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const PAGE_STALE_TIME_MS = 5 * 60 * 1000;
-const SEARCH_PREFETCH_RADIUS = 3;
-const NAVIGATION_ADJACENT_PAGE_COUNT = 2;
 
 export type RankingQueryFilters = {
   eventId: string;
@@ -36,6 +25,7 @@ export type RankingQueryFilters = {
   source?: RankingSource;
   gender: readonly GenderFilter[];
   year: number | null;
+  medalType: MedalRankingType;
   membershipVersion?: number;
   rankingsDataVersion?: string | null;
 };
@@ -56,14 +46,19 @@ export function seedSavedListVersionWindow(
   initialData?: InitialRankingData,
 ) {
   const key = savedListVersionKey(filters);
-  if (!key || !initialData?.cacheMembershipVersion || !initialData.cacheDataVersion) return;
+  if (
+    !key ||
+    !initialData?.cacheMembershipVersion ||
+    !initialData.cacheDataVersion
+  )
+    return;
   savedListVersionWindows.set(key, {
     membershipVersion: initialData.cacheMembershipVersion,
     rankingsDataVersion: initialData.cacheDataVersion,
   });
 }
 
-export function rankingPageStart(subRank: number) {
+function rankingPageStart(subRank: number) {
   return Math.floor((Math.max(1, subRank) - 1) / PAGE_SIZE) * PAGE_SIZE;
 }
 
@@ -80,10 +75,15 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     rankingSourceKey(filters.source),
     filters.eventId,
     filters.rankingType,
+    filters.medalType,
     filters.regionSelection.scope,
     filters.regionSelection.regionId,
     filters.gender.join(","),
-    filters.resource === "people" ? filters.year ?? "all" : "all",
+    filters.resource === "people" ||
+    filters.resource === "person-competition-count" ||
+    filters.resource === "person-medal-rankings"
+      ? (filters.year ?? "all")
+      : "all",
     filters.membershipVersion ?? "current",
     filters.rankingsDataVersion ?? "current",
   ] as const;
@@ -105,7 +105,9 @@ function addRankingFilterParams(
 ) {
   addSourceParams(params, filters.source);
   const versionKey = savedListVersionKey(filters);
-  const versionWindow = versionKey ? savedListVersionWindows.get(versionKey) : null;
+  const versionWindow = versionKey
+    ? savedListVersionWindows.get(versionKey)
+    : null;
   if (
     versionWindow &&
     filters.regionSelection.scope === "world" &&
@@ -114,12 +116,18 @@ function addRankingFilterParams(
     params.set("membershipVersion", String(versionWindow.membershipVersion));
     params.set("rankingsDataVersion", versionWindow.rankingsDataVersion);
   }
-  if (filters.resource === "people" && filters.year) {
+  if (
+    (filters.resource === "people" ||
+      filters.resource === "person-competition-count" ||
+      filters.resource === "person-medal-rankings") &&
+    filters.year
+  ) {
     params.set("year", String(filters.year));
   }
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
+      filters.resource === "person-medal-rankings" ||
       filters.resource === "results") &&
     filters.gender.length
   ) {
@@ -132,12 +140,21 @@ function addRankingFilterParams(
 
 function pageRequest(filters: RankingQueryFilters, start: number) {
   const params = new URLSearchParams({
-    eventId: filters.eventId,
     result: filters.rankingType,
-    start: String(rankingPageStart(start)),
+    start: String(
+      filters.resource === "person-medal-rankings"
+        ? start
+        : rankingPageStart(start),
+    ),
     limit: String(PAGE_SIZE),
     paged: "1",
   });
+  if (
+    filters.resource !== "person-medal-rankings" ||
+    filters.eventId !== "all"
+  ) {
+    params.set("eventId", filters.eventId);
+  }
   addRankingFilterParams(params, filters);
   if (filters.resource === "podiums") params.set("ranking", "podium");
   if (filters.resource === "competitor-count") {
@@ -149,19 +166,31 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
   }
   if (filters.resource.startsWith("city-")) {
     const cityRanking = filters.resource.slice("city-".length);
-    if (cityRanking === "competitors" || cityRanking === "competitions" || cityRanking === "solves") {
+    if (
+      cityRanking === "competitors" ||
+      cityRanking === "competitions" ||
+      cityRanking === "solves"
+    ) {
       params.set("stat", cityRanking);
     } else {
-      params.set("result", cityRanking === "fastest-average" ? "average" : "single");
+      params.set(
+        "result",
+        cityRanking === "fastest-average" ? "average" : "single",
+      );
     }
+  }
+  if (filters.resource === "person-medal-rankings") {
+    params.set("medal", filters.medalType);
   }
 
   let endpoint = "/api/rankings";
   if (filters.resource === "results") endpoint = "/api/rankings/results";
   else if (filters.resource === "person-competition-count") {
     endpoint = "/api/rankings/people/competitions";
-  }
-  else if (filters.resource.startsWith("city-")) endpoint = "/api/rankings/cities";
+  } else if (filters.resource === "person-medal-rankings") {
+    endpoint = "/api/rankings/people/medals";
+  } else if (filters.resource.startsWith("city-"))
+    endpoint = "/api/rankings/cities";
   else if (filters.resource !== "people") {
     endpoint = "/api/rankings/competitions";
   }
@@ -178,8 +207,9 @@ async function requestRankingPage(
     const body = (await response.json()) as { error?: string };
     throw new Error(body.error ?? "Rankings are unavailable.");
   }
-  const data = (await response.json()) as RankingPage & {
-    entries: Array<RankingEntry & { position?: number }>;
+  type RawRankingEntry = RankingEntry & { position?: number };
+  const data = (await response.json()) as Omit<RankingPage, "entries"> & {
+    entries: RawRankingEntry[];
   };
   const versionKey = savedListVersionKey(filters);
   if (versionKey && data.cacheMembershipVersion && data.cacheDataVersion) {
@@ -189,9 +219,9 @@ async function requestRankingPage(
     });
   }
   return {
-    entries: data.entries.map(({ position, ...entry }) => ({
+    entries: data.entries.map((entry) => ({
       ...entry,
-      subRank: entry.subRank ?? position ?? 0,
+      subRank: entry.subRank ?? entry.position ?? 0,
     })),
     hasMore: data.hasMore,
     nextPageStart: data.nextPageStart,
@@ -201,212 +231,80 @@ async function requestRankingPage(
     total: data.total,
     exportDate: data.exportDate ?? null,
     availableYears: data.availableYears,
+    cacheMembershipVersion: data.cacheMembershipVersion,
+    cacheDataVersion:
+      data.cacheDataVersion ?? response.headers.get("X-Rankings-Data-Version"),
     offlineStale: response.headers.get("X-Rankings-Offline-Stale") === "1",
   } satisfies RankingPage;
 }
 
-function rankingPageQueryOptions(
-  filters: RankingQueryFilters,
-  start: number,
-) {
+function rankingPageQueryOptions(filters: RankingQueryFilters, start: number) {
   const pageStart = rankingPageStart(start);
   return queryOptions({
-    queryKey: ["rankings", "page", ...rankingFilterKey(filters), pageStart] as const,
+    queryKey: [
+      "rankings",
+      "page",
+      ...rankingFilterKey(filters),
+      pageStart,
+    ] as const,
     queryFn: ({ signal }) => requestRankingPage(filters, pageStart + 1, signal),
     staleTime: PAGE_STALE_TIME_MS,
   });
-}
-
-function initialRankingPage(initialData: InitialRankingData): RankingPage {
-  return {
-    entries: initialData.entries,
-    hasMore: initialData.hasMore,
-    nextPageStart: initialData.nextPageStart,
-    previousPageStart: initialData.previousPageStart,
-    startPosition: initialData.startPosition,
-    lastRank: initialData.lastRank,
-    total: initialData.total,
-    exportDate: initialData.exportDate,
-    availableYears: initialData.availableYears,
-  };
-}
-
-export function useRankingInfiniteQuery(
-  filters: RankingQueryFilters,
-  start: number,
-  initialData?: InitialRankingData,
-) {
-  const queryClient = useQueryClient();
-  return useInfiniteQuery({
-    queryKey: rankingWindowQueryKey(filters),
-    initialPageParam: rankingPageStart(start) + 1,
-    queryFn: ({ pageParam }) =>
-      queryClient.fetchQuery(rankingPageQueryOptions(filters, pageParam)),
-    getNextPageParam: (page) => page.nextPageStart ?? undefined,
-    getPreviousPageParam: (page) => page.previousPageStart ?? undefined,
-    initialData: initialData
-      ? {
-          pages: [initialRankingPage(initialData)],
-          pageParams: [initialData.startRank],
-        }
-      : undefined,
-    placeholderData: keepPreviousData,
-    staleTime: PAGE_STALE_TIME_MS,
-  });
-}
-
-function mergePages(pages: RankingPage[]) {
-  const seen = new Set<string>();
-  return pages.flatMap((page) => page.entries.filter((entry) => {
-    const key = rankingEntryKey(entry);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }));
 }
 
 export function useRankingsQueryApi(filters: RankingQueryFilters) {
   const queryClient = useQueryClient();
 
   return useMemo(() => {
-    const getPage = (start: number) => queryClient.fetchQuery(
-      rankingPageQueryOptions(filters, start),
-    );
+    const getPage = (start: number) =>
+      queryClient.fetchQuery(rankingPageQueryOptions(filters, start));
 
-    const getEndWindow = async (endSubRank: number) => {
-      const finalPageStart = rankingPageStart(endSubRank);
-      const pageStarts = [
-        Math.max(0, finalPageStart - PAGE_SIZE),
-        finalPageStart,
-      ].filter((value, index, values) => values.indexOf(value) === index);
+    const getRange = async (
+      start: number,
+      count: number,
+      signal?: AbortSignal,
+    ) => {
+      signal?.throwIfAborted();
+      const end = Math.max(start, start + count);
+      const firstPageStart = Math.floor(start / PAGE_SIZE) * PAGE_SIZE;
+      const finalPageStart =
+        Math.floor(Math.max(start, end - 1) / PAGE_SIZE) * PAGE_SIZE;
+      const pageStarts = Array.from(
+        { length: (finalPageStart - firstPageStart) / PAGE_SIZE + 1 },
+        (_, index) => firstPageStart + index * PAGE_SIZE,
+      );
       const pages = await Promise.all(
         pageStarts.map((pageStart) => getPage(pageStart + 1)),
       );
-      const firstPage = pages[0];
-      const lastPage = pages.at(-1) ?? firstPage;
-      return {
-        ...lastPage,
-        entries: mergePages(pages),
-        startPosition: firstPage.startPosition,
-        previousPageStart: firstPage.previousPageStart,
-      };
-    };
-
-    const getNavigationWindow = async (
-      targetSubRank: number,
-      direction: -1 | 1,
-    ) => {
-      const targetPageStart = rankingPageStart(targetSubRank);
-      const pages = (await Promise.all(
-        getNavigationWindowPageStarts(
-          targetPageStart,
-          direction,
-          PAGE_SIZE,
-          NAVIGATION_ADJACENT_PAGE_COUNT,
-        )
-          .map((pageStart) => getPage(pageStart + 1)),
-      ))
-        .filter((page) => page.entries.length > 0);
-      const firstPage = pages[0];
-      if (!firstPage) return getPage(targetPageStart + 1);
-      const lastPage = pages.at(-1) ?? firstPage;
-      return {
-        ...lastPage,
-        entries: mergePages(pages),
-        startPosition: firstPage.startPosition,
-        previousPageStart: firstPage.previousPageStart,
-        nextPageStart: lastPage.nextPageStart,
-      };
-    };
-
-    const peopleFilters = { ...filters, resource: "people" } satisfies RankingQueryFilters;
-    const getPeoplePage = (start: number) => queryClient.fetchQuery(
-      rankingPageQueryOptions(peopleFilters, start),
-    );
-    const getPersonWindow = async (
-      match: Pick<RankingEntry, "personId" | "subRank">,
-    ) => {
-      const targetPageStart = rankingPageStart(match.subRank);
-      const starts = [targetPageStart - PAGE_SIZE, targetPageStart, targetPageStart + PAGE_SIZE]
-        .filter((value) => value >= 0)
-        .filter((value, index, values) => values.indexOf(value) === index);
-      const pages = await Promise.all(
-        starts.map((pageStart) => getPeoplePage(pageStart + 1)),
-      );
-      const entries = mergePages(pages);
-      if (!entries.some((entry) => entry.personId === match.personId)) {
-        throw new Error("Could not locate the selected ranking result.");
+      signal?.throwIfAborted();
+      const rows: Record<number, RankingEntry> = {};
+      for (const page of pages) {
+        page.entries.forEach((entry, entryIndex) => {
+          const globalIndex =
+            entry.subRank > 0
+              ? entry.subRank - 1
+              : page.startPosition + entryIndex;
+          if (globalIndex >= start && globalIndex < end) {
+            rows[globalIndex] = entry;
+          }
+        });
       }
-      const firstPage = pages[0];
-      const lastPage = pages.at(-1) ?? firstPage;
+      const metadata = pages.at(-1) ?? pages[0];
       return {
-        ...lastPage,
-        entries,
-        startPosition: firstPage.startPosition,
-        previousPageStart: firstPage.previousPageStart,
-        nextPageStart: lastPage.nextPageStart,
+        rows,
+        total: metadata?.total ?? 0,
+        dataVersion:
+          metadata?.cacheDataVersion ?? metadata?.exportDate ?? "current",
+        exportDate: metadata?.exportDate ?? null,
+        availableYears: metadata?.availableYears ?? [],
+        offlineStale: Boolean(metadata?.offlineStale),
       };
     };
 
-    const getDistantSearchWindow = async (
-      currentPageStart: number,
-      match: RankingEntry,
-      direction: -1 | 1,
-    ) => {
-      const targetPageStart = rankingPageStart(match.subRank);
-      const starts = [
-        currentPageStart,
-        ...getSearchBridgePageStarts(
-          currentPageStart,
-          targetPageStart,
-          direction,
-          PAGE_SIZE,
-        ),
-        targetPageStart - PAGE_SIZE,
-        targetPageStart,
-        targetPageStart + PAGE_SIZE,
-      ]
-        .filter((value) => value >= 0)
-        .filter((value, index, values) => values.indexOf(value) === index)
-        .sort((left, right) => left - right);
-      const pages = (await Promise.all(
-        starts.map((pageStart) => getPeoplePage(pageStart + 1)),
-      )).filter((page) => page.entries.length > 0);
-      const entries = mergePages(pages);
-      if (!entries.some((entry) => entry.personId === match.personId)) {
-        throw new Error("Could not locate the selected ranking result.");
-      }
-      const firstPage = pages[0];
-      const lastPage = pages.at(-1) ?? firstPage;
-      return {
-        ...lastPage,
-        entries,
-        startPosition: firstPage.startPosition,
-        previousPageStart: firstPage.previousPageStart,
-        nextPageStart: lastPage.nextPageStart,
-      };
-    };
-
-    const prefetchSearchResultPages = (
-      matches: Array<RankingEntry | null | undefined>,
-      currentMatchIndex: number,
-    ) => {
-      if (matches.length < 2 || currentMatchIndex < 0) return;
-      const requested = new Set<number>();
-      for (const direction of [-1, 1] as const) {
-        for (let distance = 1; distance <= SEARCH_PREFETCH_RADIUS; distance += 1) {
-          const matchIndex =
-            (currentMatchIndex + direction * distance + matches.length) % matches.length;
-          const match = matches[matchIndex];
-          if (!match) continue;
-          const requestKey = rankingPageStart(match.subRank);
-          if (requested.has(requestKey)) continue;
-          requested.add(requestKey);
-          void getPersonWindow(match).catch(() => undefined);
-        }
-      }
-    };
-
+    const peopleFilters = {
+      ...filters,
+      resource: "people",
+    } satisfies RankingQueryFilters;
     const searchRankings = async (
       search: string,
       regexSearch: boolean,
@@ -421,9 +319,11 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       if (regexSearch) params.set("mode", "vim");
       addRankingFilterParams(params, filters);
       const response = await fetch(
-        `${filters.resource === "results"
-          ? "/api/rankings/results"
-          : "/api/rankings"}?${params}`,
+        `${
+          filters.resource === "results"
+            ? "/api/rankings/results"
+            : "/api/rankings"
+        }?${params}`,
         { signal },
       );
       if (!response.ok) {
@@ -433,8 +333,14 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       return response.json() as Promise<{ entries: RankingEntry[] }>;
     };
 
-    const locateRanking = (wcaId: string) => queryClient.fetchQuery({
-        queryKey: ["rankings", "locate", ...rankingFilterKey(peopleFilters), wcaId] as const,
+    const locateRanking = (wcaId: string) =>
+      queryClient.fetchQuery({
+        queryKey: [
+          "rankings",
+          "locate",
+          ...rankingFilterKey(peopleFilters),
+          wcaId,
+        ] as const,
         queryFn: async ({ signal }) => {
           const params = new URLSearchParams({
             eventId: filters.eventId,
@@ -445,7 +351,9 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
           const response = await fetch(`/api/rankings?${params}`, { signal });
           if (!response.ok) {
             const body = (await response.json()) as { error?: string };
-            throw new Error(body.error ?? "Could not find this person in the rankings.");
+            throw new Error(
+              body.error ?? "Could not find this person in the rankings.",
+            );
           }
           return response.json() as Promise<{ located: RankingEntry | null }>;
         },
@@ -453,12 +361,7 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       });
 
     return {
-      getPage,
-      getEndWindow,
-      getNavigationWindow,
-      getPersonWindow,
-      getDistantSearchWindow,
-      prefetchSearchResultPages,
+      getRange,
       searchRankings,
       locateRanking,
     };

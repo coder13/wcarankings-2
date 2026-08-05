@@ -10,8 +10,8 @@ import {
   type RegionScope,
 } from "@/lib/wca";
 
-export const DEFAULT_PAGE_SIZE = 50;
-export const MAX_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
 
 export class ApiInputError extends Error {
   constructor(message: string) {
@@ -25,16 +25,21 @@ export type ApiDiagnostics = {
   timings: QueryTimings;
   queryCount: number;
   returnedRows: number;
+  cacheOutcome?: "hit" | "miss" | "coalesced" | "bypass";
+  cacheLayer?: "memory" | "list-ranking";
 };
 
-type QueryParamGuard<T> = (value: string) => value is T;
+type QueryParamGuard<T extends string> = (value: string) => value is T;
 type NumericQueryParamGuard = (value: number) => boolean;
 
 function getQueryParam(params: URLSearchParams, name: string) {
   return params.get(name);
 }
 
-function getQueryParamWithAliases(params: URLSearchParams, names: readonly string[]) {
+function getQueryParamWithAliases(
+  params: URLSearchParams,
+  names: readonly string[],
+) {
   for (const name of names) {
     const value = getQueryParam(params, name);
     if (value !== null) return value;
@@ -42,7 +47,7 @@ function getQueryParamWithAliases(params: URLSearchParams, names: readonly strin
   return null;
 }
 
-function validateQueryParam<T>(
+function validateQueryParam<T extends string>(
   value: string | null,
   guard: QueryParamGuard<T>,
   errorMessage: string,
@@ -51,7 +56,7 @@ function validateQueryParam<T>(
   return value;
 }
 
-function parseOptionalQueryParam<T>(
+function parseOptionalQueryParam<T extends string>(
   params: URLSearchParams,
   name: string,
   guard: QueryParamGuard<T>,
@@ -132,7 +137,11 @@ export function parseGender(params: URLSearchParams) {
   const unique = [...new Set(values)];
   return normalizeGenderFilters(
     unique.map((value) =>
-      validateQueryParam(value, isGenderFilterValue, "gender must contain only m, f, or o."),
+      validateQueryParam(
+        value,
+        isGenderFilterValue,
+        "gender must contain only m, f, or o.",
+      ),
     ),
   );
 }
@@ -163,7 +172,10 @@ export function parseEvent(params: URLSearchParams, { required = true } = {}) {
   return validateQueryParam(value, isEventId, "eventId is invalid.");
 }
 
-export function parseResultType(params: URLSearchParams, eventId?: string | null): RankingType {
+export function parseResultType(
+  params: URLSearchParams,
+  eventId?: string | null,
+): RankingType {
   const value = validateQueryParam(
     getQueryParamWithAliases(params, ["result", "type"]),
     isRankingType,
@@ -175,21 +187,43 @@ export function parseResultType(params: URLSearchParams, eventId?: string | null
   return value;
 }
 
-export function parseScope(params: URLSearchParams): { scope: RegionScope; regionId: string } {
+export function parseScope(params: URLSearchParams): {
+  scope: RegionScope;
+  regionId: string;
+} {
   return parseRegionQuery(getQueryParam(params, "region"));
 }
 
-export function parsePersonId(params: URLSearchParams, { required = false } = {}) {
-  const personId = (getQueryParam(params, "personId") ?? "").trim().toUpperCase();
+export function parsePersonId(
+  params: URLSearchParams,
+  { required = false } = {},
+) {
+  const personId = (getQueryParam(params, "personId") ?? "")
+    .trim()
+    .toUpperCase();
   if (!personId && !required) return "";
-  return validateQueryParam(personId, isWcaPersonId, "personId must be a valid WCA ID.");
+  return validateQueryParam(
+    personId,
+    isWcaPersonId,
+    "personId must be a valid WCA ID.",
+  );
 }
 
 export function optionalInteger(params: URLSearchParams, name: string) {
-  return parseIntegerQueryParam(params, name, null, isInteger, `${name} must be an integer.`);
+  return parseIntegerQueryParam(
+    params,
+    name,
+    null,
+    isInteger,
+    `${name} must be an integer.`,
+  );
 }
 
-export function optionalText(params: URLSearchParams, name: string, maxLength = 100) {
+export function optionalText(
+  params: URLSearchParams,
+  name: string,
+  maxLength = 100,
+) {
   return parseOptionalQueryParam(
     params,
     name,

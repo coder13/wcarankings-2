@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { checkServerDatasetCompatibility } from "../scripts/check-release-compatibility.mjs";
+import { checkServerDatasetCompatibility } from "../data-tools/projections/deployment/compatibility.ts";
 
 const server = {
   minimumDatasetSchemaVersion: 1,
@@ -9,7 +9,8 @@ const server = {
 
 test("server compatibility depends on schema format, not an exact dataset fingerprint", () => {
   assert.equal(
-    checkServerDatasetCompatibility({ server, datasetSchemaVersion: 2 }).compatible,
+    checkServerDatasetCompatibility({ server, datasetSchemaVersion: 2 })
+      .compatible,
     true,
   );
 });

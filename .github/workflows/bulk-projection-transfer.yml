@@ -29,6 +29,11 @@ jobs:
         with:
           node-version: 24
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
       - name: Build data-tools image
         run: docker build --file Dockerfile.data-tools --tag wcarankings-data-tools:pull-request .
 
@@ -44,7 +49,7 @@ jobs:
           done
 
       - name: Exercise bulk projection table transfer
-        run: bash scripts/test-bulk-projection-transfer.sh
+        run: bash scripts/projections/transfer/test-bulk-projection-transfer.sh
 
       - name: Clean up containers
         if: always()

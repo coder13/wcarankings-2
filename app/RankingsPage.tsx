@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
-import { formatRankingDocumentTitle, type RankingDocumentTitleInput } from "@/lib/ranking-document-title";
-import { isRankingEventId, isRankingType } from "@/lib/wca";
+import {
+  formatRankingDocumentTitle,
+  type RankingDocumentTitleInput,
+} from "@/lib/ranking-document-title";
+import { isMedalRankingType } from "@/lib/medal-rankings";
+import { isEventId, isRankingEventId, isRankingType } from "@/lib/wca";
 import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import { getRegions } from "@/services/regions/service";
-
-export const dynamic = "force-dynamic";
 
 const LIVE_COMMIT_SHA =
   process.env.APP_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "development";
@@ -19,15 +21,12 @@ export type RankingsSearchParams = Record<
 
 type RankingsMetadataOptions = Omit<
   RankingDocumentTitleInput,
-  "eventId" | "rankingType"
+  "eventId" | "rankingType" | "medalType"
 >;
 
-function searchParam(
-  searchParams: RankingsSearchParams,
-  key: string,
-) {
+function searchParam(searchParams: RankingsSearchParams, key: string) {
   const value = searchParams[key];
-  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
 export async function getRankingsPageMetadata({
@@ -39,14 +38,24 @@ export async function getRankingsPageMetadata({
   const params = searchParams ? await searchParams : {};
   const requestedEvent = searchParam(params, "eventId");
   const requestedResult = searchParam(params, "result");
-  const eventId = isRankingEventId(requestedEvent) ? requestedEvent : "333";
-  const rankingType = isRankingType(requestedResult) ? requestedResult : "single";
+  const requestedMedal = searchParam(params, "medal");
+  let eventId = "333";
+  if (options.personMedalRanking) {
+    eventId = isEventId(requestedEvent) ? requestedEvent : "all";
+  } else if (isRankingEventId(requestedEvent)) eventId = requestedEvent;
+  const rankingType = isRankingType(requestedResult)
+    ? requestedResult
+    : "single";
+  const medalType = isMedalRankingType(requestedMedal)
+    ? requestedMedal
+    : "overall";
 
   return {
     title: formatRankingDocumentTitle({
       ...options,
       eventId,
       rankingType,
+      medalType,
     }),
   };
 }
@@ -57,6 +66,7 @@ export async function RankingsPage({
   requiresResultRankings = false,
   requiresCompetitionRankings = false,
   requiresPersonCompetitionRankings = false,
+  requiresPersonMedalRankings = false,
   requiresCityRankings = false,
 }: {
   searchParams?: Promise<RankingsSearchParams>;
@@ -64,6 +74,7 @@ export async function RankingsPage({
   requiresResultRankings?: boolean;
   requiresCompetitionRankings?: boolean;
   requiresPersonCompetitionRankings?: boolean;
+  requiresPersonMedalRankings?: boolean;
   requiresCityRankings?: boolean;
 } = {}) {
   const featureSwitch = await getProjectionFeatureSwitch();
@@ -76,10 +87,11 @@ export async function RankingsPage({
     (requiresYearlyRankings && !featureSwitch.yearlyPersonRankings) ||
     (requiresResultRankings && !featureSwitch.resultRankings) ||
     (requiresCompetitionRankings && !featureSwitch.competitionRankings) ||
-    (requiresPersonCompetitionRankings && !featureSwitch.personCompetitionRankings) ||
+    (requiresPersonCompetitionRankings &&
+      !featureSwitch.personCompetitionRankings) ||
+    (requiresPersonMedalRankings && !featureSwitch.personMedalRankings) ||
     (requiresCityRankings && !featureSwitch.cityEventStats) ||
-    (["SOR", "sor-kinch"].includes(requestedEvent) &&
-      !featureSwitch.sumOfRanks)
+    (["SOR", "sor-kinch"].includes(requestedEvent) && !featureSwitch.sumOfRanks)
   ) {
     notFound();
   }

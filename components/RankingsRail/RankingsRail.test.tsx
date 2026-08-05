@@ -34,7 +34,29 @@ test("renders the ranking settings and search in one rail", () => {
   assert.match(markup, /aria-label="3x3x3 Cube"/);
   assert.match(markup, /Single/);
   assert.match(markup, /Search names or WCA IDs/);
+  assert.match(markup, /class="findIcon"[^>]*tabindex="-1"/);
+  assert.match(markup, /class="findInput"[^>]*tabindex="0"/);
   assert.match(markup, /aria-label="Gender"/);
+});
+
+test("makes the search icon a backward tab stop only when a query exists", () => {
+  const search = {
+    findOpen: true,
+    findQuery: "Feliks",
+    findError: "",
+    findLoading: false,
+    findPending: false,
+    findMatches: [],
+    findIndex: 0,
+    onSearchOpen: () => undefined,
+    onSearchClose: () => undefined,
+    onSearchQueryChange: () => undefined,
+    onSearchCycle: () => undefined,
+  };
+  const markup = renderWithProviders(<RankingsControlsRail controls={{ event: WCA_EVENTS[0], onEventChange: () => undefined, rankingType: "single", onRankingTypeChange: () => undefined, gender: [], onGenderChange: () => undefined, regions, regionSelection: { scope: "world", regionId: "" }, onRegionChange: () => undefined, compactResultType: false }} search={search} />);
+
+  assert.match(markup, /class="findIcon"[^>]*tabindex="0"/);
+  assert.match(markup, /class="findClose"[^>]*tabindex="0"/);
 });
 
 test("renders the person ranking period control in the settings rail", () => {
@@ -61,6 +83,20 @@ test("shows clickable previous and next person actions only while find navigatio
 
 test("makes find navigation interactive only while search navigation is active", async () => {
   const css = await readFile(new URL("./RankingsRail.css", import.meta.url), "utf8");
+  assert.match(css, /--rail-event-icon-slot-width: 48px;/);
+  assert.match(css, /\.EventPicker-preview \.EventPicker-name \{[^}]*left: var\(--rail-event-icon-slot-width\);/);
+  assert.match(css, /\.EventPicker-preview\[aria-expanded="true"\] \{\s*box-shadow: inset 0 0 0 2px var\(--focus-ring\);/);
+  assert.match(css, /\.findBar--rail \.findIcon \{ padding-right: 4px; \}/);
+  assert.match(css, /\.findBar--rail:is\(\[data-has-text="true"\], \[data-open="true"\]\) \.findIcon \{ padding-right: 0; padding-left: 4px; \}/);
+  assert.match(css, /\.findBar--rail\[data-open="false"\]\[data-has-text="false"\] \.findInput \{ position: absolute; inset: 0; width: 100%; height: 100%;[^}]*opacity: 0; pointer-events: none; \}/);
+  assert.match(css, /\.Jump-periodPicker \.TextDropdown-trigger\[aria-expanded="true"\] \{ background: transparent; box-shadow: inset 0 0 0 2px var\(--focus-ring\);/);
+  assert.match(css, /\.genderPickerTrigger\[aria-expanded="true"\] \{ border-color: var\(--border-subtle\);/);
+  assert.match(css, /\.Jump \.genderPickerTrigger \{[^}]*transition: color 150ms ease;/);
+  assert.match(css, /\.Jump \.Jump-regionPicker \.regionPickerTrigger \{[^}]*transition: color 150ms ease;/);
+  assert.match(css, /\.Jump-resultTypeToggle:hover \{[^}]*color: var\(--focus\);/);
+  assert.match(css, /\.Jump-resultTypeToggle:focus-visible \{[^}]*color: var\(--text-muted\);/);
+  assert.match(css, /\.Jump-pagerActions > \.Jump-pagerButton:first-child \{ padding-left: calc\(\.75em \+ 4px\); \}/);
+  assert.match(css, /\.Jump-pagerActions > \.Jump-pagerButton:last-child \{ padding-right: calc\(\.75em \+ 4px\); \}/);
   assert.match(css, /\.Jump-pagerButton--me \{ padding-inline: \.75em; text-align: center; \}/);
   assert.match(css, /\.Jump-periodPicker \{[^}]*border-left: 1px solid var\(--border-subtle\);/);
   assert.match(css, /\.Jump-periodPicker \{[^}]*flex: 0 0 var\(--rail-period-width\);/);

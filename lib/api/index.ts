@@ -6,7 +6,7 @@ import {
   ListValidationError,
 } from "@/services/lists/lists";
 
-export function buildApiJsonResponse<T>(body: T, init?: ResponseInit) {
+export function buildApiJsonResponse(body: unknown, init?: ResponseInit) {
   return Response.json(body, init);
 }
 

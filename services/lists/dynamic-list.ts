@@ -56,7 +56,3 @@ export async function resolveDynamicList(personIds: string[]) {
     unknownIds: personIds.filter((personId) => !known.has(personId)),
   };
 }
-
-export function dynamicListQueryValue(personIds: string[]) {
-  return personIds.join(",");
-}

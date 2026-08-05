@@ -77,6 +77,10 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -136,7 +140,7 @@ jobs:
             echo "No active dataset schema version was found; using the pre-cutover baseline (1)."
             dataset_schema_version=1
           fi
-          node scripts/check-release-compatibility.mjs \
+          bun scripts/check-release-compatibility.ts \
             --compatibility-file=/tmp/server-release-compatibility.json \
             --dataset-schema-version="$dataset_schema_version"
 
@@ -482,26 +486,37 @@ jobs:
             docker image prune -f
             cd /srv/wcarankings
             if [ "$FLYWAY_IMAGE_CHANGED" = true ] || [ "$DATA_TOOLS_IMAGE_CHANGED" = true ]; then
+              flyway_history_repair_marker=/srv/wcarankings/flyway-history-repair-v1.complete
               measure_database_cpu_baseline
-              docker compose run --rm data-tools /app/scripts/prepare-flyway-history.mjs
+              docker compose run --rm data-tools /app/scripts/prepare-flyway-history.ts
               docker compose run --rm flyway migrate
               docker compose exec -T db sh -c '
                 mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" --execute="
                   CREATE TABLE IF NOT EXISTS result_attempts (
                     result_id BIGINT NOT NULL,
-                    attempt_number INT NOT NULL
+                    attempt_number INT NOT NULL,
+                    value INT NOT NULL
                   );
                 "
               '
+              if [ ! -f "$flyway_history_repair_marker" ]; then
+                docker compose run --rm \
+                  -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
+                  -e FLYWAY_TABLE=flyway_schema_history_results \
+                  flyway repair
+              fi
               docker compose run --rm \
                 -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
                 -e FLYWAY_TABLE=flyway_schema_history_results \
                 -e FLYWAY_OUT_OF_ORDER=true \
                 flyway migrate
+              if [ ! -f "$flyway_history_repair_marker" ]; then
+                : > "$flyway_history_repair_marker"
+              fi
               wait_for_database_cooldown
             fi
             docker compose run --rm data-tools \
-              /app/scripts/activate-ranking-generation.mjs bootstrap
+              /app/scripts/projections/generation/activate-ranking-generation.ts bootstrap
           REMOTE
           echo "CANDIDATE_STAGED=true" >> "$GITHUB_ENV"
 

@@ -26,7 +26,7 @@ export type RankingRow = {
   record_streak_weeks: number | null;
 };
 
-export type KinchOrder = "regional" | "continent";
+type KinchOrder = "regional" | "continent";
 
 export type QueryInput = {
   eventId: string;
@@ -59,22 +59,8 @@ export type PersonMetricRow = {
   best: number;
 };
 
-export type FilteredPersonMetricRow = PersonMetricRow & { total_count?: number };
-
-export type PersonRankingRow = {
-  person_id: string;
-  person_name: string;
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  continent_id: string;
-  rank: number;
-  result_id: number;
-  result_value: number;
-  competition_id: string;
-  competition_name: string;
-  competition_start_date: string;
-  round_type_id: string;
+export type FilteredPersonMetricRow = PersonMetricRow & {
+  total_count?: number;
 };
 
 export type PersonCompetitionRankingRow = {
@@ -89,6 +75,7 @@ export type PersonCompetitionRankingRow = {
 
 export type ResultRankingRow = {
   result_id: number;
+  attempt_number: number | null;
   result_value: number;
   rank: number;
   position: number;
@@ -145,22 +132,6 @@ export type PodiumRow = CompetitionRow & {
   member_result_value: number;
 };
 
-export type CityRow = {
-  rank: number;
-  city_name: string;
-  country_id: string;
-  country_name: string;
-  country_iso2: string;
-  result_id: number;
-  result_value: number;
-  person_id: string;
-  person_name: string;
-  competition_id: string;
-  competition_name: string;
-  competition_start_date: string;
-  round_type_id: string;
-};
-
 export type RankingsMetadata = {
   fetchedAt: string;
   exportDate: string | null;
@@ -199,16 +170,6 @@ export type CachePool<T extends object> = {
   evictions: number;
 };
 
-export type PersonRankingsQueryInput = {
-  eventId: string;
-  resultType: string;
-  scope: string;
-  regionId: string;
-  rankColumn: string;
-  positionColumn: string;
-  conditions: string[];
-};
-
 export type ResultRankingsQueryInput = {
   source: string;
   rankColumn: string;
@@ -223,6 +184,23 @@ export type GenderRankingQueryInput = {
   selectColumns: string;
 };
 
+export type GenderPersonRankingRow = {
+  person_id: string;
+  result_id: number;
+  result_value: number;
+  country_id: string;
+  country_name: string;
+  country_iso2: string;
+  continent_id: string;
+  person_name: string;
+  world_rank: number;
+  competition_id: string;
+  competition_name: string;
+  is_world_record: number;
+  is_continent_record: number;
+  is_country_record: number;
+};
+
 export type RankingPageQueryInput = {
   selectColumns: string;
   from: string;
@@ -231,8 +209,12 @@ export type RankingPageQueryInput = {
   personColumn: string;
 };
 
-export type RankingSearchQueryInput = RankingPageQueryInput & { personIds: string[] };
-export type RankingCursorQueryInput = RankingPageQueryInput & { cursor: string };
+export type RankingSearchQueryInput = RankingPageQueryInput & {
+  personIds: string[];
+};
+export type RankingCursorQueryInput = RankingPageQueryInput & {
+  cursor: string;
+};
 
 export type PersonMetricQueryInput = {
   rankColumn: string;
@@ -247,7 +229,6 @@ export type FilteredPersonMetricQueryInput = {
   conditions: string[];
   pageConditions: string[];
 };
-export type EntityCountQueryInput = { kind: string; eventId: string; resultType: string };
 export type LatitudeQueryInput = {
   prefix: string;
   direction?: "ASC" | "DESC";
@@ -261,9 +242,3 @@ export type CompetitionEntityQueryInput = {
   positionColumn: string;
 };
 export type PodiumEntityQueryInput = { positionColumn: string };
-export type CityEntityQueryInput = {
-  valueColumn: string;
-  resultIdColumn: string;
-  rankColumn: string;
-  cursor: string;
-};
