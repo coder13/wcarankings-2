@@ -19,3 +19,7 @@ SET
   )
 WHERE
   state.id = 1;
+
+DROP TABLE IF EXISTS result_gender_ranking_counts,
+result_gender_rankings_single,
+result_gender_rankings_average;
