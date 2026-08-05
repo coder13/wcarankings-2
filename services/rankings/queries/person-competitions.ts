@@ -51,26 +51,54 @@ function lazySource(input: PersonCompetitionRankingInput) {
 }
 
 export function personCompetitionRankingRowsQuery() {
-  return sqlFragment`WITH page AS (
-      SELECT ranking.person_id, ranking.competition_count, ranking.rank, ranking.position
-      FROM person_competition_rankings ranking
-      WHERE ranking.scope = ? AND ranking.region_id = ? AND ranking.gender = ?
-        AND ranking.position >= ?
-      ORDER BY ranking.position, ranking.person_id
-      LIMIT ?
-    )
-    SELECT page.*, COALESCE(person.name, page.person_id) AS person_name,
+  return sqlFragment`
+    WITH
+      page AS (
+        SELECT
+          ranking.person_id,
+          ranking.competition_count,
+          ranking.rank,
+          ranking.position
+        FROM
+          person_competition_rankings ranking
+        WHERE
+          ranking.scope = ?
+          AND ranking.region_id = ?
+          AND ranking.gender = ?
+          AND ranking.position >= ?
+        ORDER BY
+          ranking.position,
+          ranking.person_id
+        LIMIT
+          ?
+      )
+    SELECT
+      page.*,
+      COALESCE(person.name, page.person_id) AS person_name,
       COALESCE(country.name, person.country_id, '') AS country_name,
       COALESCE(country.iso2, '') AS country_iso2
-    FROM page
-    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-    LEFT JOIN countries country ON country.id = person.country_id
-    ORDER BY page.position, page.person_id`;
+    FROM
+      page
+      LEFT JOIN persons person ON person.wca_id = page.person_id
+      AND person.sub_id = 1
+      LEFT JOIN countries country ON country.id = person.country_id
+    ORDER BY
+      page.position,
+      page.person_id
+  `;
 }
 
 export function personCompetitionRankingCountQuery() {
-  return sqlFragment`SELECT count FROM person_competition_ranking_counts
-    WHERE scope = ? AND region_id = ? AND gender = ?`;
+  return sqlFragment`
+    SELECT
+      count
+    FROM
+      person_competition_ranking_counts
+    WHERE
+      scope = ?
+      AND region_id = ?
+      AND gender = ?
+  `;
 }
 
 export function buildLazyPersonCompetitionQueryPlan(
@@ -80,34 +108,65 @@ export function buildLazyPersonCompetitionQueryPlan(
   const source = lazySource(input);
   const joins = lazyDimensionJoins(input);
   const predicate = conditions.join(" AND ");
-  const rowsQuery = sqlFragment`WITH filtered AS (
-      SELECT counts.person_id, counts.competition_count
-      FROM ${source} counts
-      ${joins}
-      WHERE ${predicate}
-    ), ranked AS (
-      SELECT filtered.*,
-        RANK() OVER (ORDER BY competition_count DESC) AS rank,
-        ROW_NUMBER() OVER (
-          ORDER BY competition_count DESC, person_id
-        ) AS position
-      FROM filtered
-    ), page AS (
-      SELECT * FROM ranked
-      WHERE position >= ? AND position < ?
-      ORDER BY position
-    )
-    SELECT page.*, COALESCE(person.name, page.person_id) AS person_name,
+  const rowsQuery = sqlFragment`
+    WITH
+      filtered AS (
+        SELECT
+          counts.person_id,
+          counts.competition_count
+        FROM
+          ${source} counts ${joins}
+        WHERE
+          ${predicate}
+      ),
+      ranked AS (
+        SELECT
+          filtered.*,
+          RANK() OVER (
+            ORDER BY
+              competition_count DESC
+          ) AS rank,
+          ROW_NUMBER() OVER (
+            ORDER BY
+              competition_count DESC,
+              person_id
+          ) AS position
+        FROM
+          filtered
+      ),
+      page AS (
+        SELECT
+          *
+        FROM
+          ranked
+        WHERE
+          position >= ?
+          AND position < ?
+        ORDER BY
+          position
+      )
+    SELECT
+      page.*,
+      COALESCE(person.name, page.person_id) AS person_name,
       COALESCE(country.name, person.country_id, '') AS country_name,
       COALESCE(country.iso2, '') AS country_iso2
-    FROM page
-    LEFT JOIN persons person ON person.wca_id = page.person_id AND person.sub_id = 1
-    LEFT JOIN countries country ON country.id = person.country_id
-    ORDER BY page.position, page.person_id`;
-  const countQuery = sqlFragment`SELECT COUNT(*) AS count
-    FROM ${source} counts
-    ${joins}
-    WHERE ${predicate}`;
+    FROM
+      page
+      LEFT JOIN persons person ON person.wca_id = page.person_id
+      AND person.sub_id = 1
+      LEFT JOIN countries country ON country.id = person.country_id
+    ORDER BY
+      page.position,
+      page.person_id
+  `;
+  const countQuery = sqlFragment`
+    SELECT
+      COUNT(*) AS count
+    FROM
+      ${source} counts ${joins}
+    WHERE
+      ${predicate}
+  `;
 
   return { rowsQuery, countQuery, values };
 }

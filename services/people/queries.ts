@@ -15,33 +15,61 @@ export function personSearchRowsQuery(
     ? "COALESCE(competition_counts.competition_count, 0)"
     : "0";
   const competitionCountJoin = includeCompetitionCounts
-    ? sqlFragment`LEFT JOIN person_competition_counts competition_counts
-       ON competition_counts.person_id = person.wca_id`
+    ? sqlFragment`
+        LEFT JOIN person_competition_counts competition_counts ON competition_counts.person_id = person.wca_id
+      `
     : sqlFragment``;
-  return sqlFragment`SELECT person.wca_id, person.name, person.country_id, user.avatar_url,
-       COUNT(*) OVER() AS total_count,
-       ${competitionCount} AS competition_count,
-       COALESCE(country.name, person.country_id) AS country_name,
-       COALESCE(country.iso2, '') AS country_iso2
-     FROM persons person
-     LEFT JOIN countries country ON country.id = person.country_id
-     LEFT JOIN app_users user ON user.wca_id = person.wca_id
-     ${competitionCountJoin}
-     WHERE person.sub_id = 1
-       AND (person.wca_id LIKE ? ESCAPE '\\\\' OR ${nameCondition})
-     ORDER BY (person.wca_id = ?) DESC, person.name, person.wca_id
-     LIMIT ?, ?`;
+  return sqlFragment`
+    SELECT
+      person.wca_id,
+      person.name,
+      person.country_id,
+      user.avatar_url,
+      COUNT(*) OVER () AS total_count,
+      ${competitionCount} AS competition_count,
+      COALESCE(country.name, person.country_id) AS country_name,
+      COALESCE(country.iso2, '') AS country_iso2
+    FROM
+      persons person
+      LEFT JOIN countries country ON country.id = person.country_id
+      LEFT JOIN app_users user ON user.wca_id = person.wca_id ${competitionCountJoin}
+    WHERE
+      person.sub_id = 1
+      AND (
+        person.wca_id LIKE ? ESCAPE '\\\\'
+        OR ${nameCondition}
+      )
+    ORDER BY
+      (person.wca_id = ?) DESC,
+      person.name,
+      person.wca_id
+    LIMIT
+      ?, ?
+  `;
 }
 
 export function personIdsQuery(input: PersonIdSearchInput) {
   const nameCondition = input.regexSearch
     ? "name REGEXP ?"
     : "name LIKE ? ESCAPE '\\\\'";
-  return sqlFragment`SELECT wca_id FROM persons
-     WHERE sub_id = 1
-       AND (wca_id = ? OR ${nameCondition})
-     ORDER BY (wca_id = ?) DESC, name, wca_id
-     LIMIT ?`;
+  return sqlFragment`
+    SELECT
+      wca_id
+    FROM
+      persons
+    WHERE
+      sub_id = 1
+      AND (
+        wca_id = ?
+        OR ${nameCondition}
+      )
+    ORDER BY
+      (wca_id = ?) DESC,
+      name,
+      wca_id
+    LIMIT
+      ?
+  `;
 }
 
 export function personCompetitionCountsQuery(personIds: string[]) {
