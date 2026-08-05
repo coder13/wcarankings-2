@@ -186,6 +186,8 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - uses: oven-sh/setup-bun@v2
+
       - id: source
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
