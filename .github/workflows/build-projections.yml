@@ -250,12 +250,12 @@ jobs:
           directory=$(dirname "$raw")
           file=$(basename "$raw")
           pushd "$directory" >/dev/null
-          oras push "$tagged_ref" \
+          push_result=$(oras push "$tagged_ref" --format json \
             --artifact-type application/vnd.cuberanks.wca-export.v1 \
             --annotation "io.wcarankings.export-id=${{ inputs.export_value }}" \
-            "$file:application/vnd.cuberanks.wca-export.sql+zip"
+            "$file:application/vnd.cuberanks.wca-export.sql+zip")
           popd >/dev/null
-          digest=$(oras manifest fetch --descriptor "$tagged_ref" | jq -r '.digest')
+          digest=$(jq -er '.digest' <<<"$push_result")
           bytes=$(stat -c %s "$raw")
           checksum=$(sha256sum "$raw" | cut -d' ' -f1)
           jq -n --arg ref "ghcr.io/${owner}/wcarankings-wca-export@${digest}" \

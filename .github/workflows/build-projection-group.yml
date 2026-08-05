@@ -176,7 +176,7 @@ jobs:
           if [ "$corrupt" = true ]; then tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
           ref="ghcr.io/${owner}/wcarankings-projection-${GROUP}:${tag}"
           pushd "$directory" >/dev/null
-          oras push "$ref" \
+          push_result=$(oras push "$ref" --format json \
             --artifact-type application/vnd.cuberanks.projection.group.v4 \
             --annotation "io.wcarankings.group=$GROUP" \
             --annotation "io.wcarankings.export-id=${{ inputs.export_value }}" \
@@ -184,9 +184,9 @@ jobs:
             --annotation "io.wcarankings.format-version=4" \
             "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json" \
             "$archive_file:application/vnd.cuberanks.projection.tables.v1+gzip" \
-            "$metadata_file:application/vnd.cuberanks.projection.transfer.v4+json"
+            "$metadata_file:application/vnd.cuberanks.projection.transfer.v4+json")
           popd >/dev/null
-          digest=$(oras manifest fetch --descriptor "$ref" | jq -r '.digest')
+          digest=$(jq -er '.digest' <<<"$push_result")
           {
             echo "### Projection group"
             echo "- Group: $GROUP"
