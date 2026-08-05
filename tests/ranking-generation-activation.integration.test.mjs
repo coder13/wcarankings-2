@@ -65,6 +65,7 @@ if (!applicationUrl && !adminUrl) {
         "person-competition-rankings",
         "new",
       ),
+      "person-medal-rankings": release("person-medal-rankings", "new"),
       "city-rankings": release("city-rankings", "new"),
       "sum-of-ranks": release("sum-of-ranks", "new"),
       "yearly-person-rankings": release("yearly-person-rankings", "new"),
