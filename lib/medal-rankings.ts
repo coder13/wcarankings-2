@@ -1,4 +1,4 @@
-export const MEDAL_RANKING_TYPES = [
+const MEDAL_RANKING_TYPES = [
   "overall",
   "gold",
   "silver",

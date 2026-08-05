@@ -24,7 +24,7 @@ import type { QueryTimings } from "@/lib/api/projection";
 
 const medalCountFormatter = new Intl.NumberFormat("en-US");
 
-export type MedalType = MedalRankingType;
+type MedalType = MedalRankingType;
 
 type MedalInput = {
   eventId: string | null;

@@ -114,6 +114,7 @@ test("a result-facts semantic change selects only its downstream closure", async
     "city-rankings",
     "sum-of-ranks",
     "yearly-person-rankings",
+    "person-medal-rankings",
   ]);
   assert.ok(!plan.changedGroups.includes("competition-rankings"));
 });
