@@ -287,9 +287,18 @@ test("result rankings create and remove their solve stage in one build", async (
   );
   assert.ok(projection);
   const statements = [];
+  let solveStageExists = false;
   const connection = {
     async query(sql) {
       statements.push(sql);
+      if (/DROP TEMPORARY TABLE IF EXISTS solve_facts_stage/.test(sql)) {
+        solveStageExists = false;
+      } else if (/CREATE TEMPORARY TABLE solve_facts_stage/.test(sql)) {
+        solveStageExists = true;
+      } else if (/DROP TEMPORARY TABLE solve_facts_stage/.test(sql)) {
+        assert.equal(solveStageExists, true);
+        solveStageExists = false;
+      }
       return [[]];
     },
   };
@@ -308,6 +317,7 @@ test("result rankings create and remove their solve stage in one build", async (
   assert.ok(createIndex >= 0);
   assert.ok(useIndex > createIndex);
   assert.ok(cleanupIndex > useIndex);
+  assert.equal(solveStageExists, false);
 });
 
 test("core ranking-table build contains only active ranking tables", () => {

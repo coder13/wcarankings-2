@@ -11,7 +11,6 @@ export const resultRankingsJobs = [
       "people/result-rankings/result_rankings_average.sql",
       "people/result-rankings/result_gender_rankings_single.sql",
       "people/result-rankings/result_gender_rankings_average.sql",
-      "people/result-rankings/solve_facts_cleanup.sql",
     ],
     tables: [
       "result_rankings_single",
