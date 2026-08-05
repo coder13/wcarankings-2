@@ -7,6 +7,14 @@ import { Dropdown } from "../Dropdown/Dropdown";
 import { flagEmoji } from "@/lib/wca";
 import type { RegionOption, RegionSelection } from "../RankingsExplorer/types";
 
+interface RegionPickerProps {
+  options: RegionOption[];
+  selected: RegionSelection;
+  onChange: (option: RegionOption) => void;
+  className?: string;
+  disabled?: boolean;
+}
+
 function regionLabel(option: RegionOption) {
   return `${regionIcon(option)} ${option.label}`;
 }
@@ -23,13 +31,7 @@ export function RegionPicker({
   onChange,
   className,
   disabled = false,
-}: {
-  options: RegionOption[];
-  selected: RegionSelection;
-  onChange: (option: RegionOption) => void;
-  className?: string;
-  disabled?: boolean;
-}) {
+}: RegionPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -38,7 +40,8 @@ export function RegionPicker({
   const selectedOption =
     options.find(
       (option) =>
-        option.scope === selected.scope && option.regionId === selected.regionId,
+        option.scope === selected.scope &&
+        option.regionId === selected.regionId,
     ) ?? options[0];
   const worldOption =
     options.find((option) => option.scope === "world") ?? options[0];
@@ -55,11 +58,7 @@ export function RegionPicker({
     (option) => option.scope === "country",
   );
   const visibleOptions = filteredOptions.length
-    ? [
-        ...(options[0] ? [options[0]] : []),
-        ...continents,
-        ...countries,
-      ]
+    ? [...(options[0] ? [options[0]] : []), ...continents, ...countries]
     : [];
   const defaultActiveOption =
     visibleOptions.find((option) => option.scope !== "world") ??
@@ -68,7 +67,9 @@ export function RegionPicker({
     (option) => option.key === activeKey,
   )
     ? activeKey
-    : defaultActiveOption?.key ?? null;
+    : (defaultActiveOption?.key ?? null);
+  let inputValue = selectedOption ? regionLabel(selectedOption) : "World";
+  if (open) inputValue = query;
   const activeIndex = visibleOptions.findIndex(
     (option) => option.key === effectiveActiveKey,
   );
@@ -137,7 +138,7 @@ export function RegionPicker({
         id="region-picker-button"
         type="text"
         ref={searchRef}
-        value={open ? query : selectedOption ? regionLabel(selectedOption) : "World"}
+        value={inputValue}
         onFocus={() => {
           if (disabled) return;
           if (!open) setQuery("");

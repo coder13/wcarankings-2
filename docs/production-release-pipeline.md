@@ -13,7 +13,7 @@ Every push to `main` starts two GitHub Actions workflows:
   deploys the application and configuration. It uses the
   `production-server-release` queue.
 - **Projection Production Release** first checks whether a projection's
-  *semantic* inputs changed. It uses the independent
+  _semantic_ inputs changed. It uses the independent
   `production-projection-release` queue.
 
 They have separate queues so a long projection build does not make an ordinary
@@ -112,12 +112,6 @@ restore the exact prior image/configuration if a release fails or is cancelled.
 It never removes explicitly protected current/previous service tags or
 artifact-scoped data-tools/Flyway tags during cleanup.
 
-The first release after the Flyway history split repairs both copied history
-tables before migration. It writes
-`/srv/wcarankings/flyway-history-repair-v1.complete` only after both migration
-lanes finish. Later releases skip repair and fail if Flyway detects new history
-drift.
-
 The release verifies local readiness and core rankings, retries the SSR root
 request and its extracted CSS asset with bounded diagnostics, then verifies the
 public proxy. The root/CSS retries protect against startup routing races without
@@ -125,12 +119,12 @@ silently accepting an unavailable page.
 
 ## Observed production evidence
 
-| Date / run | Evidence | Result |
-| --- | --- | --- |
-| 2026-08-01, server run `30708219708` | Sum-of-Ranks server fix with app migration V13 | Switched successfully. Public root, readiness, core rankings, results, yearly, Sum of Ranks, and competition endpoints all returned 200; the new `(wca_id, sub_id)` person lookup index was present. |
-| 2026-08-01, projection run `30705975286`, retry attempt 2 | Reused existing artifact `8820359138` after a prior Sum-of-Ranks timeout | All 25 group artifacts restored; no projection SQL or raw WCA import was repeated. The already-prepared candidate completed safely and all six capabilities became active. |
-| 2026-08-01, PR #149 / server run `30709139959` | CSS-only ranking-rail shadow polish | Merged at `16:53:42Z`; the new public CSS asset returned 200 at `16:57:00.643Z`, an observed merge-to-public latency of **3m 19s**. The server workflow completed at `16:57:05Z` (3m 23s after merge). |
-| 2026-08-01, projection run `30709139971` | Projection control path for the same CSS-only merge | Completed in 27 seconds. It calculated semantic fingerprints, emitted the cosmetic-gate message, and skipped WCA resolution, artifacts, build, and deployment. |
+| Date / run                                                | Evidence                                                                 | Result                                                                                                                                                                                                 |
+| --------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-08-01, server run `30708219708`                      | Sum-of-Ranks server fix with app migration V13                           | Switched successfully. Public root, readiness, core rankings, results, yearly, Sum of Ranks, and competition endpoints all returned 200; the new `(wca_id, sub_id)` person lookup index was present.   |
+| 2026-08-01, projection run `30705975286`, retry attempt 2 | Reused existing artifact `8820359138` after a prior Sum-of-Ranks timeout | All 25 group artifacts restored; no projection SQL or raw WCA import was repeated. The already-prepared candidate completed safely and all six capabilities became active.                             |
+| 2026-08-01, PR #149 / server run `30709139959`            | CSS-only ranking-rail shadow polish                                      | Merged at `16:53:42Z`; the new public CSS asset returned 200 at `16:57:00.643Z`, an observed merge-to-public latency of **3m 19s**. The server workflow completed at `16:57:05Z` (3m 23s after merge). |
+| 2026-08-01, projection run `30709139971`                  | Projection control path for the same CSS-only merge                      | Completed in 27 seconds. It calculated semantic fingerprints, emitted the cosmetic-gate message, and skipped WCA resolution, artifacts, build, and deployment.                                         |
 
 The cosmetic benchmark recorded four timestamps:
 

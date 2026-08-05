@@ -302,11 +302,7 @@ export function filteredYearlyRankingPageQuery(
       regional_single_record = 'WR' OR regional_average_record = 'WR' AS is_world_record,
       regional_single_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR')
         OR regional_average_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
-      regional_single_record = 'NR' OR regional_average_record = 'NR' AS is_country_record,
-      NULL AS world_rank_delta, NULL AS world_rank_delta_state,
-      NULL AS continent_rank_delta, NULL AS continent_rank_delta_state,
-      NULL AS country_rank_delta, NULL AS country_rank_delta_state,
-      NULL AS record_streak_weeks
+      regional_single_record = 'NR' OR regional_average_record = 'NR' AS is_country_record
     FROM ranked
     WHERE sub_rank >= ? AND sub_rank < ?
     ORDER BY sub_rank`;

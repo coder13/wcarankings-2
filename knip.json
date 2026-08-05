@@ -5,7 +5,6 @@
     "playwright.visual-smoke.config.mjs",
     "public/sw.js",
     "scripts/list-ranking-worker.ts",
-    "scripts/prepare-flyway-history.ts",
     "scripts/projections/generation/activate-ranking-generation.ts",
     "scripts/projections/planning/plan-projection-deployment.ts",
     "scripts/projections/transfer/chunk-projection-dump.ts",

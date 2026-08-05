@@ -85,7 +85,14 @@ function sliceResultWindow(
   };
 }
 
-type ResultWindowOverride = { start: number; limit: number };
+interface ResultWindowOverride {
+  start: number;
+  limit: number;
+}
+
+type ResultRankingQueryRow = ResultRankingRow & {
+  total_count?: number;
+};
 
 export async function loadResultRankings(
   params: URLSearchParams,
@@ -278,44 +285,41 @@ export async function loadResultRankings(
     values.push(start);
   }
 
-  const rows = await query<ResultRankingRow & { total_count?: number }>(
-    yearSingle
-      ? filteredResultRankingsQuery({
-          source:
-            "result_facts facts STRAIGHT_JOIN result_attempts attempt ON attempt.result_id = facts.result_id",
-          joins: "",
-          candidateColumns: `facts.result_id, attempt.attempt_number, facts.person_id,
+  let rankingsSql = resultRankingsQuery({
+    source: table,
+    rankColumn,
+    positionColumn,
+    conditions,
+  });
+  let rankingValues = [...values, rowLimit];
+  if (yearSingle) {
+    rankingsSql = filteredResultRankingsQuery({
+      source:
+        "result_facts facts STRAIGHT_JOIN result_attempts attempt ON attempt.result_id = facts.result_id",
+      joins: "",
+      candidateColumns: `facts.result_id, attempt.attempt_number, facts.person_id,
             attempt.value AS result_value, facts.person_country_id AS country_id,
             facts.person_continent_id AS continent_id, facts.competition_id,
             facts.competition_start_date,
             CASE WHEN attempt.value = facts.best THEN facts.regional_single_record ELSE '' END AS record_code`,
-          conditions: yearSingleConditions,
-        })
-      : lazySingle
-        ? lazySingleResultRankingsQuery(lazyConditions)
-        : lazyAverage
-          ? filteredResultRankingsQuery({
-              source: "result_rankings_average result",
-              joins: averageJoins.join(" "),
-              candidateColumns: `result.result_id, NULL AS attempt_number, result.person_id,
+      conditions: yearSingleConditions,
+    });
+    rankingValues = [...yearSingleValues, start, rowLimit];
+  } else if (lazySingle) {
+    rankingsSql = lazySingleResultRankingsQuery(lazyConditions);
+    rankingValues = [...lazyValues, start, rowLimit];
+  } else if (lazyAverage) {
+    rankingsSql = filteredResultRankingsQuery({
+      source: "result_rankings_average result",
+      joins: averageJoins.join(" "),
+      candidateColumns: `result.result_id, NULL AS attempt_number, result.person_id,
               result.result_value, result.country_id, result.continent_id, result.competition_id,
               average_facts.competition_start_date, result.record_code`,
-              conditions: averageConditions,
-            })
-          : resultRankingsQuery({
-              source: table,
-              rankColumn,
-              positionColumn,
-              conditions,
-            }),
-    yearSingle
-      ? [...yearSingleValues, start, rowLimit]
-      : lazySingle
-        ? [...lazyValues, start, rowLimit]
-        : lazyAverage
-          ? [...averageValues, start, rowLimit]
-          : [...values, rowLimit],
-  );
+      conditions: averageConditions,
+    });
+    rankingValues = [...averageValues, start, rowLimit];
+  }
+  const rows = await query<ResultRankingQueryRow>(rankingsSql, rankingValues);
 
   const counts =
     dynamicSingle || lazyAverage
@@ -349,11 +353,11 @@ export async function loadResultRankings(
       continentId: row.continent_id,
     }),
   }));
-  const total = search
-    ? entries.length
-    : dynamicSingle || lazyAverage
-      ? Number(rows.rows[0]?.total_count ?? 0)
-      : Number(counts?.rows[0]?.count ?? 0);
+  let total = Number(counts?.rows[0]?.count ?? 0);
+  if (dynamicSingle || lazyAverage) {
+    total = Number(rows.rows[0]?.total_count ?? 0);
+  }
+  if (search) total = entries.length;
 
   return {
     data: {

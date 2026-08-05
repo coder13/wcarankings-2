@@ -25,11 +25,10 @@ The files use these status labels:
 - [City-event statistics](city-event-stats.md)
 - [Ranking counts and list metadata](ranking-counts-and-metadata.md)
 
-## Foundation and planned work
+## Foundation tables
 
 - [Result facts](result-facts.md)
 - [Ranking tables](ranking-tables.md)
-- [Weekly rank changes and record streaks](weekly-rank-changes-and-record-streaks.md)
 
 The canonical architecture document gives the shared contracts and naming rules.
 These files add the stat-specific operating record:

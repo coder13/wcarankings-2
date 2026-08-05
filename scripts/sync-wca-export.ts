@@ -6,11 +6,6 @@ import { access, mkdir, rename, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import mysql from "mysql2/promise";
-import type {
-  Connection,
-  ResultSetHeader,
-  RowDataPacket,
-} from "mysql2/promise";
 import * as unzipper from "unzipper";
 import {
   dropManagedObject,
@@ -24,8 +19,6 @@ import { refreshSystemLists } from "./lib/system-lists.ts";
 import { resolveWcaExport } from "./lib/wca-export.ts";
 import type {
   ExportMetadataRow,
-  ImportCoverageRow,
-  ImportRunFields,
   MariaDbImportResult,
   SyncWcaOptions,
   WcaExportMetadata,
@@ -184,126 +177,6 @@ async function dropRankingViews(): Promise<void> {
   }
 }
 
-function now(): Date {
-  return new Date();
-}
-
-function elapsedMilliseconds(startedAt: Date, completedAt = now()): number {
-  return Math.max(0, completedAt.getTime() - startedAt.getTime());
-}
-
-function safeFailureMessage(error: unknown): string {
-  return String(error instanceof Error ? error.message : error)
-    .replace(/mysql:\/\/[^\s]+/gi, "mysql://[redacted]")
-    .replace(/MYSQL_PWD\s*[=:]\s*[^\s]+/gi, "MYSQL_PWD=[redacted]")
-    .slice(0, 2000);
-}
-
-async function updateImportRun(
-  id: number,
-  fields: ImportRunFields,
-): Promise<void> {
-  const connection = await mysql.createConnection(
-    databaseOptions(undefined, {
-      databaseName: process.env.DATABASE_NAME_OVERRIDE,
-    }),
-  );
-  try {
-    const entries = Object.entries(fields);
-    if (entries.length === 0) return;
-    const values = entries.map(([, value]) => value);
-    const assignments = entries.map(([key]) => `\`${key}\` = ?`).join(", ");
-    await connection.query(
-      `UPDATE import_runs SET ${assignments} WHERE id = ?`,
-      [...values, id],
-    );
-  } finally {
-    await connection.end();
-  }
-}
-
-async function createImportRun(
-  latest: WcaExportMetadata,
-  startedAt: Date,
-): Promise<number> {
-  const connection = await mysql.createConnection(
-    databaseOptions(undefined, {
-      databaseName: process.env.DATABASE_NAME_OVERRIDE,
-    }),
-  );
-  try {
-    const [result] = await connection.query<ResultSetHeader>(
-      `INSERT INTO import_runs
-        (export_date, export_format_version, export_url, status, started_at, fetch_started_at)
-       VALUES (?, ?, ?, 'running', ?, ?)`,
-      [
-        String(latest.exportDate).slice(0, 10),
-        latest.version,
-        latest.sqlUrl || null,
-        startedAt,
-        startedAt,
-      ],
-    );
-    return result.insertId;
-  } finally {
-    await connection.end();
-  }
-}
-
-async function collectImportCounts(): Promise<ImportRunFields> {
-  const connection = await mysql.createConnection(
-    databaseOptions(undefined, {
-      databaseName: process.env.DATABASE_NAME_OVERRIDE,
-    }),
-  );
-  try {
-    const [coverage] = await connection.query<ImportCoverageRow[]>(`
-      SELECT
-        (SELECT COUNT(*) FROM persons WHERE sub_id = 1) AS people,
-        (SELECT COUNT(*) FROM results) AS results,
-        (SELECT COUNT(*) FROM ranking_entries_single_staging) +
-          (SELECT COUNT(*) FROM ranking_entries_average_staging) AS rankings,
-        (SELECT COUNT(*) FROM result_rankings_single_staging) +
-          (SELECT COUNT(*) FROM result_rankings_average_staging) AS result_entries,
-        (SELECT COUNT(*) FROM (
-          SELECT event_id FROM ranking_entries_single_staging
-          UNION
-          SELECT event_id FROM ranking_entries_average_staging
-        ) AS ranking_events) AS events,
-        (SELECT COUNT(*) FROM (
-          SELECT country_id FROM ranking_entries_single_staging WHERE country_id <> ''
-          UNION
-          SELECT country_id FROM ranking_entries_average_staging WHERE country_id <> ''
-        ) AS ranking_regions) AS regions,
-        (SELECT COUNT(*) FROM ranking_counts_staging) AS aggregates,
-        (SELECT COUNT(*) FROM result_ranking_counts_staging) AS result_aggregates
-    `);
-    return {
-      source_person_count: Number(coverage[0]?.people ?? 0),
-      source_result_count: Number(coverage[0]?.results ?? 0),
-      published_ranking_count: Number(coverage[0]?.rankings ?? 0),
-      published_result_count: Number(coverage[0]?.result_entries ?? 0),
-      event_count: Number(coverage[0]?.events ?? 0),
-      region_count: Number(coverage[0]?.regions ?? 0),
-      aggregate_count: Number(coverage[0]?.aggregates ?? 0),
-      result_aggregate_count: Number(coverage[0]?.result_aggregates ?? 0),
-    };
-  } finally {
-    await connection.end();
-  }
-}
-
-async function tableExists(
-  connection: Connection,
-  name: string,
-): Promise<boolean> {
-  const [rows] = await connection.query<RowDataPacket[]>(
-    "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
-    [name],
-  );
-  return rows.length > 0;
-}
-
 async function promoteRankings(): Promise<void> {
   const connection = await mysql.createConnection(
     databaseOptions(undefined, {
@@ -311,18 +184,7 @@ async function promoteRankings(): Promise<void> {
     }),
   );
   try {
-    const hasLegacyProjection = await tableExists(
-      connection,
-      "ranking_entries",
-    );
-    if (hasLegacyProjection) {
-      await dropManagedObject(connection, "ranking_entries_legacy_previous");
-      await connection.query(
-        "RENAME TABLE ranking_entries TO ranking_entries_legacy_previous",
-      );
-    }
     await publishProjectionTables(connection);
-    await dropManagedObject(connection, "ranking_entries_legacy_previous");
   } finally {
     await connection.end();
   }
@@ -488,84 +350,38 @@ async function main(): Promise<void> {
     return;
   }
 
-  const startedAt = now();
-  const runId = await createImportRun(latest, startedAt);
-  try {
-    await updateImportRun(runId, { fetch_started_at: startedAt });
-    const zipPath = await getCachedExport(latest, options);
-    await dropRankingViews();
-    process.stdout.write("Importing WCA SQL tables into MariaDB…\n");
-    await importSqlExport(zipPath);
-    if (options.rawOnly) {
-      await refreshRawPersonLookupIndex();
-      const completedAt = now();
-      await writeExportMetadata(latest);
-      await updateImportRun(runId, {
-        status: "succeeded",
-        projection_swap_status: "not_applicable",
-        completed_at: completedAt,
-        duration_ms: elapsedMilliseconds(startedAt, completedAt),
-      });
-      process.stdout.write(
-        `WCA raw tables are current through ${latest.exportDate}; projection publication skipped by --raw-only.\n`,
-      );
-      return;
-    }
-    const projectionBuildStartedAt = now();
-    await updateImportRun(runId, {
-      fetched_at: projectionBuildStartedAt,
-      projection_build_started_at: projectionBuildStartedAt,
-      projection_swap_status: "building",
-    });
-    process.stdout.write("Refreshing staging ranking projections…\n");
-    await refreshRankingsSchema(options.selectedProjectionNames);
-    const counts = await collectImportCounts();
-    const projectionBuiltAt = now();
-    await updateImportRun(runId, {
-      ...counts,
-      projection_built_at: projectionBuiltAt,
-      projection_build_duration_ms: elapsedMilliseconds(
-        projectionBuildStartedAt,
-        projectionBuiltAt,
-      ),
-      projection_swap_status: "swapping",
-    });
-    await promoteRankings();
+  const zipPath = await getCachedExport(latest, options);
+  await dropRankingViews();
+  process.stdout.write("Importing WCA SQL tables into MariaDB…\n");
+  await importSqlExport(zipPath);
+  if (options.rawOnly) {
+    await refreshRawPersonLookupIndex();
     await writeExportMetadata(latest);
-    const systemListConnection = await mysql.createConnection(
-      databaseOptions(undefined, {
-        databaseName: process.env.DATABASE_NAME_OVERRIDE,
-      }),
-    );
-    try {
-      await refreshSystemLists(systemListConnection);
-      await refreshBoardList(systemListConnection);
-      await refreshDelegatesList(systemListConnection);
-      await enqueueAllListRankingRebuilds(systemListConnection);
-    } finally {
-      await systemListConnection.end();
-    }
-    const completedAt = now();
-    await updateImportRun(runId, {
-      status: "succeeded",
-      projection_swap_status: "published",
-      completed_at: completedAt,
-      duration_ms: elapsedMilliseconds(startedAt, completedAt),
-    });
     process.stdout.write(
-      `WCA rankings are current through ${latest.exportDate}.\n`,
+      `WCA raw tables are current through ${latest.exportDate}; projection publication skipped by --raw-only.\n`,
     );
-  } catch (error) {
-    const completedAt = now();
-    await updateImportRun(runId, {
-      status: "failed",
-      projection_swap_status: "failed",
-      completed_at: completedAt,
-      duration_ms: elapsedMilliseconds(startedAt, completedAt),
-      failure_message: safeFailureMessage(error),
-    });
-    throw error;
+    return;
   }
+  process.stdout.write("Refreshing staging ranking projections…\n");
+  await refreshRankingsSchema(options.selectedProjectionNames);
+  await promoteRankings();
+  await writeExportMetadata(latest);
+  const systemListConnection = await mysql.createConnection(
+    databaseOptions(undefined, {
+      databaseName: process.env.DATABASE_NAME_OVERRIDE,
+    }),
+  );
+  try {
+    await refreshSystemLists(systemListConnection);
+    await refreshBoardList(systemListConnection);
+    await refreshDelegatesList(systemListConnection);
+    await enqueueAllListRankingRebuilds(systemListConnection);
+  } finally {
+    await systemListConnection.end();
+  }
+  process.stdout.write(
+    `WCA rankings are current through ${latest.exportDate}.\n`,
+  );
 }
 
 if (import.meta.main) {

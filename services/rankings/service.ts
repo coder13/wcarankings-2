@@ -32,7 +32,6 @@ import {
   rankingTable,
   yearlyRankingTable,
 } from "@/services/rankings/helpers";
-import { getRankingEntryEnhancements } from "@/services/rankings/capabilities";
 import {
   filteredPersonMetricQuery,
   filteredYearlyRankingPageQuery,
@@ -60,22 +59,28 @@ import type { RankingsMetadata } from "@/services/rankings/types";
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const MAX_SEARCH_RESULTS = 500;
 
-function toRankingEntry(
-  row: RankingRow,
-  scope: QueryInput["scope"],
-): RankingEntry {
-  const rankDelta =
-    scope === "continent"
-      ? row.continent_rank_delta
-      : scope === "country"
-        ? row.country_rank_delta
-        : row.world_rank_delta;
-  const rankDeltaState =
-    scope === "continent"
-      ? row.continent_rank_delta_state
-      : scope === "country"
-        ? row.country_rank_delta_state
-        : row.world_rank_delta_state;
+interface GenderPersonColumns {
+  positionColumn: "world_position" | "continent_position" | "country_position";
+  regionColumn: "continent_id" | "country_id" | null;
+}
+
+function genderPersonColumns(scope: QueryInput["scope"]): GenderPersonColumns {
+  if (scope === "continent") {
+    return {
+      positionColumn: "continent_position",
+      regionColumn: "continent_id",
+    };
+  }
+  if (scope === "country") {
+    return {
+      positionColumn: "country_position",
+      regionColumn: "country_id",
+    };
+  }
+  return { positionColumn: "world_position", regionColumn: null };
+}
+
+function toRankingEntry(row: RankingRow): RankingEntry {
   return {
     rank: Number(row.rank),
     subRank: Number(row.sub_rank),
@@ -94,13 +99,6 @@ function toRankingEntry(
       isCountryRecord: Number(row.is_country_record) === 1,
       continentId: row.continent_id,
     }),
-    rankDelta:
-      rankDelta === null || rankDelta === undefined ? null : Number(rankDelta),
-    rankDeltaState: rankDeltaState ?? null,
-    recordStreakWeeks:
-      row.record_streak_weeks === null || row.record_streak_weeks === undefined
-        ? null
-        : Number(row.record_streak_weeks),
   };
 }
 
@@ -146,7 +144,7 @@ function normalPageResponse(
           input.scope,
           input.regionId,
         ));
-  const entries = rows.map((row) => toRankingEntry(row, input.scope));
+  const entries = rows.map(toRankingEntry);
   const startPosition = Math.min(Math.max(0, input.startRank - 1), total);
   const hasMore = input.startRank + entries.length <= total;
   return {
@@ -207,7 +205,6 @@ async function queryGenderPage(input: QueryInput) {
   if (input.year === null && !input.search && !input.locate) {
     return queryGenderPersonPage(input);
   }
-  const enhancements = await getRankingEntryEnhancements();
   const source = rankingTable(input.type);
   const { region } = rankingShape(input.scope);
   const baseConditions = ["ranking.event_id = ?", "ranking.world_rank > 0"];
@@ -263,17 +260,13 @@ async function queryGenderPage(input: QueryInput) {
       source,
       baseConditions,
       conditions,
-      selectColumns: rankingColumns(
-        "filtered_rank",
-        "filtered_position",
-        enhancements,
-      ),
+      selectColumns: rankingColumns("filtered_rank", "filtered_position"),
     }),
     [...values, resultLimit],
   );
   const entries = result.rows
     .slice(0, input.locate ? 1 : input.limit)
-    .map((row) => toRankingEntry(row, input.scope));
+    .map(toRankingEntry);
   if (input.locate)
     return {
       data: { located: entries[0] ?? null },
@@ -302,18 +295,7 @@ async function queryGenderPage(input: QueryInput) {
 }
 
 async function queryGenderPersonPage(input: QueryInput) {
-  const positionColumn =
-    input.scope === "continent"
-      ? "continent_position"
-      : input.scope === "country"
-        ? "country_position"
-        : "world_position";
-  const regionColumn =
-    input.scope === "continent"
-      ? "continent_id"
-      : input.scope === "country"
-        ? "country_id"
-        : null;
+  const { positionColumn, regionColumn } = genderPersonColumns(input.scope);
   const recordColumn =
     input.type === "average"
       ? "facts.regional_average_record"
@@ -367,11 +349,9 @@ async function queryGenderPersonPage(input: QueryInput) {
       rank: filteredRank,
       sub_rank: input.startRank + index,
       best: Number(row.result_value),
-    } as unknown as RankingRow;
+    };
   });
-  const entries = rankedRows
-    .slice(0, input.limit)
-    .map((row) => toRankingEntry(row, input.scope));
+  const entries = rankedRows.slice(0, input.limit).map(toRankingEntry);
   return {
     data: {
       entries,
@@ -443,13 +423,12 @@ async function queryNormalPage(
       returnedRows: result.rows.length,
     };
   }
-  const enhancements = await getRankingEntryEnhancements();
   const { rank, subRank, conditions, values } = filters(input);
   const pageValues = [...values, input.startRank, input.startRank + pageSize];
   const result = await query<RankingRow>(
     rankingPageQuery(
       rankingTable(input.type),
-      rankingColumns(rank, subRank, enhancements),
+      rankingColumns(rank, subRank),
       conditions,
       subRank,
     ),
@@ -476,7 +455,7 @@ async function queryMysql(input: QueryInput) {
     : rankingTable(input.type);
   const selectColumns = yearly
     ? yearlyColumns(input.type)
-    : rankingColumns(rank, subRank, await getRankingEntryEnhancements());
+    : rankingColumns(rank, subRank);
   let from = `FROM ${source} ranking`;
   if (yearly) {
     from = `FROM ${source} ranking LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1 LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id LEFT JOIN countries country ON country.id = facts.person_country_id LEFT JOIN competitions competition ON competition.id = facts.competition_id`;
@@ -501,9 +480,7 @@ async function queryMysql(input: QueryInput) {
     );
     return {
       data: {
-        located: result.rows[0]
-          ? toRankingEntry(result.rows[0], input.scope)
-          : null,
+        located: result.rows[0] ? toRankingEntry(result.rows[0]) : null,
       },
       timings: result.timings,
       queryCount: 1,
@@ -541,7 +518,7 @@ async function queryMysql(input: QueryInput) {
       }),
       [...values, ...people.personIds, input.searchLimit],
     );
-    const entries = result.rows.map((row) => toRankingEntry(row, input.scope));
+    const entries = result.rows.map(toRankingEntry);
     return {
       data: {
         entries,
@@ -581,9 +558,7 @@ async function queryMysql(input: QueryInput) {
     }),
     pageValues,
   );
-  const entries = result.rows
-    .slice(0, input.limit)
-    .map((row) => toRankingEntry(row, input.scope));
+  const entries = result.rows.slice(0, input.limit).map(toRankingEntry);
   return {
     data: {
       entries,
