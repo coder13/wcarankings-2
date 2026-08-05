@@ -39,6 +39,11 @@ import type { GenderFilter } from "@/lib/wca";
 import { i18n } from "@/lib/i18n";
 import { GenderPicker } from "../GenderPicker/GenderPicker";
 import { useWcaProfile } from "../Auth/useWcaProfile";
+import {
+  InputContainer,
+  InputContainerItem,
+} from "../InputContainer/InputContainer";
+import { ResultTypeToggle } from "./ResultTypeToggle";
 
 const railLayoutTransition = {
   type: "spring",
@@ -319,36 +324,45 @@ export function RankingsControlsRail<T extends EventPickerOption>({
     listAddAction,
     regionDisabled = false,
   } = controls;
-  const nextType = rankingType === "single" ? "average" : "single";
   let primaryControl = null;
   if (showEventPicker) {
     primaryControl = (
-      <EventPicker
-        event={event}
-        options={eventOptions}
-        leadingOptions={eventLeadingOptions}
-        additionalOptions={additionalEventOptions}
-        onChange={onEventChange}
-        onTriggerReady={onEventPickerTrigger}
-      />
+      <InputContainerItem
+        className="Jump-eventControl"
+        width="var(--rail-event-width)"
+      >
+        <EventPicker
+          event={event}
+          options={eventOptions}
+          leadingOptions={eventLeadingOptions}
+          additionalOptions={additionalEventOptions}
+          onChange={onEventChange}
+          onTriggerReady={onEventPickerTrigger}
+        />
+      </InputContainerItem>
     );
   } else if (hemisphere) {
     const nextHemisphere = hemisphere === "north" ? "south" : "north";
     primaryControl = (
-      <button
-        className="Jump-latitudeToggle"
-        type="button"
-        data-hemisphere={hemisphere}
-        aria-label={t("rankingsRail.controls.latitudeSwitch", {
-          hemisphere,
-          nextHemisphere,
-        })}
-        title={t("rankingsRail.controls.latitudeFirst", { hemisphere })}
-        onClick={() => onHemisphereChange?.(nextHemisphere)}
+      <InputContainerItem
+        className="Jump-eventControl"
+        width="var(--rail-event-width)"
       >
-        <CompassIcon />
-        <span>{t(`rankingsRail.controls.${hemisphere}`)}</span>
-      </button>
+        <button
+          className="Jump-latitudeToggle"
+          type="button"
+          data-hemisphere={hemisphere}
+          aria-label={t("rankingsRail.controls.latitudeSwitch", {
+            hemisphere,
+            nextHemisphere,
+          })}
+          title={t("rankingsRail.controls.latitudeFirst", { hemisphere })}
+          onClick={() => onHemisphereChange?.(nextHemisphere)}
+        >
+          <CompassIcon />
+          <span>{t(`rankingsRail.controls.${hemisphere}`)}</span>
+        </button>
+      </InputContainerItem>
     );
   }
   return (
@@ -357,58 +371,70 @@ export function RankingsControlsRail<T extends EventPickerOption>({
       direction="up"
       compactResultType={compactResultType}
     >
-      <div className="Jump-railSettings">
+      <InputContainer className="Jump-railSettings">
         {primaryControl}
         {showResultType && (
-          <div className="Jump-resultTypeControl">
-            <button
-              className="Jump-resultTypeToggle"
-              type="button"
+          <InputContainerItem
+            className="Jump-resultTypeControl"
+            width="var(--input-result-type-width)"
+          >
+            <ResultTypeToggle
+              value={rankingType}
               disabled={event.id === "333mbf"}
-              aria-label={t("rankingsRail.controls.switchToRankingType", {
-                rankingType: nextType,
-              })}
-              onClick={() => onRankingTypeChange(nextType)}
-            >
-              {t(`rankingsRail.controls.${rankingType}`)}
-            </button>
-          </div>
+              onChange={onRankingTypeChange}
+            />
+          </InputContainerItem>
         )}
         {showGender && (
-          <GenderPicker
-            className="Jump-genderPicker"
-            value={gender}
-            onChange={onGenderChange}
-          />
+          <InputContainerItem
+            className="Jump-genderControl"
+            width="var(--rail-gender-width)"
+          >
+            <GenderPicker
+              className="Jump-genderPicker"
+              value={gender}
+              onChange={onGenderChange}
+            />
+          </InputContainerItem>
         )}
-        <RegionPicker
-          className="Jump-regionPicker"
-          options={regions}
-          selected={regionSelection}
-          onChange={onRegionChange}
-          disabled={regionDisabled}
-        />
-        {period && (
-          <TextDropdown
-            options={period.options}
-            value={period.value}
-            onChange={period.onChange}
-            ariaLabel={
-              period.ariaLabel ?? t("rankingsRail.controls.personRankingPeriod")
-            }
-            className="personYearDropdown Jump-periodPicker"
+        <InputContainerItem className="Jump-regionControl">
+          <RegionPicker
+            className="Jump-regionPicker"
+            options={regions}
+            selected={regionSelection}
+            onChange={onRegionChange}
+            disabled={regionDisabled}
           />
+        </InputContainerItem>
+        {period && (
+          <InputContainerItem
+            className="Jump-periodControl"
+            width="var(--rail-period-width)"
+          >
+            <TextDropdown
+              options={period.options}
+              value={period.value}
+              onChange={period.onChange}
+              ariaLabel={
+                period.ariaLabel ??
+                t("rankingsRail.controls.personRankingPeriod")
+              }
+              className="personYearDropdown Jump-periodPicker"
+            />
+          </InputContainerItem>
         )}
         {listAddAction && (
-          <button
-            className="Jump-listAddButton"
-            type="button"
-            onClick={listAddAction}
-          >
-            {t("rankingsRail.controls.addToList")}
-          </button>
+          <InputContainerItem>
+            <button
+              className="Jump-listAddButton"
+              type="button"
+              onClick={listAddAction}
+            >
+              {t("rankingsRail.controls.addToList")}
+            </button>
+          </InputContainerItem>
         )}
-      </div>
+      </InputContainer>
       {search && <RailSearch model={search} />}
     </RankingsRail>
   );

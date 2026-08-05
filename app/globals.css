@@ -1,4 +1,5 @@
 @import "../components/EventPicker/cubing-icons.css";
+@import "../components/InputContainer/InputContainer.css";
 @import "./theme.css";
 @import "../components/EventPicker/EventPicker.css";
 @import "../components/Dropdown/Dropdown.css";
