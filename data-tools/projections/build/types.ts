@@ -28,6 +28,41 @@ export interface ProjectionBuildMatrix {
   include: ProjectionBuildMatrixEntry[];
 }
 
+export interface ProjectionTask {
+  dependencies: readonly string[];
+  estimatedDurationMs: number;
+  name: string;
+  run(connection: ProjectionConnection): Promise<unknown> | unknown;
+}
+
+export interface ProjectionTaskPlan {
+  satisfiedTaskNames: string[];
+  tasks: readonly ProjectionTask[];
+}
+
+export interface ProjectionTaskExecutionResult {
+  name: string;
+  result: unknown;
+}
+
+export interface CompletedProjectionTask {
+  result: unknown;
+  task: ProjectionTask;
+}
+
+export interface FailedProjectionTask {
+  error: unknown;
+  task: ProjectionTask;
+}
+
+export type ProjectionTaskOutcome =
+  CompletedProjectionTask | FailedProjectionTask;
+
+export interface RunningProjectionTask {
+  promise: Promise<ProjectionTaskOutcome>;
+  task: ProjectionTask;
+}
+
 export interface ProjectionBuildTiming {
   durationMs: number;
   name: string;
@@ -55,7 +90,13 @@ export interface ProjectionRegistryEntry {
 
 export type ProjectionConnectionFactory = () => Promise<ProjectionConnection>;
 
-export interface RefreshMysqlSchemaOptions {
+export interface ProjectionTaskExecutionOptions {
+  concurrency?: number;
+  connection: ProjectionConnection;
+  createConnection?: ProjectionConnectionFactory;
+}
+
+export interface BuildProjectionTablesOptions {
   concurrency?: number | string;
   createConnection?: ProjectionConnectionFactory;
   includeRankingTables?: boolean;

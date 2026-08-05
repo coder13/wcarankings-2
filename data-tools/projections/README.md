@@ -33,7 +33,7 @@ data-tools/
 ├── projection-catalog/  projection definitions, groups, and table ownership
 └── projections/
     ├── artifacts/       group manifests and the final release coordinate
-    ├── build/           plans, SQL execution, scheduling, and progress
+    ├── build/           build planning, database execution, and progress
     ├── deployment/      deployment planning and generation activation
     ├── release/         fingerprints and release planning
     ├── shared/          database types and shared database operations
@@ -52,6 +52,7 @@ import these domain functions directly.
 | Release plan    | `projectionReleasePlan`       | Export identity, active generation state, selected groups, and available artifacts | `ProjectionReleasePlan` with active, cached, hydrate, build, and release groups                                       | Formatted JSON on stdout |
 | Build matrix    | `createProjectionBuildMatrix` | Selected groups and wave number                                                    | `ProjectionBuildMatrix` for the GitHub Actions matrix                                                                 | JSON on stdout           |
 | Build plan      | `projectionBuildPlan`         | One build group and groups that are already hydrated                               | `ProjectionBuildPlan` with projection names, satisfied dependencies, table ownership, and the ranking-table flag      | Formatted JSON on stdout |
+| Task plan       | `createProjectionTaskPlan`    | Projection tasks and task names that are already satisfied                         | `ProjectionTaskPlan` with dependency-ordered tasks after it validates task names, dependencies, and cycles            | None                     |
 | Deployment plan | `planProjectionDeployment`    | Immutable environment values and the downloaded release directory                  | `ProjectionDeploymentPlan` with `hasRaw`, `normalizedBuildExport`, and `normalizedProductionExport`                   | JSON on stdout           |
 
 The semantic planner answers one question: which projection definitions changed?
@@ -75,11 +76,16 @@ group set, export identity, source commit, server compatibility, and raw
 requirement match. It returns the small execution plan used by
 `deploy/projection-release.sh`.
 
+The task planner is internal to one database build. It returns executable tasks
+and the names that are already satisfied. It does not open a database
+connection, run SQL, or print output. The builder consumes this plan.
+
 ## Build stages
 
 | Stage                     | Helper                              | Database effect                                                                                                    | Return value                                                                                 |
 | ------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Build projections         | `refreshMysqlSchema`                | Creates the selected projection tables                                                                             | `Promise<void>`. The build writes progress messages.                                         |
+| Execute task plan         | `executeProjectionTaskPlan`         | Runs planned tasks with bounded concurrency                                                                        | `ProjectionTaskExecutionResult[]` with each task name and result                             |
+| Build projection tables   | `buildProjectionTables`             | Plans and creates the selected projection tables                                                                   | `Promise<void>`. The build writes `[projection-build]` progress messages to stdout.          |
 | Prepare transfer          | `prepareProjectionTransfer`         | Renames owned tables with a `_transfer` suffix, records secondary indexes, and removes those indexes for transport | `PrepareProjectionTransferResult`                                                            |
 | Export transfer           | `exportProjectionTransfer`          | None                                                                                                               | `ExportProjectionTransferResult`. The helper also writes the archive and its metadata.       |
 | Create release manifest   | `createProjectionReleaseManifest`   | None                                                                                                               | `CreateProjectionReleaseManifestResult`. The helper also writes `projection-release.json`.   |
@@ -88,6 +94,10 @@ requirement match. It returns the small execution plan used by
 `data-tools/projection-catalog/registry.ts` is the only job registry.
 `data-tools/projection-catalog/groups.ts` owns release groups and dependencies.
 `data-tools/projection-catalog/tables.ts` owns the published table lists.
+
+`build/plan.ts` owns dependency validation. `build/builder.ts` owns database
+connections, task readiness, concurrency, execution, and worker cleanup. These
+two files contain all build control.
 
 ## Deployment stages
 

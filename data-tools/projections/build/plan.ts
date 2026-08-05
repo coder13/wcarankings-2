@@ -4,7 +4,11 @@ import {
   SEMANTIC_PROJECTION_DEFINITIONS,
 } from "../../projection-catalog/tables.ts";
 import type { SemanticProjectionDefinition } from "../../projection-catalog/tables.ts";
-import type { ProjectionBuildPlan } from "./types.ts";
+import type {
+  ProjectionBuildPlan,
+  ProjectionTask,
+  ProjectionTaskPlan,
+} from "./types.ts";
 
 export function projectionNamesForRefresh(
   selectedNames?: readonly string[],
@@ -43,6 +47,47 @@ export function projectionDependencyClosure(
 
   for (const name of selectedNames) visit(name);
   return ordered;
+}
+
+export function createProjectionTaskPlan(
+  tasks: readonly ProjectionTask[],
+  satisfiedTaskNames: readonly string[] = [],
+): ProjectionTaskPlan {
+  const tasksByName = new Map(tasks.map((task) => [task.name, task]));
+  if (tasksByName.size !== tasks.length) {
+    throw new Error("Projection task names must be unique");
+  }
+  const satisfied = new Set(["raw-wca", ...satisfiedTaskNames]);
+  const ordered: ProjectionTask[] = [];
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  function visit(task: ProjectionTask): void {
+    if (visited.has(task.name)) return;
+    if (visiting.has(task.name)) {
+      throw new Error(`Projection task dependency cycle at ${task.name}`);
+    }
+    visiting.add(task.name);
+    for (const dependencyName of task.dependencies) {
+      if (satisfied.has(dependencyName)) continue;
+      const dependency = tasksByName.get(dependencyName);
+      if (!dependency) {
+        throw new Error(
+          `Unknown task dependency ${dependencyName} for ${task.name}`,
+        );
+      }
+      visit(dependency);
+    }
+    visiting.delete(task.name);
+    visited.add(task.name);
+    ordered.push(task);
+  }
+
+  for (const task of tasks) visit(task);
+  return {
+    tasks: ordered,
+    satisfiedTaskNames: [...satisfied],
+  };
 }
 
 export function projectionBuildPlan(

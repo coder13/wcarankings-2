@@ -16,7 +16,7 @@ import {
   dropManagedObject,
   ensureWcaPersonLookupIndex,
 } from "../data-tools/projections/shared/database.ts";
-import { refreshMysqlSchema } from "../data-tools/projections/build/runner.ts";
+import { buildProjectionTables } from "../data-tools/projections/build/builder.ts";
 import { publishProjectionTables } from "../data-tools/projections/build/publish.ts";
 import { enqueueAllListRankingRebuilds } from "./lib/list-ranking-jobs.ts";
 import { refreshBoardList, refreshDelegatesList } from "./lib/board-lists.ts";
@@ -421,7 +421,7 @@ async function refreshRankingsSchema(
     }),
   );
   try {
-    await refreshMysqlSchema(connection, {
+    await buildProjectionTables(connection, {
       projectionSuffix: "_staging",
       projectionNames:
         selectedProjectionNames.length > 0

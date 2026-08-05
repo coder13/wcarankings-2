@@ -12,17 +12,25 @@ import {
   createRankingSource,
   rankingTableTasks,
 } from "./ranking-tables.ts";
-import { runDependencyAwareTasks } from "./scheduler.ts";
 import {
+  createProjectionTaskPlan,
   projectionDependencyClosure,
   projectionNamesForRefresh,
 } from "./plan.ts";
 import { countProjectionTables, PROJECTION_REGISTRY } from "./registry.ts";
 import type {
+  BuildProjectionTablesOptions,
   ProjectionBuildTiming,
   ProjectionRegistryEntry,
-  RefreshMysqlSchemaOptions,
+  ProjectionTask,
+  ProjectionTaskExecutionOptions,
+  ProjectionTaskExecutionResult,
+  ProjectionTaskOutcome,
+  ProjectionTaskPlan,
+  RunningProjectionTask,
 } from "./types.ts";
+
+const LONG_TASK_THRESHOLD_MS = 60_000;
 
 function orderedProjections(
   selectedNames: readonly string[] = DEFAULT_PROJECTION_NAMES,
@@ -81,9 +89,125 @@ export function projectionConcurrency(value?: number | string): number {
   return Number.isFinite(parsed) && parsed > 1 ? Math.floor(parsed) : 1;
 }
 
-export async function refreshMysqlSchema(
+export async function executeProjectionTaskPlan(
+  plan: ProjectionTaskPlan,
+  options: ProjectionTaskExecutionOptions,
+): Promise<ProjectionTaskExecutionResult[]> {
+  const { tasks, satisfiedTaskNames } = plan;
+  const { connection, createConnection, concurrency = 1 } = options;
+  if (!createConnection || concurrency === 1 || tasks.length <= 1) {
+    const results: ProjectionTaskExecutionResult[] = [];
+    const completed = new Set(satisfiedTaskNames);
+    const pending = [...tasks];
+    while (pending.length > 0) {
+      const index = pending.findIndex((task) =>
+        task.dependencies.every((dependency) => completed.has(dependency)),
+      );
+      if (index < 0) {
+        throw new Error(
+          `No projection task is ready among: ${pending.map((task) => task.name).join(", ")}`,
+        );
+      }
+      const task = pending.splice(index, 1)[0];
+      if (!task) throw new Error("Ready projection task is missing");
+      results.push({ name: task.name, result: await task.run(connection) });
+      completed.add(task.name);
+    }
+    return results;
+  }
+  const createWorkerConnection = createConnection;
+
+  const pending = [...tasks];
+  const running = new Map<string, RunningProjectionTask>();
+  const completed = new Set(satisfiedTaskNames);
+  const results = new Map<string, unknown>();
+  let failure: unknown;
+
+  async function runTask(task: ProjectionTask): Promise<unknown> {
+    const workerConnection = await createWorkerConnection();
+    try {
+      return await task.run(workerConnection);
+    } finally {
+      await workerConnection.end();
+    }
+  }
+
+  function dependenciesComplete(task: ProjectionTask): boolean {
+    return task.dependencies.every((dependency) => completed.has(dependency));
+  }
+
+  function isLongTask(task: ProjectionTask): boolean {
+    return task.estimatedDurationMs >= LONG_TASK_THRESHOLD_MS;
+  }
+
+  function nextReadyTask(): ProjectionTask | undefined {
+    const ready = pending.filter(dependenciesComplete);
+    if (ready.length === 0) return undefined;
+    const longTaskRunning = [...running.values()].some((entry) =>
+      isLongTask(entry.task),
+    );
+    const shortReady = ready.filter((task) => !isLongTask(task));
+    const candidates =
+      longTaskRunning && shortReady.length > 0 ? shortReady : ready;
+    return candidates.reduce<ProjectionTask | undefined>((selected, task) => {
+      if (!selected) return task;
+      if (longTaskRunning && shortReady.length > 0) {
+        return task.estimatedDurationMs < selected.estimatedDurationMs
+          ? task
+          : selected;
+      }
+      return task.estimatedDurationMs > selected.estimatedDurationMs
+        ? task
+        : selected;
+    }, undefined);
+  }
+
+  function startReadyTasks(): void {
+    while (running.size < concurrency) {
+      const task = nextReadyTask();
+      if (!task) break;
+      pending.splice(pending.indexOf(task), 1);
+      const promise: Promise<ProjectionTaskOutcome> = runTask(task)
+        .then((result) => ({ task, result }))
+        .catch((error: unknown) => ({ task, error }));
+      running.set(task.name, { task, promise });
+    }
+  }
+
+  while ((pending.length > 0 || running.size > 0) && failure === undefined) {
+    startReadyTasks();
+    if (running.size === 0) {
+      throw new Error(
+        `No projection task is ready among: ${pending.map((task) => task.name).join(", ")}`,
+      );
+    }
+    const outcome = await Promise.race(
+      [...running.values()].map((entry) => entry.promise),
+    );
+    running.delete(outcome.task.name);
+    if ("error" in outcome) {
+      failure = outcome.error;
+      break;
+    }
+    completed.add(outcome.task.name);
+    results.set(outcome.task.name, outcome.result);
+  }
+
+  if (running.size > 0) {
+    await Promise.allSettled(
+      [...running.values()].map((entry) => entry.promise),
+    );
+  }
+  if (failure !== undefined) throw failure;
+  return tasks.map((task) => ({
+    name: task.name,
+    result: results.get(task.name),
+  }));
+}
+
+export async function buildProjectionTables(
   connection: ProjectionConnection,
-  options: RefreshMysqlSchemaOptions = {},
+  options: BuildProjectionTablesOptions = {},
 ): Promise<void> {
   const {
     projectionSuffix = "",
@@ -165,13 +289,13 @@ export async function refreshMysqlSchema(
         tableProgress,
       })
     : [];
-  await runDependencyAwareTasks([...coreRankingTasks, ...semanticTasks], {
+  const taskPlan = createProjectionTaskPlan(
+    [...coreRankingTasks, ...semanticTasks],
+    satisfiedProjectionNames.map((name) => `projection:${name}`),
+  );
+  await executeProjectionTaskPlan(taskPlan, {
     connection,
     createConnection,
     concurrency: projectionConcurrency(concurrency),
-    satisfiedDependencies: [
-      "raw-wca",
-      ...satisfiedProjectionNames.map((name) => `projection:${name}`),
-    ],
   });
 }

@@ -1,11 +1,11 @@
 import { databaseOptions } from "./lib/database.ts";
 import mysql from "mysql2/promise";
-import { refreshMysqlSchema } from "../data-tools/projections/build/runner.ts";
+import { buildProjectionTables } from "../data-tools/projections/build/builder.ts";
 
 async function main(): Promise<void> {
   const connection = await mysql.createConnection(databaseOptions());
   try {
-    await refreshMysqlSchema(connection, {
+    await buildProjectionTables(connection, {
       createConnection: () => mysql.createConnection(databaseOptions()),
     });
     process.stdout.write("Ranking projections refreshed.\n");

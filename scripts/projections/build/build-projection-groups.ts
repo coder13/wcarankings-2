@@ -1,7 +1,7 @@
 import mysql from "mysql2/promise";
 import { argumentList, argumentValue } from "../../lib/arguments.ts";
 import { databaseOptions } from "../../lib/database.ts";
-import { refreshMysqlSchema } from "../../../data-tools/projections/build/runner.ts";
+import { buildProjectionTables } from "../../../data-tools/projections/build/builder.ts";
 
 async function main(): Promise<void> {
   const projectionNames = argumentList("projection-names");
@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   const options = databaseOptions();
   const connection = await mysql.createConnection(options);
   try {
-    await refreshMysqlSchema(connection, {
+    await buildProjectionTables(connection, {
       projectionNames: selectedProjectionNames,
       satisfiedProjectionNames,
       includeRankingTables,

@@ -11,11 +11,14 @@ import { DEFAULT_PROJECTION_NAMES } from "../data-tools/projection-catalog/table
 import { PROJECTION_REGISTRY } from "../data-tools/projections/build/registry.ts";
 import { createTableProgress } from "../data-tools/projections/build/progress.ts";
 import {
+  createProjectionTaskPlan,
   projectionBuildPlan,
   projectionNamesForRefresh,
 } from "../data-tools/projections/build/plan.ts";
-import { projectionConcurrency } from "../data-tools/projections/build/runner.ts";
-import { runDependencyAwareTasks } from "../data-tools/projections/build/scheduler.ts";
+import {
+  executeProjectionTaskPlan,
+  projectionConcurrency,
+} from "../data-tools/projections/build/builder.ts";
 
 function fakeConnection(id, closed) {
   return {
@@ -26,7 +29,7 @@ function fakeConnection(id, closed) {
   };
 }
 
-test("dependency scheduler bounds and overlaps independent tasks", async () => {
+test("projection builder bounds and overlaps independent tasks", async () => {
   const events = [];
   const closed = [];
   let active = 0;
@@ -45,31 +48,33 @@ test("dependency scheduler bounds and overlaps independent tasks", async () => {
     },
   });
 
-  const result = await runDependencyAwareTasks(
-    [
-      task("single"),
-      task("average"),
-      task("result"),
-      task("counts", ["single", "average"]),
-    ],
-    {
-      createConnection: async () => fakeConnection(closed.length + 1, closed),
-      concurrency: 2,
-    },
-  );
+  const plan = createProjectionTaskPlan([
+    task("single"),
+    task("average"),
+    task("result"),
+    task("counts", ["single", "average"]),
+  ]);
+  const result = await executeProjectionTaskPlan(plan, {
+    createConnection: async () => fakeConnection(closed.length + 1, closed),
+    concurrency: 2,
+    connection: fakeConnection(0, closed),
+  });
 
   assert.equal(maximum, 2);
   assert.ok(events.indexOf("start:single") < events.indexOf("finish:average"));
   assert.ok(events.indexOf("start:average") < events.indexOf("finish:single"));
   assert.ok(events.indexOf("start:counts") > events.indexOf("finish:single"));
   assert.ok(events.indexOf("start:counts") > events.indexOf("finish:average"));
-  assert.deepEqual(result, ["single", "average", "result", "counts"]);
+  assert.deepEqual(
+    result.map((task) => task.result),
+    ["single", "average", "result", "counts"],
+  );
   assert.equal(closed.length, 4);
 });
 
 test("hydrated dependencies count as complete without executing them", async () => {
   const started = [];
-  await runDependencyAwareTasks(
+  const plan = createProjectionTaskPlan(
     [
       {
         name: "city",
@@ -79,11 +84,9 @@ test("hydrated dependencies count as complete without executing them", async () 
         },
       },
     ],
-    {
-      connection: {},
-      satisfiedDependencies: ["facts", "competitions"],
-    },
+    ["facts", "competitions"],
   );
+  await executeProjectionTaskPlan(plan, { connection: {} });
   assert.deepEqual(started, ["city"]);
 });
 
@@ -103,7 +106,7 @@ test("a city-only build plans only owned tasks and reports hydrated projections 
   assert.equal(plan.includeRankingTables, false);
 });
 
-test("duration-aware scheduling pairs a long task with the shortest ready task", async () => {
+test("projection builder pairs a long task with the shortest ready task", async () => {
   const started = [];
   const task = (name, estimatedDurationMs, durationMs) => ({
     name,
@@ -115,27 +118,26 @@ test("duration-aware scheduling pairs a long task with the shortest ready task",
     },
   });
 
-  await runDependencyAwareTasks(
-    [
-      task("long-first", 120_000, 20),
-      task("long-second", 120_000, 5),
-      task("short", 15_000, 5),
-    ],
-    {
-      createConnection: async () => fakeConnection(started.length + 1, []),
-      concurrency: 2,
-    },
-  );
+  const plan = createProjectionTaskPlan([
+    task("long-first", 120_000, 20),
+    task("long-second", 120_000, 5),
+    task("short", 15_000, 5),
+  ]);
+  await executeProjectionTaskPlan(plan, {
+    createConnection: async () => fakeConnection(started.length + 1, []),
+    concurrency: 2,
+    connection: {},
+  });
 
   assert.deepEqual(started.slice(0, 2), ["long-first", "short"]);
 });
 
-test("dependency scheduler closes workers and does not start dependents after failure", async () => {
+test("projection builder closes workers and does not start dependents after failure", async () => {
   const started = [];
   const closed = [];
   await assert.rejects(
-    runDependencyAwareTasks(
-      [
+    executeProjectionTaskPlan(
+      createProjectionTaskPlan([
         {
           name: "failing",
           dependencies: [],
@@ -159,10 +161,11 @@ test("dependency scheduler closes workers and does not start dependents after fa
             started.push("dependent");
           },
         },
-      ],
+      ]),
       {
         createConnection: async () => fakeConnection(closed.length + 1, closed),
         concurrency: 2,
+        connection: {},
       },
     ),
     /expected failure/,
@@ -172,11 +175,11 @@ test("dependency scheduler closes workers and does not start dependents after fa
   assert.equal(closed.length, 2);
 });
 
-test("dependency scheduler rejects unknown dependencies before starting tasks", async () => {
+test("projection planner rejects unknown dependencies before the build starts", () => {
   let started = false;
-  await assert.rejects(
-    runDependencyAwareTasks(
-      [
+  assert.throws(
+    () =>
+      createProjectionTaskPlan([
         {
           name: "counts",
           dependencies: ["missing-entries"],
@@ -184,15 +187,52 @@ test("dependency scheduler rejects unknown dependencies before starting tasks", 
             started = true;
           },
         },
-      ],
-      {
-        connection: {},
-        concurrency: 1,
-      },
-    ),
+      ]),
     /Unknown task dependency missing-entries for counts/,
   );
   assert.equal(started, false);
+});
+
+test("projection planner rejects dependency cycles before the build starts", () => {
+  assert.throws(
+    () =>
+      createProjectionTaskPlan([
+        {
+          name: "single",
+          dependencies: ["average"],
+          estimatedDurationMs: 1,
+          async run() {},
+        },
+        {
+          name: "average",
+          dependencies: ["single"],
+          estimatedDurationMs: 1,
+          async run() {},
+        },
+      ]),
+    /Projection task dependency cycle/,
+  );
+});
+
+test("projection planner returns tasks in dependency order", () => {
+  const plan = createProjectionTaskPlan([
+    {
+      name: "counts",
+      dependencies: ["entries"],
+      estimatedDurationMs: 1,
+      async run() {},
+    },
+    {
+      name: "entries",
+      dependencies: [],
+      estimatedDurationMs: 1,
+      async run() {},
+    },
+  ]);
+  assert.deepEqual(
+    plan.tasks.map((task) => task.name),
+    ["entries", "counts"],
+  );
 });
 
 test("projection build concurrency defaults to two and accepts configured bounds", () => {
@@ -310,10 +350,11 @@ test("core ranking-table source views wait for result facts", async () => {
     },
   }));
 
-  await runDependencyAwareTasks(tasks, {
+  const plan = createProjectionTaskPlan(tasks, ["projection:result-facts"]);
+  await executeProjectionTaskPlan(plan, {
     createConnection: async () => fakeConnection(events.length + 1, []),
     concurrency: 2,
-    satisfiedDependencies: ["projection:result-facts"],
+    connection: {},
   });
 
   assert.deepEqual(events, [
