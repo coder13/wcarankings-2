@@ -15,6 +15,7 @@ import {
   formatRankingNumber,
   rankingScope,
 } from "@/components/RankingsExplorer/types";
+import { profileResultsHref } from "@/components/ProfileResults/profileResultsUrl";
 import { flagEmoji, formatWcaResult, type RankingType, type RegionScope } from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
@@ -164,14 +165,26 @@ export default async function PersonProfilePage({ params }: PageProps) {
           </p>
           </div>
         </div>
-        <a
-          className="profileExternalLink"
-          href={`https://www.worldcubeassociation.org/persons/${profile.person.id}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          WCA profile
-        </a>
+        <div className="profileExternalActions">
+          <Link
+            className="profileExternalLink"
+            href={profileResultsHref({
+              personId: profile.person.id,
+              eventId: "333",
+              resultType: "single",
+            })}
+          >
+            Result history
+          </Link>
+          <a
+            className="profileExternalLink"
+            href={`https://www.worldcubeassociation.org/persons/${profile.person.id}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            WCA profile
+          </a>
+        </div>
       </header>
 
       <section className="profileFreshness" aria-label="Export freshness">

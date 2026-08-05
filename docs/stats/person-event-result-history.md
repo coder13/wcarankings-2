@@ -1,6 +1,6 @@
 # Person event result history
 
-Status: **Active API, no UI entry**
+Status: **Active**
 
 ## What it ranks
 
@@ -14,7 +14,18 @@ The API route is:
 GET /api/people/{wcaId}/event/{eventId}/results?result=single|average
 ```
 
-`start` is one-based. `limit` is from 1 through 100. The route has no UI link.
+`start` is one-based. `limit` is from 1 through 100. The UI does not link to
+the API route directly.
+
+The page route is:
+
+```text
+/profile/{wcaId}/results?eventId=333&resultType=single
+```
+
+The page has a person search field, an event selector, and a Single or Average
+selector. Person profile pages link to this page. It reads the API route in
+100-row pages.
 
 ## Source data
 
