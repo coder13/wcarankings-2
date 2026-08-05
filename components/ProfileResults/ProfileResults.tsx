@@ -281,10 +281,12 @@ export function ProfileResults({
                     <span className="result">
                       <span className="resultValue">
                         {entry.recordCode && (
-                          <span
-                            className={`recordBadge recordBadge--${entry.recordCode}`}
-                          >
-                            {entry.recordCode}
+                          <span className="recordBadges">
+                            <span
+                              className={`recordBadge recordBadge--${entry.recordCode}`}
+                            >
+                              {entry.recordCode}
+                            </span>
                           </span>
                         )}
                         <span className="best">

@@ -16,11 +16,17 @@ type StatPageNavigation = {
   onJumpToEnd: () => void;
 };
 
-function StatPageFooter({ exportDate }: { exportDate: string | null }) {
+function StatPageFooter({
+  exportDate,
+  showFreshness,
+}: {
+  exportDate: string | null;
+  showFreshness: boolean;
+}) {
   return (
     <footer className="siteFooter">
       <span>By Adam Walker and Cailyn Sinclair</span>
-      <span>{formatRankingsFreshness(exportDate)}</span>
+      {showFreshness && <span>{formatRankingsFreshness(exportDate)}</span>}
     </footer>
   );
 }
@@ -33,16 +39,43 @@ export function StatPageLayout({
   hasScrolled,
   exportDate,
   navigation,
+  staticFooter = false,
+  showFreshness = true,
 }: {
   className?: string;
   header?: ReactNode;
-  topRail: ReactNode;
+  topRail?: ReactNode;
   children: ReactNode;
   hasScrolled: boolean;
   exportDate: string | null;
   navigation?: StatPageNavigation;
+  staticFooter?: boolean;
+  showFreshness?: boolean;
 }) {
-  const footer = <StatPageFooter exportDate={exportDate} />;
+  const footer = (
+    <StatPageFooter exportDate={exportDate} showFreshness={showFreshness} />
+  );
+  let bottomContent = (
+    <div className="JumpControlsFallback" data-visible="true">
+      {footer}
+    </div>
+  );
+
+  if (staticFooter) bottomContent = footer;
+  if (navigation && navigation.total > 0) {
+    bottomContent = (
+      <JumpControlsVisibility visible={hasScrolled} fallback={footer}>
+        <RankingsPagerRail
+          navigation={navigation}
+          search={{
+            active: false,
+            onPrevious: () => undefined,
+            onNext: () => undefined,
+          }}
+        />
+      </JumpControlsVisibility>
+    );
+  }
 
   return (
     <div className={`app${className ? ` ${className}` : ""}`}>
@@ -53,22 +86,7 @@ export function StatPageLayout({
       />
       {topRail}
       {children}
-      {navigation && navigation.total > 0 ? (
-        <JumpControlsVisibility visible={hasScrolled} fallback={footer}>
-          <RankingsPagerRail
-            navigation={navigation}
-            search={{
-              active: false,
-              onPrevious: () => undefined,
-              onNext: () => undefined,
-            }}
-          />
-        </JumpControlsVisibility>
-      ) : (
-        <div className="JumpControlsFallback" data-visible="true">
-          {footer}
-        </div>
-      )}
+      {bottomContent}
     </div>
   );
 }
