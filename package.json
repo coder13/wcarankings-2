@@ -30,7 +30,8 @@
     "benchmark:ranking-scroll:persons": "bun scripts/benchmark-ranking-persons.ts",
     "benchmark:ranking-scroll:results": "bun scripts/benchmark-ranking-results.ts",
     "benchmark:ranking-scroll:competitions": "bun scripts/benchmark-ranking-competitions.ts",
-    "benchmark:ranking-scroll:cities": "bun scripts/benchmark-ranking-cities.ts"
+    "benchmark:ranking-scroll:cities": "bun scripts/benchmark-ranking-cities.ts",
+    "benchmark:ranking-scroll:medals": "bun scripts/benchmark-ranking-medals.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",

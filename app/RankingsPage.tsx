@@ -12,12 +12,9 @@ export type RankingsSearchParams = Record<
   string | string[] | undefined
 >;
 
-function searchParam(
-  searchParams: RankingsSearchParams,
-  key: string,
-) {
+function searchParam(searchParams: RankingsSearchParams, key: string) {
   const value = searchParams[key];
-  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
 export async function RankingsPage({
@@ -26,6 +23,7 @@ export async function RankingsPage({
   requiresResultRankings = false,
   requiresCompetitionRankings = false,
   requiresPersonCompetitionRankings = false,
+  requiresPersonMedalRankings = false,
   requiresCityRankings = false,
 }: {
   searchParams?: Promise<RankingsSearchParams>;
@@ -33,6 +31,7 @@ export async function RankingsPage({
   requiresResultRankings?: boolean;
   requiresCompetitionRankings?: boolean;
   requiresPersonCompetitionRankings?: boolean;
+  requiresPersonMedalRankings?: boolean;
   requiresCityRankings?: boolean;
 } = {}) {
   const featureSwitch = await getProjectionFeatureSwitch();
@@ -45,10 +44,11 @@ export async function RankingsPage({
     (requiresYearlyRankings && !featureSwitch.yearlyPersonRankings) ||
     (requiresResultRankings && !featureSwitch.resultRankings) ||
     (requiresCompetitionRankings && !featureSwitch.competitionRankings) ||
-    (requiresPersonCompetitionRankings && !featureSwitch.personCompetitionRankings) ||
+    (requiresPersonCompetitionRankings &&
+      !featureSwitch.personCompetitionRankings) ||
+    (requiresPersonMedalRankings && !featureSwitch.personMedalRankings) ||
     (requiresCityRankings && !featureSwitch.cityEventStats) ||
-    (["SOR", "sor-kinch"].includes(requestedEvent) &&
-      !featureSwitch.sumOfRanks)
+    (["SOR", "sor-kinch"].includes(requestedEvent) && !featureSwitch.sumOfRanks)
   ) {
     notFound();
   }

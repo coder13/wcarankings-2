@@ -26,7 +26,7 @@ export function scenarioUrl(
     const values = Array.isArray(rawValue) ? rawValue : [rawValue];
     for (const value of values) params.append(key, String(value));
   }
-  params.set("start", String(page * pageSize));
+  params.set("start", String(page * pageSize + (scenario.startBase ?? 0)));
   params.set("limit", String(pageSize));
   return `${target.replace(/\/$/, "")}${scenario.path}?${params}`;
 }
@@ -164,7 +164,7 @@ async function fetchList(
   const entries = responsePayload.entries ?? [];
   const result: PageResult = {
     page: page + 1,
-    requestedStart: page * config.limit,
+    requestedStart: page * config.limit + (scenario.startBase ?? 0),
     status: response?.status ?? 0,
     elapsedMs,
     rows: entries.length,

@@ -5,6 +5,7 @@ export interface RankingScenario {
   label: string;
   path: string;
   params: Record<string, ScenarioParamValue>;
+  startBase?: number;
   suite?: string;
 }
 

@@ -7,6 +7,7 @@ import {
   trackGoogleAnalyticsEvent,
 } from "@/lib/helpers/analytics/google-analytics";
 import { normalizeGenderFilters, type GenderFilter } from "@/lib/wca";
+import type { MedalRankingType } from "@/lib/medal-rankings";
 import type { NavigationSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { subjectPath } from "./helpers/navigation";
 import type { CityRanking, CompetitionRanking } from "./helpers/rankingModes";
@@ -147,6 +148,7 @@ export function useRankingsState() {
         if (nextSubject === "people") {
           if (filters.personCompetitionRanking)
             nextPath = "/persons/competitions";
+          else if (filters.personMedalRanking) nextPath = "/persons/medals";
           else if (filters.year) nextPath = `/persons/year/${filters.year}`;
         }
         patchFilters(
@@ -163,7 +165,11 @@ export function useRankingsState() {
       changeYear(nextYear: number | null) {
         if (nextYear === filters.year) return;
         patchFilters(
-          { year: nextYear, personCompetitionRanking: false },
+          {
+            year: nextYear,
+            personCompetitionRanking: false,
+            personMedalRanking: false,
+          },
           {
             history: "push",
             pathname: nextYear ? `/persons/year/${nextYear}` : "/",
@@ -174,13 +180,37 @@ export function useRankingsState() {
       changePersonCompetitionRanking(enabled: boolean) {
         if (enabled === filters.personCompetitionRanking) return;
         patchFilters(
-          { personCompetitionRanking: enabled, year: null },
+          {
+            personCompetitionRanking: enabled,
+            personMedalRanking: false,
+            year: null,
+          },
           {
             history: "push",
             pathname: enabled ? "/persons/competitions" : "/",
           },
           { search: "", wcaId: "", focusMe: false },
         );
+      },
+      changePersonMedalRanking(enabled: boolean) {
+        if (enabled === filters.personMedalRanking) return;
+        patchFilters(
+          {
+            personCompetitionRanking: false,
+            personMedalRanking: enabled,
+            year: null,
+            eventId: enabled ? "all" : "333",
+          },
+          {
+            history: "push",
+            pathname: enabled ? "/persons/medals" : "/",
+          },
+          { search: "", wcaId: "", focusMe: false },
+        );
+      },
+      changeMedalType(medalType: MedalRankingType) {
+        if (medalType === filters.medalType) return;
+        patchFilters({ medalType });
       },
       changeCompetitionRanking(next: CompetitionRanking) {
         if (next === filters.competitionRanking) return;

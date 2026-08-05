@@ -6,6 +6,7 @@ import { rankingTablesJob } from "./core/ranking-tables/definition.ts";
 import { resultFactsJob } from "./core/result-facts/definition.ts";
 import { personCompetitionRankingsJob } from "./people/competition-rankings/definition.ts";
 import { personEventRankingsJobs } from "./people/event-rankings/definition.ts";
+import { personMedalRankingsJob } from "./people/medal-rankings/definition.ts";
 import { resultRankingsJobs } from "./people/result-rankings/definition.ts";
 import { sumOfRanksJob } from "./people/sum-of-ranks/definition.ts";
 import { personYearRankingsJob } from "./people/year-rankings/definition.ts";
@@ -25,5 +26,6 @@ export const PROJECTION_JOBS: readonly ProjectionJob[] = [
   ...personEventRankingsJobs,
   personYearRankingsJob,
   personCompetitionRankingsJob,
+  personMedalRankingsJob,
   cityEventStatsJob,
 ] as const;

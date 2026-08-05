@@ -231,6 +231,7 @@ if (!applicationUrl && !adminUrl) {
         competitionRankings: true,
         personCompetitionRankings: true,
         personEventRankings: true,
+        personMedalRankings: true,
         cityEventStats: true,
         sumOfRanks: true,
         yearlyPersonRankings: true,

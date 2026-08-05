@@ -4,6 +4,7 @@ import { queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import type { GenderFilter } from "@/lib/wca";
+import type { MedalRankingType } from "@/lib/medal-rankings";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
   InitialRankingData,
@@ -24,6 +25,7 @@ export type RankingQueryFilters = {
   source?: RankingSource;
   gender: readonly GenderFilter[];
   year: number | null;
+  medalType: MedalRankingType;
   membershipVersion?: number;
   rankingsDataVersion?: string | null;
 };
@@ -73,10 +75,14 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     rankingSourceKey(filters.source),
     filters.eventId,
     filters.rankingType,
+    filters.medalType,
     filters.regionSelection.scope,
     filters.regionSelection.regionId,
     filters.gender.join(","),
-    filters.resource === "people" ? (filters.year ?? "all") : "all",
+    filters.resource === "people" ||
+    filters.resource === "person-medal-rankings"
+      ? (filters.year ?? "all")
+      : "all",
     filters.membershipVersion ?? "current",
     filters.rankingsDataVersion ?? "current",
   ] as const;
@@ -109,12 +115,17 @@ function addRankingFilterParams(
     params.set("membershipVersion", String(versionWindow.membershipVersion));
     params.set("rankingsDataVersion", versionWindow.rankingsDataVersion);
   }
-  if (filters.resource === "people" && filters.year) {
+  if (
+    (filters.resource === "people" ||
+      filters.resource === "person-medal-rankings") &&
+    filters.year
+  ) {
     params.set("year", String(filters.year));
   }
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
+      filters.resource === "person-medal-rankings" ||
       filters.resource === "results") &&
     filters.gender.length
   ) {
@@ -127,12 +138,21 @@ function addRankingFilterParams(
 
 function pageRequest(filters: RankingQueryFilters, start: number) {
   const params = new URLSearchParams({
-    eventId: filters.eventId,
     result: filters.rankingType,
-    start: String(rankingPageStart(start)),
+    start: String(
+      filters.resource === "person-medal-rankings"
+        ? start
+        : rankingPageStart(start),
+    ),
     limit: String(PAGE_SIZE),
     paged: "1",
   });
+  if (
+    filters.resource !== "person-medal-rankings" ||
+    filters.eventId !== "all"
+  ) {
+    params.set("eventId", filters.eventId);
+  }
   addRankingFilterParams(params, filters);
   if (filters.resource === "podiums") params.set("ranking", "podium");
   if (filters.resource === "competitor-count") {
@@ -157,11 +177,16 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
       );
     }
   }
+  if (filters.resource === "person-medal-rankings") {
+    params.set("medal", filters.medalType);
+  }
 
   let endpoint = "/api/rankings";
   if (filters.resource === "results") endpoint = "/api/rankings/results";
   else if (filters.resource === "person-competition-count") {
     endpoint = "/api/rankings/people/competitions";
+  } else if (filters.resource === "person-medal-rankings") {
+    endpoint = "/api/rankings/people/medals";
   } else if (filters.resource.startsWith("city-"))
     endpoint = "/api/rankings/cities";
   else if (filters.resource !== "people") {

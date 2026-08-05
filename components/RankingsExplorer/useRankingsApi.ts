@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { GenderFilter } from "@/lib/wca";
+import type { MedalRankingType } from "@/lib/medal-rankings";
 import type { ExplorerSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import type {
   CityRanking,
@@ -24,6 +25,8 @@ type RankingsApiFilters = {
   competitionRanking: CompetitionRanking;
   cityRanking: CityRanking;
   personCompetitionRanking: boolean;
+  personMedalRanking: boolean;
+  medalType: MedalRankingType;
   year: number | null;
   latitudeHemisphere: "north" | "south";
   eventId: string;
@@ -37,12 +40,15 @@ function rankingResource({
   competitionRanking,
   cityRanking,
   personCompetitionRanking,
+  personMedalRanking,
   latitudeHemisphere,
 }: RankingsApiFilters): RankingResource {
   if (subject === "results") return "results";
   if (subject === "cities") return `city-${cityRanking}`;
   if (subject !== "competitions") {
-    return personCompetitionRanking ? "person-competition-count" : "people";
+    if (personCompetitionRanking) return "person-competition-count";
+    if (personMedalRanking) return "person-medal-rankings";
+    return "people";
   }
   if (competitionRanking === "latitude")
     return `latitude-${latitudeHemisphere}`;
@@ -59,7 +65,8 @@ export function useRankingsApi({
   source?: RankingSource;
   initialData?: InitialRankingData;
 }) {
-  const { eventId, rankingType, regionSelection, gender, year } = filters;
+  const { eventId, rankingType, regionSelection, gender, year, medalType } =
+    filters;
   const resource = rankingResource(filters);
   const queryFilters = useMemo(
     () => ({
@@ -70,8 +77,18 @@ export function useRankingsApi({
       source,
       gender,
       year,
+      medalType,
     }),
-    [eventId, gender, rankingType, regionSelection, resource, source, year],
+    [
+      eventId,
+      gender,
+      medalType,
+      rankingType,
+      regionSelection,
+      resource,
+      source,
+      year,
+    ],
   );
   seedSavedListVersionWindow(queryFilters, initialData);
 

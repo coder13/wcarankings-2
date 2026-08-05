@@ -2,9 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderWithProviders } from "@/tests/render-providers";
 import { EXPLORER_SUBJECTS } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
-import {
-  RankingsExplorer,
-} from "./RankingsExplorer";
+import { RankingsExplorer } from "./RankingsExplorer";
 import { subjectPath } from "./helpers/navigation";
 import { orderSearchMatches } from "./helpers/search";
 import { getTopRailScrollProgress } from "./useRailScrollProgress";
@@ -37,6 +35,7 @@ function pathnameForFilters(filters: RankingsFilterState) {
     return `/competitions/${filters.competitionRanking}`;
   }
   if (filters.subject === "cities") return `/cities/${filters.cityRanking}`;
+  if (filters.personMedalRanking) return "/persons/medals";
   if (filters.year) return `/persons/year/${filters.year}`;
   return "/";
 }
@@ -50,6 +49,8 @@ function renderExplorerMarkup(
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
     personCompetitionRanking: false,
+    personMedalRanking: false,
+    medalType: "overall",
     year: null,
     eventId: "333",
     rankingType: "single",
@@ -71,20 +72,20 @@ function renderExplorerMarkup(
 
   return renderWithProviders(
     <RankingsExplorer
-              initial={{
-                data: {
-                  entries: [rankingEntry],
-                  hasMore: false,
-                  nextPageStart: null,
-                  previousPageStart: null,
-                  startRank: 1,
-                  startPosition: 0,
-                  lastRank: 1,
-                  total: 1,
-                },
-                regions: { continents: [], countries: [] },
-              }}
-              {...props}
+      initial={{
+        data: {
+          entries: [rankingEntry],
+          hasMore: false,
+          nextPageStart: null,
+          previousPageStart: null,
+          startRank: 1,
+          startPosition: 0,
+          lastRank: 1,
+          total: 1,
+        },
+        regions: { continents: [], countries: [] },
+      }}
+      {...props}
     />,
     pathname,
     searchParams,
@@ -103,9 +104,15 @@ test("gives each non-default subject and competition ranking a page", () => {
   assert.equal(subjectPath("results"), "/results");
   assert.equal(subjectPath("competitions"), "/competitions/best-result");
   assert.equal(subjectPath("cities"), "/cities/fastest-single");
-  assert.equal(competitionRankingPath("best-result"), "/competitions/best-result");
+  assert.equal(
+    competitionRankingPath("best-result"),
+    "/competitions/best-result",
+  );
   assert.equal(competitionRankingPath("podiums"), "/competitions/podiums");
-  assert.equal(competitionRankingPath("competitor-count"), "/competitions/competitor-count");
+  assert.equal(
+    competitionRankingPath("competitor-count"),
+    "/competitions/competitor-count",
+  );
   assert.equal(competitionRankingPath("latitude"), "/competitions/latitude");
 });
 
@@ -149,9 +156,12 @@ test("renders a full-width spinner and fallback periods before rankings load", (
 });
 
 test("keeps gender filters available for sum of ranks", () => {
-  const markup = renderExplorerMarkup({
-    options: { showAllEventRankingOptions: true },
-  }, { eventId: "SOR" });
+  const markup = renderExplorerMarkup(
+    {
+      options: { showAllEventRankingOptions: true },
+    },
+    { eventId: "SOR" },
+  );
   assert.match(markup, /aria-label="Gender"/);
   assert.match(markup, />Men</);
   assert.match(markup, />Women</);
@@ -159,11 +169,26 @@ test("keeps gender filters available for sum of ranks", () => {
 });
 
 test("keeps gender filters available for Kinch", () => {
-  const markup = renderExplorerMarkup({
-    options: { showAllEventRankingOptions: true },
-  }, { eventId: "sor-kinch" });
+  const markup = renderExplorerMarkup(
+    {
+      options: { showAllEventRankingOptions: true },
+    },
+    { eventId: "sor-kinch" },
+  );
   assert.match(markup, /aria-label="Gender"/);
   assert.match(markup, />Men</);
   assert.match(markup, />Women</);
+  assert.doesNotMatch(markup, /Switch to average rankings/);
+});
+
+test("renders medal event and statistic controls", () => {
+  const markup = renderExplorerMarkup(
+    { options: { showSubjectSwitch: true } },
+    { personMedalRanking: true, eventId: "all", medalType: "gold" },
+  );
+  assert.match(markup, />All events</);
+  assert.match(markup, /aria-label="Medal statistic"/);
+  assert.match(markup, />Gold medals</);
+  assert.doesNotMatch(markup, />Sum of Ranks</);
   assert.doesNotMatch(markup, /Switch to average rankings/);
 });

@@ -9,10 +9,7 @@ import { RankingsExplorerHeader } from "./RankingsExplorerHeader";
 import { RankingsNavigationFooter } from "./RankingsNavigationFooter";
 import { RankingsResults } from "./RankingsResults";
 import { RankingsTopRail } from "./RankingsTopRail";
-import {
-  RankingsAppShell,
-  VimNavigationOverlay,
-} from "./VimNavigation";
+import { RankingsAppShell, VimNavigationOverlay } from "./VimNavigation";
 import { useExplorerKeyboardShortcuts } from "./useExplorerKeyboardShortcuts";
 import {
   ListMemberManagementOverlays,
@@ -65,12 +62,12 @@ export function RankingsExplorer({
   const rankings = useVirtualRankings({
     datasetKey: api.datasetKey,
     api: api.range,
-    initialData: initialDataset.key === api.datasetKey
-      ? initialDataset.data
-      : undefined,
+    initialData:
+      initialDataset.key === api.datasetKey ? initialDataset.data : undefined,
     expandableRows:
       state.filters.subject === "people" &&
-      !state.filters.personCompetitionRanking,
+      !state.filters.personCompetitionRanking &&
+      !state.filters.personMedalRanking,
   });
   const listMembers = useListMemberManagement({
     listId: list?.owner?.listId,
@@ -92,17 +89,23 @@ export function RankingsExplorer({
     patchFilters: state.patchFilters,
   });
 
-  const toRank = useCallback((rank: number, animate = true) => {
-    focus.clear();
-    rankings.jumpToIndex(rank - 1, animate);
-  }, [focus, rankings]);
-  const navigation = useMemo(() => ({
-    toRank,
-    toTop: () => toRank(1),
-    toEnd: () => toRank(rankings.total),
-    up: () => toRank(rankings.currentIndex + 1 - 5_000),
-    down: () => toRank(rankings.currentIndex + 1 + 5_000),
-  }), [rankings.currentIndex, rankings.total, toRank]);
+  const toRank = useCallback(
+    (rank: number, animate = true) => {
+      focus.clear();
+      rankings.jumpToIndex(rank - 1, animate);
+    },
+    [focus, rankings],
+  );
+  const navigation = useMemo(
+    () => ({
+      toRank,
+      toTop: () => toRank(1),
+      toEnd: () => toRank(rankings.total),
+      up: () => toRank(rankings.currentIndex + 1 - 5_000),
+      down: () => toRank(rankings.currentIndex + 1 + 5_000),
+    }),
+    [rankings.currentIndex, rankings.total, toRank],
+  );
   const commands = useRankingCommands();
   const vim = useVimNavigation({
     getCurrentRank: () => rankings.currentIndex + 1,
@@ -147,8 +150,7 @@ export function RankingsExplorer({
               options?.showAllEventRankingOptions ?? false,
             showSubjectSwitch: options?.showSubjectSwitch ?? false,
             showMyRank: options?.showMyRank ?? true,
-            regionSelectionDisabled:
-              options?.regionSelectionDisabled ?? false,
+            regionSelectionDisabled: options?.regionSelectionDisabled ?? false,
           },
           release: initial?.release,
         },
@@ -167,7 +169,9 @@ export function RankingsExplorer({
       <RankingsAppShell>
         <ViewportEdgeGradients
           topVisible={hasScrolled}
-          bottomVisible={pagerEnabled && (rankings.jumpAnimating || hasScrolled)}
+          bottomVisible={
+            pagerEnabled && (rankings.jumpAnimating || hasScrolled)
+          }
         />
         <RankingsExplorerHeader />
         <RankingsTopRail />

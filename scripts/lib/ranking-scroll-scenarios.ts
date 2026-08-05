@@ -421,11 +421,52 @@ export const CITY_RANKING_SCENARIOS = [
   }),
 ];
 
+export const MEDAL_RANKING_SCENARIOS = [
+  scenario(
+    "overall-all-events-world",
+    "all-event overall medals",
+    "/api/rankings/people/medals",
+    { medal: "overall", paged: "1" },
+  ),
+  scenario(
+    "gold-333-world",
+    "3x3x3 gold medals",
+    "/api/rankings/people/medals",
+    { eventId: "333", medal: "gold", paged: "1" },
+  ),
+  scenario(
+    "bronze-usa",
+    "United States bronze medals",
+    "/api/rankings/people/medals",
+    { medal: "bronze", region: "USA", paged: "1" },
+  ),
+  scenario(
+    "silver-all-events-women",
+    "women's silver medals",
+    "/api/rankings/people/medals",
+    { medal: "silver", gender: ["f"], paged: "1" },
+  ),
+  scenario(
+    "gold-333-2024-women-france",
+    "2024 French women's 3x3x3 gold medals",
+    "/api/rankings/people/medals",
+    {
+      eventId: "333",
+      medal: "gold",
+      year: "2024",
+      gender: ["f"],
+      region: "France",
+      paged: "1",
+    },
+  ),
+].map((entry) => ({ ...entry, startBase: 1 }));
+
 export const RANKING_SCROLL_SUITES = {
   persons: PERSON_RANKING_SCENARIOS,
   results: RESULT_RANKING_SCENARIOS,
   competitions: COMPETITION_RANKING_SCENARIOS,
   cities: CITY_RANKING_SCENARIOS,
+  medals: MEDAL_RANKING_SCENARIOS,
 };
 
 export const ALL_RANKING_SCROLL_SCENARIOS = Object.entries(

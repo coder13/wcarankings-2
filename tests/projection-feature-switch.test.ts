@@ -23,6 +23,9 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
       "person_competition_counts",
       "person_competition_rankings",
       "person_competition_ranking_counts",
+      "person_medal_scores",
+      "person_medal_rankings",
+      "person_medal_ranking_counts",
     ],
     { generationId: "generation-123", exportId: "2026-07-30T00:00:30Z" },
   );
@@ -36,6 +39,7 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
     sumOfRanks: true,
     yearlyPersonRankings: true,
     personCompetitionRankings: true,
+    personMedalRankings: true,
   });
 });
 
@@ -49,6 +53,7 @@ test("keeps core ranking tables available without semantic projections", () => {
   assert.equal(featureSwitch.resultRankings, false);
   assert.equal(featureSwitch.competitionRankings, false);
   assert.equal(featureSwitch.personCompetitionRankings, false);
+  assert.equal(featureSwitch.personMedalRankings, false);
 });
 
 test("competition capability does not depend on city counts", () => {

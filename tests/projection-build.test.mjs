@@ -258,6 +258,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
   for (const name of [
     "sum-of-ranks",
     "person-competition-rankings",
+    "person-medal-rankings",
     "person-event-rankings",
   ]) {
     const projection = PROJECTION_REGISTRY.find(
@@ -276,6 +277,30 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     assert.ok(task, `${name} is registered`);
     assert.deepEqual(task.dependencies, ["projection:result-facts"]);
   }
+});
+
+test("medal rankings keep event and medal type as independent dimensions", async () => {
+  const projection = PROJECTION_REGISTRY.find(
+    (candidate) => candidate.name === "person-medal-rankings",
+  );
+  assert.ok(projection);
+  assert.deepEqual(projection.dependencies, ["result-facts"]);
+  assert.equal(projection.enabledByDefault, true);
+
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/people/medal-rankings/person_medal_rankings.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(sql, /facts\.event_id/);
+  assert.match(sql, /'overall' AS medal_type/);
+  assert.match(sql, /'gold'/);
+  assert.match(sql, /'silver'/);
+  assert.match(sql, /'bronze'/);
+  assert.match(sql, /RANK\(\) OVER/);
+  assert.match(sql, /idx_person_medal_rankings_page/);
 });
 
 test("result rankings create and remove their solve stage in one build", async () => {
