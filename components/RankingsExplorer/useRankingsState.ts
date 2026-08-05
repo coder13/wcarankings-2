@@ -143,6 +143,33 @@ export function useRankingsState() {
           router.push("/lists");
           return;
         }
+        if (nextSubject === "medals") {
+          if (filters.personMedalRanking) return;
+          patchFilters(
+            {
+              personCompetitionRanking: false,
+              personMedalRanking: true,
+              year: null,
+              eventId: "all",
+            },
+            { history: "push", pathname: "/persons/medals" },
+            { search: "", wcaId: "", focusMe: false },
+          );
+          return;
+        }
+        if (nextSubject === "people" && filters.personMedalRanking) {
+          patchFilters(
+            {
+              personCompetitionRanking: false,
+              personMedalRanking: false,
+              year: null,
+              eventId: "333",
+            },
+            { history: "push", pathname: "/" },
+            { search: "", wcaId: "", focusMe: false },
+          );
+          return;
+        }
         if (nextSubject === filters.subject) return;
         let nextPath = subjectPath(nextSubject);
         if (nextSubject === "people") {
@@ -158,6 +185,10 @@ export function useRankingsState() {
         );
       },
       leaveList(nextSubject: NavigationSubject) {
+        if (nextSubject === "medals") {
+          router.push("/persons/medals");
+          return;
+        }
         router.push(
           nextSubject === "lists" ? "/lists" : subjectPath(nextSubject),
         );

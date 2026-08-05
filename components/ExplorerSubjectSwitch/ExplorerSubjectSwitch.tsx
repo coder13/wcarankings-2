@@ -10,7 +10,9 @@ export const EXPLORER_SUBJECTS = [
   { id: "cities", label: "Cities" },
 ] as const;
 const NAVIGATION_SUBJECTS = [
-  ...EXPLORER_SUBJECTS,
+  { id: "people", label: "Rankings" },
+  { id: "medals", label: "Medals" },
+  ...EXPLORER_SUBJECTS.filter((subject) => subject.id !== "people"),
   { id: "lists", label: "Lists" },
 ] as const;
 
@@ -30,6 +32,7 @@ export function ExplorerSubjectSwitch({
   const subjects = NAVIGATION_SUBJECTS.filter((option) => {
     if (option.id === "lists") return true;
     if (!featureSwitch.core) return false;
+    if (option.id === "medals") return featureSwitch.personMedalRankings;
     if (option.id === "results") return featureSwitch.resultRankings;
     if (option.id === "competitions") return featureSwitch.competitionRankings;
     if (option.id === "cities") return featureSwitch.cityEventStats;
@@ -39,6 +42,12 @@ export function ExplorerSubjectSwitch({
     value: option.id,
     label: option.label,
   }));
+  const personOptions = dropdownOptions.filter(
+    (option) => option.value === "people" || option.value === "medals",
+  );
+  const otherOptions = dropdownOptions.filter(
+    (option) => option.value !== "people" && option.value !== "medals",
+  );
 
   if (variant === "title") {
     return (
@@ -49,7 +58,10 @@ export function ExplorerSubjectSwitch({
         ariaLabel="Browse WCA data"
         className="headerSubjectDropdown"
         triggerPrefix="WCA "
-        hideSelectedOption={subject !== "lists"}
+        optionGroups={[
+          { label: "Persons", options: personOptions },
+          { options: otherOptions },
+        ]}
       />
     );
   }

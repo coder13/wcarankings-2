@@ -9,6 +9,7 @@ const description: Record<ExplorerSubject, string> = {
   people: "All-person rankings such as Sum of Ranks and SoR Kinch.",
   results: "Official individual results for the selected event and result type.",
   competitions: "Competition bests for the selected event and result type.",
+  cities: "City rankings for the selected event and result type.",
 };
 
 function InteractiveSwitch({
@@ -20,7 +21,8 @@ function InteractiveSwitch({
   return (
     <div style={{ display: "grid", gap: "1rem", minWidth: "min(100%, 30rem)" }}>
       <ExplorerSubjectSwitch subject={subject} onChange={(nextSubject) => {
-        if (nextSubject !== "lists") setSubject(nextSubject);
+        if (nextSubject !== "lists" && nextSubject !== "medals")
+          setSubject(nextSubject);
       }} variant={variant} />
       <p style={{ margin: 0, color: "var(--text-muted)" }}>{description[subject]}</p>
     </div>

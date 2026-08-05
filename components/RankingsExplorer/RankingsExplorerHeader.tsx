@@ -2,6 +2,7 @@
 
 import { AppHeader } from "../AppHeader/AppHeader";
 import { TextDropdown } from "../Dropdown/TextDropdown";
+import type { NavigationSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import {
   CITY_RANKING_OPTIONS,
   COMPETITION_RANKING_OPTIONS,
@@ -19,9 +20,10 @@ export function RankingsExplorerHeader() {
     competitionRanking,
     cityRanking,
   } = filters;
-  let headerSubject;
+  let headerSubject: NavigationSubject | undefined;
   if (source) headerSubject = "lists" as const;
-  else if (showSubjectSwitch) headerSubject = subject;
+  else if (showSubjectSwitch)
+    headerSubject = filters.personMedalRanking ? "medals" : subject;
   let changeHeaderSubject;
   if (source) changeHeaderSubject = actions.leaveList;
   else if (showSubjectSwitch) changeHeaderSubject = actions.changeSubject;
