@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   orderTopRankingHighlightCandidates,
+  parseTopRankingHighlightsPersonId,
   type TopRankingHighlightSourceRow,
 } from "@/services/people/top-ranking-highlights";
 
@@ -47,4 +48,12 @@ test("interleaves events before another variant of the same event", () => {
     ["222", "333", "444"],
   );
   assert.notEqual(candidates[0].eventId, candidates[1].eventId);
+});
+
+test("normalizes and validates the profile WCA ID", () => {
+  assert.equal(parseTopRankingHighlightsPersonId(" 2021zajd03 "), "2021ZAJD03");
+  assert.throws(
+    () => parseTopRankingHighlightsPersonId("not-a-wca-id"),
+    /wcaId must be a valid WCA ID/,
+  );
 });

@@ -42,7 +42,7 @@ type HighlightCandidate = {
   baseRank: number;
 };
 
-export type TopRankingHighlight = {
+type TopRankingHighlight = {
   id: string;
   title: string;
   eventId: string;
@@ -59,6 +59,16 @@ type HighlightsInput = {
   shown: Set<string>;
 };
 
+const WCA_ID_PATTERN = /^\d{4}[A-Z]{4}\d{2}$/;
+
+export function parseTopRankingHighlightsPersonId(personId: string) {
+  const normalized = personId.trim().toUpperCase();
+  if (!WCA_ID_PATTERN.test(normalized)) {
+    throw new ApiInputError("wcaId must be a valid WCA ID.");
+  }
+  return normalized;
+}
+
 function parseInput(params: URLSearchParams): HighlightsInput {
   const cursor = Number(params.get("cursor") ?? "0");
   if (!Number.isInteger(cursor) || cursor < 0) {
@@ -74,7 +84,7 @@ function parseInput(params: URLSearchParams): HighlightsInput {
   return { cursor, shown };
 }
 
-export function topRankingHighlightCandidatesQuery() {
+function topRankingHighlightCandidatesQuery() {
   return `SELECT ranking.event_id, ranking.result_type, ranking.gender,
       COALESCE(ranking.country_id, '') AS country_id,
       COALESCE(ranking.continent_id, '') AS continent_id,
@@ -288,6 +298,32 @@ async function loadUncached(personId: string, input: HighlightsInput) {
   };
 }
 
+type TopRankingHighlightsCacheValue = Awaited<ReturnType<typeof loadUncached>>;
+
+function isTopRankingHighlightsCacheValue(
+  value: Record<string, unknown>,
+): value is TopRankingHighlightsCacheValue {
+  if (
+    !("data" in value) ||
+    typeof value.data !== "object" ||
+    !value.data ||
+    !("diagnostics" in value) ||
+    typeof value.diagnostics !== "object" ||
+    !value.diagnostics
+  ) {
+    return false;
+  }
+  return (
+    "entries" in value.data &&
+    Array.isArray(value.data.entries) &&
+    "hasMore" in value.data &&
+    typeof value.data.hasMore === "boolean" &&
+    "timings" in value.diagnostics &&
+    typeof value.diagnostics.timings === "object" &&
+    value.diagnostics.timings !== null
+  );
+}
+
 function cacheKey(
   personId: string,
   input: HighlightsInput,
@@ -306,18 +342,16 @@ export async function loadTopRankingHighlights(
   personId: string,
   params: URLSearchParams,
 ) {
+  const normalizedPersonId = parseTopRankingHighlightsPersonId(personId);
   const input = parseInput(params);
   const metadata = await getCurrentRankingsMetadata();
-  const cached = (await rankingsWindowCache.getWithStatus(
-    cacheKey(personId, input, metadata.fetchedAt),
-    () =>
-      loadUncached(personId, input) as unknown as Promise<
-        Record<string, unknown>
-      >,
-  )) as {
-    value: Awaited<ReturnType<typeof loadUncached>>;
-    outcome: "hit" | "miss" | "coalesced";
-  };
+  const cached = await rankingsWindowCache.getWithStatus(
+    cacheKey(normalizedPersonId, input, metadata.fetchedAt),
+    async () => ({ ...(await loadUncached(normalizedPersonId, input)) }),
+  );
+  if (!isTopRankingHighlightsCacheValue(cached.value)) {
+    throw new Error("The top ranking highlights cache returned invalid data.");
+  }
 
   return {
     ...cached.value,

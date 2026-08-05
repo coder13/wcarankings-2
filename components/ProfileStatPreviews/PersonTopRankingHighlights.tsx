@@ -83,6 +83,7 @@ function PersonTopRankingHighlightsFeed({ personId }: { personId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const inFlight = useRef(false);
+  const requestController = useRef<AbortController | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const loadPage = useCallback(
@@ -90,11 +91,14 @@ function PersonTopRankingHighlightsFeed({ personId }: { personId: string }) {
       if (inFlight.current) return;
       inFlight.current = true;
       setLoading(true);
+      const controller = new AbortController();
+      requestController.current = controller;
       const params = new URLSearchParams({ cursor: String(cursor) });
       shown.forEach((id) => params.append("shown", id));
       try {
         const response = await fetch(
           `/api/people/${personId}/top-ranking-highlights?${params.toString()}`,
+          { signal: controller.signal },
         );
         const body = (await response.json()) as Response;
         if (!response.ok) {
@@ -111,14 +115,20 @@ function PersonTopRankingHighlightsFeed({ personId }: { personId: string }) {
         setHasMore(body.hasMore);
         setError(null);
       } catch (cause) {
+        if (controller.signal.aborted) return;
         setError(
           cause instanceof Error
             ? cause.message
             : "Top rankings are unavailable.",
         );
+        setNextCursor(null);
+        setHasMore(false);
       } finally {
-        inFlight.current = false;
-        setLoading(false);
+        if (requestController.current === controller) {
+          requestController.current = null;
+          inFlight.current = false;
+          if (!controller.signal.aborted) setLoading(false);
+        }
       }
     },
     [personId],
@@ -130,6 +140,13 @@ function PersonTopRankingHighlightsFeed({ personId }: { personId: string }) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadPage]);
+
+  useEffect(
+    () => () => {
+      requestController.current?.abort();
+    },
+    [],
+  );
 
   const loadMore = useCallback(() => {
     if (!hasMore || nextCursor === null || loading) return;
