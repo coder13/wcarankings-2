@@ -370,7 +370,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run visual smoke test
-        run: pnpm exec playwright test --config=playwright.visual-smoke.config.ts
+        run: pnpm exec playwright test --config=playwright.visual-smoke.config.mjs
 
       - name: Run List Browser Tests
         if: always()
