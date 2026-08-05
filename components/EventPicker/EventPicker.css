@@ -16,8 +16,6 @@
 .EventPicker-preview {
   width: 44px;
   padding-left: 8px;
-  border-right: 1px solid var(--border-subtle);
-  border-radius: 20px 0 0 20px;
   color: var(--text-strong);
   font-size: 1.25em;
 }
@@ -50,7 +48,8 @@
   pointer-events: none;
   transform: scale(0.97);
   transform-origin: top left;
-  transition: opacity 150ms var(--cubic-exit),
+  transition:
+    opacity 150ms var(--cubic-exit),
     transform 150ms var(--cubic-exit),
     visibility 0s linear 150ms;
 }
@@ -86,8 +85,10 @@
   opacity: 1;
   pointer-events: auto;
   transform: scale(1);
-  transition: opacity 150ms var(--cubic-enter),
-    transform 150ms var(--cubic-enter), visibility 0s;
+  transition:
+    opacity 150ms var(--cubic-enter),
+    transform 150ms var(--cubic-enter),
+    visibility 0s;
 }
 
 .EventPicker-option {

@@ -4,58 +4,36 @@ import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import { TextDropdown } from "@/components/Dropdown/TextDropdown";
 import { EventPicker } from "@/components/EventPicker/EventPicker";
+import {
+  InputContainer,
+  InputContainerItem,
+} from "@/components/InputContainer/InputContainer";
 import { LoadingSpinner } from "@/components/LoadingSpinner/LoadingSpinner";
 import { RankingsRail } from "@/components/RankingsRail/RankingsRail";
-import { formatRankingNumber } from "@/components/RankingsExplorer/types";
+import { ResultTypeToggle } from "@/components/RankingsRail/ResultTypeToggle";
+import { YearSelector } from "@/components/RankingsRail/YearSelector";
 import {
   useHasScrolled,
   useTopRailScrollProgress,
 } from "@/components/RankingsExplorer/useRailScrollProgress";
 import { useRankingListOffset } from "@/components/RankingsExplorer/useRankingListOffset";
 import { StatPageLayout } from "@/components/StatPageLayout/StatPageLayout";
-import { formatWcaResult, WCA_EVENTS, type RankingType } from "@/lib/wca";
+import { WCA_EVENTS, type RankingType } from "@/lib/wca";
+import { PersonResultRow, type PersonResultEntry } from "./PersonResultRow";
 import { profileResultsHref } from "./profileResultsUrl";
 
 const PAGE_SIZE = 100;
 const ROW_HEIGHT = 65;
 
-type ResultEntry = {
-  rank: number;
-  position: number;
-  resultId: number;
-  attemptNumber: number | null;
-  resultValue: number;
-  formattedValue: string;
-  personId: string;
-  personName: string;
-  competitionId: string;
-  competitionName: string;
-  competitionStartDate: string | null;
-  recordCode: string;
-};
-
 type ResultResponse = {
-  entries: ResultEntry[];
+  entries: PersonResultEntry[];
   total: number;
   availableYears: number[];
   hasMore: boolean;
   snapshot?: { exportDate: string | null };
   error?: string;
 };
-
-function formatDate(value: string | null) {
-  if (!value) return "Date unavailable";
-  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
-  if (!Number.isFinite(date.getTime())) return "Date unavailable";
-  return new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
-}
 
 function resultUrl(
   personId: string,
@@ -85,7 +63,7 @@ export function ProfileResults({
   year: number | null;
 }) {
   const router = useRouter();
-  const [entries, setEntries] = useState<ResultEntry[]>([]);
+  const [entries, setEntries] = useState<PersonResultEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [personName, setPersonName] = useState(personId);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -182,13 +160,13 @@ export function ProfileResults({
     );
   };
 
-  const chooseYear = (value: string) => {
+  const chooseYear = (nextYear: number | null) => {
     router.replace(
       profileResultsHref({
         personId,
         eventId,
         resultType,
-        year: value ? Number(value) : null,
+        year: nextYear,
       }),
     );
   };
@@ -197,18 +175,6 @@ export function ProfileResults({
   const virtualRows = virtualizer.getVirtualItems();
   const lastVisibleIndex = virtualRows.at(-1)?.index ?? -1;
   const firstVisibleIndex = virtualRows[0]?.index ?? 0;
-  const railYears =
-    year !== null && !availableYears.includes(year)
-      ? [year, ...availableYears]
-      : availableYears;
-  const yearOptions = [
-    { value: "", label: "All time" },
-    ...railYears.map((availableYear) => ({
-      value: `${availableYear}`,
-      label: `${availableYear}`,
-    })),
-  ];
-
   useEffect(() => {
     // The window virtualizer reports the current visible range after render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -262,51 +228,12 @@ export function ProfileResults({
                 transform: `translateY(${virtualRow.start - listOffset}px)`,
               }}
             >
-              <div className="listItem">
-                <div
-                  className={`row${virtualRow.index % 2 ? " row--alternate" : ""}`}
-                >
-                  <div className="rowHeader">
-                    <span className="rank">
-                      {formatRankingNumber(entry.rank)}
-                    </span>
-                    <span className="identity">
-                      <span className="personName">
-                        <span className="name">{entry.competitionName}</span>
-                        <span className="wcaId">
-                          {formatDate(entry.competitionStartDate)}
-                        </span>
-                      </span>
-                    </span>
-                    <span className="result">
-                      <span className="resultValue">
-                        {entry.recordCode && (
-                          <span className="recordBadges">
-                            <span
-                              className={`recordBadge recordBadge--${entry.recordCode}`}
-                            >
-                              {entry.recordCode}
-                            </span>
-                          </span>
-                        )}
-                        <span className="best">
-                          {entry.formattedValue ||
-                            formatWcaResult(
-                              eventId,
-                              entry.resultValue,
-                              resultType,
-                            )}
-                        </span>
-                      </span>
-                      {entry.attemptNumber !== null && (
-                        <span className="competitionName">
-                          Attempt {entry.attemptNumber}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <PersonResultRow
+                entry={entry}
+                eventId={eventId}
+                resultType={resultType}
+                rowIndex={virtualRow.index}
+              />
             </div>
           );
         })}
@@ -346,30 +273,35 @@ export function ProfileResults({
             direction="up"
             compactResultType={railProgress >= 1}
           >
-            <div className="Jump-railSettings">
-              <EventPicker event={event} onChange={chooseEvent} />
-              <div className="Jump-resultTypeControl">
-                <button
-                  className="Jump-resultTypeToggle"
-                  type="button"
+            <InputContainer className="Jump-railSettings">
+              <InputContainerItem
+                className="Jump-eventControl"
+                width="var(--rail-event-width)"
+              >
+                <EventPicker event={event} onChange={chooseEvent} />
+              </InputContainerItem>
+              <InputContainerItem
+                className="Jump-resultTypeControl"
+                width="var(--input-result-type-width)"
+              >
+                <ResultTypeToggle
+                  value={resultType}
                   disabled={eventId === "333mbf"}
-                  onClick={() =>
-                    chooseResultType(
-                      resultType === "single" ? "average" : "single",
-                    )
-                  }
-                >
-                  {resultType === "single" ? "Single" : "Average"}
-                </button>
-              </div>
-              <TextDropdown
-                options={yearOptions}
-                value={year ? `${year}` : ""}
-                onChange={chooseYear}
-                ariaLabel="Year"
-                className="personYearDropdown Jump-periodPicker"
-              />
-            </div>
+                  onChange={chooseResultType}
+                />
+              </InputContainerItem>
+              <InputContainerItem
+                className="Jump-periodControl"
+                width="var(--rail-period-width)"
+              >
+                <YearSelector
+                  year={year}
+                  availableYears={availableYears}
+                  onChange={chooseYear}
+                  className="personYearDropdown Jump-periodPicker"
+                />
+              </InputContainerItem>
+            </InputContainer>
           </RankingsRail>
         </div>
       }

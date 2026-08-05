@@ -1,14 +1,17 @@
 .profileHub {
+  --profile-section-space: 1.5rem;
   width: min(100%, 68rem);
   margin-inline: auto;
-  padding: 1rem var(--page-gutter) 2rem;
+  padding: 0.5rem var(--page-gutter) 2rem;
 }
 
 .profileHubHero {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.9rem;
+  padding-bottom: var(--profile-section-space);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .profileHubAvatar {
@@ -43,8 +46,7 @@
   text-transform: uppercase;
 }
 
-.profileHubIdentity h2,
-.profileHubSectionHeading h2 {
+.profileHubIdentity h2 {
   margin: 0;
   color: var(--text-strong);
 }
@@ -73,15 +75,11 @@
 }
 
 .profileHubWcaLink {
-  grid-column: 1 / -1;
-  min-height: 2.5rem;
-  padding: 0.55rem 0.8rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.55rem;
-  color: var(--text-strong);
-  font-size: 0.9rem;
+  align-self: start;
+  padding: 0.35rem 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
   font-weight: 600;
-  text-align: center;
   text-decoration: none;
 }
 
@@ -97,18 +95,25 @@
 
 .profileHubCounts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-top: 1.35rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0;
+  padding: var(--profile-section-space) 0;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .profileHubCounts > div {
   display: grid;
   gap: 0.1rem;
-  padding: 0.8rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.7rem;
-  background: var(--surface);
+  padding: 0 0.35rem;
+  text-align: center;
+}
+
+.profileHubCounts > div + div {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.profileHubCounts > div:first-child {
+  border-left: 0;
 }
 
 .profileHubCounts strong {
@@ -119,45 +124,41 @@
 
 .profileHubCounts span {
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
+  line-height: 1.15;
 }
 
 .profileHubStats {
-  margin-top: 2.25rem;
-}
-
-.profileHubSectionHeading,
-.profilePreviewHeading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.profileHubSectionHeading {
-  margin-bottom: 0.8rem;
-}
-
-.profileHubSectionHeading h2 {
-  font-size: 1.3rem;
-}
-
-.profileHubSectionHeading a,
-.profilePreviewHeading a {
-  flex: 0 0 auto;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.profilePreviewGrid {
   display: grid;
-  gap: 0.75rem;
+  gap: 0;
+  margin-top: 0;
+}
+
+.profileHubStats > * {
+  padding: var(--profile-section-space) 0;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .profilePreview {
   min-width: 0;
+}
+
+.profilePreviewName {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.profilePreviewLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.45rem;
+}
+
+.profilePreviewTable {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: 0.75rem;
@@ -165,70 +166,350 @@
 }
 
 .profilePreviewHeading {
-  min-height: 3.1rem;
-  padding: 0.75rem 0.85rem;
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  padding: 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.profilePreviewHeading h3 {
-  margin: 0;
-  color: var(--text-strong);
+.profilePreviewSelectors {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  height: 3rem;
+  align-items: stretch;
+}
+
+.profilePreviewEventControl {
+  height: 3rem;
+}
+
+.profilePreview .EventPicker-preview {
+  display: flex;
+  width: auto;
+  height: 100%;
+  align-items: center;
+  gap: 0.55rem;
+  padding-inline: 0.8rem;
+  border-radius: 0.7rem 0 0 0;
   font-size: 1rem;
+}
+
+.profilePreview .EventPicker-preview::before {
+  font-size: 1.25rem;
+}
+
+.profilePreview .EventPicker-name {
+  display: block;
+  white-space: nowrap;
+}
+
+.profilePreview .Jump-resultTypeControl {
+  height: 3rem;
+}
+
+.profilePreview .Jump-resultTypeToggle {
+  min-height: 100%;
+  padding-inline: 0.75rem;
+  color: var(--text-strong);
+}
+
+.profilePreviewYearControl {
+  flex: 0 1 7rem;
+  min-width: 5.9rem;
+}
+
+.profilePreview .profilePreviewYearPicker,
+.profilePreview .profilePreviewYearPicker .TextDropdown,
+.profilePreview .profilePreviewYearPicker .TextDropdown-trigger {
+  height: 100%;
+}
+
+.profilePreview .profilePreviewYearPicker .TextDropdown-trigger {
+  width: 100%;
+  padding-inline: 0.65rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-strong);
+  font-size: 0.9rem;
+}
+
+.profilePreview .profilePreviewYearPicker .TextDropdown-options {
+  z-index: 3;
+}
+
+.profilePreviewExplore {
+  display: grid;
+  min-height: 3rem;
+  padding-inline: 0.8rem;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (max-width: 639px) {
+  .profilePreviewHeading:has(.profilePreviewSelectors) {
+    flex-wrap: nowrap;
+  }
+
+  .profilePreviewHeading .profilePreviewSelectors {
+    flex: 1 1 auto;
+  }
+
+  .profilePreviewHeading .profilePreviewExplore {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 3rem;
+    padding-inline: 0.5rem;
+  }
+
+  .profilePreview .profilePreviewYearControl {
+    flex-basis: 6rem;
+    min-width: 5.75rem;
+  }
+
+  .profilePreview .EventPicker-preview {
+    width: 100%;
+    gap: 0.35rem;
+    padding-inline: 0.45rem;
+  }
+
+  .profilePreview .EventPicker-name {
+    line-height: 1.05;
+    white-space: normal;
+  }
+}
+
+.profilePreviewExplore:hover,
+.profilePreviewExplore:focus-visible {
+  color: var(--focus);
+  outline: none;
 }
 
 .profilePreviewRows {
   margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
-.profilePreviewRows li {
+.profileMedalSummary {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.9rem;
+  background: var(--surface);
+}
+
+.profileMedalSummaryTotal {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.75rem;
-  min-height: 3.6rem;
-  padding: 0.55rem 0.85rem;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  background: var(--surface-selected);
 }
 
-.profilePreviewRows li + li {
+.profileMedalSummaryBreakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.profileMedalSummaryBreakdown > div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.8rem 0.7rem;
+}
+
+.profileMedalSummaryBreakdown > div + div {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.profileMedalSummary dt {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.profileMedalSummary dd {
+  margin: 0;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.profileMedalSummaryTotal dd {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.profileMedalSummaryTotal dt {
+  color: var(--text-strong);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.profileMedalSummaryBreakdown dd {
+  font-size: 1.1rem;
+}
+
+.profilePersonalBestsMock {
+  --personal-best-result-row-height: 1.55rem;
+  --personal-best-result-row-gap: 0.2rem;
+  --personal-best-rank-column-width: 5rem;
+
+  margin: 0;
+}
+
+.profilePersonalBestColumnHeaders {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  column-gap: 0.5rem;
+  gap: 0.2rem;
+  padding: 0.4rem 1rem 0.15rem;
+  color: var(--text-subtle);
+  font-size: 0.68rem;
+}
+
+.profilePersonalBestResultHeaders,
+.profilePersonalBestValues {
+  display: grid;
+  grid-template-columns: repeat(2, 3rem);
+  justify-content: start;
+  gap: 0.2rem;
+}
+
+.profilePersonalBestResultHeaders {
+  text-align: right;
+}
+
+.profilePersonalBestRankHeaders,
+.profilePersonalBestRanks {
+  display: grid;
+  grid-template-columns: repeat(3, var(--personal-best-rank-column-width));
+  gap: 0.2rem;
+  justify-content: end;
+}
+
+.profilePersonalBestRankHeaders {
+  text-align: right;
+}
+
+.profilePersonalBestRankHeaders > span {
+  justify-self: end;
+}
+
+.profilePersonalBestRow {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  column-gap: 0.5rem;
+  padding: 0.8rem 1rem;
+}
+
+.profilePersonalBestRow + .profilePersonalBestRow {
   border-top: 1px solid var(--border-subtle);
 }
 
-.profilePreviewRows li:nth-child(even) {
-  background: var(--surface-muted);
-}
-
-.profilePreviewRows li > div:first-child {
-  display: grid;
-  min-width: 0;
-  gap: 0.1rem;
-}
-
-.profilePreviewRows strong {
+.profilePersonalBestRow h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: center;
+  margin: 0;
   color: var(--text-strong);
-  font-size: 1rem;
-  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
-.profilePreviewRows li > div:first-child span,
-.profilePreviewResultMeta > span:last-child,
-.profileStatsMessage {
+.profilePersonalBestRow h3 > span {
+  color: var(--text-muted);
+  font-size: 1.15rem;
+}
+
+.profilePersonalBestValues {
+  align-items: center;
+  align-self: start;
+  grid-template-rows: repeat(2, var(--personal-best-result-row-height));
+  row-gap: var(--personal-best-result-row-gap);
+}
+
+.profilePersonalBestValues > strong {
+  color: var(--text-strong);
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.profilePersonalBestValues > strong:first-child {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.profilePersonalBestValues > strong:nth-child(2) {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.profilePersonalBestRankColumn {
+  display: grid;
+  grid-template-rows: repeat(2, var(--personal-best-result-row-height));
+  align-items: center;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  row-gap: var(--personal-best-result-row-gap);
+}
+
+.profilePersonalBestRank {
+  min-width: 0;
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+  justify-self: end;
+  text-align: right;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.profilePreviewResultMeta {
+.profilePersonalBestRank[data-record="true"] {
+  font-weight: 600;
+}
+
+.profilePersonalBestRank[data-record="true"][data-scope="WR"] {
+  color: var(--record-world);
+}
+
+.profilePersonalBestRank[data-record="true"][data-scope="CR"] {
+  color: var(--record-continent);
+}
+
+.profilePersonalBestRank[data-record="true"][data-scope="NR"] {
+  color: var(--record-national);
+}
+
+.profilePreview .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profilePreview .rowHeader {
   display: grid;
-  justify-items: end;
-  gap: 0.22rem;
+  grid-template-columns: 3ch minmax(0, 1fr) auto;
 }
 
-.profilePreviewResultMeta .recordBadge {
-  font-size: 0.68rem;
+.profilePreview .rank {
+  width: auto;
+  flex: none;
+}
+
+.profilePreview .identity,
+.profilePreview .personName {
+  width: 100%;
+  overflow: hidden;
+}
+
+.profilePreview .result {
+  flex: 0 0 auto;
+  margin-left: 0;
+  max-width: none;
 }
 
 .profileStatsLoading,
@@ -249,11 +530,7 @@
 
 @media (min-width: 640px) {
   .profileHub {
-    padding-top: 1.75rem;
-  }
-
-  .profileHubHero {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding-top: 0.75rem;
   }
 
   .profileHubAvatar {
@@ -261,15 +538,44 @@
     height: 5rem;
   }
 
-  .profileHubWcaLink {
-    grid-column: auto;
-  }
-
   .profileHubCounts {
-    max-width: 30rem;
+    max-width: 44rem;
   }
 
-  .profilePreviewGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .profileHubCounts > div {
+    padding-inline: 0.8rem;
+  }
+
+  .profileHubCounts span {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .profileHubHero {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .profilePersonalBestRow {
+    grid-template-columns: 1.8rem minmax(0, 1fr) auto;
+    column-gap: 0.3rem;
+  }
+
+  .profilePersonalBestColumnHeaders {
+    grid-template-columns: 1.8rem minmax(0, 1fr) auto;
+    column-gap: 0.3rem;
+  }
+
+  .profilePersonalBestRankHeaders,
+  .profilePersonalBestRanks {
+    --personal-best-rank-column-width: 3rem;
+  }
+
+  .profilePersonalBestRow h3 {
+    justify-content: center;
+  }
+
+  .profilePersonalBestEventName {
+    display: none;
   }
 }

@@ -10,6 +10,7 @@ export type PersonProfileHeader = {
     avatarUrl: string | null;
   };
   competitionCount: number;
+  countryCount: number;
   solveCount: number;
 };
 
@@ -21,6 +22,7 @@ type PersonProfileHeaderRow = {
   continent_name: string;
   avatar_url: string | null;
   competition_count: number;
+  country_count: number;
   solve_count: number;
 };
 
@@ -44,6 +46,7 @@ export async function loadPersonProfileHeader(
        COALESCE(continent.name, country.continent_id, '') AS continent_name,
        app_user.avatar_url,
        COALESCE(competition_counts.competition_count, 0) AS competition_count,
+       COALESCE(profile_stats.country_count, 0) AS country_count,
        COALESCE(solves.solve_count, 0) AS solve_count
      FROM persons person
      LEFT JOIN countries country ON country.id = person.country_id
@@ -51,6 +54,15 @@ export async function loadPersonProfileHeader(
      LEFT JOIN app_users app_user ON app_user.wca_id = person.wca_id
      LEFT JOIN person_competition_counts competition_counts
        ON competition_counts.person_id = person.wca_id
+     LEFT JOIN (
+       SELECT
+         facts.person_id,
+         COUNT(DISTINCT competition.country_id) AS country_count
+       FROM result_facts facts
+       LEFT JOIN competitions competition ON competition.id = facts.competition_id
+       WHERE facts.person_id = ?
+       GROUP BY facts.person_id
+     ) profile_stats ON profile_stats.person_id = person.wca_id
      LEFT JOIN (
        SELECT facts.person_id, COUNT(*) AS solve_count
        FROM result_facts facts
@@ -60,7 +72,7 @@ export async function loadPersonProfileHeader(
      ) solves ON solves.person_id = person.wca_id
      WHERE person.wca_id = ? AND person.sub_id = 1
      LIMIT 1`,
-    [normalized, normalized],
+    [normalized, normalized, normalized],
   );
   const person = result.rows[0];
   if (!person) return null;
@@ -75,6 +87,7 @@ export async function loadPersonProfileHeader(
       avatarUrl: person.avatar_url,
     },
     competitionCount: Number(person.competition_count),
+    countryCount: Number(person.country_count),
     solveCount: Number(person.solve_count),
   };
 }

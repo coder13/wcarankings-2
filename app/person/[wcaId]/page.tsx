@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ProfileStatPreviews } from "@/components/ProfileStatPreviews/ProfileStatPreviews";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { PersonMedalPreview } from "@/components/ProfileStatPreviews/PersonMedalPreview";
+import { PersonalBestsPreviewMock } from "@/components/ProfileStatPreviews/PersonalBestsPreviewMock";
+import { PersonResultsPreview } from "@/components/ProfileStatPreviews/PersonResultsPreview";
 import { StatPageLayout } from "@/components/StatPageLayout/StatPageLayout";
 import {
   loadPersonProfileHeader,
@@ -15,18 +16,6 @@ export const dynamic = "force-dynamic";
 type PageProps = {
   params: Promise<{ wcaId: string }>;
 };
-
-function initials(name: string) {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
 
 function formatCount(value: number) {
   return new Intl.NumberFormat().format(value);
@@ -65,22 +54,12 @@ export default async function PersonProfilePage({ params }: PageProps) {
     >
       <main className="profileHub">
         <section className="profileHubHero" aria-labelledby="profile-name">
-          <span className="profileHubAvatar" aria-hidden="true">
-            {person.avatarUrl ? (
-              <Image
-                src={person.avatarUrl}
-                alt=""
-                width={80}
-                height={80}
-                unoptimized
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              initials(person.name)
-            )}
-          </span>
+          <ProfileAvatar
+            personId={person.id}
+            name={person.name}
+            initialAvatarUrl={person.avatarUrl}
+          />
           <div className="profileHubIdentity">
-            <p className="profileHubEyebrow">Competitor profile</p>
             <h2 id="profile-name">{person.name}</h2>
             <p className="profileHubLocation">
               <span
@@ -103,26 +82,25 @@ export default async function PersonProfilePage({ params }: PageProps) {
           </a>
         </section>
 
-        <section className="profileHubCounts" aria-label="Competition summary">
+        <section className="profileHubCounts" aria-label="Profile summary">
           <div>
             <strong>{formatCount(profile.competitionCount)}</strong>
             <span>competitions</span>
           </div>
           <div>
             <strong>{formatCount(profile.solveCount)}</strong>
-            <span>official solves</span>
+            <span>solves</span>
+          </div>
+          <div>
+            <strong>{formatCount(profile.countryCount)}</strong>
+            <span>countries</span>
           </div>
         </section>
 
-        <section className="profileHubStats" aria-labelledby="profile-stats">
-          <div className="profileHubSectionHeading">
-            <div>
-              <p className="profileHubEyebrow">Stats</p>
-              <h2 id="profile-stats">Explore results</h2>
-            </div>
-            <Link href="/">All rankings</Link>
-          </div>
-          <ProfileStatPreviews personId={person.id} />
+        <section className="profileHubStats" aria-label="Profile statistics">
+          <PersonalBestsPreviewMock />
+          <PersonMedalPreview personId={person.id} />
+          <PersonResultsPreview personId={person.id} />
         </section>
       </main>
     </StatPageLayout>

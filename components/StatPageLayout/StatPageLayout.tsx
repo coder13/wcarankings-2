@@ -19,12 +19,16 @@ type StatPageNavigation = {
 function StatPageFooter({
   exportDate,
   showFreshness,
+  standalone = false,
 }: {
   exportDate: string | null;
   showFreshness: boolean;
+  standalone?: boolean;
 }) {
   return (
-    <footer className="siteFooter">
+    <footer
+      className={`siteFooter${standalone ? " siteFooter--standalone" : ""}`}
+    >
       <span>By Adam Walker and Cailyn Sinclair</span>
       {showFreshness && <span>{formatRankingsFreshness(exportDate)}</span>}
     </footer>
@@ -53,7 +57,11 @@ export function StatPageLayout({
   showFreshness?: boolean;
 }) {
   const footer = (
-    <StatPageFooter exportDate={exportDate} showFreshness={showFreshness} />
+    <StatPageFooter
+      exportDate={exportDate}
+      showFreshness={showFreshness}
+      standalone={staticFooter}
+    />
   );
   let bottomContent = (
     <div className="JumpControlsFallback" data-visible="true">

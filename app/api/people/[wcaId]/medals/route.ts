@@ -1,5 +1,5 @@
 import { handleProjectionRequest } from "@/controllers/projection-controller";
-import { loadPersonProfileStatPreviews } from "@/services/profile-stat-previews";
+import { loadPersonMedalPreview } from "@/services/people/medal-preview";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET(
   context: { params: Promise<{ wcaId: string }> },
 ) {
   const { wcaId } = await context.params;
-  return handleProjectionRequest(request, "person-profile-stat-previews", () =>
-    loadPersonProfileStatPreviews(wcaId),
+  return handleProjectionRequest(request, "person-medal-preview", (params) =>
+    loadPersonMedalPreview(wcaId, params),
   );
 }
