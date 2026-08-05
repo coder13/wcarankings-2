@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import mysql from "mysql2/promise";
-import test from "node:test";
+import { test } from "bun:test";
 import {
   activateGeneration,
   activationTables,

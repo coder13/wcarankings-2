@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import test from "node:test";
+import { test } from "bun:test";
 import mysql from "mysql2/promise";
 import { ensureWcaPersonLookupIndex } from "../data-tools/projections/build.ts";
 
 const adminDatabaseUrl = process.env.INTEGRATION_ADMIN_DATABASE_URL;
+const integrationTest = adminDatabaseUrl ? test : test.skip;
 
 function databaseOptions(connectionString, database) {
   const url = new URL(connectionString);
@@ -17,12 +18,8 @@ function databaseOptions(connectionString, database) {
   };
 }
 
-test(
+integrationTest(
   "person lookup index survives the empty-candidate then raw-import lifecycle",
-  {
-    skip:
-      !adminDatabaseUrl && "INTEGRATION_ADMIN_DATABASE_URL is not configured",
-  },
   async () => {
     const schema = `person_lookup_index_${process.pid}`;
     const admin = await mysql.createConnection(
