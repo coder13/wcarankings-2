@@ -12,8 +12,8 @@ export const personActivityRankingsJob = {
   releaseGroup: "person-activity-rankings",
   releaseOrder: 6,
   releaseSchemaVersion: 1,
-  estimatedDurationMs: 180_000,
-  enabledByDefault: false,
+  estimatedDurationMs: 560_000,
+  enabledByDefault: true,
   subject: "people",
   stat: "activity-rankings",
 } as const satisfies ProjectionJob;

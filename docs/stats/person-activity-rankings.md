@@ -1,6 +1,6 @@
 # Person activity rankings
 
-Status: **Planned**
+Status: **Active**
 
 ## What it ranks
 
@@ -51,8 +51,9 @@ Region and gender requests rank `person_activity_counts` in a 400-row cached
 window. The cache key includes the generation, metric, scope, region, gender
 set, and window start. Equal cache misses use the shared in-flight cache.
 
-The projection is not in the default build set. Enable it only after the
-pending build, request, query-plan, and storage measurements are complete.
+The default build includes this projection. The common World lists serve the
+API and profile highlights. The measured ranking phase adds 12.7 seconds to
+the count-table build.
 
 This layout also supports profile highlights. A highlight can query the
 stored World ranking by metric and person ID. It does not scan result facts.
@@ -69,31 +70,66 @@ needs one. The lazy path reads one row per person, not raw result rows.
 
 ## Performance evidence
 
-### Measured
+### Measured build
 
-No build or request measurement exists for this projection yet.
+The 2026-08-05 build used MariaDB 11.8.8 and the existing local full dataset.
+The source contained 6,758,694 result facts and 29,601,524 positive attempts.
 
-On 2026-08-05, local MariaDB 11.8.8 reported these
-`EXPLAIN FORMAT=JSON` plans:
+| Phase                                  |       Time |
+| -------------------------------------- | ---------: |
+| Temporary solve counts and primary key | 198,310 ms |
+| Person activity counts                 | 339,986 ms |
+| Common World rankings and indexes      |  12,710 ms |
+| Ranking counts and primary key         |     306 ms |
+| Complete projection                    | 552,105 ms |
 
-- The solve-count phase used an `ALL` scan of 31,062,285 estimated
-  `result_attempts` rows. It also used a filesort and a temporary table.
-- The base activity aggregate scanned 294,476 estimated `persons` rows.
-  It read `result_facts` by person with `ref` access and 23 estimated rows.
-  The country joins used `eq_ref` access. The group step used a filesort and
-  a temporary table.
+The build created 293,298 count rows, 878,803 ranking rows, and three ranking-count rows.
+The output totals equal the source totals. Three high-value sample people also
+matched raw country, round, and solve counts.
 
-The base aggregate plan did not include the unbuilt solve-count table. These
-plans do not contain execution timing. No index decision is measured yet.
+### Measured storage
+
+| Table                            |      Data |  Indexes |
+| -------------------------------- | --------: | -------: |
+| `person_activity_counts`         |  29.6 MiB |    0 MiB |
+| `person_activity_rankings`       |  80.7 MiB | 41.6 MiB |
+| `person_activity_ranking_counts` |  0.02 MiB |    0 MiB |
+| Total                            | 110.3 MiB | 41.6 MiB |
+
+### Measured requests
+
+The request measurements used 20 iterations and a warm database buffer pool.
+
+| Request                      | Database p95 | HTTP p95 | Cache  |
+| ---------------------------- | -----------: | -------: | ------ |
+| Countries, World, first page |       1.7 ms |  11.6 ms | Bypass |
+| Rounds, World, women         |      83.7 ms | 104.6 ms | Miss   |
+| Solves, Europe               |     154.9 ms | 167.3 ms | Miss   |
+| Rounds, World, women         |            — |   6.8 ms | Hit    |
+
+Two equal uncached requests used one database load. One response reported
+`miss`, and the other response reported `coalesced`. Both finished in 84.5 ms.
+
+### Measured plans
+
+The solve-count phase scans 31,062,285 estimated `result_attempts` rows. It
+uses one filesort and one temporary table. This full scan occurs once per build.
+
+The person aggregate scans 294,476 estimated `persons` rows. It reads
+`result_facts` by person with `ref` access and 23 estimated rows per person.
+Competition and solve-count joins use `eq_ref` access. The group operation
+uses one filesort and one temporary table.
+
+The eager request uses `idx_person_activity_rankings_page` with `range`
+access. It sorts only the 51-row page and does not use a temporary table.
+
+The lazy requests scan 293,646 estimated compact count rows. Each plan uses
+two filesorts and one temporary table. Their measured p95 values meet the
+200 ms target, so no additional count-table index is justified.
 
 ### Pending
 
-- Run the complete aggregate plan after the solve-count stage exists.
-- Run `EXPLAIN FORMAT=JSON` for a World gender page and a continent page.
-- Measure cache miss, cache hit, and coalesced 400-row windows.
-- Measure the temporary attempt-count phase, aggregate phase, ranking phase,
-  and complete group duration on the reference export.
-- Record source rows, output rows, table size, and index size.
-- Review the measurements, then decide whether to enable the default build.
+- Measure a cold database buffer pool on the release environment.
+- Record the first production projection build and request measurements.
 
-No local import, refresh, or projection build ran for this change.
+No import, raw-table refresh, or database recreation ran for these measurements.
