@@ -345,7 +345,6 @@
   height: var(--profile-preview-results-height);
   margin: 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .profileMedalPreview {
@@ -650,7 +649,6 @@
   height: var(--profile-preview-results-height);
   margin: 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 0;
   list-style: none;
 }
