@@ -150,7 +150,7 @@ export function RankingsTopRail() {
     ];
   } else if (filters.personActivityRanking) {
     personRankingPeriodOptions = PERSON_ACTIVITY_OPTIONS;
-    personRankingPeriodAriaLabel = "Activity statistic";
+    personRankingPeriodAriaLabel = "Person ranking statistic";
   } else {
     personRankingPeriodOptions = [
       ...(featureSwitch.personActivityRankings

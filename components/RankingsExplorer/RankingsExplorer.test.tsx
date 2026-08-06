@@ -220,7 +220,7 @@ test("renders activity statistic controls", () => {
     { options: { showSubjectSwitch: true } },
     { personActivityRanking: true, personActivityMetric: "rounds" },
   );
-  assert.match(markup, /aria-label="Activity statistic"/);
+  assert.match(markup, /aria-label="Person ranking statistic"/);
   assert.match(markup, />Competition count</);
   assert.match(markup, />Countries</);
   assert.match(markup, />Rounds</);
