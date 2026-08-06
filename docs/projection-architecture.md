@@ -63,7 +63,7 @@ same change.
 ## Active projection graph
 
 The default import activates shared facts and the result, person-event,
-competition, city, Sum-of-Ranks, and yearly-person projection groups:
+competition, city, country, Sum-of-Ranks, and yearly-person projection groups:
 
 ```text
 raw results + dimensions
@@ -72,7 +72,7 @@ raw results + dimensions
     │   ├── result_rankings_single
     │   └── result_rankings_average
     ├── person_event_rankings
-    └── city, yearly, competition, and Sum-of-Ranks projections
+    └── city, country, yearly, competition, and Sum-of-Ranks projections
 ```
 
 Registration alone does not activate a future projection. Only the explicit
@@ -140,14 +140,16 @@ position
 best
 average
 attempt_count
+official_solve_count
 regional_single_record
 regional_average_record
 ```
 
 `gender` is normalized once to `m`, `f`, or `o` at the shared source row.
 This removes repeated profile lookups from solve, Average-result,
-person-event, and city staging while adding only one compact dimension to the
-fact row.
+person-event, city, and country staging while adding only one compact dimension
+to the fact row. `official_solve_count` counts positive attempt values once for
+all downstream activity and location aggregates.
 
 The current public export v2 omits the five attempt values from `results`.
 They are therefore not repeated as always-NULL columns in `result_facts`;
