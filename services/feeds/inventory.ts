@@ -69,6 +69,15 @@ function resultName(resultType: RankingType) {
   return resultType === "single" ? "Single" : "Average";
 }
 
+export function feedStatKindName(kind: FeedStatKind) {
+  if (kind === "person") return "Person rankings";
+  if (kind === "result") return "Person result rankings";
+  if (kind === "person-competition") return "Person competition rankings";
+  if (kind === "person-medals") return "Person medal rankings";
+  if (kind === "competition") return "Competition rankings";
+  return "City rankings";
+}
+
 function exploreUrl({
   kind,
   eventId,
@@ -120,7 +129,7 @@ export function buildFeedStatInventory({
             ].join(" · ");
             for (const kind of FEED_STAT_KINDS) {
               const family = kind;
-              const title = `${event.name} · ${resultName(resultType)} · ${suffix}`;
+              const title = `${event.name} · ${feedStatKindName(kind)} · ${resultName(resultType)} · ${suffix}`;
               inventory.push({
                 id: `${family}-${eventId}-${resultType}-${region.scope}-${region.regionId || "world"}-${gender ?? "all"}-${year ?? "all"}`,
                 eventId,
@@ -217,7 +226,7 @@ export function buildRecentFeedStatInventory({
                 region,
                 gender,
                 year,
-                title: `${event.name} · ${resultName(resultType)} · ${suffix}`,
+                title: `${event.name} · ${feedStatKindName(kind)} · ${resultName(resultType)} · ${suffix}`,
                 exploreUrl: exploreUrl({
                   kind,
                   eventId: event.id,

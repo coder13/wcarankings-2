@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildFeedStatInventory,
+  feedStatKindName,
   prioritizeFeedStatInventory,
 } from "@/services/feeds/inventory";
 import { hasRecentFeedEntry } from "@/services/feeds/stat-previews";
@@ -46,6 +47,11 @@ test("builds the full bounded feed stat inventory", () => {
     inventory.some((stat) => stat.gender === "m"),
     false,
   );
+});
+
+test("names personal-best and all-result ranking families clearly", () => {
+  assert.equal(feedStatKindName("person"), "Person rankings");
+  assert.equal(feedStatKindName("result"), "Person result rankings");
 });
 
 test("qualifies a stat when a recent result is in the top ten", () => {
