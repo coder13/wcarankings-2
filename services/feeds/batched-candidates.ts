@@ -3,7 +3,6 @@ import type { GenderFilter } from "@/lib/wca";
 import type { FeedInventoryStat } from "./inventory";
 import type { RecentResultReference } from "./recent-changes";
 import type { FeedInterestingResult } from "./stat-previews";
-import { FEED_SORT_CONSTANTS } from "./constants";
 
 type FeedQuery = (
   text: string,
@@ -25,28 +24,6 @@ type CandidateRow = {
   continent_sub_rank?: number | string | null;
   country_sub_rank?: number | string | null;
 };
-
-function notabilityScore(row: CandidateRow) {
-  const ranks = [
-    [row.world_position ?? row.world_sub_rank, FEED_SORT_CONSTANTS.worldRank],
-    [
-      row.continent_position ?? row.continent_sub_rank,
-      FEED_SORT_CONSTANTS.continentRank,
-    ],
-    [
-      row.country_position ?? row.country_sub_rank,
-      FEED_SORT_CONSTANTS.countryRank,
-    ],
-  ];
-  return Math.max(
-    ...ranks.map(([rank, weight]) => {
-      const position = number(rank);
-      return position !== null && position <= 10
-        ? Number(weight) + (11 - position) * FEED_SORT_CONSTANTS.rankStep
-        : 0;
-    }),
-  );
-}
 
 function placeholders(count: number) {
   return Array.from({ length: count }, () => "?").join(", ");
@@ -84,7 +61,9 @@ function candidate(
     regionId: string;
     gender: GenderFilter | null;
     reference: RecentResultReference;
-    notability: number;
+    worldRank: number | null;
+    continentRank: number | null;
+    countryRank: number | null;
   },
 ) {
   const id = `${input.kind}-${input.reference.eventId}-${input.resultType}-${input.scope}-${input.regionId || "world"}-${input.gender ?? "all"}-${input.year ?? "all"}`;
@@ -97,8 +76,9 @@ function candidate(
         ? String(input.reference.resultId)
         : input.reference.personId,
     interestingResultId: input.reference.resultId,
-    notabilityScore: input.notability,
-    statPopularityScore: 0,
+    worldRank: input.worldRank,
+    continentRank: input.continentRank,
+    countryRank: input.countryRank,
   } satisfies FeedInterestingResult;
 }
 
@@ -129,7 +109,9 @@ function addRowCandidates(
         regionId,
         gender: selectedGender,
         reference,
-        notability: notabilityScore(row),
+        worldRank: number(row.world_position ?? row.world_sub_rank),
+        continentRank: number(row.continent_position ?? row.continent_sub_rank),
+        countryRank: number(row.country_position ?? row.country_sub_rank),
       });
       if (item) output.set(`${item.id}:${item.interestingEntityId}`, item);
     }

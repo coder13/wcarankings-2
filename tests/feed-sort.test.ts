@@ -20,8 +20,9 @@ function candidate(
     exploreUrl: "/results?eventId=333",
     interestingEntityId: id,
     interestingResultId: 1,
-    notabilityScore: 0,
-    statPopularityScore: 0,
+    worldRank: null,
+    continentRank: null,
+    countryRank: null,
     ...overrides,
   };
 }
@@ -31,16 +32,16 @@ test("orders world results before continent and national results", () => {
     [
       candidate("country", {
         region: { scope: "country", regionId: "USA", name: "United States" },
-        notabilityScore: 110,
+        countryRank: 1,
       }),
-      candidate("world", { notabilityScore: 310 }),
+      candidate("world", { worldRank: 1 }),
       candidate("continent", {
         region: {
           scope: "continent",
           regionId: "_North America",
           name: "North America",
         },
-        notabilityScore: 210,
+        continentRank: 1,
       }),
     ],
     null,
@@ -56,11 +57,11 @@ test("boosts averages and the logged-in user's country", () => {
     [
       candidate("average", {
         resultType: "average",
-        notabilityScore: 200,
+        worldRank: 8,
       }),
       candidate("my-country", {
         region: { scope: "country", regionId: "USA", name: "United States" },
-        notabilityScore: 150,
+        countryRank: 1,
       }),
     ],
     {

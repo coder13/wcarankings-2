@@ -2,7 +2,6 @@ import type { RankingEntry } from "@/components/RankingsExplorer/types";
 import { getRegions } from "@/services/regions/service";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
-import { readPopularRankingDescriptors } from "@/services/ranking-popularity/read-service";
 import { generateBatchedFeedCandidates } from "./batched-candidates";
 import { FEED_PAGE_SIZE, FEED_TOP_SCAN_SIZE } from "./constants";
 import {
@@ -20,6 +19,7 @@ import {
   writeFeedSnapshot,
 } from "./snapshot";
 import { addFeedStatPopularity, sortFeedCandidates } from "./sort";
+import { readPopularRankingDescriptors } from "@/services/ranking-popularity/read-service";
 import type { FeedUserPreferences } from "./preferences";
 
 const PAGE_SIZE = FEED_PAGE_SIZE;
@@ -34,8 +34,10 @@ export type FeedStatPreview = FeedInventoryStat & {
 export type FeedInterestingResult = FeedInventoryStat & {
   interestingEntityId: string;
   interestingResultId: number | undefined;
-  notabilityScore: number;
-  statPopularityScore: number;
+  worldRank: number | null;
+  continentRank: number | null;
+  countryRank: number | null;
+  statPopularityScore?: number;
 };
 
 export type FeedStatPreviewPage = {
@@ -153,19 +155,22 @@ export async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
     buildRecentFeedStatInventory({ references, continents, countries }),
     triggers,
   );
-  const [candidates, popularity] = await Promise.all([
-    generateBatchedFeedCandidates({ references, inventory }),
-    readPopularRankingDescriptors({ limit: 100, viewedAt: now ?? new Date() }),
-  ]);
-  return addFeedStatPopularity(candidates, popularity);
+  return generateBatchedFeedCandidates({
+    references,
+    inventory,
+  });
 }
 
 async function loadInterestingResultPage(
   candidates: readonly FeedInterestingResult[],
   preferences: Parameters<typeof sortFeedCandidates>[1],
+  popularity: Awaited<ReturnType<typeof readPopularRankingDescriptors>>,
 ) {
   const loaded = await loadSourcePage(
-    sortFeedCandidates(candidates, preferences),
+    sortFeedCandidates(
+      addFeedStatPopularity(candidates, popularity),
+      preferences,
+    ),
   );
   return loaded.flatMap(({ source, entries }) => {
     const interestingIndex = entries
@@ -231,8 +236,19 @@ export async function loadFeedStatPreviews({
     startBackgroundBuild(now);
     return { previews: [], nextCursor: null };
   }
+  const popularity = await readPopularRankingDescriptors({
+    limit: 100,
+    viewedAt: now ?? new Date(),
+  }).catch((error) => {
+    console.warn("Feed stat popularity is unavailable.", error);
+    return [];
+  });
   const candidates = snapshot.candidates.slice(cursor, cursor + PAGE_SIZE);
-  const previews = await loadInterestingResultPage(candidates, preferences);
+  const previews = await loadInterestingResultPage(
+    candidates,
+    preferences,
+    popularity,
+  );
   const nextCursor =
     cursor + candidates.length < snapshot.candidates.length
       ? cursor + candidates.length

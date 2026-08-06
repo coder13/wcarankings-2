@@ -16,7 +16,10 @@ function feedDescriptor(source: FeedInventoryStat): RankingListDescriptor {
     eventId: source.eventId,
     resultType: source.resultType,
     year: source.year,
-    region: source.region,
+    region: {
+      scope: source.region.scope,
+      regionId: source.region.regionId,
+    },
     genders: source.gender === null ? [] : [source.gender],
     population: { kind: "everyone" },
   };
@@ -76,21 +79,38 @@ function personalScore(
   return 0;
 }
 
+export function feedNotabilityScore(candidate: FeedInterestingResult) {
+  return Math.max(
+    candidate.worldRank !== null && candidate.worldRank <= 10
+      ? FEED_SORT_CONSTANTS.worldRank +
+          (11 - candidate.worldRank) * FEED_SORT_CONSTANTS.rankStep
+      : 0,
+    candidate.continentRank !== null && candidate.continentRank <= 10
+      ? FEED_SORT_CONSTANTS.continentRank +
+          (11 - candidate.continentRank) * FEED_SORT_CONSTANTS.rankStep
+      : 0,
+    candidate.countryRank !== null && candidate.countryRank <= 10
+      ? FEED_SORT_CONSTANTS.countryRank +
+          (11 - candidate.countryRank) * FEED_SORT_CONSTANTS.rankStep
+      : 0,
+  );
+}
+
 export function sortFeedCandidates(
   candidates: readonly FeedInterestingResult[],
   preferences: FeedUserPreferences | null,
 ) {
   return [...candidates].sort((left, right) => {
     const rightScore =
-      right.notabilityScore +
+      feedNotabilityScore(right) +
       (right.resultType === "average" ? FEED_SORT_CONSTANTS.averageResult : 0) +
       personalScore(right, preferences) +
-      right.statPopularityScore;
+      (right.statPopularityScore ?? 0);
     const leftScore =
-      left.notabilityScore +
+      feedNotabilityScore(left) +
       (left.resultType === "average" ? FEED_SORT_CONSTANTS.averageResult : 0) +
       personalScore(left, preferences) +
-      left.statPopularityScore;
+      (left.statPopularityScore ?? 0);
     return rightScore - leftScore || left.id.localeCompare(right.id);
   });
 }

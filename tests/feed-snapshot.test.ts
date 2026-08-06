@@ -16,7 +16,7 @@ test("uses the export fetched time as the feed snapshot version", async () => {
       rows: [
         {
           snapshot_json: JSON.stringify({
-            exportVersion: "v5:export-1",
+            exportVersion: "v7:export-1",
             candidates: [],
           }),
         },
@@ -24,9 +24,9 @@ test("uses the export fetched time as the feed snapshot version", async () => {
     };
   };
 
-  assert.equal(await currentFeedExportVersion(query), "v5:export-1");
+  assert.equal(await currentFeedExportVersion(query), "v7:export-1");
   assert.deepEqual(await readFeedSnapshot({ query }), {
-    exportVersion: "v5:export-1",
+    exportVersion: "v7:export-1",
     candidates: [],
   });
   assert.equal(calls.length, 3);
@@ -39,12 +39,12 @@ test("writes one complete snapshot for one export", async () => {
     return { rows: [] };
   };
   await writeFeedSnapshot(
-    { exportVersion: "v5:export-1", candidates: [] },
+    { exportVersion: "v7:export-1", candidates: [] },
     { query },
   );
   assert.match(call?.text ?? "", /ON DUPLICATE KEY UPDATE/);
   assert.deepEqual(call?.values, [
-    "v5:export-1",
-    '{"exportVersion":"v5:export-1","candidates":[]}',
+    "v7:export-1",
+    '{"exportVersion":"v7:export-1","candidates":[]}',
   ]);
 });
