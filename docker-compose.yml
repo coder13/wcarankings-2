@@ -57,6 +57,7 @@ services:
       WCA_CLIENT_ID: ${WCA_CLIENT_ID:-}
       WCA_CLIENT_SECRET: ${WCA_CLIENT_SECRET:-}
       WCA_REDIRECT_URI: ${WCA_REDIRECT_URI:-}
+      FEED_WORKER_URL: ${FEED_WORKER_URL:-http://background-worker:3010}
     depends_on:
       db:
         condition: service_healthy
@@ -74,14 +75,16 @@ services:
     volumes:
       - wca_export_cache:/var/cache/wcarankings
 
-  list-ranking-worker:
+  background-worker:
     image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
     restart: unless-stopped
-    command: ["/app/scripts/list-ranking-worker.ts"]
+    command: ["/app/scripts/background-worker.ts"]
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
       LIST_RANKING_WORKER_POLL_MS: ${LIST_RANKING_WORKER_POLL_MS:-2000}
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: 3010
     depends_on:
       db:
         condition: service_healthy

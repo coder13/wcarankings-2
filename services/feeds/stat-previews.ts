@@ -214,13 +214,51 @@ async function loadInterestingResultPage(
 
 let backgroundBuild: Promise<void> | null = null;
 
+export async function buildFeedSnapshot({ now }: { now?: Date } = {}) {
+  const exportVersion = await currentFeedExportVersion();
+  const candidates = await generateFeedStatPreviews({ now });
+  if ((await currentFeedExportVersion()) !== exportVersion) {
+    return { exportVersion, candidateCount: candidates.length, written: false };
+  }
+  await writeFeedSnapshot({ exportVersion, candidates });
+  return { exportVersion, candidateCount: candidates.length, written: true };
+}
+
+export async function ensureFeedSnapshot({ now }: { now?: Date } = {}) {
+  const snapshot = await readFeedSnapshot();
+  if (snapshot) {
+    return {
+      exportVersion: snapshot.exportVersion,
+      written: false,
+      candidateCount: snapshot.candidates.length,
+    };
+  }
+  return buildFeedSnapshot({ now });
+}
+
 function startBackgroundBuild(now?: Date) {
   if (backgroundBuild) return;
+  const workerUrl = process.env.FEED_WORKER_URL;
+  if (workerUrl) {
+    backgroundBuild = fetch(`${workerUrl.replace(/\/$/, "")}/jobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "feed.generate" }),
+    })
+      .then((response) => {
+        if (!response.ok)
+          throw new Error(`Feed worker returned ${response.status}.`);
+      })
+      .catch((error) => {
+        console.error("The feed worker request failed.", error);
+      })
+      .finally(() => {
+        backgroundBuild = null;
+      });
+    return;
+  }
   backgroundBuild = (async () => {
-    const exportVersion = await currentFeedExportVersion();
-    const candidates = await generateFeedStatPreviews({ now });
-    if ((await currentFeedExportVersion()) !== exportVersion) return;
-    await writeFeedSnapshot({ exportVersion, candidates });
+    await buildFeedSnapshot({ now });
   })()
     .catch((error) => {
       console.error("The feed snapshot build failed.", error);
