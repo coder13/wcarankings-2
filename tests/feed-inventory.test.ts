@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildFeedStatInventory } from "@/services/feeds/inventory";
+import { hasRecentTopFiveEntry } from "@/services/feeds/stat-previews";
 
 test("builds the full bounded feed stat inventory", () => {
   const inventory = buildFeedStatInventory({
@@ -32,5 +33,19 @@ test("builds the full bounded feed stat inventory", () => {
   assert.equal(
     inventory.some((stat) => stat.year !== null && stat.year !== 2026),
     false,
+  );
+});
+
+test("qualifies a stat only when a recent result is in the top five", () => {
+  const entries = Array.from({ length: 6 }, (_, index) => ({
+    competitionId: index === 5 ? "recent" : `old-${index}`,
+  }));
+  assert.equal(hasRecentTopFiveEntry(entries, new Set(["recent"])), false);
+  assert.equal(
+    hasRecentTopFiveEntry(
+      [{ competitionId: "old" }, { competitionId: "recent" }],
+      new Set(["recent"]),
+    ),
+    true,
   );
 });

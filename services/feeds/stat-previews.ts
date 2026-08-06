@@ -45,6 +45,15 @@ async function sourceEntries(source: FeedInventoryStat) {
   }
 }
 
+export function hasRecentTopFiveEntry(
+  entries: readonly Pick<RankingEntry, "competitionId">[],
+  competitionIds: ReadonlySet<string>,
+) {
+  return entries
+    .slice(0, 5)
+    .some((entry) => competitionIds.has(entry.competitionId));
+}
+
 async function loadSourcePage(sourcePage: readonly FeedInventoryStat[]) {
   const loaded: Array<{ source: FeedInventoryStat; entries: RankingEntry[] }> =
     [];
@@ -91,11 +100,7 @@ export async function loadFeedStatPreviews({
   const sourcePage = inventory.slice(cursor, cursor + MAX_SOURCE_SCAN);
   const loaded = await loadSourcePage(sourcePage);
   const previews = loaded
-    // This first experiment uses the current result's competition as a change
-    // signal. A historical generation diff will replace this filter later.
-    .filter(({ entries }) =>
-      entries.some((entry) => competitionIds.has(entry.competitionId)),
-    )
+    .filter(({ entries }) => hasRecentTopFiveEntry(entries, competitionIds))
     .slice(0, PAGE_SIZE)
     .map(({ source, entries }) => ({
       ...source,
