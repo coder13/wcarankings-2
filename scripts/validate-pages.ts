@@ -2,6 +2,17 @@ type PageCheck = {
   name: string;
   path: string;
   expected: string[];
+  capability?: CapabilityName;
+};
+
+type CapabilityName =
+  | "personCompetitionRankings"
+  | "personMedalRankings";
+
+type HealthResponse = {
+  generation?: {
+    capabilities?: Partial<Record<CapabilityName, { status: string }>>;
+  } | null;
 };
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
@@ -18,7 +29,7 @@ function argumentValue(name: string) {
 }
 
 function pageChecks(personId: string): PageCheck[] {
-  const checks = [
+  const checks: PageCheck[] = [
     {
       name: "people: 3x3 single",
       path: "/?eventId=333&result=single",
@@ -37,11 +48,13 @@ function pageChecks(personId: string): PageCheck[] {
     {
       name: "persons: competition count",
       path: "/persons/competitions",
+      capability: "personCompetitionRankings",
       expected: ["People by Competition Count | WCA Rankings"],
     },
     {
       name: "persons: gold medals",
       path: "/persons/medals?eventId=333&medal=gold",
+      capability: "personMedalRankings",
       expected: ["3x3x3 Cube Gold Medal Rankings | WCA Rankings"],
     },
     {
@@ -107,7 +120,15 @@ function pageChecks(personId: string): PageCheck[] {
   );
 }
 
-async function checkPage(baseUrl: string, check: PageCheck, timeoutMs: number) {
+async function checkPage(
+  baseUrl: string,
+  check: PageCheck,
+  timeoutMs: number,
+  enabledCapabilities: Set<CapabilityName>,
+) {
+  if (check.capability && !enabledCapabilities.has(check.capability)) {
+    return { skipped: true, elapsedMs: 0 };
+  }
   const url = new URL(check.path, baseUrl);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -140,7 +161,7 @@ async function checkPage(baseUrl: string, check: PageCheck, timeoutMs: number) {
         throw new Error("SSR description does not contain three result lines");
       }
     }
-    return { elapsedMs: Math.round(performance.now() - startedAt) };
+    return { skipped: false, elapsedMs: Math.round(performance.now() - startedAt) };
   } finally {
     clearTimeout(timeout);
   }
@@ -152,12 +173,37 @@ async function main() {
   const personId = argumentValue("person-id") || DEFAULT_PERSON_ID;
   const timeoutMs = Number(argumentValue("timeout-ms") || DEFAULT_TIMEOUT_MS);
   const checks = pageChecks(personId);
+  const healthResponse = await fetch(new URL("/api/admin/health", baseUrl));
+  if (!healthResponse.ok) {
+    throw new Error(`Health check failed with HTTP ${healthResponse.status}`);
+  }
+  const health = (await healthResponse.json()) as HealthResponse;
+  const enabledCapabilities = new Set<CapabilityName>();
+  for (const capability of [
+    "personCompetitionRankings",
+    "personMedalRankings",
+  ] as const) {
+    if (health.generation?.capabilities?.[capability]?.status === "enabled") {
+      enabledCapabilities.add(capability);
+    }
+  }
   let failures = 0;
+  let skipped = 0;
 
   for (const check of checks) {
     try {
-      const result = await checkPage(baseUrl, check, timeoutMs);
-      console.log(`PASS ${result.elapsedMs}ms ${check.name}`);
+      const result = await checkPage(
+        baseUrl,
+        check,
+        timeoutMs,
+        enabledCapabilities,
+      );
+      if (result.skipped) {
+        skipped += 1;
+        console.log(`SKIP ${check.name}: projection capability unavailable`);
+      } else {
+        console.log(`PASS ${result.elapsedMs}ms ${check.name}`);
+      }
     } catch (error) {
       failures += 1;
       console.error(
@@ -166,7 +212,9 @@ async function main() {
     }
   }
 
-  console.log(`\n${checks.length - failures}/${checks.length} pages passed.`);
+  console.log(
+    `\n${checks.length - failures - skipped}/${checks.length - skipped} pages passed; ${skipped} skipped.`,
+  );
   if (failures) process.exitCode = 1;
 }
 
