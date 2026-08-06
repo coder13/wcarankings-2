@@ -26,6 +26,26 @@ test("formats specific titles for people rankings and results", () => {
     formatRankingDocumentDescription(defaults),
     "Browse 3x3x3 cube single rankings from the World Cube Association.",
   );
+  assert.equal(
+    formatRankingDocumentDescription({ ...defaults, subject: "results" }),
+    "Browse 3x3x3 cube single results from the World Cube Association.",
+  );
+  assert.equal(
+    formatRankingDocumentDescription({
+      ...defaults,
+      subject: "competitions",
+      competitionRanking: "competitor-count",
+    }),
+    "Browse competition competitor counts from the World Cube Association.",
+  );
+  assert.equal(
+    formatRankingDocumentDescription({
+      ...defaults,
+      subject: "cities",
+      cityRanking: "fastest-single",
+    }),
+    "Browse 3x3x3 cube fastest single cities from the World Cube Association.",
+  );
 });
 
 test("formats titles for non-person ranking views and saved lists", () => {
