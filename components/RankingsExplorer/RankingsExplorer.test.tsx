@@ -10,6 +10,7 @@ import { competitionRankingPath } from "./useRankingsState";
 import type { RankingsFilterState } from "./rankingsUrl";
 import {
   personActivityRankingPath,
+  parseRankingsUrl,
   serializeRankingsUrl,
   type RankingsUrlState,
 } from "./rankingsUrl";
@@ -259,6 +260,14 @@ test("uses a unique canonical path for each person activity stat", () => {
   };
   assert.equal(
     serializeRankingsUrl("/persons/countries", filters).toString(),
-    "gender=f%2Co",
+    "gender=f%2Co&year=2023",
   );
+  const parsed = parseRankingsUrl(
+    "/persons/countries",
+    new URLSearchParams("year=2023&search=Avery"),
+  );
+  assert.equal(parsed.personActivityRanking, true);
+  assert.equal(parsed.personActivityMetric, "countries");
+  assert.equal(parsed.year, 2023);
+  assert.equal(parsed.search, "Avery");
 });

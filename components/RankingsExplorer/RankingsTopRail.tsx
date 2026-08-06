@@ -118,7 +118,7 @@ export function RankingsTopRail() {
   if (filters.personCompetitionRanking)
     personRankingPeriod = filters.year ? String(filters.year) : "competitions";
   else if (filters.personActivityRanking)
-    personRankingPeriod = filters.personActivityMetric;
+    personRankingPeriod = filters.year ? String(filters.year) : "";
   else if (filters.personMedalRanking) personRankingPeriod = filters.medalType;
   else if (filters.year) personRankingPeriod = String(filters.year);
   let personRankingYears = rankings.availableYears;
@@ -142,7 +142,13 @@ export function RankingsTopRail() {
       })),
     ];
   } else if (filters.personActivityRanking) {
-    personRankingPeriodOptions = [];
+    personRankingPeriodOptions = [
+      { value: "", label: t("rankingsRail.period.allTime") },
+      ...personRankingYears.map((year) => ({
+        value: String(year),
+        label: String(year),
+      })),
+    ];
   } else {
     personRankingPeriodOptions = [
       ...(featureSwitch.personMedalRankings
@@ -238,16 +244,14 @@ export function RankingsTopRail() {
                           true,
                           "competitions",
                         );
+                    } else if (filters.personActivityRanking) {
+                      actions.changeYear(value ? Number(value) : null);
                     } else if (
                       filters.subject === "people" &&
                       ["countries", "rounds", "solves"].includes(value)
                     ) {
                       actions.changePersonActivityRanking(
                         true,
-                        value as typeof filters.personActivityMetric,
-                      );
-                    } else if (filters.personActivityRanking) {
-                      actions.changePersonActivityMetric(
                         value as typeof filters.personActivityMetric,
                       );
                     } else if (value === "medals")
@@ -289,10 +293,7 @@ export function RankingsTopRail() {
               : undefined,
             regionDisabled: options.regionSelectionDisabled,
           }}
-          search={
-            filters.personActivityRanking
-              ? undefined
-              : {
+          search={{
                   searchInputRef: commands.registerSearchInput,
                   findOpen: search.state.open,
                   findQuery: search.state.query,
@@ -305,8 +306,7 @@ export function RankingsTopRail() {
                   onSearchClose: search.actions.close,
                   onSearchQueryChange: search.actions.changeQuery,
                   onSearchCycle: search.actions.cycle,
-                }
-          }
+                }}
         />
       )}
     </div>

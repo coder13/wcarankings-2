@@ -176,6 +176,19 @@ export function useRankingsState() {
           );
           return;
         }
+        if (filters.personActivityRanking) {
+          patchFilters(
+            { year: nextYear },
+            {
+              history: "push",
+              pathname: personActivityRankingPath(
+                filters.personActivityMetric,
+              ),
+            },
+            { search: "", wcaId: "", focusMe: false },
+          );
+          return;
+        }
         patchFilters(
           {
             year: nextYear,

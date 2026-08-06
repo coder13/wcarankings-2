@@ -142,6 +142,9 @@ function addRankingFilterParams(
   if (filters.regionSelection.scope !== "world") {
     params.set("region", filters.regionSelection.regionId);
   }
+  if (filters.resource === "person-activity-rankings") {
+    params.set("metric", filters.personActivityMetric);
+  }
 }
 
 function pageRequest(filters: RankingQueryFilters, start: number) {
