@@ -12,6 +12,7 @@
     "storybook": "STORYBOOK=true storybook dev -p 6006",
     "build-storybook": "STORYBOOK=true storybook build",
     "start": "node dist/standalone/server.js",
+    "validate:pages": "bun scripts/validate-pages.ts",
     "db:migrate": "docker compose --env-file .env.local run --rm flyway migrate",
     "db:refresh-rankings": "bun --env-file-if-exists=.env.local scripts/refresh-rankings.ts",
     "db:refresh-system-lists": "bun --env-file-if-exists=.env.local scripts/refresh-system-lists.ts",
