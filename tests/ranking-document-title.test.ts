@@ -81,3 +81,14 @@ test("formats titles for non-person ranking views and saved lists", () => {
     "Gold Medal Rankings | WCA Rankings",
   );
 });
+
+test("includes the top three results in ranking descriptions", () => {
+  assert.equal(
+    formatRankingDocumentDescription(defaults, [
+      "Teodor Zajder (2.76)",
+      "Xuanyi Geng (2.80)",
+      "Yiheng Wang (3.06)",
+    ]),
+    "Browse 3x3x3 cube single rankings from the World Cube Association. Top 3 results: Teodor Zajder (2.76); Xuanyi Geng (2.80); Yiheng Wang (3.06).",
+  );
+});

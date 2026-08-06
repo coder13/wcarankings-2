@@ -10,6 +10,7 @@ import { isMedalRankingType } from "@/lib/medal-rankings";
 import { isEventId, isRankingEventId, isRankingType } from "@/lib/wca";
 import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
+import { loadTopRankingResultLabels } from "@/services/rankings/page-metadata";
 import { getRegions } from "@/services/regions/service";
 
 const LIVE_COMMIT_SHA =
@@ -57,10 +58,18 @@ export async function getRankingsPageMetadata({
     rankingType,
     medalType,
   } satisfies RankingDocumentTitleInput;
+  const topResults = await loadTopRankingResultLabels(
+    new URLSearchParams(
+      Object.entries(params).flatMap(([key, value]) =>
+        Array.isArray(value) ? value.map((item) => [key, item]) : [[key, value ?? ""]],
+      ),
+    ),
+    metadataInput,
+  );
 
   return {
     title: formatRankingDocumentTitle(metadataInput),
-    description: formatRankingDocumentDescription(metadataInput),
+    description: formatRankingDocumentDescription(metadataInput, topResults),
   };
 }
 
