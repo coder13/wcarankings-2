@@ -1,4 +1,5 @@
 import { AuthenticationRequiredError } from "@/services/auth/auth";
+import { getRequestOrigin } from "@/services/auth/wca";
 import {
   ListConflictError,
   ListForbiddenError,
@@ -68,7 +69,7 @@ export async function readJsonObject(request: Request) {
 export function assertSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return;
-  if (origin !== new URL(request.url).origin) {
+  if (origin !== getRequestOrigin(request)) {
     throw new ListForbiddenError("Cross-origin mutations are not allowed.");
   }
 }
