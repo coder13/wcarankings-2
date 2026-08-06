@@ -126,20 +126,27 @@ export async function loadFeedStatPreviews({
     buildFeedStatInventory({ continents, countries }),
     triggers,
   );
-  const sourcePage = inventory.slice(cursor, cursor + MAX_SOURCE_SCAN);
-  const loaded = await loadSourcePage(sourcePage);
-  const previews = loaded
-    .filter(({ source, entries }) =>
-      hasRecentFeedEntry(source, entries, triggers),
-    )
-    .slice(0, PAGE_SIZE)
-    .map(({ source, entries }) => ({
-      ...source,
-      entries: entries.slice(0, 5),
-    }));
-  const nextCursor =
-    cursor + sourcePage.length < inventory.length
-      ? cursor + sourcePage.length
-      : null;
+  const previews: FeedStatPreview[] = [];
+  let scanCursor = cursor;
+  while (previews.length < PAGE_SIZE && scanCursor < inventory.length) {
+    const sourcePage = inventory.slice(
+      scanCursor,
+      scanCursor + MAX_SOURCE_SCAN,
+    );
+    const loaded = await loadSourcePage(sourcePage);
+    const matching = loaded
+      .filter(
+        ({ source, entries }) =>
+          entries.length >= PAGE_SIZE &&
+          hasRecentFeedEntry(source, entries, triggers),
+      )
+      .map(({ source, entries }) => ({
+        ...source,
+        entries: entries.slice(0, 5),
+      }));
+    previews.push(...matching.slice(0, PAGE_SIZE - previews.length));
+    scanCursor += sourcePage.length;
+  }
+  const nextCursor = scanCursor < inventory.length ? scanCursor : null;
   return { previews, nextCursor };
 }
