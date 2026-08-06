@@ -271,7 +271,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     (candidate) => candidate.name === "person-activity-rankings",
   );
   assert.ok(activity, "person-activity-rankings is registered");
-  assert.deepEqual(activity.dependencies, ["person-competition-rankings"]);
+  assert.deepEqual(activity.dependencies, ["result-facts"]);
   assert.equal(activity.enabledByDefault, false);
   for (const name of [
     "ranking-tables-entries-single-source",
