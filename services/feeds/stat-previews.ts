@@ -1,4 +1,5 @@
 import type { RankingEntry } from "@/components/RankingsExplorer/types";
+import { LRUCache } from "lru-cache";
 import { getRegions } from "@/services/regions/service";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
@@ -26,11 +27,13 @@ import { readFeedItems, replaceFeedItems } from "./items";
 import { addFeedStatPopularity, sortFeedCandidates } from "./sort";
 import { readPopularRankingDescriptors } from "@/services/ranking-popularity/read-service";
 import type { FeedUserPreferences } from "./preferences";
+import { readRedisJson, writeRedisJson } from "@/services/cache/redis";
 
 const PAGE_SIZE = FEED_PAGE_SIZE;
 const TOP_SCAN_SIZE = FEED_TOP_SCAN_SIZE;
 const PREVIEW_CANDIDATE_SCAN_SIZE = 20;
 const SOURCE_READ_CONCURRENCY = 2;
+const sourceEntriesCache = new LRUCache<string, RankingEntry[]>({ max: 256 });
 
 function normalizeSourceEntries(entries: readonly Record<string, unknown>[]) {
   function subRank(entry: Record<string, unknown>) {
@@ -121,7 +124,7 @@ function sourceParams(source: FeedInventoryStat) {
       source.kind === "person-medals"
         ? "1"
         : "0",
-    limit: "20",
+    limit: "50",
   });
   if (source.region.scope !== "world") {
     params.set("region", source.region.regionId);
@@ -135,7 +138,7 @@ function sourceParams(source: FeedInventoryStat) {
   return params;
 }
 
-async function sourceEntries(source: FeedInventoryStat) {
+async function loadSourceEntries(source: FeedInventoryStat) {
   try {
     const params = sourceParams(source);
     if (source.kind === "person") {
@@ -175,6 +178,23 @@ async function sourceEntries(source: FeedInventoryStat) {
   } catch {
     return [];
   }
+}
+
+async function sourceEntries(source: FeedInventoryStat) {
+  const cacheKey = `feed-stat:${JSON.stringify(source)}`;
+  const local = sourceEntriesCache.get(cacheKey);
+  if (local) return local;
+  const cached = await readRedisJson<RankingEntry[]>(cacheKey);
+  if (cached) {
+    sourceEntriesCache.set(cacheKey, cached);
+    return cached;
+  }
+  const entries = await loadSourceEntries(source);
+  if (entries.length) {
+    sourceEntriesCache.set(cacheKey, entries);
+    void writeRedisJson(cacheKey, entries);
+  }
+  return entries;
 }
 
 export function hasRecentTopTenEntry(
@@ -334,6 +354,20 @@ export async function ensureFeedItems({ now }: { now?: Date } = {}) {
     };
   }
   return buildFeedItems({ now });
+}
+
+export async function seedFeedStatPreviews({ now }: { now?: Date } = {}) {
+  let cursor = 0;
+  let seeded = 0;
+  while (true) {
+    const items = await readFeedItems({ cursor, limit: 1, now });
+    const item = items[0];
+    if (!item) break;
+    await loadInterestingResultPage([item], null, []);
+    seeded += 1;
+    cursor += items.length;
+  }
+  return seeded;
 }
 
 function startBackgroundBuild(now?: Date) {

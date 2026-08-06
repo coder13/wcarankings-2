@@ -1,11 +1,15 @@
 import { createServer } from "node:http";
-import { ensureFeedItems } from "../services/feeds/stat-previews";
+import {
+  ensureFeedItems,
+  seedFeedStatPreviews,
+} from "../services/feeds/stat-previews";
 import { runListRankingWorker } from "./list-ranking-worker";
 
 const HOST = process.env.WORKER_HOST ?? "127.0.0.1";
 const PORT = Number(process.env.WORKER_PORT ?? 3010);
 
 let feedBuild: Promise<unknown> | null = null;
+let feedSeed: Promise<unknown> | null = null;
 
 function startFeedBuild() {
   if (feedBuild) return feedBuild;
@@ -26,6 +30,23 @@ function startFeedBuild() {
       feedBuild = null;
     });
   return feedBuild;
+}
+
+function startFeedSeed() {
+  if (feedSeed) return feedSeed;
+  feedSeed = seedFeedStatPreviews()
+    .then((seeded) => {
+      process.stdout.write(`Feed stat cache seeded: ${seeded} items\n`);
+    })
+    .catch((error) => {
+      process.stderr.write(
+        `Feed stat cache seeding failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+      );
+    })
+    .finally(() => {
+      feedSeed = null;
+    });
+  return feedSeed;
 }
 
 function sendJson(
@@ -72,7 +93,7 @@ const server = createServer((request, response) => {
 
 server.listen(PORT, HOST, () => {
   process.stdout.write(`Background worker listening on ${HOST}:${PORT}\n`);
-  void startFeedBuild();
+  void startFeedBuild().then(() => startFeedSeed());
   setInterval(() => void startFeedBuild(), 60_000).unref();
   void runListRankingWorker().catch((error: unknown) => {
     process.stderr.write(
