@@ -6,6 +6,8 @@ type FeedQuery = (
   values?: unknown[],
 ) => Promise<{ rows: Record<string, unknown>[] }>;
 
+const FEED_SNAPSHOT_FORMAT = "v2";
+
 export type FeedSnapshot = {
   exportVersion: string;
   previews: FeedStatPreview[];
@@ -17,7 +19,7 @@ export async function currentFeedExportVersion(
   const result = await query(
     "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
   );
-  return String(result.rows[0]?.value ?? "unavailable");
+  return `${FEED_SNAPSHOT_FORMAT}:${String(result.rows[0]?.value ?? "unavailable")}`;
 }
 
 export async function readFeedSnapshot(options: { query?: FeedQuery } = {}) {

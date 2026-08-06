@@ -15,6 +15,7 @@ import {
 } from "./snapshot";
 
 const PAGE_SIZE = 5;
+const TOP_SCAN_SIZE = 10;
 const MAX_SOURCE_SCAN = PAGE_SIZE;
 const SOURCE_READ_CONCURRENCY = 2;
 
@@ -57,13 +58,28 @@ async function sourceEntries(source: FeedInventoryStat) {
   }
 }
 
-export function hasRecentTopFiveEntry(
+export function hasRecentTopTenEntry(
   entries: readonly Pick<RankingEntry, "competitionId">[],
   competitionIds: ReadonlySet<string>,
 ) {
   return entries
-    .slice(0, 5)
+    .slice(0, TOP_SCAN_SIZE)
     .some((entry) => competitionIds.has(entry.competitionId));
+}
+
+export function selectFeedPreviewEntries<
+  Entry extends Pick<RankingEntry, "competitionId">,
+>(entries: readonly Entry[], competitionIds: ReadonlySet<string>) {
+  const topTen = entries.slice(0, TOP_SCAN_SIZE);
+  const changedIndex = topTen.findIndex((entry) =>
+    competitionIds.has(entry.competitionId),
+  );
+  if (changedIndex < 0 || topTen.length < PAGE_SIZE) return [];
+  const start = Math.max(
+    0,
+    Math.min(changedIndex - 2, topTen.length - PAGE_SIZE),
+  );
+  return topTen.slice(start, start + PAGE_SIZE);
 }
 
 export function hasRecentFeedEntry(
@@ -79,7 +95,7 @@ export function hasRecentFeedEntry(
       .filter((trigger) => trigger.eventIds.includes(source.eventId))
       .map((trigger) => trigger.competitionId),
   );
-  return hasRecentTopFiveEntry(entries, competitionIds);
+  return hasRecentTopTenEntry(entries, competitionIds);
 }
 
 function highlightedCompetitionIds(
@@ -145,15 +161,26 @@ export async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
           entries.length >= PAGE_SIZE &&
           hasRecentFeedEntry(source, entries, triggers),
       )
-      .map(({ source, entries }) => ({
-        ...source,
-        entries: entries.slice(0, 5),
-        highlightedCompetitionIds: highlightedCompetitionIds(
-          source,
-          entries.slice(0, 5),
-          triggers,
-        ),
-      }));
+      .map(({ source, entries }) => {
+        const recentCompetitionIds = new Set(
+          triggers
+            .filter((trigger) => trigger.eventIds.includes(source.eventId))
+            .map((trigger) => trigger.competitionId),
+        );
+        const previewEntries = selectFeedPreviewEntries(
+          entries,
+          recentCompetitionIds,
+        );
+        return {
+          ...source,
+          entries: previewEntries,
+          highlightedCompetitionIds: highlightedCompetitionIds(
+            source,
+            previewEntries,
+            triggers,
+          ),
+        };
+      });
     previews.push(...matching);
     scanCursor += sourcePage.length;
   }

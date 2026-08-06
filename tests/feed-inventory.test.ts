@@ -5,7 +5,10 @@ import {
   prioritizeFeedStatInventory,
 } from "@/services/feeds/inventory";
 import { hasRecentFeedEntry } from "@/services/feeds/stat-previews";
-import { hasRecentTopFiveEntry } from "@/services/feeds/stat-previews";
+import {
+  hasRecentTopTenEntry,
+  selectFeedPreviewEntries,
+} from "@/services/feeds/stat-previews";
 
 test("builds the full bounded feed stat inventory", () => {
   const inventory = buildFeedStatInventory({
@@ -40,17 +43,37 @@ test("builds the full bounded feed stat inventory", () => {
   );
 });
 
-test("qualifies a stat only when a recent result is in the top five", () => {
-  const entries = Array.from({ length: 6 }, (_, index) => ({
+test("qualifies a stat when a recent result is in the top ten", () => {
+  const entries = Array.from({ length: 11 }, (_, index) => ({
     competitionId: index === 5 ? "recent" : `old-${index}`,
   }));
-  assert.equal(hasRecentTopFiveEntry(entries, new Set(["recent"])), false);
+  assert.equal(hasRecentTopTenEntry(entries, new Set(["recent"])), true);
   assert.equal(
-    hasRecentTopFiveEntry(
+    hasRecentTopTenEntry(
       [{ competitionId: "old" }, { competitionId: "recent" }],
       new Set(["recent"]),
     ),
     true,
+  );
+});
+
+test("shows four neighboring ranks around a changed top-ten result", () => {
+  const entries = Array.from({ length: 10 }, (_, index) => ({
+    competitionId: index === 7 ? "recent" : `old-${index}`,
+    rank: index + 1,
+  }));
+  assert.deepEqual(
+    selectFeedPreviewEntries(entries, new Set(["recent"])).map(
+      (entry) => entry.rank,
+    ),
+    [6, 7, 8, 9, 10],
+  );
+  entries[9]!.competitionId = "recent";
+  assert.deepEqual(
+    selectFeedPreviewEntries(entries, new Set(["recent"])).map(
+      (entry) => entry.rank,
+    ),
+    [6, 7, 8, 9, 10],
   );
 });
 

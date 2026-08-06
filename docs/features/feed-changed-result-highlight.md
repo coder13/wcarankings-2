@@ -14,7 +14,11 @@ record that is outside the visible top five has no visible row to highlight.
 The feed matches a trigger to the source event. A recent competition in another
 event does not match the preview.
 
-The feed skips a stat when no visible top-five row matches a recent trigger.
+The feed skips a stat when no visible five-row window matches a recent trigger.
+
+The feed scans the top ten rows. It displays five rows around the first changed row, with four neighboring rows.
 
 The server stores the complete feed snapshot under the current export fetched time.
 The server starts one background build when that export has no snapshot. Feed requests read the stored snapshot until a new export arrives.
+
+The snapshot format has a version. A feed behavior change creates a new snapshot for the same export.
