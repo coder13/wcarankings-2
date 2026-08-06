@@ -90,6 +90,7 @@ test("discovers only bounded competitions in the recent date window", async () =
   });
   assert.equal(result.triggers.length, 1);
   assert.equal(result.triggers[0]?.hasCountryRecord, true);
+  assert.deepEqual(result.triggers[0]?.countryRecordEventIds, ["333"]);
   assert.deepEqual(calls[0]?.values, ["2026-07-30", "2026-08-05", 10]);
   assert.match(calls[0]?.text ?? "", /FROM competitions/);
   assert.match(calls[0]?.text ?? "", /LIMIT \?/);

@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS feed_snapshots (
+  export_version VARCHAR(64) NOT NULL PRIMARY KEY,
+  snapshot_json MEDIUMTEXT NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP (6)
+);

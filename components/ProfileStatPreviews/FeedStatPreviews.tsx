@@ -64,7 +64,7 @@ export function FeedStatPreviews({
                 </Link>
               }
             >
-              <ol className="list profilePreviewRows profileRankingHighlightRows">
+              <ol className="list profilePreviewRows profileRankingHighlightRows feedRankingRows">
                 {preview.entries.map((entry, index) => (
                   <RankingRow
                     key={`${preview.id}:${entry.entryKey ?? entry.resultId ?? index}`}

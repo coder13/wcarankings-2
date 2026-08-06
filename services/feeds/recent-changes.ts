@@ -22,6 +22,7 @@ export type RecentCompetitionTrigger = {
   endDate: string;
   eventIds: string[];
   hasCountryRecord: boolean;
+  countryRecordEventIds: string[];
 };
 
 type RecentChangeMeasurement = {
@@ -91,10 +92,20 @@ function recentCompetitionTriggersQuery() {
     SELECT competition.id AS competition_id, competition.name AS competition_name,
       competition.country_id, competition.city_name, competition.end_year,
       competition.end_month, competition.end_day, result.event_id,
-      MAX(result.regional_single_record = 'NR' OR
-        result.regional_average_record = 'NR') AS has_country_record
+      MAX(
+        current_single.result_id IS NOT NULL OR
+        current_average.result_id IS NOT NULL
+      ) AS has_country_record
     FROM competitions competition
     LEFT JOIN results result ON result.competition_id = competition.id
+    LEFT JOIN result_rankings_single current_single
+      ON current_single.result_id = result.id
+      AND current_single.event_id = result.event_id
+      AND current_single.country_rank = 1
+    LEFT JOIN result_rankings_average current_average
+      ON current_average.result_id = result.id
+      AND current_average.event_id = result.event_id
+      AND current_average.country_rank = 1
     WHERE STR_TO_DATE(CONCAT(competition.end_year, '-',
       LPAD(competition.end_month, 2, '0'), '-', LPAD(competition.end_day, 2, '0')),
       '%Y-%m-%d') BETWEEN ? AND ?
@@ -133,6 +144,13 @@ export async function discoverRecentCompetitionTriggers(
       }
       existing.hasCountryRecord =
         existing.hasCountryRecord || Boolean(raw.has_country_record);
+      if (
+        eventId &&
+        raw.has_country_record &&
+        !existing.countryRecordEventIds.includes(eventId)
+      ) {
+        existing.countryRecordEventIds.push(eventId);
+      }
       continue;
     }
     triggers.set(competitionId, {
@@ -145,6 +163,7 @@ export async function discoverRecentCompetitionTriggers(
         .join("-"),
       eventIds: eventId ? [eventId] : [],
       hasCountryRecord: Boolean(raw.has_country_record),
+      countryRecordEventIds: eventId && raw.has_country_record ? [eventId] : [],
     });
   }
   return {

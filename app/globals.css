@@ -577,6 +577,10 @@ main {
   text-align: center;
 }
 
+.feedRankingRows .competitionName {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-old(*),

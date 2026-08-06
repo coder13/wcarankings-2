@@ -69,7 +69,7 @@ test("prioritizes recent national event sources", () => {
   assert.equal(prioritized[0]?.kind, "result");
 });
 
-test("accepts a recent national record even when it is not in the top five", () => {
+test("requires a recent result in the visible top five", () => {
   const source = buildFeedStatInventory({
     continents: [],
     countries: [{ id: "USA", name: "United States" }],
@@ -84,16 +84,43 @@ test("accepts a recent national record even when it is not in the top five", () 
   assert.equal(
     hasRecentFeedEntry(
       source,
-      [{ competitionId: "older" }],
+      [{ competitionId: "HamptonBeachSummer2026" }],
       [
         {
           competitionId: "HamptonBeachSummer2026",
-          countryId: "USA",
           eventIds: ["333"],
-          hasCountryRecord: true,
         },
       ],
     ),
     true,
+  );
+  assert.equal(
+    hasRecentFeedEntry(
+      source,
+      [{ competitionId: "older" }],
+      [{ competitionId: "HamptonBeachSummer2026", eventIds: ["333"] }],
+    ),
+    false,
+  );
+});
+
+test("does not match a recent competition from another event", () => {
+  const source = buildFeedStatInventory({
+    continents: [],
+    countries: [{ id: "USA", name: "United States" }],
+  }).find(
+    (candidate) =>
+      candidate.kind === "result" &&
+      candidate.eventId === "333" &&
+      candidate.region.regionId === "USA",
+  );
+  assert.ok(source);
+  assert.equal(
+    hasRecentFeedEntry(
+      source,
+      [{ competitionId: "HamptonBeachSummer2026" }],
+      [{ competitionId: "HamptonBeachSummer2026", eventIds: ["444"] }],
+    ),
+    false,
   );
 });

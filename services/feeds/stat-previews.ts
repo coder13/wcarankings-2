@@ -8,6 +8,11 @@ import {
   type FeedInventoryStat,
 } from "./inventory";
 import { discoverRecentCompetitionTriggers } from "./recent-changes";
+import {
+  currentFeedExportVersion,
+  readFeedSnapshot,
+  writeFeedSnapshot,
+} from "./snapshot";
 
 const PAGE_SIZE = 5;
 const MAX_SOURCE_SCAN = PAGE_SIZE;
@@ -66,32 +71,26 @@ export function hasRecentFeedEntry(
   entries: readonly Pick<RankingEntry, "competitionId">[],
   triggers: readonly {
     competitionId: string;
-    countryId: string;
     eventIds: readonly string[];
-    hasCountryRecord: boolean;
   }[],
 ) {
   const competitionIds = new Set(
-    triggers.map((trigger) => trigger.competitionId),
+    triggers
+      .filter((trigger) => trigger.eventIds.includes(source.eventId))
+      .map((trigger) => trigger.competitionId),
   );
-  if (hasRecentTopFiveEntry(entries, competitionIds)) return true;
-  return (
-    source.region.scope === "country" &&
-    triggers.some(
-      (trigger) =>
-        trigger.hasCountryRecord &&
-        trigger.countryId === source.region.regionId &&
-        trigger.eventIds.includes(source.eventId),
-    )
-  );
+  return hasRecentTopFiveEntry(entries, competitionIds);
 }
 
 function highlightedCompetitionIds(
+  source: FeedInventoryStat,
   entries: readonly Pick<RankingEntry, "competitionId">[],
-  triggers: readonly { competitionId: string }[],
+  triggers: readonly { competitionId: string; eventIds: readonly string[] }[],
 ) {
   const recentCompetitionIds = new Set(
-    triggers.map((trigger) => trigger.competitionId),
+    triggers
+      .filter((trigger) => trigger.eventIds.includes(source.eventId))
+      .map((trigger) => trigger.competitionId),
   );
   return entries
     .filter((entry) => recentCompetitionIds.has(entry.competitionId))
@@ -122,16 +121,7 @@ async function loadSourcePage(sourcePage: readonly FeedInventoryStat[]) {
   );
 }
 
-export async function loadFeedStatPreviews({
-  cursor = 0,
-  now,
-}: {
-  cursor?: number;
-  now?: Date;
-} = {}): Promise<FeedStatPreviewPage> {
-  if (!Number.isInteger(cursor) || cursor < 0) {
-    throw new Error("The feed cursor must be a non-negative integer.");
-  }
+export async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
   const [{ triggers }, continents, countries] = await Promise.all([
     discoverRecentCompetitionTriggers({ now }),
     getRegions("continent"),
@@ -142,8 +132,8 @@ export async function loadFeedStatPreviews({
     triggers,
   );
   const previews: FeedStatPreview[] = [];
-  let scanCursor = cursor;
-  while (previews.length < PAGE_SIZE && scanCursor < inventory.length) {
+  let scanCursor = 0;
+  while (scanCursor < inventory.length) {
     const sourcePage = inventory.slice(
       scanCursor,
       scanCursor + MAX_SOURCE_SCAN,
@@ -159,13 +149,54 @@ export async function loadFeedStatPreviews({
         ...source,
         entries: entries.slice(0, 5),
         highlightedCompetitionIds: highlightedCompetitionIds(
+          source,
           entries.slice(0, 5),
           triggers,
         ),
       }));
-    previews.push(...matching.slice(0, PAGE_SIZE - previews.length));
+    previews.push(...matching);
     scanCursor += sourcePage.length;
   }
-  const nextCursor = scanCursor < inventory.length ? scanCursor : null;
+  return previews;
+}
+
+let backgroundBuild: Promise<void> | null = null;
+
+function startBackgroundBuild(now?: Date) {
+  if (backgroundBuild) return;
+  backgroundBuild = (async () => {
+    const exportVersion = await currentFeedExportVersion();
+    const previews = await generateFeedStatPreviews({ now });
+    if ((await currentFeedExportVersion()) !== exportVersion) return;
+    await writeFeedSnapshot({ exportVersion, previews });
+  })()
+    .catch((error) => {
+      console.error("The feed snapshot build failed.", error);
+    })
+    .finally(() => {
+      backgroundBuild = null;
+    });
+}
+
+export async function loadFeedStatPreviews({
+  cursor = 0,
+  now,
+}: {
+  cursor?: number;
+  now?: Date;
+} = {}): Promise<FeedStatPreviewPage> {
+  if (!Number.isInteger(cursor) || cursor < 0) {
+    throw new Error("The feed cursor must be a non-negative integer.");
+  }
+  const snapshot = await readFeedSnapshot();
+  if (!snapshot) {
+    startBackgroundBuild(now);
+    return { previews: [], nextCursor: null };
+  }
+  const previews = snapshot.previews.slice(cursor, cursor + PAGE_SIZE);
+  const nextCursor =
+    cursor + previews.length < snapshot.previews.length
+      ? cursor + previews.length
+      : null;
   return { previews, nextCursor };
 }
