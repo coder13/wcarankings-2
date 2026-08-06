@@ -123,9 +123,10 @@
 
 .row--feedHighlight {
   background-image: linear-gradient(
-    color-mix(in srgb, var(--secondary-soft) 24%, transparent),
-    color-mix(in srgb, var(--secondary-soft) 24%, transparent)
+    rgb(250 204 21 / 10%),
+    rgb(250 204 21 / 10%)
   );
+  box-shadow: inset 4px 0 0 var(--secondary);
 }
 
 :root[data-theme="dark"] .virtualRow:hover {
