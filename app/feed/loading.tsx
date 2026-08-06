@@ -1,4 +1,5 @@
 import { AppHeader } from "@/components/AppHeader/AppHeader";
+import { FeedLoadingSkeletons } from "@/components/ProfileStatPreviews/FeedLoadingSkeletons";
 
 export default function FeedLoading() {
   return (
@@ -6,16 +7,7 @@ export default function FeedLoading() {
       <AppHeader />
       <main className="feedPage feedLoading" aria-label="Loading feed">
         <p role="status">Loading feed…</p>
-        {Array.from({ length: 2 }, (_, index) => (
-          <div className="feedLoadingCard" key={index} aria-hidden="true">
-            <div className="feedLoadingTitle" />
-            <div className="feedLoadingRows">
-              {Array.from({ length: 5 }, (_, row) => (
-                <div className="feedLoadingRow" key={row} />
-              ))}
-            </div>
-          </div>
-        ))}
+        <FeedLoadingSkeletons />
       </main>
     </div>
   );

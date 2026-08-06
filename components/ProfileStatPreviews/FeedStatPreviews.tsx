@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { RankingRow } from "@/components/RankingRow/RankingRow";
 import { StatPreviewTable } from "./StatPreviewTable";
+import { FeedLoadingSkeletons } from "./FeedLoadingSkeletons";
 import type { FeedStatPreview } from "@/services/feeds/stat-previews";
 
 type FeedStatPreviewPage = {
@@ -106,16 +107,7 @@ export function FeedStatPreviews({
       {loadingInitialPage && previews.length === 0 && (
         <div className="feedLoading feedInlineLoading" role="status">
           <p>Loading feed…</p>
-          {Array.from({ length: 2 }, (_, index) => (
-            <div className="feedLoadingCard" key={index} aria-hidden="true">
-              <div className="feedLoadingTitle" />
-              <div className="feedLoadingRows">
-                {Array.from({ length: 5 }, (_, row) => (
-                  <div className="feedLoadingRow" key={row} />
-                ))}
-              </div>
-            </div>
-          ))}
+          <FeedLoadingSkeletons />
         </div>
       )}
       <ol className="feedCards">
@@ -149,6 +141,7 @@ export function FeedStatPreviews({
                       rankIsDuplicate:
                         index > 0 &&
                         preview.entries[index - 1]?.rank === entry.rank,
+                      hideIdentityId: preview.kind === "city",
                     }}
                   />
                 ))}

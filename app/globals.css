@@ -587,31 +587,68 @@ main {
   color: var(--text-subtle);
 }
 
+.feedLoadingSkeletons {
+  display: grid;
+  gap: 1rem;
+}
+
+.feedLoadingSkeleton {
+  --profile-preview-table-height: 370px;
+  --profile-preview-results-height: calc(
+    var(--profile-preview-table-height) - 3rem - 2px
+  );
+
+  min-width: 0;
+}
+
+.feedLoadingLabel {
+  width: 70%;
+  height: 1rem;
+  margin-bottom: 0.45rem;
+  border-radius: 0.35rem;
+  animation: feedLoadingPulse 1.4s ease-in-out infinite;
+  background: var(--surface-raised);
+}
+
 .feedLoadingCard {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 1rem;
   background: var(--surface);
+  box-sizing: border-box;
+  height: var(--profile-preview-table-height);
 }
 
-.feedLoadingTitle,
 .feedLoadingRow {
   animation: feedLoadingPulse 1.4s ease-in-out infinite;
   background: var(--surface-raised);
 }
 
-.feedLoadingTitle {
-  height: 1.25rem;
-  margin: 1rem;
+.feedLoadingHeading {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
+.feedLoadingAction {
+  width: 3.5rem;
+  height: 1rem;
   border-radius: 0.35rem;
+  animation: feedLoadingPulse 1.4s ease-in-out infinite;
+  background: var(--surface-raised);
 }
 
 .feedLoadingRows {
-  border-top: 1px solid var(--border);
+  height: var(--profile-preview-results-height);
 }
 
 .feedLoadingRow {
-  height: 3.5rem;
+  height: 64px;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--border);
 }
 
@@ -637,7 +674,8 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .feedLoadingTitle,
+  .feedLoadingLabel,
+  .feedLoadingAction,
   .feedLoadingRow {
     animation: none;
   }
