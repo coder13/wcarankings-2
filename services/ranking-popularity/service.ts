@@ -26,9 +26,25 @@ type PopularityTotalsRow = {
 
 type RankingPopularityServiceOptions = {
   buffer?: RankingPopularityBuffer;
+  flushEntryThreshold?: number;
   now?: () => Date;
   query?: PopularityQuery;
 };
+
+const DEFAULT_RANKING_POPULARITY_FLUSH_ENTRY_THRESHOLD = 100;
+
+function positiveInteger(value: number | undefined, fallback: number) {
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : fallback;
+}
+
+function configuredFlushEntryThreshold() {
+  return positiveInteger(
+    Number(process.env.RANKING_POPULARITY_FLUSH_ENTRY_THRESHOLD),
+    DEFAULT_RANKING_POPULARITY_FLUSH_ENTRY_THRESHOLD,
+  );
+}
 
 function utcDate(value: Date) {
   if (!Number.isFinite(value.getTime())) {
@@ -78,11 +94,16 @@ function verifyPublicList(
 
 export class RankingPopularityService {
   private readonly buffer: RankingPopularityBuffer;
+  private readonly flushEntryThreshold: number;
   private readonly now: () => Date;
   private readonly database: PopularityQuery;
 
   constructor(options: RankingPopularityServiceOptions = {}) {
     this.buffer = options.buffer ?? new RankingPopularityBuffer();
+    this.flushEntryThreshold = positiveInteger(
+      options.flushEntryThreshold,
+      configuredFlushEntryThreshold(),
+    );
     this.now = options.now ?? (() => new Date());
     this.database = options.query ?? query;
   }
@@ -121,6 +142,16 @@ export class RankingPopularityService {
     return this.buffer.flush(async (increments) => {
       await this.writeIncrements(increments);
     });
+  }
+
+  hasReachedFlushThreshold() {
+    return this.buffer.viewCount() >= this.flushEntryThreshold;
+  }
+
+  async flushIfThresholdReached() {
+    if (!this.hasReachedFlushThreshold()) return false;
+    await this.flush();
+    return true;
   }
 
   async totals(

@@ -109,6 +109,102 @@ test("records UTC dates and reads inclusive UTC totals", async () => {
   ]);
 });
 
+test("does not flush before the entry threshold", async () => {
+  const calls: Array<{ text: string; values: unknown[] }> = [];
+  const service = new RankingPopularityService({
+    flushEntryThreshold: 2,
+    query: queryRecorder(calls),
+  });
+  const registered = await service.register(EVENT_DESCRIPTOR);
+  service.recordSuccessfulFirstPageView(
+    registered,
+    new Date("2026-08-05T00:00:00.000Z"),
+  );
+
+  assert.equal(service.hasReachedFlushThreshold(), false);
+  assert.equal(await service.flushIfThresholdReached(), false);
+  assert.equal(calls.length, 1);
+  assert.equal(service.entries().length, 1);
+});
+
+test("flushes one combined batch at the entry threshold", async () => {
+  const calls: Array<{ text: string; values: unknown[] }> = [];
+  const service = new RankingPopularityService({
+    flushEntryThreshold: 2,
+    query: queryRecorder(calls),
+  });
+  const registered = await service.register(EVENT_DESCRIPTOR);
+  service.recordSuccessfulFirstPageView(
+    registered,
+    new Date("2026-08-05T00:00:00.000Z"),
+  );
+  service.recordSuccessfulFirstPageView(
+    registered,
+    new Date("2026-08-05T00:00:00.000Z"),
+  );
+
+  assert.equal(service.hasReachedFlushThreshold(), true);
+  assert.equal(await service.flushIfThresholdReached(), true);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1]?.values, [
+    registered.rankingListKey,
+    "2026-08-05",
+    2,
+  ]);
+  assert.deepEqual(service.entries(), []);
+});
+
+test("uses one in-flight flush for concurrent threshold checks", async () => {
+  const calls: Array<{ text: string; values: unknown[] }> = [];
+  let completeWrite: (() => void) | undefined;
+  const writeStarted = new Promise<void>((resolve) => {
+    completeWrite = resolve;
+  });
+  const query: PopularityQuery = async (text, values = []) => {
+    calls.push({ text, values });
+    if (text.includes("ranking_list_daily_popularity")) await writeStarted;
+    return { rows: [] };
+  };
+  const service = new RankingPopularityService({
+    flushEntryThreshold: 1,
+    query,
+  });
+  const registered = await service.register(EVENT_DESCRIPTOR);
+  service.recordSuccessfulFirstPageView(registered);
+
+  const first = service.flushIfThresholdReached();
+  const second = service.flushIfThresholdReached();
+  completeWrite?.();
+  assert.deepEqual(await Promise.all([first, second]), [true, false]);
+  assert.equal(calls.length, 2);
+});
+
+test("restores a failed threshold batch", async () => {
+  const query: PopularityQuery = async (text) => {
+    if (text.includes("ranking_list_daily_popularity")) {
+      throw new Error("database unavailable");
+    }
+    return { rows: [] };
+  };
+  const service = new RankingPopularityService({
+    flushEntryThreshold: 1,
+    now: () => new Date("2026-08-05T00:00:00.000Z"),
+    query,
+  });
+  const registered = await service.register(EVENT_DESCRIPTOR);
+  service.recordSuccessfulFirstPageView(registered);
+
+  await assert.rejects(service.flushIfThresholdReached());
+  assert.equal(service.hasReachedFlushThreshold(), true);
+  assert.deepEqual(service.entries(), [
+    {
+      rankingListKey: registered.rankingListKey,
+      popularityDate: "2026-08-05",
+      count: 1,
+    },
+  ]);
+});
+
 test("converts database totals and calculates a service score", async () => {
   const query = (async () => ({
     rows: [{ seven_day_views: "7", thirty_day_views: "31" }],

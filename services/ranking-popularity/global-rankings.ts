@@ -7,7 +7,7 @@ import { rankingPopularityService, RankingPopularityService } from "./service";
 
 type GlobalPopularityCollector = Pick<
   RankingPopularityService,
-  "register" | "recordSuccessfulFirstPageView"
+  "register" | "recordSuccessfulFirstPageView" | "flushIfThresholdReached"
 >;
 
 type GlobalRankingPopularityOptions = {
@@ -64,7 +64,10 @@ export async function collectGlobalRankingPopularity(
     if (!descriptor) return false;
     const collector = options.collector ?? rankingPopularityService;
     const registered = await collector.register(descriptor);
-    collector.recordSuccessfulFirstPageView(registered);
+    if (!collector.recordSuccessfulFirstPageView(registered)) return false;
+    void collector
+      .flushIfThresholdReached()
+      .catch(options.reportFailure ?? reportGlobalRankingPopularityFailure);
     return true;
   } catch (error) {
     (options.reportFailure ?? reportGlobalRankingPopularityFailure)(error);

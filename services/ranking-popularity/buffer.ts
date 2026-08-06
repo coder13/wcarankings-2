@@ -47,6 +47,13 @@ export class RankingPopularityBuffer {
       .sort((left, right) => entryKey(left).localeCompare(entryKey(right)));
   }
 
+  viewCount() {
+    return [...this.pending.values()].reduce(
+      (total, increment) => total + increment.count,
+      0,
+    );
+  }
+
   async flush(
     write: (increments: readonly PopularityIncrement[]) => Promise<void>,
   ) {

@@ -32,7 +32,13 @@ The global rankings endpoint starts collection only after it creates a successfu
 
 Collection excludes list requests, dynamic WCA-ID requests, locate requests, later pages, and composite metrics.
 
-Collection starts in the background and does not block the ranking response. This slice does not flush the process-local buffer.
+Collection starts in the background and does not block the ranking response.
+
+After collection adds a view, it starts a best-effort flush when buffered views reach the entry threshold.
+
+`RANKING_POPULARITY_FLUSH_ENTRY_THRESHOLD` specifies the threshold. The default is 100 buffered views.
+
+A process restart can lose buffered views when the buffer has fewer views than the threshold.
 
 ## Reading totals
 

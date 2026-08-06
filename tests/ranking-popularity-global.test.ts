@@ -8,14 +8,20 @@ import type { RankingPopularityService } from "@/services/ranking-popularity/ser
 
 type GlobalPopularityCollector = Pick<
   RankingPopularityService,
-  "register" | "recordSuccessfulFirstPageView"
+  "register" | "recordSuccessfulFirstPageView" | "flushIfThresholdReached"
 >;
 
 function collector(
   register: GlobalPopularityCollector["register"],
   recordSuccessfulFirstPageView: GlobalPopularityCollector["recordSuccessfulFirstPageView"],
+  flushIfThresholdReached: GlobalPopularityCollector["flushIfThresholdReached"] = async () =>
+    false,
 ) {
-  return { register, recordSuccessfulFirstPageView };
+  return {
+    register,
+    recordSuccessfulFirstPageView,
+    flushIfThresholdReached,
+  };
 }
 
 test("maps a global rankings query to a normalized person-event descriptor", () => {
@@ -75,13 +81,18 @@ test("records the descriptor through an injected popularity collector", async ()
           calls.push(value);
           return true;
         },
+        async () => {
+          calls.push("flush");
+          return true;
+        },
       ),
     },
   );
 
   assert.equal(didCollect, true);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.equal(calls[1], registered);
+  assert.equal(calls[2], "flush");
 });
 
 test("contains popularity registration and recording failures", async () => {
