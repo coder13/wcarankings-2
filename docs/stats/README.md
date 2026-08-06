@@ -22,6 +22,7 @@ The files use these status labels:
 - [Sum of Ranks and Kinch](sum-of-ranks-and-kinch.md)
 - [Person-competition rankings](person-competition-rankings.md)
 - [Medal rankings](medal-rankings.md)
+- [PR Streak rankings](pr-streak-rankings.md)
 - [Competition rankings](competition-rankings.md)
 - [City-event statistics](city-event-stats.md)
 - [Ranking counts and list metadata](ranking-counts-and-metadata.md)

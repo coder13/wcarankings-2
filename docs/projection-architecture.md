@@ -63,7 +63,8 @@ same change.
 ## Active projection graph
 
 The default import activates shared facts and the result, person-event,
-competition, city, Sum-of-Ranks, and yearly-person projection groups:
+person-competition, PR Streak, medal, competition, city, Sum-of-Ranks, and
+yearly-person projection groups:
 
 ```text
 raw results + dimensions
@@ -72,7 +73,9 @@ raw results + dimensions
     │   ├── result_rankings_single
     │   └── result_rankings_average
     ├── person_event_rankings
-    └── city, yearly, competition, and Sum-of-Ranks projections
+    ├── person_pr_streak_counts + person_pr_streak_year_counts
+    │   └── person_pr_streak_rankings + ranking counts
+    └── city, yearly, competition, medal, and Sum-of-Ranks projections
 ```
 
 Registration alone does not activate a future projection. Only the explicit
@@ -91,6 +94,27 @@ The all-time ranking table stores common scope and single-gender cohorts.
 Yearly and multi-gender requests rank the compact count tables in cached,
 bounded windows. The public rank uses `RANK()` by competition count. The stable
 position orders tied rows by `person_id`.
+
+## PR Streak rankings
+
+### `person_pr_streak_counts` and `person_pr_streak_year_counts`
+
+The all-time count table has one row per person whose longest qualifying streak
+contains at least two competitions. The yearly table has one row per person and
+year meeting the same minimum. Both carry current normalized gender, country,
+and continent values for filtered cohorts.
+
+A qualifying date requires every competition with that start date to contain a
+positive Single or Average improvement relative to the person's best on prior
+dates. Every competition on a qualifying date adds to the streak. A cumulative
+count of non-qualifying dates identifies streak groups without imposing an
+arbitrary order on same-date competitions.
+
+`person_pr_streak_rankings` stores all-time World, continent, country, and
+single-gender cohorts. `person_pr_streak_ranking_counts` supplies their totals.
+Year and multi-gender requests rank the compact score tables in cached, bounded
+windows. Public rank uses descending `RANK()`; deterministic `position` orders
+ties by `person_id` and remains internal.
 
 ## Person activity rankings
 
