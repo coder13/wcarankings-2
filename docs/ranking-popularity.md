@@ -44,6 +44,10 @@ The result rankings endpoint uses the same boundary for person-result descriptor
 
 It excludes list requests, dynamic WCA-ID requests, locate requests, and later pages. It uses the same best-effort threshold flush.
 
+The person activity endpoints use person-activity descriptors. The competitions endpoint includes its supported year filter. The activity endpoint records competitions, countries, rounds, or solves without a year.
+
+The medals endpoint uses person-medals descriptors with medal type, event, year, region, and gender filters. These endpoints collect only global first pages. They exclude saved lists, dynamic WCA-ID lists, locate requests, and later pages. They use the same threshold flush and failure handling.
+
 ## Reading totals
 
 Daily rows store successful first-page view counts. The service reads inclusive seven-day and thirty-day UTC totals.

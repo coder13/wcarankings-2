@@ -3,30 +3,15 @@ import {
   type RankingListDescriptor,
 } from "@/lib/ranking-list-descriptor";
 import { isPersonMetric, parseRankingInput } from "@/services/rankings/request";
-import { rankingPopularityService, RankingPopularityService } from "./service";
-
-type GlobalPopularityCollector = Pick<
-  RankingPopularityService,
-  "register" | "recordSuccessfulFirstPageView" | "flushIfThresholdReached"
->;
-
-type GlobalRankingPopularityOptions = {
-  collector?: GlobalPopularityCollector;
-  reportFailure?: (error: unknown) => void;
-};
+import {
+  collectRankingPopularityDescriptor,
+  reportRankingPopularityFailure,
+  type RankingPopularityCollectionOptions,
+} from "./collection";
 
 function isRequestedFirstPage(searchParams: URLSearchParams) {
   const start = searchParams.get("start");
   return start === null || Number(start) === 0;
-}
-
-function reportGlobalRankingPopularityFailure(error: unknown) {
-  console.warn(
-    JSON.stringify({
-      operation: "ranking-popularity",
-      error: error instanceof Error ? error.name : "unknown",
-    }),
-  );
 }
 
 /** Returns a person-event descriptor only for an intentional global first-page view. */
@@ -57,20 +42,14 @@ export function globalRankingPopularityDescriptor(
 /** Records a completed global first-page view without changing the ranking response. */
 export async function collectGlobalRankingPopularity(
   searchParams: URLSearchParams,
-  options: GlobalRankingPopularityOptions = {},
+  options: RankingPopularityCollectionOptions = {},
 ) {
   try {
     const descriptor = globalRankingPopularityDescriptor(searchParams);
     if (!descriptor) return false;
-    const collector = options.collector ?? rankingPopularityService;
-    const registered = await collector.register(descriptor);
-    if (!collector.recordSuccessfulFirstPageView(registered)) return false;
-    void collector
-      .flushIfThresholdReached()
-      .catch(options.reportFailure ?? reportGlobalRankingPopularityFailure);
-    return true;
+    return collectRankingPopularityDescriptor(descriptor, options);
   } catch (error) {
-    (options.reportFailure ?? reportGlobalRankingPopularityFailure)(error);
+    (options.reportFailure ?? reportRankingPopularityFailure)(error);
     return false;
   }
 }

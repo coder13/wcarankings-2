@@ -3,30 +3,15 @@ import {
   type RankingListDescriptor,
 } from "@/lib/ranking-list-descriptor";
 import { parseResultRankingRequest } from "@/services/rankings/result-request";
-import { rankingPopularityService, RankingPopularityService } from "./service";
-
-type ResultPopularityCollector = Pick<
-  RankingPopularityService,
-  "register" | "recordSuccessfulFirstPageView" | "flushIfThresholdReached"
->;
-
-type ResultRankingPopularityOptions = {
-  collector?: ResultPopularityCollector;
-  reportFailure?: (error: unknown) => void;
-};
+import {
+  collectRankingPopularityDescriptor,
+  reportRankingPopularityFailure,
+  type RankingPopularityCollectionOptions,
+} from "./collection";
 
 function isRequestedFirstPage(params: URLSearchParams) {
   const start = params.get("start");
   return start === null || Number(start) === 0;
-}
-
-function reportResultRankingPopularityFailure(error: unknown) {
-  console.warn(
-    JSON.stringify({
-      operation: "ranking-popularity",
-      error: error instanceof Error ? error.name : "unknown",
-    }),
-  );
 }
 
 export function resultRankingPopularityDescriptor(
@@ -54,20 +39,14 @@ export function resultRankingPopularityDescriptor(
 
 export async function collectResultRankingPopularity(
   params: URLSearchParams,
-  options: ResultRankingPopularityOptions = {},
+  options: RankingPopularityCollectionOptions = {},
 ) {
   try {
     const descriptor = resultRankingPopularityDescriptor(params);
     if (!descriptor) return false;
-    const collector = options.collector ?? rankingPopularityService;
-    const registered = await collector.register(descriptor);
-    if (!collector.recordSuccessfulFirstPageView(registered)) return false;
-    void collector
-      .flushIfThresholdReached()
-      .catch(options.reportFailure ?? reportResultRankingPopularityFailure);
-    return true;
+    return collectRankingPopularityDescriptor(descriptor, options);
   } catch (error) {
-    (options.reportFailure ?? reportResultRankingPopularityFailure)(error);
+    (options.reportFailure ?? reportRankingPopularityFailure)(error);
     return false;
   }
 }
