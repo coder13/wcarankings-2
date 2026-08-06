@@ -295,20 +295,24 @@ export function RankingsTopRail() {
               : undefined,
             regionDisabled: options.regionSelectionDisabled,
           }}
-          search={{
-            searchInputRef: commands.registerSearchInput,
-            findOpen: search.state.open,
-            findQuery: search.state.query,
-            findError: search.state.error,
-            findLoading: search.state.loading,
-            findPending: search.state.pending,
-            findMatches: search.state.matches,
-            findIndex: search.state.index,
-            onSearchOpen: search.actions.activate,
-            onSearchClose: search.actions.close,
-            onSearchQueryChange: search.actions.changeQuery,
-            onSearchCycle: search.actions.cycle,
-          }}
+          search={
+            filters.personActivityRanking
+              ? undefined
+              : {
+                  searchInputRef: commands.registerSearchInput,
+                  findOpen: search.state.open,
+                  findQuery: search.state.query,
+                  findError: search.state.error,
+                  findLoading: search.state.loading,
+                  findPending: search.state.pending,
+                  findMatches: search.state.matches,
+                  findIndex: search.state.index,
+                  onSearchOpen: search.actions.activate,
+                  onSearchClose: search.actions.close,
+                  onSearchQueryChange: search.actions.changeQuery,
+                  onSearchCycle: search.actions.cycle,
+                }
+          }
         />
       )}
     </div>

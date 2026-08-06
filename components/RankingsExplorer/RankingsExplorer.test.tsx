@@ -218,6 +218,7 @@ test("renders activity statistic controls", () => {
   assert.match(markup, />Rounds</);
   assert.match(markup, />Official solves</);
   assert.doesNotMatch(markup, /Switch to average rankings/);
+  assert.doesNotMatch(markup, /Find ranking/);
 });
 
 test("keeps a competition-ranking year in its query string", () => {
