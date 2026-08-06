@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { RankingRow } from "@/components/RankingRow/RankingRow";
 import { StatPreviewTable } from "./StatPreviewTable";
-import { FeedLoadingSkeletons } from "./FeedLoadingSkeletons";
+import { FeedLoadingSkeleton } from "./FeedLoadingSkeletons";
 import type { FeedStatPreview } from "@/services/feeds/stat-previews";
 
 type FeedStatPreviewPage = {
@@ -15,9 +15,18 @@ type FeedStatPreviewPage = {
 async function fetchFeedPreviewPage(
   cursor: number,
 ): Promise<FeedStatPreviewPage> {
-  const response = await fetch(`/api/feed?cursor=${cursor}`);
+  const response = await fetch(`/api/feed?cursor=${cursor}&limit=1`);
   if (!response.ok) throw new Error("Feed previews are unavailable.");
   return response.json() as Promise<FeedStatPreviewPage>;
+}
+
+function initialFeedSlots(
+  previews: readonly FeedStatPreview[],
+  cursor: number | null,
+) {
+  if (previews.length > 0) return previews.map((preview) => preview);
+  if (cursor !== null) return Array.from({ length: 5 }, () => null);
+  return [];
 }
 
 export function FeedStatPreviews({
@@ -27,12 +36,13 @@ export function FeedStatPreviews({
   initialPreviews: readonly FeedStatPreview[];
   initialCursor: number | null;
 }) {
-  const [previews, setPreviews] = useState([...initialPreviews]);
+  const [slots, setSlots] = useState<Array<FeedStatPreview | null>>(() =>
+    initialFeedSlots(initialPreviews, initialCursor),
+  );
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [loadingInitialPage, setLoadingInitialPage] = useState(
     initialPreviews.length === 0 && initialCursor !== null,
   );
-  const [loadingNextPage, setLoadingNextPage] = useState(false);
   const loading = useRef(false);
   const itemCursor = useRef<number | null>(0);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -45,21 +55,31 @@ export function FeedStatPreviews({
       .then((page: { nextCursor: number | null }) => {
         itemCursor.current = page.nextCursor;
       });
-    void fetchFeedPreviewPage(0)
-      .then(async (firstPage) => {
-        setPreviews(firstPage.previews);
-        setLoadingInitialPage(false);
-        if (firstPage.nextCursor === null) {
-          setNextCursor(null);
-          return;
+    void (async () => {
+      let cursor: number | null = 0;
+      let slotIndex = 0;
+      while (cursor !== null && slotIndex < 5) {
+        const page = await fetchFeedPreviewPage(cursor);
+        const preview = page.previews[0];
+        if (preview) {
+          const currentSlot = slotIndex;
+          setSlots((current) => {
+            const next = [...current];
+            next[currentSlot] = preview;
+            return next;
+          });
+          slotIndex += 1;
+          setLoadingInitialPage(false);
         }
-        const secondPage = await fetchFeedPreviewPage(firstPage.nextCursor);
-        setPreviews((current) => [...current, ...secondPage.previews]);
-        setNextCursor(secondPage.nextCursor);
-      })
+        cursor = page.nextCursor;
+      }
+      setSlots((current) => current.slice(0, slotIndex));
+      setNextCursor(cursor);
+    })()
       .catch(() => {
         setLoadingInitialPage(false);
         setNextCursor(null);
+        setSlots((current) => current.filter(Boolean));
       })
       .finally(() => {
         loading.current = false;
@@ -74,7 +94,10 @@ export function FeedStatPreviews({
         if (!entry.isIntersecting || loading.current || nextCursor === null)
           return;
         loading.current = true;
-        setLoadingNextPage(true);
+        setSlots((current) => [
+          ...current,
+          ...Array.from({ length: 5 }, () => null),
+        ]);
         if (
           itemCursor.current !== null &&
           nextCursor >= itemCursor.current - 10
@@ -85,76 +108,94 @@ export function FeedStatPreviews({
               itemCursor.current = page.nextCursor;
             });
         }
-        fetchFeedPreviewPage(nextCursor)
-          .then((page) => {
-            setPreviews((current) => [...current, ...page.previews]);
-            setNextCursor(page.nextCursor);
-          })
+        void (async () => {
+          let cursor: number | null = nextCursor;
+          let slotIndex = slots.length;
+          const firstNewSlot = slotIndex;
+          while (cursor !== null && slotIndex < firstNewSlot + 5) {
+            const page = await fetchFeedPreviewPage(cursor);
+            const preview = page.previews[0];
+            if (preview) {
+              const currentSlot = slotIndex;
+              setSlots((current) => {
+                const next = [...current];
+                next[currentSlot] = preview;
+                return next;
+              });
+              slotIndex += 1;
+            }
+            cursor = page.nextCursor;
+          }
+          setSlots((current) => current.slice(0, slotIndex));
+          setNextCursor(cursor);
+        })()
           .catch(() => setNextCursor(null))
           .finally(() => {
             loading.current = false;
-            setLoadingNextPage(false);
           });
       },
       { rootMargin: "800px" },
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [nextCursor]);
+  }, [nextCursor, slots.length]);
 
   return (
     <>
-      {loadingInitialPage && previews.length === 0 && (
+      {loadingInitialPage && slots.length === 0 && (
         <div className="feedLoading feedInlineLoading" role="status">
           <p>Loading feed…</p>
-          <FeedLoadingSkeletons />
         </div>
       )}
       <ol className="feedCards">
-        {previews.map((preview, index) => (
-          <li key={`${preview.id}:${preview.interestingEntityId ?? index}`}>
-            <StatPreviewTable
-              tableName={preview.title}
-              surfaceClassName="profileRankingHighlightPreviewTable"
-              action={
-                <Link
-                  className="profilePreviewExplore"
-                  href={preview.exploreUrl}
-                >
-                  Explore
-                </Link>
-              }
-            >
-              <ol className="list profilePreviewRows profileRankingHighlightRows feedRankingRows">
-                {preview.entries.map((entry, index) => (
-                  <RankingRow
-                    key={`${preview.id}:${entry.entryKey ?? entry.resultId ?? index}`}
-                    entry={entry}
-                    display={{
-                      eventId: preview.eventId,
-                      rankingType: preview.resultType,
-                      animationIndex: index,
-                      alternate: index % 2 === 1,
-                      highlighted: preview.highlightedCompetitionIds.includes(
-                        entry.competitionId,
-                      ),
-                      rankIsDuplicate:
-                        index > 0 &&
-                        preview.entries[index - 1]?.rank === entry.rank,
-                      hideIdentityId: preview.kind === "city",
-                    }}
-                  />
-                ))}
-              </ol>
-            </StatPreviewTable>
+        {slots.map((preview, index) => (
+          <li
+            key={
+              preview
+                ? `${preview.id}:${preview.interestingEntityId ?? index}`
+                : `loading:${index}`
+            }
+          >
+            {!preview && <FeedLoadingSkeleton />}
+            {preview && (
+              <StatPreviewTable
+                tableName={preview.title}
+                surfaceClassName="profileRankingHighlightPreviewTable"
+                action={
+                  <Link
+                    className="profilePreviewExplore"
+                    href={preview.exploreUrl}
+                  >
+                    Explore
+                  </Link>
+                }
+              >
+                <ol className="list profilePreviewRows profileRankingHighlightRows feedRankingRows">
+                  {preview.entries.map((entry, index) => (
+                    <RankingRow
+                      key={`${preview.id}:${entry.entryKey ?? entry.resultId ?? index}`}
+                      entry={entry}
+                      display={{
+                        eventId: preview.eventId,
+                        rankingType: preview.resultType,
+                        animationIndex: index,
+                        alternate: index % 2 === 1,
+                        highlighted: preview.highlightedCompetitionIds.includes(
+                          entry.competitionId,
+                        ),
+                        rankIsDuplicate:
+                          index > 0 &&
+                          preview.entries[index - 1]?.rank === entry.rank,
+                        hideIdentityId: preview.kind === "city",
+                      }}
+                    />
+                  ))}
+                </ol>
+              </StatPreviewTable>
+            )}
           </li>
         ))}
       </ol>
-      {loadingNextPage && (
-        <div className="feedLoadingMore" role="status">
-          Loading more feed stats
-        </div>
-      )}
       <div ref={sentinel} aria-hidden="true" />
     </>
   );

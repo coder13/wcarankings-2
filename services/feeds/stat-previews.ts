@@ -372,10 +372,12 @@ export async function loadFeedStatPreviews({
   cursor = 0,
   now,
   preferences = null,
+  limit = PAGE_SIZE,
 }: {
   cursor?: number;
   now?: Date;
   preferences?: FeedUserPreferences | null;
+  limit?: number;
 } = {}): Promise<FeedStatPreviewPage> {
   if (!Number.isInteger(cursor) || cursor < 0) {
     throw new Error("The feed cursor must be a non-negative integer.");
@@ -389,7 +391,7 @@ export async function loadFeedStatPreviews({
   if (candidates.length === 0 && cursor === 0) startBackgroundBuild(now);
   const previews = (
     await loadInterestingResultPage(candidates, preferences, [])
-  ).slice(0, PAGE_SIZE);
+  ).slice(0, limit);
   const nextCursor =
     candidates.length === PREVIEW_CANDIDATE_SCAN_SIZE
       ? cursor + candidates.length

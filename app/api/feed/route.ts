@@ -35,12 +35,23 @@ export async function GET(request: Request) {
   }
   if (url.searchParams.has("cursor")) {
     const cursor = Number(url.searchParams.get("cursor"));
+    const rawLimit = url.searchParams.get("limit");
+    const limit = rawLimit === null ? undefined : Number(rawLimit);
+    if (
+      limit !== undefined &&
+      (!Number.isInteger(limit) || limit < 1 || limit > 5)
+    ) {
+      return Response.json(
+        { error: "limit must be between 1 and 5." },
+        { status: 400 },
+      );
+    }
     const [user, countries] = await Promise.all([
       getAuthUser(request),
       getRegions("country"),
     ]);
     const preferences = await loadFeedUserPreferences(user, countries);
-    return loadFeedStatPreviews({ cursor, preferences })
+    return loadFeedStatPreviews({ cursor, preferences, limit })
       .then((data) => Response.json(data))
       .catch(() =>
         Response.json(
