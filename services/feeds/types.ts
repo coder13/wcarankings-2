@@ -36,3 +36,17 @@ export type RankingFeedCursor = {
   diversityKeys: string[];
   anchors: string[];
 };
+
+export type FeedTopFiveRow = {
+  entityId: string;
+  rank: number;
+  value: number | string | null;
+};
+
+export type FeedTopFiveChange = {
+  type: "leader" | "enter" | "leave" | "move" | "value" | "tie";
+  previousTopFive: FeedTopFiveRow[];
+  currentTopFive: FeedTopFiveRow[];
+  focusEntityId: string | null;
+  summary: string;
+};
