@@ -22,122 +22,77 @@ function pageChecks(personId: string): PageCheck[] {
     {
       name: "people: 3x3 single",
       path: "/?eventId=333&result=single",
-      expected: [
-        "3x3x3 Cube Single Rankings | WCA Rankings",
-        "Browse 3x3x3 cube single rankings from the World Cube Association.",
-      ],
+      expected: ["3x3x3 Cube Single Rankings | WCA Rankings"],
     },
     {
       name: "people: 3x3 average",
       path: "/?eventId=333&result=average",
-      expected: [
-        "3x3x3 Cube Average Rankings | WCA Rankings",
-        "Browse 3x3x3 cube average rankings from the World Cube Association.",
-      ],
+      expected: ["3x3x3 Cube Average Rankings | WCA Rankings"],
     },
     {
       name: "results: 3x3 single",
       path: "/results?eventId=333&result=single",
-      expected: [
-        "3x3x3 Cube Single Results | WCA Rankings",
-        "Browse 3x3x3 cube single results from the World Cube Association.",
-      ],
+      expected: ["3x3x3 Cube Single Results | WCA Rankings"],
     },
     {
       name: "persons: competition count",
       path: "/persons/competitions",
-      expected: [
-        "People by Competition Count | WCA Rankings",
-        "Browse people by competition count from the World Cube Association.",
-      ],
+      expected: ["People by Competition Count | WCA Rankings"],
     },
     {
       name: "persons: gold medals",
       path: "/persons/medals?eventId=333&medal=gold",
-      expected: [
-        "3x3x3 Cube Gold Medal Rankings | WCA Rankings",
-        "Browse 3x3x3 cube gold medal rankings from the World Cube Association.",
-      ],
+      expected: ["3x3x3 Cube Gold Medal Rankings | WCA Rankings"],
     },
     {
       name: "persons: yearly rankings",
       path: "/persons/year/2024?eventId=333&result=single",
-      expected: [
-        "3x3x3 Cube Single Rankings 2024 | WCA Rankings",
-        "Browse 3x3x3 cube single rankings 2024 from the World Cube Association.",
-      ],
+      expected: ["3x3x3 Cube Single Rankings 2024 | WCA Rankings"],
     },
     {
       name: "competitions: best results",
       path: "/competitions/best-result",
-      expected: [
-        "Competition Best Results | WCA Rankings",
-        "Browse competition best results from the World Cube Association.",
-      ],
+      expected: ["Competition Best Results | WCA Rankings"],
     },
     {
       name: "competitions: competitor count",
       path: "/competitions/competitor-count",
-      expected: [
-        "Competition Competitor Counts | WCA Rankings",
-        "Browse competition competitor counts from the World Cube Association.",
-      ],
+      expected: ["Competition Competitor Counts | WCA Rankings"],
     },
     {
       name: "competitions: latitude",
       path: "/competitions/latitude",
-      expected: [
-        "Northernmost and Southernmost Competitions | WCA Rankings",
-        "Browse northernmost and southernmost competitions from the World Cube Association.",
-      ],
+      expected: ["Northernmost and Southernmost Competitions | WCA Rankings"],
     },
     {
       name: "competitions: podiums",
       path: "/competitions/podiums?eventId=333",
-      expected: [
-        "3x3x3 Cube Average Competition Podiums | WCA Rankings",
-        "Browse 3x3x3 cube average competition podiums from the World Cube Association.",
-      ],
+      expected: ["3x3x3 Cube Average Competition Podiums | WCA Rankings"],
     },
     {
       name: "cities: fastest single",
       path: "/cities/fastest-single?eventId=333",
-      expected: [
-        "3x3x3 Cube Fastest Single Cities | WCA Rankings",
-        "Browse 3x3x3 cube fastest single cities from the World Cube Association.",
-      ],
+      expected: ["3x3x3 Cube Fastest Single Cities | WCA Rankings"],
     },
     {
       name: "cities: fastest average",
       path: "/cities/fastest-average?eventId=333",
-      expected: [
-        "3x3x3 Cube Fastest Average Cities | WCA Rankings",
-        "Browse 3x3x3 cube fastest average cities from the World Cube Association.",
-      ],
+      expected: ["3x3x3 Cube Fastest Average Cities | WCA Rankings"],
     },
     {
       name: "cities: competitor count",
       path: "/cities/competitors",
-      expected: [
-        "Cities by Competitor Count | WCA Rankings",
-        "Browse cities by competitor count from the World Cube Association.",
-      ],
+      expected: ["Cities by Competitor Count | WCA Rankings"],
     },
     {
       name: "cities: competition count",
       path: "/cities/competitions",
-      expected: [
-        "Cities by Competition Count | WCA Rankings",
-        "Browse cities by competition count from the World Cube Association.",
-      ],
+      expected: ["Cities by Competition Count | WCA Rankings"],
     },
     {
       name: "cities: official solve count",
       path: "/cities/solves",
-      expected: [
-        "Cities by Official Solve Count | WCA Rankings",
-        "Browse cities by official solve count from the World Cube Association.",
-      ],
+      expected: ["Cities by Official Solve Count | WCA Rankings"],
     },
     {
       name: "person profile",
@@ -148,7 +103,7 @@ function pageChecks(personId: string): PageCheck[] {
   return checks.map((check) =>
     check.name === "person profile"
       ? check
-      : { ...check, expected: [...check.expected, "Top 3 results:"] },
+      : check,
   );
 }
 
@@ -163,6 +118,28 @@ async function checkPage(baseUrl: string, check: PageCheck, timeoutMs: number) {
     const missing = check.expected.filter((value) => !body.includes(value));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     if (missing.length) throw new Error(`missing: ${missing.join(", ")}`);
+    if (check.name !== "person profile") {
+      const descriptions = [
+        body.match(/<meta name="description" content="([^"]*)"/)?.[1],
+        body.match(/<meta property="og:description" content="([^"]*)"/)?.[1],
+        body.match(/<meta name="twitter:description" content="([^"]*)"/)?.[1],
+      ];
+      if (descriptions.some((description) => !description)) {
+        throw new Error("missing SSR descriptions");
+      }
+      if (
+        descriptions.some(
+          (description) =>
+            description?.includes("Browse") ||
+            description?.includes("Top 3 results"),
+        )
+      ) {
+        throw new Error("SSR description contains a removed label");
+      }
+      if (descriptions.some((description) => description?.split("\n").length !== 3)) {
+        throw new Error("SSR description does not contain three result lines");
+      }
+    }
     return { elapsedMs: Math.round(performance.now() - startedAt) };
   } finally {
     clearTimeout(timeout);
