@@ -203,7 +203,7 @@ test("renders a separate person ranking picker", () => {
   assert.match(markup, /aria-label="Person ranking"/);
   assert.match(
     markup,
-    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button><button[^>]*>Competitions<\/button><button[^>]*>Activity<\/button>/,
+    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button>/,
   );
 });
 

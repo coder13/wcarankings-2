@@ -153,16 +153,12 @@ export function RankingsTopRail() {
     personRankingPeriodAriaLabel = "Activity statistic";
   } else {
     personRankingPeriodOptions = [
-      ...(featureSwitch.personCompetitionRankings
+      ...(featureSwitch.personActivityRankings
         ? [
             {
               value: "competitions",
               label: t("rankingsRail.period.competitionCount"),
             },
-          ]
-        : []),
-      ...(featureSwitch.personActivityRankings
-        ? [
             { value: "countries", label: "Countries" },
             { value: "rounds", label: "Rounds" },
             { value: "solves", label: "Official solves" },
@@ -256,9 +252,11 @@ export function RankingsTopRail() {
                     if (value === "competitions") {
                       if (filters.personCompetitionRanking)
                         actions.changeYear(null);
-                      else if (filters.personActivityRanking)
-                        actions.changePersonActivityMetric("competitions");
-                      else actions.changePersonCompetitionRanking(true);
+                      else
+                        actions.changePersonActivityRanking(
+                          true,
+                          "competitions",
+                        );
                     } else if (
                       filters.subject === "people" &&
                       ["countries", "rounds", "solves"].includes(value)
