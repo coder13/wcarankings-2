@@ -47,13 +47,6 @@ type PersonRankingPeriodOption = {
   label: string;
 };
 
-const PERSON_ACTIVITY_OPTIONS: readonly PersonRankingPeriodOption[] = [
-  { value: "competitions", label: "Competition count" },
-  { value: "countries", label: "Countries" },
-  { value: "rounds", label: "Rounds" },
-  { value: "solves", label: "Official solves" },
-];
-
 function subscribeMobileControls(listener: () => void) {
   const media = window.matchMedia(MOBILE_CONTROLS_QUERY);
   media.addEventListener("change", listener);
@@ -149,21 +142,9 @@ export function RankingsTopRail() {
       })),
     ];
   } else if (filters.personActivityRanking) {
-    personRankingPeriodOptions = PERSON_ACTIVITY_OPTIONS;
-    personRankingPeriodAriaLabel = "Person ranking statistic";
+    personRankingPeriodOptions = [];
   } else {
     personRankingPeriodOptions = [
-      ...(featureSwitch.personActivityRankings
-        ? [
-            {
-              value: "competitions",
-              label: t("rankingsRail.period.competitionCount"),
-            },
-            { value: "countries", label: "Countries" },
-            { value: "rounds", label: "Rounds" },
-            { value: "solves", label: "Official solves" },
-          ]
-        : []),
       ...(featureSwitch.personMedalRankings
         ? [{ value: "medals", label: "Medal rankings" }]
         : []),

@@ -203,11 +203,11 @@ test("renders a separate person ranking picker", () => {
   assert.match(markup, /aria-label="Person ranking"/);
   assert.match(
     markup,
-    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button>/,
+    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Competition count<\/button><button[^>]*>Countries<\/button><button[^>]*>Rounds<\/button><button[^>]*>Official solves<\/button><button[^>]*>Medals<\/button>/,
   );
 });
 
-test("adds activity statistics to the people secondary selector", () => {
+test("adds activity statistics to the person ranking selector", () => {
   const markup = renderExplorerMarkup({ options: { showSubjectSwitch: true } });
 
   assert.match(markup, />Countries</);
@@ -215,17 +215,17 @@ test("adds activity statistics to the people secondary selector", () => {
   assert.match(markup, />Official solves</);
 });
 
-test("renders activity statistic controls", () => {
+test("keeps the activity metric in the person ranking selector", () => {
   const markup = renderExplorerMarkup(
     { options: { showSubjectSwitch: true } },
     { personActivityRanking: true, personActivityMetric: "rounds" },
   );
-  assert.match(markup, /aria-label="Person ranking statistic"/);
+  assert.match(markup, /aria-label="Person ranking"/);
   assert.match(markup, />Competition count</);
   assert.match(markup, />Countries</);
   assert.match(markup, />Rounds</);
   assert.match(markup, />Official solves</);
-  assert.doesNotMatch(markup, /Switch to average rankings/);
+  assert.doesNotMatch(markup, /aria-label="Person ranking statistic"/);
   assert.doesNotMatch(markup, /Find ranking/);
 });
 

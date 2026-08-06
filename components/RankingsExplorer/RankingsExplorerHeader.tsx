@@ -12,6 +12,10 @@ import { useRankingsExplorer } from "./RankingsExplorerContext";
 
 const PERSON_RANKING_OPTIONS = [
   { value: "rankings", label: "Rankings" },
+  { value: "competitions", label: "Competition count" },
+  { value: "countries", label: "Countries" },
+  { value: "rounds", label: "Rounds" },
+  { value: "solves", label: "Official solves" },
   { value: "medals", label: "Medals" },
 ] as const;
 
@@ -38,10 +42,14 @@ export function RankingsExplorerHeader() {
   if (!source && showSubjectSwitch && subject === "people") {
     const personRankingOptions = PERSON_RANKING_OPTIONS.filter((option) => {
       if (option.value === "medals") return featureSwitch.personMedalRankings;
+      if (option.value !== "rankings")
+        return featureSwitch.personActivityRankings;
       return true;
     });
     let personRankingValue = "rankings";
     if (filters.personMedalRanking) personRankingValue = "medals";
+    else if (filters.personActivityRanking)
+      personRankingValue = filters.personActivityMetric;
     contextualControl = (
       <TextDropdown
         options={personRankingOptions}
@@ -49,10 +57,17 @@ export function RankingsExplorerHeader() {
         onChange={(value) => {
           if (value === "medals") {
             actions.changePersonMedalRanking(true);
-          } else if (filters.personMedalRanking) {
-            actions.changePersonMedalRanking(false);
+          } else if (value === "rankings") {
+            if (filters.personMedalRanking)
+              actions.changePersonMedalRanking(false);
+            else if (filters.personActivityRanking)
+              actions.changePersonActivityRanking(false);
+            else actions.changePersonCompetitionRanking(false);
           } else {
-            actions.changePersonCompetitionRanking(false);
+            actions.changePersonActivityRanking(
+              true,
+              value as typeof filters.personActivityMetric,
+            );
           }
         }}
         ariaLabel="Person ranking"
