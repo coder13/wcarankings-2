@@ -28,6 +28,9 @@ export function FeedStatPreviews({
 }) {
   const [previews, setPreviews] = useState([...initialPreviews]);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [loadingInitialPage, setLoadingInitialPage] = useState(
+    initialPreviews.length === 0 && initialCursor !== null,
+  );
   const [loadingNextPage, setLoadingNextPage] = useState(false);
   const loading = useRef(false);
   const itemCursor = useRef<number | null>(0);
@@ -44,6 +47,7 @@ export function FeedStatPreviews({
     void fetchFeedPreviewPage(0)
       .then(async (firstPage) => {
         setPreviews(firstPage.previews);
+        setLoadingInitialPage(false);
         if (firstPage.nextCursor === null) {
           setNextCursor(null);
           return;
@@ -52,7 +56,10 @@ export function FeedStatPreviews({
         setPreviews((current) => [...current, ...secondPage.previews]);
         setNextCursor(secondPage.nextCursor);
       })
-      .catch(() => setNextCursor(null))
+      .catch(() => {
+        setLoadingInitialPage(false);
+        setNextCursor(null);
+      })
       .finally(() => {
         loading.current = false;
       });
@@ -96,6 +103,21 @@ export function FeedStatPreviews({
 
   return (
     <>
+      {loadingInitialPage && previews.length === 0 && (
+        <div className="feedLoading feedInlineLoading" role="status">
+          <p>Loading feed…</p>
+          {Array.from({ length: 2 }, (_, index) => (
+            <div className="feedLoadingCard" key={index} aria-hidden="true">
+              <div className="feedLoadingTitle" />
+              <div className="feedLoadingRows">
+                {Array.from({ length: 5 }, (_, row) => (
+                  <div className="feedLoadingRow" key={row} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <ol className="feedCards">
         {previews.map((preview, index) => (
           <li key={`${preview.id}:${preview.interestingEntityId ?? index}`}>
