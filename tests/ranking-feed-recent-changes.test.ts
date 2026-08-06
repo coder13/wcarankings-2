@@ -3,10 +3,12 @@ import test from "node:test";
 import {
   compareFeedTopFive,
   discoverRecentCompetitionTriggers,
+  discoverRecentResultReferences,
   precomputeInjectedCandidates,
   precomputeRecentChangeCandidates,
 } from "@/services/feeds/recent-changes";
 import type { RankingFeedCandidate } from "@/services/feeds";
+import { generateBatchedFeedCandidates } from "@/services/feeds/batched-candidates";
 
 const change = compareFeedTopFive(
   [
@@ -96,6 +98,42 @@ test("discovers only bounded competitions in the recent date window", async () =
   assert.match(calls[0]?.text ?? "", /LIMIT \?/);
 });
 
+test("discovers only result references from the recent date window", async () => {
+  const calls: Array<{ text: string; values: unknown[] }> = [];
+  const result = await discoverRecentResultReferences({
+    now: new Date("2026-08-05T12:00:00.000Z"),
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      return {
+        rows: [
+          {
+            result_id: 123,
+            event_id: "333",
+            person_id: "2024TEST01",
+            competition_id: "Recent2026",
+            country_id: "USA",
+            continent_id: "_North America",
+            gender: "f",
+          },
+        ],
+      };
+    },
+  });
+  assert.deepEqual(result.references, [
+    {
+      resultId: 123,
+      eventId: "333",
+      competitionId: "Recent2026",
+      personId: "2024TEST01",
+      countryId: "USA",
+      continentId: "_North America",
+      gender: "f",
+    },
+  ]);
+  assert.deepEqual(calls[0]?.values, ["2026-07-30", "2026-08-05"]);
+  assert.match(calls[0]?.text ?? "", /FROM results/);
+});
+
 test("benchmarks the injected candidate path", async () => {
   const measurements: unknown[] = [];
   const result = await precomputeRecentChangeCandidates({
@@ -112,6 +150,63 @@ test("benchmarks the injected candidate path", async () => {
   assert.equal(
     typeof (measurements[0] as { candidatePathMs: number }).candidatePathMs,
     "number",
+  );
+});
+
+test("uses grouped ranking reads for recent result candidates", async () => {
+  const queries: string[] = [];
+  const source = {
+    id: "result-333-single-world-world-all-all",
+    eventId: "333",
+    eventName: "3x3x3 Cube",
+    resultType: "single" as const,
+    kind: "result" as const,
+    region: { scope: "world" as const, regionId: "", name: "World" },
+    gender: null,
+    year: null,
+    title: "3x3x3 Cube · Single · World · Everyone · All time",
+    exploreUrl: "/results?eventId=333&result=single",
+  };
+  const reference = {
+    resultId: 123,
+    eventId: "333",
+    competitionId: "Recent2026",
+    personId: "2024TEST01",
+    countryId: "USA",
+    continentId: "_North America",
+    gender: "f" as const,
+  };
+  const candidates = await generateBatchedFeedCandidates({
+    references: [reference],
+    inventory: [source],
+    query: async (text) => {
+      queries.push(text);
+      if (text.includes("result_rankings_single")) {
+        return {
+          rows: [
+            {
+              result_id: 123,
+              event_id: "333",
+              person_id: "2024TEST01",
+              gender: "f",
+              country_id: "USA",
+              continent_id: "_North America",
+              world_position: 1,
+              continent_position: 1,
+              country_position: 1,
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    },
+  });
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0]?.interestingResultId, 123);
+  assert.equal(queries.length, 6);
+  assert.equal(
+    queries.every((query) => !query.includes("ranking_entries")),
+    false,
   );
 });
 

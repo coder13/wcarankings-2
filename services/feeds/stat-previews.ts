@@ -2,12 +2,16 @@ import type { RankingEntry } from "@/components/RankingsExplorer/types";
 import { getRegions } from "@/services/regions/service";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
+import { generateBatchedFeedCandidates } from "./batched-candidates";
 import {
-  buildFeedStatInventory,
+  buildRecentFeedStatInventory,
   prioritizeFeedStatInventory,
   type FeedInventoryStat,
 } from "./inventory";
-import { discoverRecentCompetitionTriggers } from "./recent-changes";
+import {
+  discoverRecentCompetitionTriggers,
+  discoverRecentResultReferences,
+} from "./recent-changes";
 import {
   currentFeedExportVersion,
   readFeedSnapshot,
@@ -16,7 +20,6 @@ import {
 
 const PAGE_SIZE = 5;
 const TOP_SCAN_SIZE = 10;
-const MAX_SOURCE_SCAN = PAGE_SIZE;
 const SOURCE_READ_CONCURRENCY = 2;
 
 export type FeedStatPreview = FeedInventoryStat & {
@@ -133,57 +136,18 @@ async function loadSourcePage<T extends FeedInventoryStat>(
 }
 
 export async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
-  const [{ triggers }, continents, countries] = await Promise.all([
-    discoverRecentCompetitionTriggers({ now }),
-    getRegions("continent"),
-    getRegions("country"),
-  ]);
+  const [{ triggers }, { references }, continents, countries] =
+    await Promise.all([
+      discoverRecentCompetitionTriggers({ now }),
+      discoverRecentResultReferences({ now }),
+      getRegions("continent"),
+      getRegions("country"),
+    ]);
   const inventory = prioritizeFeedStatInventory(
-    buildFeedStatInventory({ continents, countries }),
+    buildRecentFeedStatInventory({ references, continents, countries }),
     triggers,
   );
-  const candidates: FeedInterestingResult[] = [];
-  let scanCursor = 0;
-  while (scanCursor < inventory.length) {
-    const sourcePage = inventory.slice(
-      scanCursor,
-      scanCursor + MAX_SOURCE_SCAN,
-    );
-    const loaded = await loadSourcePage(sourcePage);
-    const matching = loaded
-      .filter(
-        ({ source, entries }) =>
-          entries.length >= PAGE_SIZE &&
-          hasRecentFeedEntry(source, entries, triggers),
-      )
-      .map(({ source, entries }) => {
-        const recentCompetitionIds = new Set(
-          triggers
-            .filter((trigger) => trigger.eventIds.includes(source.eventId))
-            .map((trigger) => trigger.competitionId),
-        );
-        const interestingEntry = entries
-          .slice(0, TOP_SCAN_SIZE)
-          .find((entry) => recentCompetitionIds.has(entry.competitionId));
-        if (!interestingEntry) return null;
-        const resultId =
-          "resultId" in interestingEntry &&
-          typeof interestingEntry.resultId === "number"
-            ? interestingEntry.resultId
-            : undefined;
-        return {
-          ...source,
-          interestingEntityId: String(resultId ?? interestingEntry.personId),
-          interestingResultId: resultId,
-        };
-      })
-      .filter(
-        (candidate): candidate is FeedInterestingResult => candidate !== null,
-      );
-    candidates.push(...matching);
-    scanCursor += sourcePage.length;
-  }
-  return candidates;
+  return generateBatchedFeedCandidates({ references, inventory });
 }
 
 async function loadInterestingResultPage(

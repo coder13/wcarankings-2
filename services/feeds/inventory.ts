@@ -124,6 +124,92 @@ export function buildFeedStatInventory({
   return inventory;
 }
 
+export function buildRecentFeedStatInventory({
+  references,
+  continents,
+  countries,
+}: {
+  references: readonly {
+    eventId: string;
+    countryId: string;
+    continentId: string;
+    gender: GenderFilter | null;
+  }[];
+  continents: readonly RegionRecord[];
+  countries: readonly RegionRecord[];
+}) {
+  const continentNames = new Map(
+    continents.map((region) => [region.id, region.name]),
+  );
+  const countryNames = new Map(
+    countries.map((region) => [region.id, region.name]),
+  );
+  const inventory = new Map<string, FeedInventoryStat>();
+  for (const reference of references) {
+    const event = WCA_EVENTS.find(
+      (candidate) => candidate.id === reference.eventId,
+    );
+    if (!event) continue;
+    const affectedRegions: FeedInventoryRegion[] = [
+      { scope: "world", regionId: "", name: "World" },
+    ];
+    if (reference.continentId && continentNames.has(reference.continentId)) {
+      affectedRegions.push({
+        scope: "continent",
+        regionId: reference.continentId,
+        name: continentNames.get(reference.continentId)!,
+      });
+    }
+    if (reference.countryId && countryNames.has(reference.countryId)) {
+      affectedRegions.push({
+        scope: "country",
+        regionId: reference.countryId,
+        name: countryNames.get(reference.countryId)!,
+      });
+    }
+    const genders = [null, reference.gender].filter(
+      (gender, index, values): gender is GenderFilter | null =>
+        gender !== null || index === 0 || values.indexOf(gender) === index,
+    );
+    for (const resultType of ["single", "average"] as const) {
+      for (const region of affectedRegions) {
+        for (const gender of genders) {
+          for (const year of [null, 2026] as const) {
+            for (const kind of ["person", "result"] as const) {
+              const suffix = [
+                region.name,
+                genderName(gender),
+                year === null ? "All time" : String(year),
+              ].join(" · ");
+              const id = `${kind}-${event.id}-${resultType}-${region.scope}-${region.regionId || "world"}-${gender ?? "all"}-${year ?? "all"}`;
+              inventory.set(id, {
+                id,
+                eventId: event.id,
+                eventName: event.name,
+                resultType,
+                kind,
+                region,
+                gender,
+                year,
+                title: `${event.name} · ${resultName(resultType)} · ${suffix}`,
+                exploreUrl: exploreUrl({
+                  kind,
+                  eventId: event.id,
+                  resultType,
+                  region,
+                  gender,
+                  year,
+                }),
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  return [...inventory.values()];
+}
+
 export function prioritizeFeedStatInventory(
   inventory: readonly FeedInventoryStat[],
   triggers: readonly { countryId: string; eventIds: readonly string[] }[],

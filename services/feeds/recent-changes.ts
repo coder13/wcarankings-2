@@ -25,6 +25,16 @@ export type RecentCompetitionTrigger = {
   countryRecordEventIds: string[];
 };
 
+export type RecentResultReference = {
+  resultId: number;
+  eventId: string;
+  competitionId: string;
+  personId: string;
+  countryId: string;
+  continentId: string;
+  gender: "m" | "f" | "o" | null;
+};
+
 type RecentChangeMeasurement = {
   triggerQueryMs: number;
   candidatePathMs: number;
@@ -54,6 +64,16 @@ type TriggerRow = {
   end_day: number | string;
   event_id: string | null;
   has_country_record: number | boolean;
+};
+
+type RecentResultRow = {
+  result_id: number | string;
+  event_id: string;
+  person_id: string;
+  competition_id: string;
+  country_id: string | null;
+  continent_id: string | null;
+  gender: string | null;
 };
 
 function utcDate(value: Date) {
@@ -170,6 +190,42 @@ export async function discoverRecentCompetitionTriggers(
     triggers: [...triggers.values()],
     triggerQueryMs: performance.now() - startedAt,
   };
+}
+
+export async function discoverRecentResultReferences(
+  options: RecentTriggerOptions = {},
+) {
+  const now = options.now ?? new Date();
+  const endDate = utcDate(now);
+  const startedAt = performance.now();
+  const result = await (options.query ?? defaultQuery)(
+    `SELECT DISTINCT result.id AS result_id, result.event_id,
+       result.person_id, result.competition_id, competition.country_id, country.continent_id,
+       person.gender
+     FROM results result
+     INNER JOIN competitions competition ON competition.id = result.competition_id
+     LEFT JOIN countries country ON country.id = competition.country_id
+     LEFT JOIN persons person ON person.wca_id = result.person_id AND person.sub_id = 1
+     WHERE STR_TO_DATE(CONCAT(competition.end_year, '-',
+       LPAD(competition.end_month, 2, '0'), '-', LPAD(competition.end_day, 2, '0')),
+       '%Y-%m-%d') BETWEEN ? AND ?`,
+    [daysBefore(endDate, positiveDays(options.triggerDays)), endDate],
+  );
+  const references = (result.rows as unknown as RecentResultRow[]).map(
+    (row): RecentResultReference => ({
+      resultId: Number(row.result_id),
+      eventId: row.event_id,
+      competitionId: String(row.competition_id),
+      personId: row.person_id,
+      countryId: String(row.country_id ?? ""),
+      continentId: String(row.continent_id ?? ""),
+      gender:
+        row.gender === "m" || row.gender === "f" || row.gender === "o"
+          ? row.gender
+          : null,
+    }),
+  );
+  return { references, resultQueryMs: performance.now() - startedAt };
 }
 
 export function compareFeedTopFive(
