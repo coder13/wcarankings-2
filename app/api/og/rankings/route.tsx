@@ -1,11 +1,17 @@
 import { ImageResponse } from "next/og";
 import {
-  formatRankingDocumentTitle,
-  type RankingDocumentTitleInput,
-} from "@/lib/ranking-document-title";
-import { isEventId, isRankingEventId, isRankingType } from "@/lib/wca";
+  flagEmoji,
+  formatWcaResult,
+  isEventId,
+  isRankingEventId,
+  isRankingType,
+} from "@/lib/wca";
+import type { RankingDocumentTitleInput } from "@/lib/ranking-document-title";
 import { isMedalRankingType } from "@/lib/medal-rankings";
-import { loadTopRankingResultLabels } from "@/services/rankings/page-metadata";
+import {
+  loadTopRankingEntries,
+  type RankingPageEntry,
+} from "@/services/rankings/page-metadata";
 
 export const dynamic = "force-dynamic";
 
@@ -83,60 +89,138 @@ function metadataInput(params: URLSearchParams): RankingDocumentTitleInput {
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const input = metadataInput(params);
-  const topResults = await loadTopRankingResultLabels(params, input);
-  const title = formatRankingDocumentTitle(input).replace(
-    / \| WCA Rankings$/,
-    "",
-  );
+  const topResults = await loadTopRankingEntries(params, input);
+  const rowStyle = {
+    alignItems: "center",
+    background: "#1b1f23",
+    display: "flex",
+    fontSize: 24,
+    height: 116,
+    padding: "0 48px",
+    width: "100%",
+  } as const;
+
+  const row = (entry: RankingPageEntry, index: number) => {
+    const result =
+      entry.formattedValue ??
+      formatWcaResult(
+        input.eventId,
+        entry.best,
+        input.rankingType === "average" ? "average" : "single",
+      );
+    const country = entry.countryName || "Country unavailable";
+    const badge = entry.recordBadges?.[0];
+    const competition = entry.competitionName || "";
+    return (
+      <div
+        key={`${index}-${entry.personId}`}
+        style={{
+          ...rowStyle,
+          background: index % 2 ? "#20272c" : "#1b1f23",
+        }}
+      >
+        <div
+          style={{
+            color: "#aab8c1",
+            display: "flex",
+            fontVariantNumeric: "tabular-nums",
+            width: 84,
+          }}
+        >
+          {entry.rank}
+        </div>
+        <div
+          style={{
+            alignItems: "center",
+            display: "flex",
+            flex: 1,
+            gap: 16,
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{ display: "flex", fontSize: 34 }}
+            aria-label={country}
+          >
+            {flagEmoji(entry.countryIso2 ?? "")}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+            }}
+          >
+            <div style={{ display: "flex", fontSize: 28 }}>
+              {entry.personName}
+            </div>
+            <div style={{ color: "#aab8c1", display: "flex", fontSize: 20 }}>
+              {entry.identitySubtitle || entry.personId}
+            </div>
+            {entry.identitySubtitle && entry.personId ? (
+              <div style={{ color: "#aab8c1", display: "flex", fontSize: 18 }}>
+                {entry.personId}
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div
+          style={{
+            alignItems: "flex-end",
+            display: "flex",
+            flexDirection: "column",
+            marginLeft: 24,
+            minWidth: 260,
+          }}
+        >
+          <div style={{ alignItems: "center", display: "flex", gap: 10 }}>
+            {badge ? (
+              <div
+                style={{
+                  background: badge === "WR" ? "#fb7185" : "#60a5fa",
+                  borderRadius: 6,
+                  color: "#fff",
+                  display: "flex",
+                  fontSize: 18,
+                  padding: "3px 8px",
+                }}
+              >
+                {badge}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", fontSize: 28 }}>{result}</div>
+          </div>
+          {competition ? (
+            <div style={{ color: "#aab8c1", display: "flex", fontSize: 18 }}>
+              {competition}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
 
   const imageResponse = new ImageResponse(
     <div
       style={{
         background: "#121417",
-        color: "#fffcff",
+        color: "#f5f8fa",
         display: "flex",
         flexDirection: "column",
         fontFamily: "Arial",
         height: "100%",
-        justifyContent: "space-between",
-        padding: "64px 72px",
         width: "100%",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ color: "#aab4c3", display: "flex", fontSize: 28 }}>
-          WCA Rankings
-        </div>
-        <div style={{ display: "flex", fontSize: 52, fontWeight: 700 }}>
-          {title}
-        </div>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {topResults.length > 0 ? (
-          topResults.map((result, index) => (
-            <div
-              key={`${index}-${result}`}
-              style={{
-                alignItems: "center",
-                display: "flex",
-                fontSize: 32,
-                gap: 24,
-              }}
-            >
-              <div style={{ color: "#77d6c6", display: "flex", width: 56 }}>
-                {index + 1}
-              </div>
-              <div style={{ display: "flex" }}>{result}</div>
-            </div>
-          ))
-        ) : (
-          <div style={{ color: "#aab4c3", display: "flex", fontSize: 30 }}>
-            Ranking data is not available.
-          </div>
-        )}
-      </div>
+      {topResults.length > 0
+        ? topResults.map(row)
+        : [
+            <div key="empty" style={{ ...rowStyle, color: "#aab8c1" }}>
+              Ranking data is not available.
+            </div>,
+          ]}
     </div>,
-    { height: 630, width: 1200 },
+    { height: 348, width: 1200 },
   );
   return new Response(await imageResponse.arrayBuffer(), {
     headers: imageResponse.headers,

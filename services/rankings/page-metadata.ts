@@ -7,10 +7,17 @@ import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
 import type { RankingDocumentTitleInput } from "@/lib/ranking-document-title";
 
-type RankingPageEntry = {
+export type RankingPageEntry = {
+  rank: number;
+  personId: string;
   personName: string;
+  identitySubtitle?: string;
+  countryName?: string;
+  countryIso2?: string;
   best: number;
   formattedValue?: string;
+  competitionName?: string;
+  recordBadges?: string[];
 };
 
 function rankingParams(
@@ -45,7 +52,7 @@ function entryLabel(
   return `${entry.personName} (${value})`;
 }
 
-async function loadTopEntries(
+export async function loadTopRankingEntries(
   params: URLSearchParams,
   input: RankingDocumentTitleInput,
 ): Promise<RankingPageEntry[]> {
@@ -109,7 +116,7 @@ export async function loadTopRankingResultLabels(
   input: RankingDocumentTitleInput,
 ): Promise<string[]> {
   try {
-    const entries = await loadTopEntries(params, input);
+    const entries = await loadTopRankingEntries(params, input);
     return entries.map((entry) => entryLabel(entry, input));
   } catch (error) {
     console.warn("Ranking metadata top-result lookup failed", error);
