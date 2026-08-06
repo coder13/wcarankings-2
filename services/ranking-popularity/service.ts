@@ -175,3 +175,5 @@ export function rankingPopularityScore(
       0.25 * Math.log2(1 + totals.thirtyDayViews),
   };
 }
+
+export const rankingPopularityService = new RankingPopularityService();

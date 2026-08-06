@@ -26,6 +26,14 @@ A clear database failure restores the batch in the buffer. Records during a flus
 
 The buffer has a fixed entry limit. It drops a new key-date pair when full, but it continues to combine existing pairs.
 
+## Global collection boundary
+
+The global rankings endpoint starts collection only after it creates a successful person-event first-page response.
+
+Collection excludes list requests, dynamic WCA-ID requests, locate requests, later pages, and composite metrics.
+
+Collection starts in the background and does not block the ranking response. This slice does not flush the process-local buffer.
+
 ## Reading totals
 
 Daily rows store successful first-page view counts. The service reads inclusive seven-day and thirty-day UTC totals.
