@@ -66,10 +66,17 @@ export async function getRankingsPageMetadata({
     ),
     metadataInput,
   );
+  const title = formatRankingDocumentTitle(metadataInput);
+  const description = formatRankingDocumentDescription(
+    metadataInput,
+    topResults,
+  );
 
   return {
-    title: formatRankingDocumentTitle(metadataInput),
-    description: formatRankingDocumentDescription(metadataInput, topResults),
+    title,
+    description,
+    openGraph: { title, description },
+    twitter: { title, description },
   };
 }
 
