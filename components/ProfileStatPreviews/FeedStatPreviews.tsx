@@ -14,8 +14,9 @@ type FeedStatPreviewPage = {
 
 async function fetchFeedPreviewPage(
   cursor: number,
+  limit = 5,
 ): Promise<FeedStatPreviewPage> {
-  const response = await fetch(`/api/feed?cursor=${cursor}&limit=1`);
+  const response = await fetch(`/api/feed?cursor=${cursor}&limit=${limit}`);
   if (!response.ok) throw new Error("Feed previews are unavailable.");
   return response.json() as Promise<FeedStatPreviewPage>;
 }
@@ -59,9 +60,9 @@ export function FeedStatPreviews({
       let cursor: number | null = 0;
       let slotIndex = 0;
       while (cursor !== null && slotIndex < 5) {
-        const page = await fetchFeedPreviewPage(cursor);
-        const preview = page.previews[0];
-        if (preview) {
+        const page = await fetchFeedPreviewPage(cursor, 5);
+        for (const preview of page.previews) {
+          if (slotIndex >= 5) break;
           const currentSlot = slotIndex;
           setSlots((current) => {
             const next = [...current];
@@ -113,9 +114,9 @@ export function FeedStatPreviews({
           let slotIndex = slots.length;
           const firstNewSlot = slotIndex;
           while (cursor !== null && slotIndex < firstNewSlot + 5) {
-            const page = await fetchFeedPreviewPage(cursor);
-            const preview = page.previews[0];
-            if (preview) {
+            const page = await fetchFeedPreviewPage(cursor, 5);
+            for (const preview of page.previews) {
+              if (slotIndex >= firstNewSlot + 5) break;
               const currentSlot = slotIndex;
               setSlots((current) => {
                 const next = [...current];
