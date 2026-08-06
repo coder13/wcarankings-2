@@ -24,6 +24,11 @@ export type FeedStatPreview = FeedInventoryStat & {
   highlightedCompetitionIds: string[];
 };
 
+export type FeedInterestingResult = FeedInventoryStat & {
+  interestingEntityId: string;
+  interestingResultId: number | undefined;
+};
+
 export type FeedStatPreviewPage = {
   previews: FeedStatPreview[];
   nextCursor: number | null;
@@ -69,11 +74,15 @@ export function hasRecentTopTenEntry(
 
 export function selectFeedPreviewEntries<
   Entry extends Pick<RankingEntry, "competitionId">,
->(entries: readonly Entry[], competitionIds: ReadonlySet<string>) {
+>(
+  entries: readonly Entry[],
+  competitionIds: ReadonlySet<string>,
+  preferredIndex?: number,
+) {
   const topTen = entries.slice(0, TOP_SCAN_SIZE);
-  const changedIndex = topTen.findIndex((entry) =>
-    competitionIds.has(entry.competitionId),
-  );
+  const changedIndex =
+    preferredIndex ??
+    topTen.findIndex((entry) => competitionIds.has(entry.competitionId));
   if (changedIndex < 0 || topTen.length < PAGE_SIZE) return [];
   const start = Math.max(
     0,
@@ -98,24 +107,10 @@ export function hasRecentFeedEntry(
   return hasRecentTopTenEntry(entries, competitionIds);
 }
 
-function highlightedCompetitionIds(
-  source: FeedInventoryStat,
-  entries: readonly Pick<RankingEntry, "competitionId">[],
-  triggers: readonly { competitionId: string; eventIds: readonly string[] }[],
+async function loadSourcePage<T extends FeedInventoryStat>(
+  sourcePage: readonly T[],
 ) {
-  const recentCompetitionIds = new Set(
-    triggers
-      .filter((trigger) => trigger.eventIds.includes(source.eventId))
-      .map((trigger) => trigger.competitionId),
-  );
-  return entries
-    .filter((entry) => recentCompetitionIds.has(entry.competitionId))
-    .map((entry) => entry.competitionId);
-}
-
-async function loadSourcePage(sourcePage: readonly FeedInventoryStat[]) {
-  const loaded: Array<{ source: FeedInventoryStat; entries: RankingEntry[] }> =
-    [];
+  const loaded: Array<{ source: T; entries: RankingEntry[] }> = [];
   let nextIndex = 0;
   async function worker() {
     while (nextIndex < sourcePage.length) {
@@ -132,7 +127,7 @@ async function loadSourcePage(sourcePage: readonly FeedInventoryStat[]) {
     ),
   );
   return loaded.filter(
-    (item): item is { source: FeedInventoryStat; entries: RankingEntry[] } =>
+    (item): item is { source: T; entries: RankingEntry[] } =>
       item !== undefined,
   );
 }
@@ -147,7 +142,7 @@ export async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
     buildFeedStatInventory({ continents, countries }),
     triggers,
   );
-  const previews: FeedStatPreview[] = [];
+  const candidates: FeedInterestingResult[] = [];
   let scanCursor = 0;
   while (scanCursor < inventory.length) {
     const sourcePage = inventory.slice(
@@ -167,24 +162,61 @@ export async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
             .filter((trigger) => trigger.eventIds.includes(source.eventId))
             .map((trigger) => trigger.competitionId),
         );
-        const previewEntries = selectFeedPreviewEntries(
-          entries,
-          recentCompetitionIds,
-        );
+        const interestingEntry = entries
+          .slice(0, TOP_SCAN_SIZE)
+          .find((entry) => recentCompetitionIds.has(entry.competitionId));
+        if (!interestingEntry) return null;
+        const resultId =
+          "resultId" in interestingEntry &&
+          typeof interestingEntry.resultId === "number"
+            ? interestingEntry.resultId
+            : undefined;
         return {
           ...source,
-          entries: previewEntries,
-          highlightedCompetitionIds: highlightedCompetitionIds(
-            source,
-            previewEntries,
-            triggers,
-          ),
+          interestingEntityId: String(resultId ?? interestingEntry.personId),
+          interestingResultId: resultId,
         };
-      });
-    previews.push(...matching);
+      })
+      .filter(
+        (candidate): candidate is FeedInterestingResult => candidate !== null,
+      );
+    candidates.push(...matching);
     scanCursor += sourcePage.length;
   }
-  return previews;
+  return candidates;
+}
+
+async function loadInterestingResultPage(
+  candidates: readonly FeedInterestingResult[],
+) {
+  const loaded = await loadSourcePage(candidates);
+  return loaded.flatMap(({ source, entries }) => {
+    const interestingIndex = entries
+      .slice(0, TOP_SCAN_SIZE)
+      .findIndex((entry) => {
+        const resultId =
+          "resultId" in entry && typeof entry.resultId === "number"
+            ? String(entry.resultId)
+            : entry.personId;
+        return resultId === source.interestingEntityId;
+      });
+    if (interestingIndex < 0) return [];
+    const interestingEntry = entries[interestingIndex];
+    if (!interestingEntry) return [];
+    const previewEntries = selectFeedPreviewEntries(
+      entries,
+      new Set([interestingEntry.competitionId]),
+      interestingIndex,
+    );
+    if (previewEntries.length < PAGE_SIZE) return [];
+    return [
+      {
+        ...source,
+        entries: previewEntries,
+        highlightedCompetitionIds: [interestingEntry.competitionId],
+      },
+    ];
+  });
 }
 
 let backgroundBuild: Promise<void> | null = null;
@@ -193,9 +225,9 @@ function startBackgroundBuild(now?: Date) {
   if (backgroundBuild) return;
   backgroundBuild = (async () => {
     const exportVersion = await currentFeedExportVersion();
-    const previews = await generateFeedStatPreviews({ now });
+    const candidates = await generateFeedStatPreviews({ now });
     if ((await currentFeedExportVersion()) !== exportVersion) return;
-    await writeFeedSnapshot({ exportVersion, previews });
+    await writeFeedSnapshot({ exportVersion, candidates });
   })()
     .catch((error) => {
       console.error("The feed snapshot build failed.", error);
@@ -220,10 +252,11 @@ export async function loadFeedStatPreviews({
     startBackgroundBuild(now);
     return { previews: [], nextCursor: null };
   }
-  const previews = snapshot.previews.slice(cursor, cursor + PAGE_SIZE);
+  const candidates = snapshot.candidates.slice(cursor, cursor + PAGE_SIZE);
+  const previews = await loadInterestingResultPage(candidates);
   const nextCursor =
-    cursor + previews.length < snapshot.previews.length
-      ? cursor + previews.length
+    cursor + candidates.length < snapshot.candidates.length
+      ? cursor + candidates.length
       : null;
   return { previews, nextCursor };
 }

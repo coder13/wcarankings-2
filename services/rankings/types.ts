@@ -3,6 +3,7 @@ import type { LRUCache } from "lru-cache";
 import type { MedalRankingType } from "@/lib/medal-rankings";
 
 export type RankingRow = {
+  result_id: number;
   rank: number;
   sub_rank: number;
   total_count?: number;

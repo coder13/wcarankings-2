@@ -17,6 +17,7 @@ export const RECORD_BADGE_LABELS: Record<RecordBadgeCode, string> = {
 };
 
 export type RankingEntry = {
+  resultId?: number;
   rank: number;
   subRank: number;
   personId: string;

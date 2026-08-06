@@ -23,4 +23,6 @@ The server starts one background build when that export has no snapshot. Feed re
 
 The snapshot format has a version. A feed behavior change creates a new snapshot for the same export.
 
+The snapshot stores one interesting result reference per candidate. It uses the existing solve-fact result ID when the stat provides one. It does not store the five display rows. The page fetches the source stat and selects the five rows around the referenced result.
+
 The feed inventory includes all 17 WCA events, both single and average result types, all four gender variants, all-time and 2026 variants, and person and result families.

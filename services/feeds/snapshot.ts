@@ -1,16 +1,16 @@
 import { query as defaultQuery } from "@/db";
-import type { FeedStatPreview } from "./stat-previews";
+import type { FeedInterestingResult } from "./stat-previews";
 
 type FeedQuery = (
   text: string,
   values?: unknown[],
 ) => Promise<{ rows: Record<string, unknown>[] }>;
 
-const FEED_SNAPSHOT_FORMAT = "v3";
+const FEED_SNAPSHOT_FORMAT = "v4";
 
 export type FeedSnapshot = {
   exportVersion: string;
-  previews: FeedStatPreview[];
+  candidates: FeedInterestingResult[];
 };
 
 export async function currentFeedExportVersion(
