@@ -26,4 +26,14 @@ The endpoint returns injected candidates for tests. The production trigger adapt
 
 The measurement hook reports trigger query time, pure candidate-path time, trigger count, and candidate count. The current bound is 50 trigger rows and five cards per response.
 
-The estimated work for this slice is one bounded trigger query plus in-memory candidate filtering. Ranking source adapters, preview loading, and durable old-generation comparison remain later work.
+The estimated work for this slice is one bounded trigger query plus bounded ranking reads. Ranking source adapters, preview loading, and durable old-generation comparison remain later work.
+
+## Feed preview experiment
+
+The feed page uses the profile `StatPreviewTable` component. It shows one vertical list of stat previews. Each preview has an Explore action.
+
+The first experiment checks a fixed catalog of person and result rankings. A stat qualifies when one of its current top-20 rows comes from a competition that ended during the last seven days. This is a recent-result signal, not a historical top-five diff.
+
+The page returns five qualifying stats per request. A scroll sentinel fetches the next bounded source page before it enters view. The feed has no user-specific state.
+
+The current catalog contains 20 ranking sources. It does not scan all event, year, gender, region, or list combinations. A later change can replace the recent-result signal with the completed previous-generation comparator.

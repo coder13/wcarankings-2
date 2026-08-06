@@ -563,53 +563,12 @@ main {
 
 .feedCards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
-  margin: 0;
+  max-width: 42rem;
+  margin: 0 auto;
   padding: 0;
   list-style: none;
-}
-
-.feedCard {
-  border: 1px solid var(--border);
-  border-radius: 0.8rem;
-  background: var(--surface);
-  box-shadow: 0 1px 4px var(--shadow-soft);
-}
-
-.feedCard {
-  padding: 1.25rem;
-}
-
-.feedCardHeader h2 {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 500;
-}
-
-.feedCardHeader p {
-  margin: 0.35rem 0 0;
-  color: var(--text-subtle);
-}
-
-.feedPreview {
-  margin: 1rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.feedPreviewRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 0;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.feedPreviewRow strong {
-  color: var(--text-strong);
-  font-weight: 500;
 }
 
 .feedEmpty {
