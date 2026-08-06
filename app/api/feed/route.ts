@@ -1,4 +1,3 @@
-import { handleHomeFeedRequest } from "@/controllers/feed-controller";
 import {
   loadFeedInterestingItems,
   loadFeedStatPreviews,
@@ -11,8 +10,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  let itemCursor: number | null = 0;
   if (url.searchParams.has("items")) {
-    const cursor = Number(url.searchParams.get("items"));
+    itemCursor = Number(url.searchParams.get("items"));
+  } else if (url.searchParams.has("cursor")) {
+    itemCursor = null;
+  }
+  if (itemCursor !== null) {
+    const cursor = itemCursor;
     const [user, countries] = await Promise.all([
       getAuthUser(request),
       getRegions("country"),
@@ -44,5 +49,4 @@ export async function GET(request: Request) {
         ),
       );
   }
-  return handleHomeFeedRequest(request);
 }
