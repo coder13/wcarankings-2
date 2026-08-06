@@ -24,7 +24,6 @@ The files use these status labels:
 - [Medal rankings](medal-rankings.md)
 - [Competition rankings](competition-rankings.md)
 - [City-event statistics](city-event-stats.md)
-- [Country-event statistics](country-event-stats.md)
 - [Ranking counts and list metadata](ranking-counts-and-metadata.md)
 
 ## Foundation tables
