@@ -6,7 +6,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export function generateMetadata({
+export async function generateMetadata({
   searchParams,
 }: {
   searchParams: Promise<RankingsSearchParams>;
@@ -19,11 +19,11 @@ export function generateMetadata({
     year: null,
     personCompetitionRanking: false,
     personActivityRanking: true,
-    personActivityMetric: "competitions",
+    personActivityMetric: "countries",
   });
 }
 
-export default function PersonCompetitionRankingsPage({
+export default function PersonCountryRankingsPage({
   searchParams,
 }: {
   searchParams: Promise<RankingsSearchParams>;

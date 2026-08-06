@@ -19,10 +19,11 @@ export async function generateMetadata({
     year: null,
     personCompetitionRanking: false,
     personActivityRanking: true,
+    personActivityMetric: "rounds",
   });
 }
 
-export default function PersonActivityRankingsPage({
+export default function PersonRoundRankingsPage({
   searchParams,
 }: {
   searchParams: Promise<RankingsSearchParams>;

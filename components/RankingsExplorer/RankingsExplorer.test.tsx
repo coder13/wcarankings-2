@@ -8,7 +8,11 @@ import { orderSearchMatches } from "./helpers/search";
 import { getTopRailScrollProgress } from "./useRailScrollProgress";
 import { competitionRankingPath } from "./useRankingsState";
 import type { RankingsFilterState } from "./rankingsUrl";
-import { serializeRankingsUrl, type RankingsUrlState } from "./rankingsUrl";
+import {
+  personActivityRankingPath,
+  serializeRankingsUrl,
+  type RankingsUrlState,
+} from "./rankingsUrl";
 import type { RankingEntry } from "./types";
 
 const rankingEntry: RankingEntry = {
@@ -36,7 +40,9 @@ function pathnameForFilters(filters: RankingsFilterState) {
   }
   if (filters.subject === "cities") return `/cities/${filters.cityRanking}`;
   if (filters.personCompetitionRanking) return "/persons/competitions";
-  if (filters.personActivityRanking) return "/persons/activity";
+  if (filters.personActivityRanking) {
+    return personActivityRankingPath(filters.personActivityMetric);
+  }
   if (filters.personMedalRanking) return "/persons/medals";
   if (filters.year) return `/persons/year/${filters.year}`;
   return "/";
@@ -229,14 +235,14 @@ test("keeps the activity metric in the person ranking selector", () => {
   assert.doesNotMatch(markup, /Find ranking/);
 });
 
-test("keeps a competition-ranking year in its query string", () => {
+test("uses a unique canonical path for each person activity stat", () => {
   const filters: RankingsUrlState = {
     subject: "people",
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
-    personCompetitionRanking: true,
-    personActivityRanking: false,
-    personActivityMetric: "competitions",
+    personCompetitionRanking: false,
+    personActivityRanking: true,
+    personActivityMetric: "countries",
     personMedalRanking: false,
     medalType: "overall",
     year: 2023,
@@ -252,14 +258,7 @@ test("keeps a competition-ranking year in its query string", () => {
     kinchOrder: "regional",
   };
   assert.equal(
-    serializeRankingsUrl("/persons/competitions", filters).toString(),
-    "gender=f%2Co&year=2023",
+    serializeRankingsUrl("/persons/countries", filters).toString(),
+    "gender=f%2Co",
   );
-  const markup = renderExplorerMarkup(
-    { options: { showSubjectSwitch: true } },
-    { personCompetitionRanking: true, year: 2023 },
-  );
-  assert.match(markup, /aria-label="Person ranking period"/);
-  assert.match(markup, />All time</);
-  assert.match(markup, />2023</);
 });

@@ -50,15 +50,17 @@ export async function getRankingsPageMetadata({
   const medalType = isMedalRankingType(requestedMedal)
     ? requestedMedal
     : "overall";
-  const personActivityMetric = [
-    "competitions",
-    "countries",
-    "rounds",
-    "solves",
-  ].includes(requestedActivityMetric)
-    ? (requestedActivityMetric as
-        "competitions" | "countries" | "rounds" | "solves")
-    : "competitions";
+  const personActivityMetric =
+    options.personActivityMetric ??
+    (["competitions", "countries", "rounds", "solves"].includes(
+      requestedActivityMetric,
+    )
+      ? (requestedActivityMetric as
+          | "competitions"
+          | "countries"
+          | "rounds"
+          | "solves")
+      : "competitions");
 
   return {
     title: formatRankingDocumentTitle({

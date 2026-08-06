@@ -15,6 +15,7 @@ import {
   parseRankingsUrl,
   rankingsFilterStateFromUrl,
   serializeRankingsUrl,
+  personActivityRankingPath,
   type RankingsFilterState,
   type RankingsUrlNavigation,
   type RankingsUrlUpdate,
@@ -209,7 +210,11 @@ export function useRankingsState() {
         enabled: boolean,
         metric: PersonActivityMetric = filters.personActivityMetric,
       ) {
-        if (enabled === filters.personActivityRanking) return;
+        if (
+          enabled === filters.personActivityRanking &&
+          (!enabled || metric === filters.personActivityMetric)
+        )
+          return;
         patchFilters(
           {
             personCompetitionRanking: false,
@@ -220,7 +225,7 @@ export function useRankingsState() {
           },
           {
             history: "push",
-            pathname: enabled ? "/persons/activity" : "/",
+            pathname: enabled ? personActivityRankingPath(metric) : "/",
           },
           { search: "", wcaId: "", focusMe: false },
         );

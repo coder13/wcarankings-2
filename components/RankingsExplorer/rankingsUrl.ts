@@ -150,21 +150,41 @@ function cityRankingFromPathname(pathname: string) {
     : "fastest-single";
 }
 
-function personCompetitionRankingFromPathname(pathname: string) {
-  return pathname === "/persons/competitions";
+function personCompetitionRankingFromPathname(_pathname: string) {
+  return false;
 }
 
-function personActivityRankingFromPathname(pathname: string) {
-  return pathname === "/persons/activity";
+function personActivityMetricFromPathname(
+  pathname: string,
+): PersonActivityMetric | null {
+  const value = pathname.match(
+    /^\/persons\/(competitions|countries|rounds|solves)$/,
+  )?.[1];
+  return value && PERSON_ACTIVITY_METRICS.has(value)
+    ? (value as PersonActivityMetric)
+    : null;
 }
 
 function personActivityMetricFromParams(
+  pathname: string,
   params: URLSearchParams,
 ): PersonActivityMetric {
-  const value = params.get("metric") ?? "competitions";
-  return PERSON_ACTIVITY_METRICS.has(value)
-    ? (value as PersonActivityMetric)
-    : "competitions";
+  const requested = params.get("metric");
+  return (
+    personActivityMetricFromPathname(pathname) ??
+    (requested && PERSON_ACTIVITY_METRICS.has(requested)
+      ? (requested as PersonActivityMetric)
+      : null) ??
+    "competitions"
+  );
+}
+
+function personActivityRankingFromPathname(pathname: string) {
+  return personActivityMetricFromPathname(pathname) !== null;
+}
+
+export function personActivityRankingPath(metric: PersonActivityMetric) {
+  return `/persons/${metric}`;
 }
 
 function personMedalRankingFromPathname(pathname: string) {
@@ -304,7 +324,7 @@ export function parseRankingsUrl(
     cityRanking,
     personCompetitionRanking,
     personActivityRanking,
-    personActivityMetric: personActivityMetricFromParams(params),
+    personActivityMetric: personActivityMetricFromParams(pathname, params),
     personMedalRanking,
     medalType: isMedalRankingType(params.get("medal") ?? "")
       ? (params.get("medal") as MedalRankingType)
@@ -366,12 +386,6 @@ export function serializeRankingsUrl(
   if (state.gender.length) params.set("gender", state.gender.join(","));
   if (state.personMedalRanking && state.medalType !== "overall") {
     params.set("medal", state.medalType);
-  }
-  if (
-    state.personActivityRanking &&
-    state.personActivityMetric !== "competitions"
-  ) {
-    params.set("metric", state.personActivityMetric);
   }
   if (
     state.subject === "people" &&
