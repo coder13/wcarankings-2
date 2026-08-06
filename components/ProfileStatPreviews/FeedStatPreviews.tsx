@@ -6,6 +6,19 @@ import { RankingRow } from "@/components/RankingRow/RankingRow";
 import { StatPreviewTable } from "./StatPreviewTable";
 import type { FeedStatPreview } from "@/services/feeds/stat-previews";
 
+type FeedStatPreviewPage = {
+  previews: FeedStatPreview[];
+  nextCursor: number | null;
+};
+
+async function fetchFeedPreviewPage(
+  cursor: number,
+): Promise<FeedStatPreviewPage> {
+  const response = await fetch(`/api/feed?cursor=${cursor}`);
+  if (!response.ok) throw new Error("Feed previews are unavailable.");
+  return response.json() as Promise<FeedStatPreviewPage>;
+}
+
 export function FeedStatPreviews({
   initialPreviews,
   initialCursor,
@@ -22,19 +35,27 @@ export function FeedStatPreviews({
 
   useEffect(() => {
     if (initialPreviews.length > 0 || initialCursor === null) return;
+    loading.current = true;
     void fetch(`/api/feed?items=${initialCursor}`)
       .then((response) => response.json())
       .then((page: { nextCursor: number | null }) => {
         itemCursor.current = page.nextCursor;
       });
-    void fetch(`/api/feed?cursor=0`)
-      .then((response) => response.json())
-      .then(
-        (page: { previews: FeedStatPreview[]; nextCursor: number | null }) => {
-          setPreviews(page.previews);
-          setNextCursor(page.nextCursor);
-        },
-      );
+    void fetchFeedPreviewPage(0)
+      .then(async (firstPage) => {
+        setPreviews(firstPage.previews);
+        if (firstPage.nextCursor === null) {
+          setNextCursor(null);
+          return;
+        }
+        const secondPage = await fetchFeedPreviewPage(firstPage.nextCursor);
+        setPreviews((current) => [...current, ...secondPage.previews]);
+        setNextCursor(secondPage.nextCursor);
+      })
+      .catch(() => setNextCursor(null))
+      .finally(() => {
+        loading.current = false;
+      });
   }, [initialCursor, initialPreviews.length]);
 
   useEffect(() => {
@@ -56,17 +77,12 @@ export function FeedStatPreviews({
               itemCursor.current = page.nextCursor;
             });
         }
-        fetch(`/api/feed?cursor=${nextCursor}`)
-          .then((response) => response.json())
-          .then(
-            (page: {
-              previews: FeedStatPreview[];
-              nextCursor: number | null;
-            }) => {
-              setPreviews((current) => [...current, ...page.previews]);
-              setNextCursor(page.nextCursor);
-            },
-          )
+        fetchFeedPreviewPage(nextCursor)
+          .then((page) => {
+            setPreviews((current) => [...current, ...page.previews]);
+            setNextCursor(page.nextCursor);
+          })
+          .catch(() => setNextCursor(null))
           .finally(() => {
             loading.current = false;
             setLoadingNextPage(false);
