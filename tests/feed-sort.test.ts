@@ -125,3 +125,27 @@ test("keeps only the most notable stat for each result", () => {
     1,
   );
 });
+
+test("weights stat families and grouped interesting results", () => {
+  const sorted = sortFeedCandidates(
+    [
+      candidate("single-city", { kind: "city", eventId: "444", worldRank: 2 }),
+      candidate("person-result", { kind: "result", worldRank: 10 }),
+      candidate("grouped-city-1", {
+        kind: "city",
+        worldRank: 2,
+        interestingResultId: 2,
+      }),
+      candidate("grouped-city-2", {
+        kind: "city",
+        worldRank: 2,
+        interestingResultId: 3,
+      }),
+    ],
+    null,
+  );
+  assert.deepEqual(
+    sorted.map((item) => item.id),
+    ["grouped-city-1", "grouped-city-2", "single-city", "person-result"],
+  );
+});

@@ -13,5 +13,10 @@ average-result boost, region-specific top-ten notability, and current ranking
 popularity data. The API returns the selected rows before it loads stat
 preview pages.
 
+Family weights and the same-stat result boost are defined in
+`services/feeds/constants.ts`. A stat with several interesting results gets a
+small capped boost. Rank remains the main signal, so a high-ranked city can
+still appear above a lower-ranked person result.
+
 The feed does not create Men variants. It supports Everyone, Female, and
 Other variants only.

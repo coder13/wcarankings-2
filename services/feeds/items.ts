@@ -3,6 +3,7 @@ import type { FeedUserPreferences } from "./preferences";
 import type { FeedInterestingResult } from "./stat-previews";
 import { currentFeedExportVersion } from "./snapshot";
 import { rankingListKeyForFeedStat } from "./sort";
+import { FEED_SORT_CONSTANTS } from "./constants";
 
 type FeedQuery = (
   text: string,
@@ -116,9 +117,30 @@ export async function readFeedItems({
        CASE WHEN feed.result_type = 'average' THEN 25 ELSE 0 END DESC,
        CASE feed.region_scope
          WHEN 'world' THEN 300 + CASE WHEN feed.world_rank BETWEEN 1 AND 10 THEN 110 - feed.world_rank * 10 ELSE 0 END
-         WHEN 'continent' THEN 200 + CASE WHEN feed.continent_rank BETWEEN 1 AND 10 THEN 110 - feed.continent_rank * 10 ELSE 0 END
+       WHEN 'continent' THEN 200 + CASE WHEN feed.continent_rank BETWEEN 1 AND 10 THEN 110 - feed.continent_rank * 10 ELSE 0 END
          ELSE 100 + CASE WHEN feed.country_rank BETWEEN 1 AND 10 THEN 110 - feed.country_rank * 10 ELSE 0 END
        END DESC,
+       CASE
+         WHEN feed.stat_kind IN ('person', 'person-competition', 'person-medals')
+           THEN ${FEED_SORT_CONSTANTS.personRankingWeight}
+         WHEN feed.stat_kind = 'result' AND feed.stat_year IS NULL
+           THEN ${FEED_SORT_CONSTANTS.allTimePersonResultWeight}
+         WHEN feed.stat_kind = 'result'
+           THEN ${FEED_SORT_CONSTANTS.currentYearPersonResultWeight}
+         WHEN feed.stat_kind = 'competition'
+           THEN ${FEED_SORT_CONSTANTS.competitionWeight}
+         ELSE ${FEED_SORT_CONSTANTS.cityWeight}
+       END DESC,
+       GREATEST(
+         0,
+         LEAST(
+           COUNT(*) OVER (
+             PARTITION BY feed.event_id, feed.result_type, feed.stat_kind,
+               feed.region_scope, feed.region_id, feed.gender, feed.stat_year
+           ),
+           ${FEED_SORT_CONSTANTS.maxSameStatResultBoost + 1}
+         ) - 1
+       ) * ${FEED_SORT_CONSTANTS.sameStatResultWeight} DESC,
        (LOG2(1 + COALESCE(popularity.seven_day_views, 0))
          + 0.25 * LOG2(1 + COALESCE(popularity.thirty_day_views, 0))) DESC,
        feed.id ASC

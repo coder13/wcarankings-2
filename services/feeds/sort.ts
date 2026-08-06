@@ -141,6 +141,48 @@ function baseForRegion(candidate: FeedInterestingResult) {
   return FEED_SORT_CONSTANTS.countryRank;
 }
 
+function statGroupKey(candidate: FeedInterestingResult) {
+  return [
+    candidate.eventId,
+    candidate.resultType,
+    candidate.kind,
+    candidate.region.scope,
+    candidate.region.regionId,
+    candidate.gender ?? "all",
+    candidate.year ?? "all",
+  ].join(":");
+}
+
+function feedStatFamilyWeight(candidate: FeedInterestingResult) {
+  if (
+    candidate.kind === "person" ||
+    candidate.kind === "person-competition" ||
+    candidate.kind === "person-medals"
+  ) {
+    return FEED_SORT_CONSTANTS.personRankingWeight;
+  }
+  if (candidate.kind === "result") {
+    return candidate.year === null
+      ? FEED_SORT_CONSTANTS.allTimePersonResultWeight
+      : FEED_SORT_CONSTANTS.currentYearPersonResultWeight;
+  }
+  if (candidate.kind === "competition") {
+    return FEED_SORT_CONSTANTS.competitionWeight;
+  }
+  return FEED_SORT_CONSTANTS.cityWeight;
+}
+
+function sameStatResultBoost(
+  candidate: FeedInterestingResult,
+  statCounts: ReadonlyMap<string, number>,
+) {
+  const count = Math.min(
+    statCounts.get(statGroupKey(candidate)) ?? 1,
+    FEED_SORT_CONSTANTS.maxSameStatResultBoost + 1,
+  );
+  return Math.max(0, count - 1) * FEED_SORT_CONSTANTS.sameStatResultWeight;
+}
+
 function feedNotabilityScore(candidate: FeedInterestingResult) {
   const rank = rankForRegion(candidate);
   if (rank === null || rank > 10) return 0;
@@ -151,15 +193,24 @@ export function sortFeedCandidates(
   candidates: readonly FeedInterestingResult[],
   preferences: FeedUserPreferences | null,
 ) {
+  const statCounts = new Map<string, number>();
+  for (const candidate of candidates) {
+    const key = statGroupKey(candidate);
+    statCounts.set(key, (statCounts.get(key) ?? 0) + 1);
+  }
   return [...candidates].sort((left, right) => {
     const rightScore =
       feedNotabilityScore(right) +
       (right.resultType === "average" ? FEED_SORT_CONSTANTS.averageResult : 0) +
+      feedStatFamilyWeight(right) +
+      sameStatResultBoost(right, statCounts) +
       personalScore(right, preferences) +
       (right.statPopularityScore ?? 0);
     const leftScore =
       feedNotabilityScore(left) +
       (left.resultType === "average" ? FEED_SORT_CONSTANTS.averageResult : 0) +
+      feedStatFamilyWeight(left) +
+      sameStatResultBoost(left, statCounts) +
       personalScore(left, preferences) +
       (left.statPopularityScore ?? 0);
     return rightScore - leftScore || left.id.localeCompare(right.id);
