@@ -71,6 +71,30 @@ export async function getRankingsPageMetadata({
     metadataInput,
     topResults,
   );
+  const imageParams = new URLSearchParams(
+    Object.entries(params).flatMap(([key, value]) =>
+      Array.isArray(value)
+        ? value.map((item) => [key, item])
+        : [[key, value ?? ""]],
+    ),
+  );
+  imageParams.set("subject", metadataInput.subject);
+  imageParams.set("result", metadataInput.rankingType);
+  imageParams.set("competitionRanking", metadataInput.competitionRanking);
+  imageParams.set("cityRanking", metadataInput.cityRanking);
+  imageParams.set(
+    "personCompetitionRanking",
+    String(metadataInput.personCompetitionRanking === true),
+  );
+  imageParams.set(
+    "personMedalRanking",
+    String(metadataInput.personMedalRanking === true),
+  );
+  imageParams.set("medal", metadataInput.medalType);
+  if (metadataInput.year) imageParams.set("year", String(metadataInput.year));
+  if (metadataInput.eventId === "all") imageParams.delete("eventId");
+  else imageParams.set("eventId", metadataInput.eventId);
+  const imageUrl = `/api/og/rankings?${imageParams.toString()}`;
 
   return {
     title,
@@ -78,13 +102,13 @@ export async function getRankingsPageMetadata({
     openGraph: {
       title,
       description,
-      images: [{ url: "/icon-512.png", width: 512, height: 512 }],
+      images: [{ url: imageUrl, width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/icon-512.png"],
+      images: [imageUrl],
     },
   };
 }
