@@ -1,5 +1,7 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+"use client";
+
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { PersonMedalPreview } from "@/components/ProfileStatPreviews/PersonMedalPreview";
 import { PersonalBestsPreview } from "@/components/ProfileStatPreviews/PersonalBestsPreview";
@@ -7,17 +9,24 @@ import { PersonResultProgressPreview } from "@/components/ProfileStatPreviews/Pe
 import { PersonResultsPreview } from "@/components/ProfileStatPreviews/PersonResultsPreview";
 import { PersonTopRankingHighlights } from "@/components/ProfileStatPreviews/PersonTopRankingHighlights";
 import { StatPageLayout } from "@/components/StatPageLayout/StatPageLayout";
-import {
-  loadPersonProfileHeader,
-  normalizeProfileWcaId,
-} from "@/lib/person-profile";
 import { flagEmoji } from "@/lib/wca";
 
-export const dynamic = "force-dynamic";
-
-type PageProps = {
-  params: Promise<{ wcaId: string }>;
+type Profile = {
+  person: {
+    id: string;
+    name: string;
+    countryName: string;
+    countryIso2: string;
+    continentName: string;
+    avatarUrl: string | null;
+  };
+  competitionCount: number;
+  countryCount: number;
+  solveCount: number;
+  kinchScore: number | null;
 };
+
+type ProfileResponse = Profile & { error?: string };
 
 function formatCount(value: number) {
   return new Intl.NumberFormat().format(value);
@@ -25,35 +34,76 @@ function formatCount(value: number) {
 
 function formatKinchScore(value: number | null) {
   if (value === null) return "—";
-  return new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: 2,
-  }).format(value);
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(
+    value,
+  );
 }
 
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const { wcaId } = await params;
-  const normalized = normalizeProfileWcaId(wcaId);
-  if (!normalized) return { title: "Competitor profile" };
-  const profile = await loadPersonProfileHeader(normalized);
-  if (!profile) return { title: `${normalized} | WCA Rankings` };
-  return {
-    title: `${profile.person.name} | WCA Rankings`,
-    description: `WCA rankings profile for ${profile.person.name} (${profile.person.id}).`,
-  };
+function ProfileLoading({ error }: { error: string | null }) {
+  return (
+    <StatPageLayout
+      hasScrolled={false}
+      exportDate={null}
+      staticFooter
+      showFreshness={false}
+    >
+      <main className="profileHub">
+        <section className="profileHubHero">
+          <div className="profileHubIdentity">
+            <p className="profileHubEyebrow">Competitor profile</p>
+            <h1>{error ?? "Loading profile…"}</h1>
+            {error ? <p className="profileStatsMessage">{error}</p> : null}
+          </div>
+        </section>
+      </main>
+    </StatPageLayout>
+  );
 }
 
-export default async function PersonProfilePage({ params }: PageProps) {
-  const { wcaId } = await params;
-  const profile = await loadPersonProfileHeader(wcaId);
-  if (!profile) notFound();
+export default function PersonProfilePage() {
+  const params = useParams<{ wcaId: string }>();
+  const wcaId = Array.isArray(params.wcaId) ? params.wcaId[0] : params.wcaId;
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [error, setError] = useState<{
+    wcaId: string;
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/people/${encodeURIComponent(wcaId)}/profile`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const body = (await response.json()) as ProfileResponse;
+        if (!response.ok)
+          throw new Error(body.error ?? "Profile is unavailable.");
+        setProfile(body);
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return;
+        setError({
+          wcaId,
+          message:
+            cause instanceof Error ? cause.message : "Profile is unavailable.",
+        });
+      });
+    return () => controller.abort();
+  }, [wcaId]);
+
+  const normalizedWcaId = wcaId.toUpperCase();
+  if (!profile || profile.person.id !== normalizedWcaId) {
+    return (
+      <ProfileLoading
+        error={error && error.wcaId === normalizedWcaId ? error.message : null}
+      />
+    );
+  }
 
   const { person } = profile;
   const region = [person.continentName, person.countryName]
     .filter(Boolean)
     .join(" · ");
-
   return (
     <StatPageLayout
       hasScrolled={false}
@@ -90,7 +140,6 @@ export default async function PersonProfilePage({ params }: PageProps) {
             WCA profile
           </a>
         </section>
-
         <section className="profileHubCounts" aria-label="Profile summary">
           <div>
             <strong>{formatCount(profile.competitionCount)}</strong>
@@ -109,7 +158,6 @@ export default async function PersonProfilePage({ params }: PageProps) {
             <span>Kinch</span>
           </div>
         </section>
-
         <section className="profileHubStats" aria-label="Profile statistics">
           <PersonalBestsPreview personId={person.id} />
           <PersonMedalPreview personId={person.id} />

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatRankingDocumentTitle } from "@/lib/ranking-document-title";
+import {
+  formatRankingDocumentDescription,
+  formatRankingDocumentTitle,
+} from "@/lib/ranking-document-title";
 
 const defaults = {
   subject: "people" as const,
@@ -18,6 +21,10 @@ test("formats specific titles for people rankings and results", () => {
   assert.equal(
     formatRankingDocumentTitle({ ...defaults, subject: "results" }),
     "3x3x3 Cube Single Results | WCA Rankings",
+  );
+  assert.equal(
+    formatRankingDocumentDescription(defaults),
+    "Browse 3x3x3 cube single rankings from the World Cube Association.",
   );
 });
 

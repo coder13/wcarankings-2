@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
 import {
+  formatRankingDocumentDescription,
   formatRankingDocumentTitle,
   type RankingDocumentTitleInput,
 } from "@/lib/ranking-document-title";
@@ -50,13 +51,16 @@ export async function getRankingsPageMetadata({
     ? requestedMedal
     : "overall";
 
+  const metadataInput = {
+    ...options,
+    eventId,
+    rankingType,
+    medalType,
+  } satisfies RankingDocumentTitleInput;
+
   return {
-    title: formatRankingDocumentTitle({
-      ...options,
-      eventId,
-      rankingType,
-      medalType,
-    }),
+    title: formatRankingDocumentTitle(metadataInput),
+    description: formatRankingDocumentDescription(metadataInput),
   };
 }
 

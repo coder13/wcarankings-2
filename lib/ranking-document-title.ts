@@ -125,3 +125,13 @@ export function formatRankingDocumentTitle({
   const yearSuffix = year ? ` ${year}` : "";
   return titleWithSite(`${event} ${resultType} Rankings${yearSuffix}`);
 }
+
+export function formatRankingDocumentDescription(
+  input: RankingDocumentTitleInput,
+) {
+  const title = formatRankingDocumentTitle(input).replace(
+    / \| WCA Rankings$/,
+    "",
+  );
+  return `Browse ${title.toLowerCase()} from the World Cube Association.`;
+}
