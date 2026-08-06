@@ -148,7 +148,8 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
   const params = new URLSearchParams({
     result: filters.rankingType,
     start: String(
-      filters.resource === "person-medal-rankings"
+      filters.resource === "person-medal-rankings" ||
+        filters.resource === "person-activity-rankings"
         ? start
         : rankingPageStart(start),
     ),
