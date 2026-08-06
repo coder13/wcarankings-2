@@ -20,19 +20,6 @@ export type FeedInventoryStat = {
   exploreUrl: string;
 };
 
-const SOURCE_VARIANTS = [
-  ["333", "single"],
-  ["333", "average"],
-  ["222", "single"],
-  ["222", "average"],
-  ["444", "single"],
-  ["444", "average"],
-  ["555", "single"],
-  ["555", "average"],
-  ["333oh", "single"],
-  ["pyram", "single"],
-] as const satisfies readonly (readonly [string, RankingType])[];
-
 const GENDERS: readonly (GenderFilter | null)[] = [null, "m", "f", "o"];
 
 function regions(
@@ -95,39 +82,40 @@ export function buildFeedStatInventory({
   countries: readonly RegionRecord[];
 }) {
   const inventory: FeedInventoryStat[] = [];
-  for (const [eventId, resultType] of SOURCE_VARIANTS) {
-    const event = WCA_EVENTS.find((candidate) => candidate.id === eventId);
-    if (!event) continue;
-    for (const region of regions(continents, countries)) {
-      for (const gender of GENDERS) {
-        for (const year of [null, 2026] as const) {
-          const suffix = [
-            region.name,
-            genderName(gender),
-            year === null ? "All time" : String(year),
-          ].join(" · ");
-          for (const kind of ["person", "result"] as const) {
-            const family = kind === "person" ? "person" : "result";
-            const title = `${event.name} · ${resultName(resultType)} · ${suffix}`;
-            inventory.push({
-              id: `${family}-${eventId}-${resultType}-${region.scope}-${region.regionId || "world"}-${gender ?? "all"}-${year ?? "all"}`,
-              eventId,
-              eventName: event.name,
-              resultType,
-              kind,
-              region,
-              gender,
-              year,
-              title,
-              exploreUrl: exploreUrl({
-                kind,
+  for (const event of WCA_EVENTS) {
+    for (const resultType of ["single", "average"] as const) {
+      const eventId = event.id;
+      for (const region of regions(continents, countries)) {
+        for (const gender of GENDERS) {
+          for (const year of [null, 2026] as const) {
+            const suffix = [
+              region.name,
+              genderName(gender),
+              year === null ? "All time" : String(year),
+            ].join(" · ");
+            for (const kind of ["person", "result"] as const) {
+              const family = kind === "person" ? "person" : "result";
+              const title = `${event.name} · ${resultName(resultType)} · ${suffix}`;
+              inventory.push({
+                id: `${family}-${eventId}-${resultType}-${region.scope}-${region.regionId || "world"}-${gender ?? "all"}-${year ?? "all"}`,
                 eventId,
+                eventName: event.name,
                 resultType,
+                kind,
                 region,
                 gender,
                 year,
-              }),
-            });
+                title,
+                exploreUrl: exploreUrl({
+                  kind,
+                  eventId,
+                  resultType,
+                  region,
+                  gender,
+                  year,
+                }),
+              });
+            }
           }
         }
       }
