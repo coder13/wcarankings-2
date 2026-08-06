@@ -123,8 +123,8 @@
 
 .row--feedHighlight {
   background-image: linear-gradient(
-    color-mix(in srgb, var(--secondary-soft) 65%, transparent),
-    color-mix(in srgb, var(--secondary-soft) 65%, transparent)
+    color-mix(in srgb, var(--secondary-soft) 24%, transparent),
+    color-mix(in srgb, var(--secondary-soft) 24%, transparent)
   );
 }
 
