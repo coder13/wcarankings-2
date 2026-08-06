@@ -1,4 +1,4 @@
 interface:
   display_name: "WCA Results Export"
-  short_description: "Use and interpret the WCA results export"
-  default_prompt: "Use $wca-results-export to work safely with the WCA public results export."
+  short_description: "Understand WCA export tables and values"
+  default_prompt: "Use $wca-results-export to explain the export tables and decode WCA result values."

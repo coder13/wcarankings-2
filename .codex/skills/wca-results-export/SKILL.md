@@ -1,114 +1,129 @@
 ---
 name: wca-results-export
-description: Use and interpret the official World Cube Association public Results Export v2 for download automation, schema-aware analysis, result decoding, version compatibility, attribution, and safe integration with this repository. Use when a task involves the WCA export page or API, SQL or TSV export archives, export metadata, raw WCA tables, results and result_attempts, rank tables, WCA value encodings, multi-blind decoding, import readiness, or scripts/sync-wca-export.ts.
+description: Explain and interpret the contents of the World Cube Association Results Export v2. Use when identifying export tables, understanding results and result_attempts, decoding DNF/DNS/no-result values, formatting time and Fewest Moves values, decoding old or new multi-blind results, or handling documented export-specific edge cases.
 ---
 
 # WCA Results Export
 
-Use the official public export as the source of truth, preserve its version and
-date metadata, and distinguish inspecting data from importing it.
+Use this reference to understand the meaning of data in the official WCA
+Results Export v2. Keep the scope to export contents and encodings; inspect the
+archive's SQL definitions or TSV headers when exact column-level schema is
+needed.
 
-## Read first
+## Tables
 
-- Read [references/export-v2.md](references/export-v2.md) before interpreting
-  tables, result values, attempt rows, multi-blind values, TSV scrambles, or
-  republication requirements.
-- Read `scripts/lib/wca-export.ts` and `scripts/sync-wca-export.ts` before
-  changing this repository's resolver or importer.
-- Treat dates, archive names, sizes, URLs, API fields, and the latest minor
-  version as live information. Check the official export page or public API
-  instead of copying the reference snapshot into current-facing output.
-- Obey `AGENTS.md`: inspect the existing local database first. Do not run an
-  import, refresh, destructive SQL, or database/volume recreation without the
-  user's explicit authorization for that exact operation.
+| Table | Contents |
+| --- | --- |
+| `persons` | WCA competitors |
+| `competitions` | WCA competitions |
+| `events` | WCA events and their result formats |
+| `results` | Results per competition, event, round, and person |
+| `result_attempts` | Individual attempts that make up a `results` row |
+| `ranks_single` | Best single per competitor and event, with ranks |
+| `ranks_average` | Best average per competitor and event, with ranks |
+| `round_types` | Round types such as first and final |
+| `formats` | Round formats such as best of 3 and average of 5 |
+| `countries` | Countries |
+| `continents` | Continents |
+| `scrambles` | Scrambles |
+| `championships` | Championship competitions |
+| `eligible_country_iso2s_for_championship` | Citizenship eligibility for special cross-country championship types |
 
-## Workflow
+## Results and attempts
 
-### 1. Classify the task
+- Treat a `results` row as one competitor's overall result in one round.
+- Read `results.best` as the best single solve in the round.
+- Read `results.average` as the round average when the round format produces
+  one.
+- Join `results.id = result_attempts.result_id` to find the individual attempts.
+- Order attempts with `result_attempts.attempt_number`.
+- Do not look for `results.value1` through `results.value5`; v2 moved attempts
+  into `result_attempts`.
 
-Choose the smallest relevant path:
+## Result values
 
-- For schema or value questions, use the bundled reference and inspect the
-  archive's `README.md` or `metadata.json` when an archive is available.
-- For column-level SQL, inspect the archive's `CREATE TABLE` statements or TSV
-  headers. The bundled reference is a table catalog and interpretation guide,
-  not a complete DDL; do not invent undocumented column names or joins.
-- For latest-export checks, request the public API endpoint and compare
-  `export_date` with the consumer's stored export identity.
-- For flat-file analysis, use the TSV archive. For a database import, use the
-  SQL archive.
-- For repository work, inspect the current resolver, importer, metadata table,
-  and tests before proposing changes.
+Interpret values in `results` and `result_attempts` as follows:
 
-### 2. Resolve and validate the export
+| Value | Meaning |
+| --- | --- |
+| `-1` | DNF — Did Not Finish |
+| `-2` | DNS — Did Not Start |
+| `0` | No result; for example, a best-of-3 round has no average |
+| Positive | Decode according to the event's `format` |
 
-Use `https://www.worldcubeassociation.org/api/v0/export/public` for automation.
-Prefer the returned `sql_url` or `tsv_url`; these are version-stable permalinks
-to the latest export within that major version.
+### Time
 
-Before processing:
+For most events, `format = time` and the value is centiseconds. Interpret `8653`
+as 86.53 seconds, or 1 minute 26.53 seconds.
 
-1. Record the API's `export_date` and version.
-2. After download, read the archive's `metadata.json` and bundled `README.md`.
-3. Normalize an optional leading `v` before comparing versions.
-4. Accept only a major format version the consumer explicitly supports.
-5. If the major version changes, stop and audit table names, columns,
-   relationships, value encodings, import behavior, and tests before proceeding.
+### Number and Fewest Moves
 
-Do not infer freshness from a cached filename alone. Do not silently treat a
-missing or renamed version field as proof of compatibility; inspect the actual
-payload and archive metadata.
+For `format = number`, treat the value as a raw number. This is used for Fewest
+Moves. Treat an individual attempt as a move count, but divide a Fewest Moves
+average by 100 because averages are stored as 100 times the rounded average.
 
-### 3. Interpret records correctly
+### Multi-blind
 
-- Join `results.id` to `result_attempts.result_id`; attempts are no longer held
-  in `results.value1` through `results.value5` in v2.
-- Treat `results.best` as the best single for a round and `results.average` as
-  the round average, not as individual attempts.
-- Interpret `-1`, `-2`, and `0` as DNF, DNS, and no result. Interpret positive
-  values according to the event's `format`.
-- Use `ranks_single` and `ranks_average` for exported personal-best ranks. Use
-  `results` plus `result_attempts` when the task needs round or attempt history.
-- Decode time, fewest-moves, and multi-blind values with the formulas in the
-  reference. Do not apply centisecond formatting to every event.
-- Restore `|` to newlines only when interpreting `333mbf` scrambles from TSV.
+Pad the stored positive integer to 10 digits before splitting it into fields;
+this restores the leading `0` used by the new encoding.
 
-### 4. Work safely in this repository
+Decode old multi-blind values in the form `1SSAATTTTT`:
 
-For a readiness check, inspect existing state without mutating it. Useful
-evidence includes the `export_metadata` values, presence of required raw tables,
-and the resolver/importer tests. Report exactly what is absent or stale.
+```text
+solved         = 99 - SS
+attempted      = AA
+timeInSeconds  = TTTTT
+```
 
-Only after explicit authorization, use the repository's existing entry points
-rather than inventing a parallel importer:
+Decode new multi-blind values in the form `0DDTTTTTMM`:
 
-- `pnpm run sync:wca` for the configured environment;
-- `pnpm run sync:wca:local` for the local Docker-backed flow;
-- `--sql-path` or `WCA_SQL_EXPORT_PATH` for a supplied SQL archive;
-- `--dry-run`, `--raw-only`, or `--force` only when their side effects match the
-  authorized task.
+```text
+difference     = 99 - DD
+timeInSeconds  = TTTTT
+missed         = MM
+solved         = difference + missed
+attempted      = solved + missed
+```
 
-Preserve the export identity in `export_metadata`. Keep download-to-partial and
-atomic-rename behavior so interrupted downloads are not reused as complete
-archives. Update focused resolver/importer tests when compatibility logic
-changes.
+For example, pad `870360001` to `0870360001`. This gives `DD = 87`,
+`TTTTT = 03600`, and `MM = 01`: 13 solved out of 14 attempted in 3,600 seconds.
 
-### 5. Publish or present derived data
+Encode a new multi-blind value with:
 
-Carry the export date through to freshness labels and generated artifacts. If
-WCA export information is republished in whole or in part, include the required
-notice from the reference with the actual export date. In product UI, open any
-external WCA link in a new tab.
+```text
+missed         = attempted - solved
+DD             = 99 - (solved - missed)
+TTTTT          = solve time in seconds
+MM             = missed
+```
 
-## Verification
+Treat `TTTTT = 99999` as an unknown time. Remember that the encoding is designed
+so a smaller decimal value is a better result. It supports at most 99 attempted
+cubes and 99,999 seconds.
 
-- Confirm the source is the public results export, not an unrelated developer
-  dump.
-- Confirm UTF-8 handling and the selected SQL-versus-TSV format.
-- Confirm the live API identity agrees with the downloaded archive metadata.
-- Confirm the supported major version before import or analysis.
-- Test DNF, DNS, no-result, time, fewest-moves average, and multi-blind cases
-  when changing value handling.
-- Test the `results` to `result_attempts` join and attempt ordering when changing
-  result queries.
-- Run the narrowest relevant repository tests and `git diff --check`.
+## Export-specific details
+
+- Expect UTF-8 data.
+- In the TSV export, replace `|` with newlines when interpreting the multiple
+  scrambles that make up a `333mbf` attempt.
+- Allow for historical countries and occasional custom country codes even
+  though `countries.iso2` normally follows ISO 3166-1 alpha-2.
+- Interpret `eligible_country_iso2s_for_championship` as the mapping from a
+  special championship type to citizenship codes eligible to win it. For
+  example, `greater_china` includes `CN`, `HK`, `MO`, and `TW`.
+- Expect snake_case table names in v2. Key v2 changes include `persons.wca_id`,
+  `persons.sub_id`, `competitions.delegates`, `competitions.organizers`,
+  `competitions.latitude_microdegrees`, `competitions.longitude_microdegrees`,
+  and `scrambles.id`.
+- Do not expect `id`, `created_at`, or `updated_at` on `result_attempts` in
+  v2.0.2; identify an attempt by its result and attempt number.
+
+## Accuracy
+
+- Use the export's bundled `README.md` and `metadata.json` as the authority for
+  the archive being examined.
+- Check `https://www.worldcubeassociation.org/export/results` when the current
+  export version matters; this skill describes v2 and should not be treated as
+  a promise about future major versions.
+- Inspect SQL `CREATE TABLE` statements or TSV headers before naming columns or
+  joins not documented above.
