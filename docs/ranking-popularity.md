@@ -1,0 +1,43 @@
+# Ranking popularity storage
+
+The popularity service stores interest in a ranking list. It does not store ranking rows or cached result data.
+
+## Identity
+
+The service uses `rankingListKey` as the popularity key. The key is the SHA-256 hash of the canonical descriptor JSON.
+
+The registry stores the descriptor family, canonical JSON, and first and last seen times. A public-list descriptor also stores its stable public list ID.
+
+The key does not include a generation ID, result window, list membership version, title, slug, or cache time.
+
+## Registration and recording
+
+The caller must normalize the descriptor through the service before registration. The service rejects unsupported descriptor shapes before it writes a registry row.
+
+For a public-list descriptor, the caller must resolve the list in request context. The caller passes the verified public list ID to registration.
+
+The service cannot prove list visibility from a descriptor alone. A caller must not register a private list or a temporary WCA-ID collection.
+
+After a successful first-page response, the caller can record one intentional view. The process-local buffer combines views with the same key and UTC date.
+
+The caller can flush the buffer at a controlled time. Each flush sends one atomic additive MariaDB upsert for its combined increments.
+
+A clear database failure restores the batch in the buffer. Records during a flush stay in the next buffer.
+
+The buffer has a fixed entry limit. It drops a new key-date pair when full, but it continues to combine existing pairs.
+
+## Reading totals
+
+Daily rows store successful first-page view counts. The service reads inclusive seven-day and thirty-day UTC totals.
+
+The issue-217 score is `log2(1 + sevenDayViews) + 0.25 * log2(1 + thirtyDayViews)`.
+
+This collection is approximate. A process restart can lose unflushed views. The additive increment is not strictly idempotent.
+
+An ambiguous connection failure can duplicate a small count when the service retries a batch.
+
+## Boundary with ranking data
+
+The registry identifies a semantic ranking list. The daily table counts views of that list.
+
+Neither table stores projection generation data, pagination data, ranking results, list memberships, or cached ranking rows. A later feed slice can join popularity totals to current ranking data.
