@@ -132,5 +132,5 @@ export function formatRankingDocumentDescription(
 ) {
   void input;
   if (topResults.length === 0) return "";
-  return `Top 3 results:\n${topResults.join("\n")}.`;
+  return `${topResults.join("\n")}.`;
 }
