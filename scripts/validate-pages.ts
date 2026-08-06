@@ -18,7 +18,7 @@ function argumentValue(name: string) {
 }
 
 function pageChecks(personId: string): PageCheck[] {
-  return [
+  const checks = [
     {
       name: "people: 3x3 single",
       path: "/?eventId=333&result=single",
@@ -145,6 +145,11 @@ function pageChecks(personId: string): PageCheck[] {
       expected: ["Competitor profile"],
     },
   ];
+  return checks.map((check) =>
+    check.name === "person profile"
+      ? check
+      : { ...check, expected: [...check.expected, "Top 3 results:"] },
+  );
 }
 
 async function checkPage(baseUrl: string, check: PageCheck, timeoutMs: number) {
