@@ -74,6 +74,9 @@ export function FeedStatPreviews({
                       rankingType: preview.resultType,
                       animationIndex: index,
                       alternate: index % 2 === 1,
+                      highlighted: preview.highlightedCompetitionIds.includes(
+                        entry.competitionId,
+                      ),
                       rankIsDuplicate:
                         index > 0 &&
                         preview.entries[index - 1]?.rank === entry.rank,

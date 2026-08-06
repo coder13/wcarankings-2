@@ -13,7 +13,10 @@ const PAGE_SIZE = 5;
 const MAX_SOURCE_SCAN = PAGE_SIZE;
 const SOURCE_READ_CONCURRENCY = 2;
 
-export type FeedStatPreview = FeedInventoryStat & { entries: RankingEntry[] };
+export type FeedStatPreview = FeedInventoryStat & {
+  entries: RankingEntry[];
+  highlightedCompetitionIds: string[];
+};
 
 export type FeedStatPreviewPage = {
   previews: FeedStatPreview[];
@@ -83,6 +86,18 @@ export function hasRecentFeedEntry(
   );
 }
 
+function highlightedCompetitionIds(
+  entries: readonly Pick<RankingEntry, "competitionId">[],
+  triggers: readonly { competitionId: string }[],
+) {
+  const recentCompetitionIds = new Set(
+    triggers.map((trigger) => trigger.competitionId),
+  );
+  return entries
+    .filter((entry) => recentCompetitionIds.has(entry.competitionId))
+    .map((entry) => entry.competitionId);
+}
+
 async function loadSourcePage(sourcePage: readonly FeedInventoryStat[]) {
   const loaded: Array<{ source: FeedInventoryStat; entries: RankingEntry[] }> =
     [];
@@ -143,6 +158,10 @@ export async function loadFeedStatPreviews({
       .map(({ source, entries }) => ({
         ...source,
         entries: entries.slice(0, 5),
+        highlightedCompetitionIds: highlightedCompetitionIds(
+          entries.slice(0, 5),
+          triggers,
+        ),
       }));
     previews.push(...matching.slice(0, PAGE_SIZE - previews.length));
     scanCursor += sourcePage.length;
