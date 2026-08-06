@@ -21,6 +21,36 @@ test("rejects a home feed limit above five", async () => {
 });
 
 test("returns bounded recent-change cards from injected feed sources", async () => {
+  const candidate = {
+    cardId: "changed",
+    listKey: "changed",
+    descriptor: {
+      version: 1 as const,
+      family: "person-event" as const,
+      eventId: "333",
+      resultType: "single" as const,
+      year: 2026,
+      region: { scope: "world" as const, regionId: "" },
+      genders: [],
+      population: { kind: "everyone" as const },
+    },
+    title: "Changed ranking",
+    exploreUrl: "/api/rankings?eventId=333",
+    previewRows: [],
+    sourceFamily: "person-event" as const,
+    diversityKey: "333",
+    anchor: "competition:Recent2026",
+    change: {
+      type: change.type,
+      detectedAt: "2026-08-05T00:00:00.000Z",
+      summary: change.summary,
+    },
+    trigger: {
+      competitionId: "Recent2026",
+      competitionName: "Recent Competition 2026",
+      endDate: "2026-08-05",
+    },
+  };
   const response = await handleHomeFeedRequest(
     new Request("https://example.test/feed?limit=1"),
     {
@@ -40,7 +70,7 @@ test("returns bounded recent-change cards from injected feed sources", async () 
           },
         ],
       }),
-      topFiveChanges: new Map([["Recent2026", change]]),
+      candidates: [candidate],
       readPopularity: async () => [],
     },
   );

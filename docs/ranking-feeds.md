@@ -18,12 +18,12 @@ This slice does not add source SQL, a home-feed change log, or a new ranking pro
 
 The `/feed` endpoint reads competitions that ended during the last seven days. The query returns at most 50 trigger rows. It joins recent results to find event IDs.
 
-The precomputation function emits all-time and current-year person and result descriptors. It also emits one competition descriptor and one city descriptor per event. It does not emit prior-year lazy variants or every filter combination.
+The precomputation function accepts injected candidates. It keeps candidates that contain semantic change metadata. It does not scan ranking filters or generate source-specific variants.
 
-The source supplies previous and current top-five rows through a testable comparison hook. The comparison reports leader, entry, exit, movement, and value changes.
+The source supplies previous and current top-five rows through a pure comparison hook. The comparison reports leader, entry, exit, movement, and value changes.
 
-The endpoint returns no card when a trigger has no semantic top-five change. The current schema has no old-generation change table, so this slice does not add a migration or refresh data.
+The endpoint returns injected candidates for tests. The production trigger adapter is missing because the current schema has no old-generation change table. This slice does not add a migration or refresh data.
 
-The measurement hook reports trigger query time, candidate build time, trigger count, and candidate count. The current bound is 50 trigger rows, 12 event IDs per competition, and five cards per response.
+The measurement hook reports trigger query time, pure candidate-path time, trigger count, and candidate count. The current bound is 50 trigger rows and five cards per response.
 
-The estimated work for the current slice is one bounded trigger query plus in-memory descriptor construction. Preview loading and durable old-generation comparison remain later work.
+The estimated work for this slice is one bounded trigger query plus in-memory candidate filtering. Ranking source adapters, preview loading, and durable old-generation comparison remain later work.

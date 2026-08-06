@@ -1,12 +1,4 @@
 import { query as defaultQuery } from "@/db";
-import { cityPopularityDescriptor } from "@/services/ranking-popularity/city-rankings";
-import { competitionPopularityDescriptor } from "@/services/ranking-popularity/competition-rankings";
-import { globalRankingPopularityDescriptor } from "@/services/ranking-popularity/global-rankings";
-import { resultRankingPopularityDescriptor } from "@/services/ranking-popularity/result-rankings";
-import {
-  rankingListDescriptorUrl,
-  rankingListKey,
-} from "@/lib/ranking-list-descriptor";
 import type {
   FeedTopFiveChange,
   FeedTopFiveRow,
@@ -31,25 +23,22 @@ export type RecentCompetitionTrigger = {
   eventIds: string[];
 };
 
-export type RecentChangeCandidate = RankingFeedCandidate & {
-  trigger: { competitionId: string; competitionName: string; endDate: string };
-  topFiveChange: FeedTopFiveChange;
-};
-
 type RecentChangeMeasurement = {
   triggerQueryMs: number;
-  candidateBuildMs: number;
+  candidatePathMs: number;
   triggerCount: number;
   candidateCount: number;
 };
 
-export type PrecomputeRecentChangeCandidatesOptions = {
+export type RecentTriggerOptions = {
   now?: Date;
-  currentYear?: number;
   triggerDays?: number;
   triggerLimit?: number;
   query?: FeedQuery;
-  topFiveChanges?: ReadonlyMap<string, FeedTopFiveChange>;
+};
+
+export type PrecomputeRecentChangeCandidatesOptions = RecentTriggerOptions & {
+  candidates?: readonly RankingFeedCandidate[];
   onMeasure?: (measurement: RecentChangeMeasurement) => void;
 };
 
@@ -65,8 +54,9 @@ type TriggerRow = {
 };
 
 function utcDate(value: Date) {
-  if (!Number.isFinite(value.getTime()))
+  if (!Number.isFinite(value.getTime())) {
     throw new Error("The feed requires a valid time.");
+  }
   return value.toISOString().slice(0, 10);
 }
 
@@ -113,27 +103,29 @@ function recentCompetitionTriggersQuery() {
   `;
 }
 
-async function loadTriggers(
-  now: Date,
-  days: number,
-  limit: number,
-  query: FeedQuery,
+export async function discoverRecentCompetitionTriggers(
+  options: RecentTriggerOptions = {},
 ) {
+  const now = options.now ?? new Date();
   const endDate = utcDate(now);
   const startedAt = performance.now();
-  const result = await query(recentCompetitionTriggersQuery(), [
-    daysBefore(endDate, days),
-    endDate,
-    limit,
-  ]);
+  const result = await (options.query ?? defaultQuery)(
+    recentCompetitionTriggersQuery(),
+    [
+      daysBefore(endDate, positiveDays(options.triggerDays)),
+      endDate,
+      positiveLimit(options.triggerLimit),
+    ],
+  );
   const triggers = new Map<string, RecentCompetitionTrigger>();
   for (const raw of result.rows as unknown as TriggerRow[]) {
     const eventId = raw.event_id?.trim();
     const competitionId = String(raw.competition_id);
     const existing = triggers.get(competitionId);
     if (existing) {
-      if (eventId && existing.eventIds.length < MAX_EVENT_IDS)
+      if (eventId && existing.eventIds.length < MAX_EVENT_IDS) {
         existing.eventIds.push(eventId);
+      }
       continue;
     }
     triggers.set(competitionId, {
@@ -214,95 +206,23 @@ export function compareFeedTopFive(
   return null;
 }
 
-function descriptorCandidates(eventId: string, currentYear: number) {
-  const params = new URLSearchParams({ eventId, result: "single" });
-  const currentYearParams = new URLSearchParams({
-    eventId,
-    result: "single",
-    year: String(currentYear),
-  });
-  const descriptors = [
-    globalRankingPopularityDescriptor(params),
-    resultRankingPopularityDescriptor(params),
-    globalRankingPopularityDescriptor(currentYearParams),
-    resultRankingPopularityDescriptor(currentYearParams),
-  ].filter((descriptor) => descriptor !== null);
-  const competition = competitionPopularityDescriptor(params);
-  const city = cityPopularityDescriptor(params);
-  if (competition) descriptors.push(competition);
-  if (city) descriptors.push(city);
-  return descriptors;
-}
-
-export function buildRecentChangeCandidates(
-  triggers: readonly RecentCompetitionTrigger[],
-  options: {
-    currentYear: number;
-    topFiveChanges?: ReadonlyMap<string, FeedTopFiveChange>;
-  },
+export function precomputeInjectedCandidates(
+  candidates: readonly RankingFeedCandidate[],
 ) {
-  const candidates = new Map<string, RecentChangeCandidate>();
-  for (const trigger of triggers) {
-    const change = options.topFiveChanges?.get(trigger.competitionId);
-    if (!change) continue;
-    for (const eventId of trigger.eventIds.slice(0, MAX_EVENT_IDS)) {
-      for (const descriptor of descriptorCandidates(
-        eventId,
-        options.currentYear,
-      )) {
-        const listKey = rankingListKey(descriptor);
-        if (candidates.has(listKey)) continue;
-        candidates.set(listKey, {
-          cardId: `${trigger.competitionId}:${listKey}`,
-          listKey,
-          descriptor,
-          title: `${trigger.competitionName} changed a ranking`,
-          exploreUrl: rankingListDescriptorUrl(descriptor),
-          previewRows: [],
-          sourceFamily: descriptor.family,
-          diversityKey: `${descriptor.family}:${eventId}`,
-          anchor: `competition:${trigger.competitionId}`,
-          focusEntityId: change.focusEntityId ?? undefined,
-          rank: change.currentTopFive[0]?.rank,
-          change: {
-            type: change.type,
-            detectedAt: `${trigger.endDate}T00:00:00.000Z`,
-            summary: change.summary,
-          },
-          trigger: {
-            competitionId: trigger.competitionId,
-            competitionName: trigger.competitionName,
-            endDate: trigger.endDate,
-          },
-          topFiveChange: change,
-        });
-      }
-    }
-  }
-  return [...candidates.values()];
+  return candidates.filter((candidate) => candidate.change !== undefined);
 }
 
 export async function precomputeRecentChangeCandidates(
   options: PrecomputeRecentChangeCandidatesOptions = {},
 ) {
-  const now = options.now ?? new Date();
-  const currentYear = options.currentYear ?? now.getUTCFullYear();
-  const { triggers, triggerQueryMs } = await loadTriggers(
-    now,
-    positiveDays(options.triggerDays),
-    positiveLimit(options.triggerLimit),
-    options.query ?? defaultQuery,
-  );
+  const discovered = await discoverRecentCompetitionTriggers(options);
   const startedAt = performance.now();
-  const candidates = buildRecentChangeCandidates(triggers, {
-    currentYear,
-    topFiveChanges: options.topFiveChanges,
-  });
+  const candidates = precomputeInjectedCandidates(options.candidates ?? []);
   options.onMeasure?.({
-    triggerQueryMs,
-    candidateBuildMs: performance.now() - startedAt,
-    triggerCount: triggers.length,
+    triggerQueryMs: discovered.triggerQueryMs,
+    candidatePathMs: performance.now() - startedAt,
+    triggerCount: discovered.triggers.length,
     candidateCount: candidates.length,
   });
-  return { triggers, candidates };
+  return { triggers: discovered.triggers, candidates };
 }

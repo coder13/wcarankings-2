@@ -1,20 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  buildRecentChangeCandidates,
   compareFeedTopFive,
+  discoverRecentCompetitionTriggers,
+  precomputeInjectedCandidates,
   precomputeRecentChangeCandidates,
-  type RecentCompetitionTrigger,
 } from "@/services/feeds/recent-changes";
-
-const trigger: RecentCompetitionTrigger = {
-  competitionId: "Recent2026",
-  competitionName: "Recent Competition 2026",
-  countryId: "US",
-  cityName: "Austin",
-  endDate: "2026-08-05",
-  eventIds: ["333", "222"],
-};
+import type { RankingFeedCandidate } from "@/services/feeds";
 
 const change = compareFeedTopFive(
   [
@@ -37,47 +29,44 @@ test("detects semantic top-five changes", () => {
   );
 });
 
-test("builds bounded source variants with only the current year", () => {
-  assert.ok(change);
-  const candidates = buildRecentChangeCandidates([trigger], {
-    currentYear: 2026,
-    topFiveChanges: new Map([[trigger.competitionId, change]]),
-  });
-  assert.equal(candidates.length, 12);
+test("keeps the pure candidate path bounded and skips candidates without changes", () => {
+  const candidate: RankingFeedCandidate = {
+    cardId: "changed",
+    listKey: "changed",
+    descriptor: {
+      version: 1,
+      family: "person-event",
+      eventId: "333",
+      resultType: "single",
+      year: 2026,
+      region: { scope: "world", regionId: "" },
+      genders: [],
+      population: { kind: "everyone" },
+    },
+    title: "Changed ranking",
+    exploreUrl: "/api/rankings?eventId=333",
+    previewRows: [],
+    sourceFamily: "person-event",
+    diversityKey: "333",
+    anchor: "competition:Recent2026",
+    change: {
+      type: change.type,
+      detectedAt: "2026-08-05T00:00:00.000Z",
+      summary: change.summary,
+    },
+  };
   assert.deepEqual(
-    candidates.map((candidate) => candidate.descriptor.family),
-    [
-      "person-event",
-      "person-result",
-      "person-event",
-      "person-result",
-      "competition",
-      "city",
-      "person-event",
-      "person-result",
-      "person-event",
-      "person-result",
-      "competition",
-      "city",
-    ],
-  );
-  assert.ok(
-    candidates.every(
-      (candidate) =>
-        candidate.descriptor.family !== "person-event" ||
-        candidate.descriptor.year === null ||
-        candidate.descriptor.year === 2026,
-    ),
-  );
-  assert.ok(
-    candidates.every((candidate) => candidate.topFiveChange === change),
+    precomputeInjectedCandidates([
+      candidate,
+      { ...candidate, cardId: "unchanged", change: undefined },
+    ]),
+    [candidate],
   );
 });
 
-test("queries only bounded competitions in the recent date window", async () => {
+test("discovers only bounded competitions in the recent date window", async () => {
   const calls: Array<{ text: string; values: unknown[] }> = [];
-  const measurements: unknown[] = [];
-  const result = await precomputeRecentChangeCandidates({
+  const result = await discoverRecentCompetitionTriggers({
     now: new Date("2026-08-05T12:00:00.000Z"),
     triggerLimit: 10,
     query: async (text, values = []) => {
@@ -97,34 +86,38 @@ test("queries only bounded competitions in the recent date window", async () => 
         ],
       };
     },
-    topFiveChanges: new Map([[trigger.competitionId, change]]),
-    onMeasure: (measurement) => measurements.push(measurement),
   });
   assert.equal(result.triggers.length, 1);
-  assert.equal(result.candidates.length, 6);
   assert.deepEqual(calls[0]?.values, ["2026-07-30", "2026-08-05", 10]);
   assert.match(calls[0]?.text ?? "", /FROM competitions/);
   assert.match(calls[0]?.text ?? "", /LIMIT \?/);
+});
+
+test("benchmarks the injected candidate path", async () => {
+  const measurements: unknown[] = [];
+  const result = await precomputeRecentChangeCandidates({
+    query: async () => ({ rows: [] }),
+    candidates: [],
+    onMeasure: (measurement) => measurements.push(measurement),
+  });
+  assert.deepEqual(result.candidates, []);
   assert.equal(measurements.length, 1);
   assert.equal(
     (measurements[0] as { candidateCount: number }).candidateCount,
-    6,
+    0,
+  );
+  assert.equal(
+    typeof (measurements[0] as { candidatePathMs: number }).candidatePathMs,
+    "number",
   );
 });
 
-test("returns no candidate when the source has no semantic change", () => {
+test("returns no semantic change for equal top fives", () => {
   const noChange = compareFeedTopFive(
     [{ entityId: "same", rank: 1, value: 100 }],
     [{ entityId: "same", rank: 1, value: 100 }],
   );
   assert.equal(noChange, null);
-  assert.equal(
-    buildRecentChangeCandidates([trigger], {
-      currentYear: 2026,
-      topFiveChanges: new Map(),
-    }).length,
-    0,
-  );
 });
 
 test("classifies movement and value changes", () => {
