@@ -127,6 +127,7 @@ test("discovers only result references from the recent date window", async () =>
       personId: "2024TEST01",
       countryId: "USA",
       continentId: "_North America",
+      cityName: "",
       gender: "f",
     },
   ]);

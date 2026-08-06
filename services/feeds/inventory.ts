@@ -7,12 +7,29 @@ export type FeedInventoryRegion = {
   name: string;
 };
 
+export type FeedStatKind =
+  | "person"
+  | "result"
+  | "person-competition"
+  | "person-medals"
+  | "competition"
+  | "city";
+
+export const FEED_STAT_KINDS: readonly FeedStatKind[] = [
+  "person",
+  "result",
+  "person-competition",
+  "person-medals",
+  "competition",
+  "city",
+];
+
 export type FeedInventoryStat = {
   id: string;
   eventId: string;
   eventName: string;
   resultType: RankingType;
-  kind: "person" | "result";
+  kind: FeedStatKind;
   region: FeedInventoryRegion;
   gender: GenderFilter | null;
   year: 2026 | null;
@@ -20,7 +37,7 @@ export type FeedInventoryStat = {
   exploreUrl: string;
 };
 
-const GENDERS: readonly (GenderFilter | null)[] = [null, "m", "f", "o"];
+const GENDERS: readonly (GenderFilter | null)[] = [null, "f", "o"];
 
 function regions(
   continents: readonly RegionRecord[],
@@ -60,7 +77,7 @@ function exploreUrl({
   gender,
   year,
 }: {
-  kind: "person" | "result";
+  kind: FeedStatKind;
   eventId: string;
   resultType: RankingType;
   region: FeedInventoryRegion;
@@ -71,7 +88,15 @@ function exploreUrl({
   if (region.scope !== "world") params.set("region", region.regionId);
   if (gender !== null) params.set("gender", gender);
   if (year !== null) params.set("year", String(year));
-  return `${kind === "person" ? "/" : "/results"}?${params.toString()}`;
+  if (kind === "person") return `/?${params.toString()}`;
+  if (kind === "result") return `/results?${params.toString()}`;
+  if (kind === "person-competition") return "/persons/competitions";
+  if (kind === "person-medals") return "/persons/medals?medal=overall";
+  if (kind === "competition") {
+    params.set("ranking", "fastest");
+    return `/competitions?${params.toString()}`;
+  }
+  return `/cities?${params.toString()}`;
 }
 
 export function buildFeedStatInventory({
@@ -93,8 +118,8 @@ export function buildFeedStatInventory({
               genderName(gender),
               year === null ? "All time" : String(year),
             ].join(" · ");
-            for (const kind of ["person", "result"] as const) {
-              const family = kind === "person" ? "person" : "result";
+            for (const kind of FEED_STAT_KINDS) {
+              const family = kind;
               const title = `${event.name} · ${resultName(resultType)} · ${suffix}`;
               inventory.push({
                 id: `${family}-${eventId}-${resultType}-${region.scope}-${region.regionId || "world"}-${gender ?? "all"}-${year ?? "all"}`,
@@ -175,7 +200,7 @@ export function buildRecentFeedStatInventory({
       for (const region of affectedRegions) {
         for (const gender of genders) {
           for (const year of [null, 2026] as const) {
-            for (const kind of ["person", "result"] as const) {
+            for (const kind of FEED_STAT_KINDS) {
               const suffix = [
                 region.name,
                 genderName(gender),
@@ -229,7 +254,7 @@ export function prioritizeFeedStatInventory(
           ? 1_000
           : 0) +
         (recentEvents.has(source.eventId) ? 100 : 0) +
-        (source.kind === "result" ? 10 : 0) +
+        (source.kind === "result" || source.kind === "competition" ? 10 : 0) +
         (source.gender === null ? 4 : 0) +
         (source.year === 2026 ? 2 : 0),
     }))

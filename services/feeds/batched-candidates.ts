@@ -1,6 +1,10 @@
 import { query as defaultQuery } from "@/db";
 import type { GenderFilter } from "@/lib/wca";
-import type { FeedInventoryStat } from "./inventory";
+import {
+  FEED_STAT_KINDS,
+  type FeedInventoryStat,
+  type FeedStatKind,
+} from "./inventory";
 import type { RecentResultReference } from "./recent-changes";
 import type { FeedInterestingResult } from "./stat-previews";
 
@@ -54,7 +58,7 @@ function rowGender(row: CandidateRow, reference: RecentResultReference) {
 function candidate(
   inventory: ReadonlyMap<string, FeedInventoryStat>,
   input: {
-    kind: "person" | "result";
+    kind: FeedStatKind;
     resultType: "single" | "average";
     year: 2026 | null;
     scope: "world" | "continent" | "country";
@@ -69,12 +73,17 @@ function candidate(
   const id = `${input.kind}-${input.reference.eventId}-${input.resultType}-${input.scope}-${input.regionId || "world"}-${input.gender ?? "all"}-${input.year ?? "all"}`;
   const source = inventory.get(id);
   if (!source) return null;
+  let interestingEntityId = input.reference.personId;
+  if (input.kind === "result") {
+    interestingEntityId = String(input.reference.resultId);
+  } else if (input.kind === "competition") {
+    interestingEntityId = input.reference.competitionId;
+  } else if (input.kind === "city") {
+    interestingEntityId = `city:${input.reference.countryId}:${input.reference.cityName ?? ""}`;
+  }
   return {
     ...source,
-    interestingEntityId:
-      input.kind === "result"
-        ? String(input.reference.resultId)
-        : input.reference.personId,
+    interestingEntityId,
     interestingResultId: input.reference.resultId,
     worldRank: input.worldRank,
     continentRank: input.continentRank,
@@ -89,7 +98,7 @@ function addRowCandidates(
   reference: RecentResultReference,
   resultType: "single" | "average",
   year: 2026 | null,
-  kind: "person" | "result",
+  _kind: FeedStatKind,
 ) {
   if (!isTopTen(row)) return;
   const gender = rowGender(row, reference);
@@ -101,19 +110,23 @@ function addRowCandidates(
   for (const [scope, regionId] of regions) {
     if (scope !== "world" && !regionId) continue;
     for (const selectedGender of [null, gender]) {
-      const item = candidate(inventory, {
-        kind,
-        resultType,
-        year,
-        scope,
-        regionId,
-        gender: selectedGender,
-        reference,
-        worldRank: number(row.world_position ?? row.world_sub_rank),
-        continentRank: number(row.continent_position ?? row.continent_sub_rank),
-        countryRank: number(row.country_position ?? row.country_sub_rank),
-      });
-      if (item) output.set(`${item.id}:${item.interestingEntityId}`, item);
+      for (const statKind of FEED_STAT_KINDS) {
+        const item = candidate(inventory, {
+          kind: statKind,
+          resultType,
+          year,
+          scope,
+          regionId,
+          gender: selectedGender,
+          reference,
+          worldRank: number(row.world_position ?? row.world_sub_rank),
+          continentRank: number(
+            row.continent_position ?? row.continent_sub_rank,
+          ),
+          countryRank: number(row.country_position ?? row.country_sub_rank),
+        });
+        if (item) output.set(`${item.id}:${item.interestingEntityId}`, item);
+      }
     }
   }
 }

@@ -6,7 +6,7 @@ type FeedQuery = (
   values?: unknown[],
 ) => Promise<{ rows: Record<string, unknown>[] }>;
 
-const FEED_SNAPSHOT_FORMAT = "v7";
+const FEED_SNAPSHOT_FORMAT = "v8";
 
 export type FeedSnapshot = {
   exportVersion: string;

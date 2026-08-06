@@ -2,6 +2,10 @@ import type { RankingEntry } from "@/components/RankingsExplorer/types";
 import { getRegions } from "@/services/regions/service";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
+import { loadPersonCompetitionRankings } from "@/services/rankings/person-competitions";
+import { loadPersonMedalRankings } from "@/services/rankings/medals";
+import { loadCompetitionRankings } from "@/services/rankings/competition-rankings";
+import { loadCityRankings } from "@/services/rankings/city-rankings";
 import { generateBatchedFeedCandidates } from "./batched-candidates";
 import {
   FEED_ITEM_PAGE_SIZE,
@@ -31,10 +35,29 @@ const TOP_SCAN_SIZE = FEED_TOP_SCAN_SIZE;
 const PREVIEW_CANDIDATE_SCAN_SIZE = 20;
 const SOURCE_READ_CONCURRENCY = 2;
 
+function normalizeSourceEntries(entries: readonly Record<string, unknown>[]) {
+  function subRank(entry: Record<string, unknown>) {
+    if (typeof entry.subRank === "number") return entry.subRank;
+    if (typeof entry.position === "number") return entry.position;
+    return Number(entry.rank);
+  }
+  return entries.map((entry) => ({
+    ...entry,
+    subRank: subRank(entry),
+  })) as unknown as RankingEntry[];
+}
+
 function sourceRegionRank(source: FeedInterestingResult) {
   if (source.region.scope === "world") return source.worldRank;
   if (source.region.scope === "continent") return source.continentRank;
   return source.countryRank;
+}
+
+function sourceEntityId(source: FeedInventoryStat, entry: RankingEntry) {
+  if (source.kind === "result") {
+    return typeof entry.resultId === "number" ? String(entry.resultId) : "";
+  }
+  return entry.personId;
 }
 
 export type FeedStatPreview = FeedInventoryStat & {
@@ -63,11 +86,44 @@ export type FeedInterestingItemPage = {
   nextCursor: number | null;
 };
 
+function uniqueInterestingResults(
+  candidates: readonly FeedInterestingResult[],
+) {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key =
+      candidate.interestingResultId === undefined
+        ? `${candidate.eventId}:${candidate.interestingEntityId}`
+        : String(candidate.interestingResultId);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function sortedFeedCandidates(
+  candidates: readonly FeedInterestingResult[],
+  preferences: Parameters<typeof sortFeedCandidates>[1],
+  popularity: Awaited<ReturnType<typeof readPopularRankingDescriptors>>,
+) {
+  return uniqueInterestingResults(
+    sortFeedCandidates(
+      addFeedStatPopularity(candidates, popularity),
+      preferences,
+    ),
+  );
+}
+
 function sourceParams(source: FeedInventoryStat) {
   const params = new URLSearchParams({
     eventId: source.eventId,
     result: source.resultType,
-    start: source.kind === "person" ? "1" : "0",
+    start:
+      source.kind === "person" ||
+      source.kind === "person-competition" ||
+      source.kind === "person-medals"
+        ? "1"
+        : "0",
     limit: "20",
   });
   if (source.region.scope !== "world") {
@@ -75,6 +131,10 @@ function sourceParams(source: FeedInventoryStat) {
   }
   if (source.gender !== null) params.set("gender", source.gender);
   if (source.year !== null) params.set("year", String(source.year));
+  if (source.kind === "person-medals") params.set("medal", "overall");
+  if (source.kind === "competition" || source.kind === "city") {
+    params.set("ranking", "fastest");
+  }
   return params;
 }
 
@@ -83,10 +143,38 @@ async function sourceEntries(source: FeedInventoryStat) {
     const params = sourceParams(source);
     if (source.kind === "person") {
       const result = await loadRankingsWithDiagnostics(params);
-      return result.data.entries ?? [];
+      return normalizeSourceEntries(
+        (result.data.entries ?? []) as unknown as Record<string, unknown>[],
+      );
     }
-    const result = await loadResultRankings(params);
-    return result.data.entries ?? [];
+    if (source.kind === "result") {
+      const result = await loadResultRankings(params);
+      return normalizeSourceEntries(
+        (result.data.entries ?? []) as unknown as Record<string, unknown>[],
+      );
+    }
+    if (source.kind === "person-competition") {
+      const result = await loadPersonCompetitionRankings(params);
+      return normalizeSourceEntries(
+        (result.data.entries ?? []) as unknown as Record<string, unknown>[],
+      );
+    }
+    if (source.kind === "person-medals") {
+      const result = await loadPersonMedalRankings(params);
+      return normalizeSourceEntries(
+        (result.data.entries ?? []) as unknown as Record<string, unknown>[],
+      );
+    }
+    if (source.kind === "competition") {
+      const result = await loadCompetitionRankings(params);
+      return normalizeSourceEntries(
+        (result.data.entries ?? []) as unknown as Record<string, unknown>[],
+      );
+    }
+    const result = await loadCityRankings(params);
+    return normalizeSourceEntries(
+      (result.data.entries ?? []) as unknown as Record<string, unknown>[],
+    );
   } catch {
     return [];
   }
@@ -185,27 +273,21 @@ async function loadInterestingResultPage(
   popularity: Awaited<ReturnType<typeof readPopularRankingDescriptors>>,
 ) {
   const loaded = await loadSourcePage(
-    sortFeedCandidates(
-      addFeedStatPopularity(
-        candidates.filter((candidate) => {
-          const rank = sourceRegionRank(candidate);
-          return rank !== null && rank <= TOP_SCAN_SIZE;
-        }),
-        popularity,
-      ),
+    sortedFeedCandidates(
+      candidates.filter((candidate) => {
+        const rank = sourceRegionRank(candidate);
+        return rank !== null && rank <= TOP_SCAN_SIZE;
+      }),
       preferences,
+      popularity,
     ),
   );
   return loaded.flatMap(({ source, entries }) => {
     const interestingIndex = entries
       .slice(0, TOP_SCAN_SIZE)
-      .findIndex((entry) => {
-        const resultId =
-          "resultId" in entry && typeof entry.resultId === "number"
-            ? String(entry.resultId)
-            : entry.personId;
-        return resultId === source.interestingEntityId;
-      });
+      .findIndex(
+        (entry) => sourceEntityId(source, entry) === source.interestingEntityId,
+      );
     if (interestingIndex < 0) return [];
     const interestingEntry = entries[interestingIndex];
     if (!interestingEntry) return [];
@@ -305,10 +387,11 @@ export async function loadFeedStatPreviews({
     console.warn("Feed stat popularity is unavailable.", error);
     return [];
   });
-  const candidates = snapshot.candidates.slice(
-    cursor,
-    cursor + PREVIEW_CANDIDATE_SCAN_SIZE,
-  );
+  const candidates = sortedFeedCandidates(
+    snapshot.candidates,
+    preferences,
+    popularity,
+  ).slice(cursor, cursor + PREVIEW_CANDIDATE_SCAN_SIZE);
   const previews = (
     await loadInterestingResultPage(candidates, preferences, popularity)
   ).slice(0, PAGE_SIZE);
@@ -340,9 +423,10 @@ export async function loadFeedInterestingItems({
     limit: 100,
     viewedAt: now ?? new Date(),
   }).catch(() => []);
-  const candidates = sortFeedCandidates(
-    addFeedStatPopularity(snapshot.candidates, popularity),
+  const candidates = sortedFeedCandidates(
+    snapshot.candidates,
     preferences,
+    popularity,
   );
   const items = candidates.slice(cursor, cursor + FEED_ITEM_PAGE_SIZE);
   return {

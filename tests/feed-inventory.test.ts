@@ -21,7 +21,7 @@ test("builds the full bounded feed stat inventory", () => {
       { id: "Japan", name: "Japan" },
     ],
   });
-  assert.equal(inventory.length, 17 * 2 * 5 * 4 * 2 * 2);
+  assert.equal(inventory.length, 17 * 2 * 5 * 3 * 6 * 2);
   assert.equal(new Set(inventory.map((stat) => stat.eventId)).size, 17);
   assert.equal(
     new Set(inventory.map((stat) => stat.id)).size,
@@ -40,6 +40,10 @@ test("builds the full bounded feed stat inventory", () => {
   );
   assert.equal(
     inventory.some((stat) => stat.year !== null && stat.year !== 2026),
+    false,
+  );
+  assert.equal(
+    inventory.some((stat) => stat.gender === "m"),
     false,
   );
 });

@@ -18,7 +18,7 @@ export type RecentCompetitionTrigger = {
   competitionId: string;
   competitionName: string;
   countryId: string;
-  cityName: string;
+  cityName?: string;
   endDate: string;
   eventIds: string[];
   hasCountryRecord: boolean;
@@ -32,6 +32,7 @@ export type RecentResultReference = {
   personId: string;
   countryId: string;
   continentId: string;
+  cityName?: string;
   gender: "m" | "f" | "o" | null;
 };
 
@@ -73,6 +74,7 @@ type RecentResultRow = {
   competition_id: string;
   country_id: string | null;
   continent_id: string | null;
+  city_name: string | null;
   gender: string | null;
 };
 
@@ -200,7 +202,7 @@ export async function discoverRecentResultReferences(
   const startedAt = performance.now();
   const result = await (options.query ?? defaultQuery)(
     `SELECT DISTINCT result.id AS result_id, result.event_id,
-       result.person_id, result.competition_id, competition.country_id, country.continent_id,
+       result.person_id, result.competition_id, competition.country_id, competition.city_name, country.continent_id,
        person.gender
      FROM results result
      INNER JOIN competitions competition ON competition.id = result.competition_id
@@ -219,6 +221,7 @@ export async function discoverRecentResultReferences(
       personId: row.person_id,
       countryId: String(row.country_id ?? ""),
       continentId: String(row.continent_id ?? ""),
+      cityName: String(row.city_name ?? ""),
       gender:
         row.gender === "m" || row.gender === "f" || row.gender === "o"
           ? row.gender
