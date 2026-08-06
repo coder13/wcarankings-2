@@ -3,19 +3,38 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { query } from "@/db";
 
 export const USER_LIST_MEMBER_LIMIT = 10_000;
-export const LIST_RANKING_PRIORITY = { lazy: 1, active: 5, system: 10 } as const;
+const LIST_RANKING_PRIORITY = {
+  lazy: 1,
+  active: 5,
+  system: 10,
+} as const;
 export type ListRankingGrain = "person" | "result";
-export type ListRankingFilter = { scope: "world" | "continent" | "country"; regionId: string; genders: readonly string[] };
+export type ListRankingFilter = {
+  scope: "world" | "continent" | "country";
+  regionId: string;
+  genders: readonly string[];
+};
 
-const GENDER_ORDER = new Map([["m", 0], ["f", 1], ["o", 2]]);
+const GENDER_ORDER = new Map([
+  ["m", 0],
+  ["f", 1],
+  ["o", 2],
+]);
 
-export function listRankingGenderSet(genders: readonly string[]) {
+function listRankingGenderSet(genders: readonly string[]) {
   return [...genders]
-    .sort((left, right) => (GENDER_ORDER.get(left) ?? 99) - (GENDER_ORDER.get(right) ?? 99))
+    .sort(
+      (left, right) =>
+        (GENDER_ORDER.get(left) ?? 99) - (GENDER_ORDER.get(right) ?? 99),
+    )
     .join(",");
 }
 
-type ListTarget = { id: number; membershipVersion: number; kind: "user" | "system" };
+type ListTarget = {
+  id: number;
+  membershipVersion: number;
+  kind: "user" | "system";
+};
 
 export function listRankingFilterKey(filter: ListRankingFilter) {
   return `${filter.scope}|${filter.scope === "world" ? "" : filter.regionId}|${filter.genders.length ? listRankingGenderSet(filter.genders) : "all"}`;
@@ -38,7 +57,10 @@ function savedTargetKey(listId: number) {
   return `list:${listId}`;
 }
 
-async function refreshSavedTarget(connection: PoolConnection, list: ListTarget) {
+async function refreshSavedTarget(
+  connection: PoolConnection,
+  list: ListTarget,
+) {
   const targetKey = savedTargetKey(list.id);
   await connection.execute(
     `INSERT INTO list_ranking_cache_targets
@@ -48,7 +70,10 @@ async function refreshSavedTarget(connection: PoolConnection, list: ListTarget) 
        list_id = VALUES(list_id), membership_version = VALUES(membership_version), member_count = VALUES(member_count)`,
     [targetKey, list.id, list.membershipVersion, list.id],
   );
-  await connection.execute("DELETE FROM list_ranking_cache_target_members WHERE target_key = ?", [targetKey]);
+  await connection.execute(
+    "DELETE FROM list_ranking_cache_target_members WHERE target_key = ?",
+    [targetKey],
+  );
   await connection.execute(
     `INSERT INTO list_ranking_cache_target_members (target_key, person_id)
      SELECT ?, person_id FROM list_members WHERE list_id = ?`,
@@ -57,23 +82,31 @@ async function refreshSavedTarget(connection: PoolConnection, list: ListTarget) 
   return targetKey;
 }
 
-export function assertListMemberCapacity(kind: "user" | "system", currentCount: number, additions: number) {
+export function assertListMemberCapacity(
+  kind: "user" | "system",
+  currentCount: number,
+  additions: number,
+) {
   if (kind === "user" && currentCount + additions > USER_LIST_MEMBER_LIMIT) {
-    throw new Error(`User lists can contain at most ${USER_LIST_MEMBER_LIMIT.toLocaleString()} members.`);
+    throw new Error(
+      `User lists can contain at most ${USER_LIST_MEMBER_LIMIT.toLocaleString()} members.`,
+    );
   }
 }
 
 async function rankingsDataVersion(connection: PoolConnection) {
-  const [rows] = await connection.execute<Array<RowDataPacket & { value: string }>>(
-    "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
-  );
+  const [rows] = await connection.execute<
+    Array<RowDataPacket & { value: string }>
+  >("SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1");
   return rows[0]?.value ?? null;
 }
 
 export async function enqueueListRankingRebuild(
   connection: PoolConnection,
   list: ListTarget,
-  priority = list.kind === "system" ? LIST_RANKING_PRIORITY.system : LIST_RANKING_PRIORITY.lazy,
+  priority = list.kind === "system"
+    ? LIST_RANKING_PRIORITY.system
+    : LIST_RANKING_PRIORITY.lazy,
   grain: ListRankingGrain = "person",
   filterKey = "world||all",
 ) {
@@ -92,42 +125,15 @@ export async function enqueueListRankingRebuild(
        priority = GREATEST(priority, VALUES(priority)),
        available_at = LEAST(available_at, VALUES(available_at)),
        last_error = NULL`,
-    [list.id, targetKey, grain, filterKey, list.membershipVersion, dataVersion, priority],
-  );
-}
-
-export async function enqueueAllListRankingRebuilds(connection: PoolConnection) {
-  const dataVersion = await rankingsDataVersion(connection);
-  if (!dataVersion) return;
-  await connection.execute(
-    `INSERT INTO list_ranking_cache_targets
-      (target_key, list_id, target_kind, membership_version, member_count)
-     SELECT CONCAT('list:', id), id, 'saved', membership_version, member_count
-     FROM lists WHERE deleted_at IS NULL
-     ON DUPLICATE KEY UPDATE
-       membership_version = VALUES(membership_version), member_count = VALUES(member_count)`,
-  );
-  await connection.execute(
-    `DELETE member FROM list_ranking_cache_target_members member
-     JOIN list_ranking_cache_targets target ON target.target_key = member.target_key
-     JOIN lists list ON list.id = target.list_id
-     WHERE target.target_kind = 'saved' AND list.deleted_at IS NULL`,
-  );
-  await connection.execute(
-    `INSERT INTO list_ranking_cache_target_members (target_key, person_id)
-     SELECT CONCAT('list:', list_id), person_id FROM list_members`,
-  );
-  await connection.execute(
-    `INSERT INTO list_ranking_rebuild_jobs
-      (list_id, target_key, grain, filter_key, membership_version, rankings_data_version, priority, available_at, lease_token, leased_until, attempts, last_error)
-     SELECT list.id, CONCAT('list:', list.id), 'person', 'world||all', list.membership_version, ?, IF(list.kind = 'system', ?, ?), CURRENT_TIMESTAMP(6), NULL, NULL, 0, NULL
-     FROM lists list WHERE list.deleted_at IS NULL
-     ON DUPLICATE KEY UPDATE
-       list_id = VALUES(list_id),
-       membership_version = VALUES(membership_version), rankings_data_version = VALUES(rankings_data_version),
-       priority = GREATEST(priority, VALUES(priority)), available_at = LEAST(available_at, VALUES(available_at)),
-       last_error = NULL`,
-    [dataVersion, LIST_RANKING_PRIORITY.system, LIST_RANKING_PRIORITY.lazy],
+    [
+      list.id,
+      targetKey,
+      grain,
+      filterKey,
+      list.membershipVersion,
+      dataVersion,
+      priority,
+    ],
   );
 }
 
@@ -136,7 +142,9 @@ export async function raiseListRankingRebuildPriority(
   grain: ListRankingGrain = "person",
   filterKey = "world||all",
 ) {
-  const result = await query<{ value: string }>("SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1");
+  const result = await query<{ value: string }>(
+    "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
+  );
   const dataVersion = result.rows[0]?.value;
   if (!dataVersion) return;
   const targetKey = savedTargetKey(list.id);
@@ -148,7 +156,10 @@ export async function raiseListRankingRebuildPriority(
        list_id = VALUES(list_id), membership_version = VALUES(membership_version), member_count = VALUES(member_count)`,
     [targetKey, list.id, list.membershipVersion, list.id],
   );
-  await query("DELETE FROM list_ranking_cache_target_members WHERE target_key = ?", [targetKey]);
+  await query(
+    "DELETE FROM list_ranking_cache_target_members WHERE target_key = ?",
+    [targetKey],
+  );
   await query(
     `INSERT INTO list_ranking_cache_target_members (target_key, person_id)
      SELECT ?, person_id FROM list_members WHERE list_id = ?`,
@@ -161,7 +172,17 @@ export async function raiseListRankingRebuildPriority(
      ON DUPLICATE KEY UPDATE
        list_id = VALUES(list_id), grain = VALUES(grain), filter_key = VALUES(filter_key), membership_version = VALUES(membership_version), rankings_data_version = VALUES(rankings_data_version),
        priority = GREATEST(priority, VALUES(priority)), available_at = LEAST(available_at, VALUES(available_at))`,
-    [list.id, targetKey, grain, filterKey, list.membershipVersion, dataVersion, list.kind === "system" ? LIST_RANKING_PRIORITY.system : LIST_RANKING_PRIORITY.active],
+    [
+      list.id,
+      targetKey,
+      grain,
+      filterKey,
+      list.membershipVersion,
+      dataVersion,
+      list.kind === "system"
+        ? LIST_RANKING_PRIORITY.system
+        : LIST_RANKING_PRIORITY.active,
+    ],
   );
 }
 
@@ -172,7 +193,9 @@ export async function ensureDynamicListRankingTarget(
 ) {
   const normalized = [...new Set(personIds)].sort();
   const targetKey = `dynamic:${createHash("sha256").update(normalized.join(",")).digest("hex")}`;
-  const result = await query<{ value: string }>("SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1");
+  const result = await query<{ value: string }>(
+    "SELECT value FROM export_metadata WHERE `key` = 'fetched_at' LIMIT 1",
+  );
   const dataVersion = result.rows[0]?.value;
   if (!dataVersion) return null;
   await query(

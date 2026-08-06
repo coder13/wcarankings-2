@@ -26,5 +26,7 @@ test("Enter commits typed WCA IDs directly", () => {
 });
 
 test("Enter with no partial text commits the buffered chips", () => {
-  assert.deepEqual(resolveListAddSubmission("", [], 0), { type: "commit-buffer" });
+  assert.deepEqual(resolveListAddSubmission("", [], 0), {
+    type: "commit-buffer",
+  });
 });

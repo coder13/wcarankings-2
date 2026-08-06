@@ -1,11 +1,15 @@
 import type { GenderFilter, RankingType, RegionScope } from "@/lib/wca";
 
 export function rankingTable(type: RankingType) {
-  return type === "average" ? "ranking_entries_average" : "ranking_entries_single";
+  return type === "average"
+    ? "ranking_entries_average"
+    : "ranking_entries_single";
 }
 
 export function yearlyRankingTable(type: RankingType) {
-  return type === "average" ? "person_year_rankings_average" : "person_year_rankings_single";
+  return type === "average"
+    ? "person_year_rankings_average"
+    : "person_year_rankings_single";
 }
 
 export function rankingShape(scope: RegionScope) {
@@ -16,34 +20,44 @@ export function rankingShape(scope: RegionScope) {
       region: "continent_id",
     } as const;
   if (scope === "country")
-    return { rank: "country_rank", subRank: "country_sub_rank", region: "country_id" } as const;
-  return { rank: "world_rank", subRank: "world_sub_rank", region: null } as const;
+    return {
+      rank: "country_rank",
+      subRank: "country_sub_rank",
+      region: "country_id",
+    } as const;
+  return {
+    rank: "world_rank",
+    subRank: "world_sub_rank",
+    region: null,
+  } as const;
 }
 
-export type RankingEntryEnhancements = {
-  rankDeltas: boolean;
-};
+export function rankingColumns(rank: string, subRank: string) {
+  return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record`;
+}
 
-export function rankingColumns(
-  rank: string,
-  subRank: string,
-  { rankDeltas }: RankingEntryEnhancements = { rankDeltas: false },
+export function genderCondition(
+  alias: string,
+  genders: readonly GenderFilter[],
 ) {
-  const enhancements = rankDeltas
-    ? "world_rank_delta, world_rank_delta_state, continent_rank_delta, continent_rank_delta_state, country_rank_delta, country_rank_delta_state, record_streak_weeks"
-    : "NULL AS world_rank_delta, NULL AS world_rank_delta_state, NULL AS continent_rank_delta, NULL AS continent_rank_delta_state, NULL AS country_rank_delta, NULL AS country_rank_delta_state, NULL AS record_streak_weeks";
-  return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record, ${enhancements}`;
-}
-
-export function genderCondition(alias: string, genders: readonly GenderFilter[]) {
   if (!genders.length) return { sql: "", values: [] as unknown[] };
   const parts = genders.map((gender) =>
-    gender === "o" ? `(${alias}.gender = 'o' OR ${alias}.gender IS NULL)` : `${alias}.gender = ?`,
+    gender === "o"
+      ? `(${alias}.gender = 'o' OR ${alias}.gender IS NULL)`
+      : `${alias}.gender = ?`,
   );
-  return { sql: `(${parts.join(" OR ")})`, values: genders.filter((gender) => gender !== "o") };
+  return {
+    sql: `(${parts.join(" OR ")})`,
+    values: genders.filter((gender) => gender !== "o"),
+  };
 }
 
-export function countKey(eventId: string, type: RankingType, scope: RegionScope, regionId: string) {
+export function countKey(
+  eventId: string,
+  type: RankingType,
+  scope: RegionScope,
+  regionId: string,
+) {
   return `${eventId}:${type}:${scope}:${regionId}`;
 }
 

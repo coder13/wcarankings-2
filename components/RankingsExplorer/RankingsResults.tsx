@@ -17,33 +17,36 @@ export function RankingsResults() {
     focus,
     listMembers,
   } = useRankingsExplorer();
-  const navigateRow = useCallback((globalIndex: number, direction: -1 | 1) => {
-    const targetIndex = Math.min(
-      rankings.total - 1,
-      Math.max(0, globalIndex + direction),
-    );
-    const selector = `.listItem[data-global-index="${targetIndex}"]`;
-    const mounted = document.querySelector<HTMLElement>(selector);
-    if (mounted) {
-      mounted.focus({ preventScroll: true });
-      mounted.scrollIntoView({ block: "nearest" });
-      return;
-    }
-    rankings.jumpToIndex(targetIndex, false);
-    let attempts = 4;
-    const focusWhenRendered = () => {
-      window.requestAnimationFrame(() => {
-        const row = document.querySelector<HTMLElement>(selector);
-        if (row) {
-          row.focus({ preventScroll: true });
-          return;
-        }
-        attempts -= 1;
-        if (attempts > 0) focusWhenRendered();
-      });
-    };
-    focusWhenRendered();
-  }, [rankings]);
+  const navigateRow = useCallback(
+    (globalIndex: number, direction: -1 | 1) => {
+      const targetIndex = Math.min(
+        rankings.total - 1,
+        Math.max(0, globalIndex + direction),
+      );
+      const selector = `.listItem[data-global-index="${targetIndex}"]`;
+      const mounted = document.querySelector<HTMLElement>(selector);
+      if (mounted) {
+        mounted.focus({ preventScroll: true });
+        mounted.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      rankings.jumpToIndex(targetIndex, false);
+      let attempts = 4;
+      const focusWhenRendered = () => {
+        window.requestAnimationFrame(() => {
+          const row = document.querySelector<HTMLElement>(selector);
+          if (row) {
+            row.focus({ preventScroll: true });
+            return;
+          }
+          attempts -= 1;
+          if (attempts > 0) focusWhenRendered();
+        });
+      };
+      focusWhenRendered();
+    },
+    [rankings],
+  );
   const membershipRequests = list?.membershipRequests;
   const emptyListMessage = emptyOwnerListMessage(list?.owner);
   const emptyState = (
@@ -55,9 +58,7 @@ export function RankingsResults() {
   let results;
   if (rankings.error || focus.error) {
     results = (
-      <div className="listMessage">
-        {rankings.error || focus.error}
-      </div>
+      <div className="listMessage">{rankings.error || focus.error}</div>
     );
   } else if (rankings.loading && rankings.items.length === 0) {
     results = (
@@ -98,9 +99,12 @@ export function RankingsResults() {
           enablePersonDetails:
             filters.subject === "people" &&
             !filters.personCompetitionRanking &&
+            !filters.personMedalRanking &&
             WCA_EVENTS.some((event) => event.id === filters.eventId),
           onFocusedPersonChange:
-            filters.subject === "people" && !filters.personCompetitionRanking
+            filters.subject === "people" &&
+            !filters.personCompetitionRanking &&
+            !filters.personMedalRanking
               ? focus.updateFocusedPerson
               : undefined,
         }}
@@ -113,9 +117,7 @@ export function RankingsResults() {
       <div className="listContainer">
         {list?.notice && <div className="listMessage">{list.notice}</div>}
         {focus.notice && (
-          <div className="listMessage listMessage--notice">
-            {focus.notice}
-          </div>
+          <div className="listMessage listMessage--notice">{focus.notice}</div>
         )}
         {membershipRequests && (
           <ListMembershipRequestRows

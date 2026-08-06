@@ -29,14 +29,27 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Run lint checks
         run: pnpm run lint
 
-      - name: Run unit tests
+      - name: Check application types
+        run: pnpm run typecheck
+
+      - name: Check data-tool types
+        run: pnpm run data-tools:typecheck
+
+      - name: Build application and run projection tests
         run: pnpm test
+
+      - name: Run TypeScript unit tests
+        run: pnpm run test:unit
 
   validate:
     name: Database and Application Validation
@@ -61,6 +74,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -70,7 +87,7 @@ jobs:
       - name: Calculate independent component identities
         id: components
         run: |
-          fingerprints=$(node scripts/server-component-fingerprints.mjs)
+          fingerprints=$(bun scripts/server-component-fingerprints.ts)
           echo "app=$(jq -r '.app' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
           echo "flyway=$(jq -r '.flyway' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
           echo "data_tools=$(jq -r '.dataTools' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
@@ -205,109 +222,12 @@ jobs:
       - name: Verify data-tools image
         run: |
           docker run --rm --entrypoint sh wcarankings-data-tools:pull-request -c \
-            'test -f /app/release-compatibility.json && test -f /app/scripts/activate-ranking-generation.mjs && test -f /app/scripts/sync-wca-export.mjs'
-
-      - name: Exercise legacy Flyway baseline history split
-        run: |
-          compatibility_schema=flyway_history_compatibility
-          compatibility_url="jdbc:mariadb://db:3306/${compatibility_schema}"
-          compatibility_database_url="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${compatibility_schema}"
-          docker compose exec -T db mariadb \
-            --user=root \
-            --password="$MYSQL_ROOT_PASSWORD" \
-            --execute="
-              DROP DATABASE IF EXISTS \`${compatibility_schema}\`;
-              CREATE DATABASE \`${compatibility_schema}\`;
-              GRANT ALL PRIVILEGES ON \`${compatibility_schema}\`.* TO '${MYSQL_USER}'@'%';
-            "
-          docker compose exec -T db mariadb \
-            --user="$MYSQL_USER" \
-            --password="$MYSQL_PASSWORD" \
-            "$compatibility_schema" \
-            --execute="
-              CREATE TABLE export_metadata (
-                \`key\` VARCHAR(64) NOT NULL PRIMARY KEY,
-                \`value\` TEXT NOT NULL
-              );
-              CREATE TABLE result_attempts (
-                result_id BIGINT NOT NULL,
-                attempt_number INT NOT NULL,
-                value INT NOT NULL
-              );
-            "
-          docker compose run --rm \
-            -e FLYWAY_URL="$compatibility_url" \
-            -e FLYWAY_TABLE=flyway_schema_history \
-            -e FLYWAY_TARGET=1 \
-            flyway migrate
-          docker compose exec -T db mariadb \
-            --user="$MYSQL_USER" \
-            --password="$MYSQL_PASSWORD" \
-            "$compatibility_schema" \
-            --execute="
-              INSERT INTO flyway_schema_history
-                (installed_rank, version, description, type, script, checksum,
-                 installed_by, execution_time, success)
-              VALUES
-                (2, '8', 'system list definitions', 'SQL',
-                 'V8__system_list_definitions.sql', NULL, '${MYSQL_USER}', 0, 1);
-              CREATE TABLE flyway_schema_history_results LIKE flyway_schema_history;
-              INSERT INTO flyway_schema_history_results
-                SELECT * FROM flyway_schema_history;
-            "
-          DATA_TOOLS_IMAGE_REF=wcarankings-data-tools:pull-request \
-            docker compose run --rm \
-              -e DATABASE_URL="$compatibility_database_url" \
-              data-tools /app/scripts/prepare-flyway-history.mjs
-          split_valid=$(docker compose exec -T db mariadb \
-            --user="$MYSQL_USER" \
-            --password="$MYSQL_PASSWORD" \
-            "$compatibility_schema" \
-            --batch \
-            --skip-column-names \
-            --execute="
-              SELECT
-                (SELECT COUNT(*) FROM flyway_schema_history_app
-                  WHERE version = '1' AND type = 'BASELINE') = 1
-                AND (SELECT COUNT(*) FROM flyway_schema_history_app
-                  WHERE version = '8') = 0
-                AND (SELECT COUNT(*) FROM flyway_schema_history_results
-                  WHERE type = 'BASELINE' OR version = '8') = 0;
-            ")
-          test "$split_valid" = 1
-          docker compose run --rm \
-            -e FLYWAY_URL="$compatibility_url" \
-            -e FLYWAY_TABLE=flyway_schema_history_app \
-            flyway migrate
-          docker compose run --rm \
-            -e FLYWAY_URL="$compatibility_url" \
-            -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
-            -e FLYWAY_TABLE=flyway_schema_history_results \
-            flyway migrate
-          migrated_valid=$(docker compose exec -T db mariadb \
-            --user="$MYSQL_USER" \
-            --password="$MYSQL_PASSWORD" \
-            "$compatibility_schema" \
-            --batch \
-            --skip-column-names \
-            --execute="
-              SELECT
-                (SELECT COUNT(*) FROM flyway_schema_history_app
-                  WHERE version = '1' AND type = 'BASELINE') = 1
-                AND (SELECT COUNT(*) FROM flyway_schema_history_results
-                  WHERE version = '8'
-                    AND script = 'V8__result_attempts_lookup.sql') = 1;
-            ")
-          test "$migrated_valid" = 1
-          docker compose exec -T db mariadb \
-            --user=root \
-            --password="$MYSQL_ROOT_PASSWORD" \
-            --execute="DROP DATABASE \`${compatibility_schema}\`;"
+            'test -f /app/release-compatibility.json && test -f /app/scripts/projections/generation/activate-ranking-generation.ts && test -f /app/scripts/sync-wca-export.ts'
 
       - name: Verify production image contents
         run: |
           docker run --rm --entrypoint sh wcarankings-app:pull-request -c \
-            'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.mjs'
+            'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.ts'
 
       - name: Seed visual smoke-test database
         run: |
@@ -317,11 +237,10 @@ jobs:
             --user="$MYSQL_USER" \
             --password="$MYSQL_PASSWORD" \
             "$MYSQL_DATABASE" < tests/fixtures/visual-smoke.sql
-          docker compose run --rm data-tools /app/scripts/backfill-result-entries.mjs
-          docker compose run --rm data-tools /app/scripts/refresh-rankings.mjs
-          docker compose run --rm data-tools /app/scripts/refresh-system-lists.mjs
-          docker compose run --rm data-tools /app/scripts/activate-ranking-generation.mjs bootstrap
-          docker compose run --rm data-tools /app/scripts/activate-ranking-generation.mjs bootstrap \
+          docker compose run --rm data-tools /app/scripts/projections/build/build-projection-groups.ts
+          docker compose run --rm data-tools /app/scripts/refresh-rankings.ts
+          docker compose run --rm data-tools /app/scripts/projections/generation/activate-ranking-generation.ts bootstrap
+          docker compose run --rm data-tools /app/scripts/projections/generation/activate-ranking-generation.ts bootstrap \
             | grep -q '"bootstrapped":false'
 
       - name: Exercise candidate-schema activation against disposable MariaDB
@@ -335,11 +254,11 @@ jobs:
           docker compose run --rm \
             -e INTEGRATION_ADMIN_DATABASE_URL="$INTEGRATION_ADMIN_DATABASE_URL" \
             -v "$GITHUB_WORKSPACE:/app/repo:ro" \
-            data-tools --test /app/repo/tests/person-lookup-index.integration.mjs
+            data-tools test /app/repo/tests/person-lookup-index.integration.test.mjs
           docker compose run --rm \
             -e INTEGRATION_ADMIN_DATABASE_URL="$INTEGRATION_ADMIN_DATABASE_URL" \
             -v "$GITHUB_WORKSPACE:/app/repo:ro" \
-            data-tools /app/repo/tests/ranking-generation-activation.integration.mjs
+            data-tools test /app/repo/tests/ranking-generation-activation.integration.test.mjs
 
       - name: Start visual smoke-test app
         run: |
@@ -362,11 +281,10 @@ jobs:
       - name: Install Chromium for visual smoke test
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run Visual Smoke Test
+      - name: Run visual smoke test
         run: pnpm exec playwright test --config=playwright.visual-smoke.config.mjs
 
       - name: Run List Browser Tests
-        if: always()
         run: pnpm exec playwright test --config=playwright.list-e2e.config.mjs
 
       - name: Show Database State After Browser Test Failure

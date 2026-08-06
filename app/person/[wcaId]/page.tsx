@@ -1,296 +1,171 @@
-import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import {
-  loadPersonProfile,
-  metricHref,
-  normalizeProfileWcaId,
-  rankingHref,
-  type PersonProfileMetricScore,
-  type PersonProfileResult,
-} from "@/lib/person-profile";
-import {
-  formatExportDate,
-  formatRankingNumber,
-  rankingScope,
-} from "@/components/RankingsExplorer/types";
-import { flagEmoji, formatWcaResult, type RankingType, type RegionScope } from "@/lib/wca";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { PersonMedalPreview } from "@/components/ProfileStatPreviews/PersonMedalPreview";
+import { PersonalBestsPreview } from "@/components/ProfileStatPreviews/PersonalBestsPreview";
+import { PersonResultProgressPreview } from "@/components/ProfileStatPreviews/PersonResultProgressPreview";
+import { PersonResultsPreview } from "@/components/ProfileStatPreviews/PersonResultsPreview";
+import { PersonTopRankingHighlights } from "@/components/ProfileStatPreviews/PersonTopRankingHighlights";
+import { StatPageLayout } from "@/components/StatPageLayout/StatPageLayout";
+import { flagEmoji } from "@/lib/wca";
 
-type PageProps = {
-  params: Promise<{ wcaId: string }>;
+type Profile = {
+  person: {
+    id: string;
+    name: string;
+    countryName: string;
+    countryIso2: string;
+    continentName: string;
+    avatarUrl: string | null;
+  };
+  competitionCount: number;
+  countryCount: number;
+  solveCount: number;
+  kinchScore: number | null;
 };
 
-function scopeLabel(scope: RegionScope, regionId: string, profile: Awaited<ReturnType<typeof loadPersonProfile>> extends infer T ? NonNullable<T> : never) {
-  if (scope === "world") return "World";
-  if (scope === "continent") return profile.person.continentName || regionId;
-  return profile.person.countryName || regionId;
+type ProfileResponse = Profile & { error?: string };
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat().format(value);
 }
 
-function rankLine(result: PersonProfileResult, profile: NonNullable<Awaited<ReturnType<typeof loadPersonProfile>>>) {
-  return [
-    rankingScope("world", "World", result.worldRank),
-    rankingScope(
-      "continent",
-      profile.person.continentName || profile.person.continentId,
-      result.continentRank,
-    ),
-    rankingScope(
-      "national",
-      profile.person.countryName || profile.person.countryId,
-      result.countryRank,
-    ),
-  ];
-}
-
-function bestResults(profile: NonNullable<Awaited<ReturnType<typeof loadPersonProfile>>>, type: RankingType) {
-  return profile.eventRows
-    .map((row) => ({ event: row, result: row[type] }))
-    .filter((row): row is { event: typeof profile.eventRows[number]; result: PersonProfileResult } => row.result !== null)
-    .sort((left, right) => left.result.worldRank - right.result.worldRank)
-    .slice(0, 4);
-}
-
-function metricScore(profile: NonNullable<Awaited<ReturnType<typeof loadPersonProfile>>>, type: RankingType, scope: RegionScope) {
-  let regionId = profile.person.countryId;
-  if (scope === "world") regionId = "";
-  else if (scope === "continent") regionId = profile.person.continentId;
-  return profile.metricScores.find((score) =>
-    score.resultType === type &&
-    score.scope === scope &&
-    score.regionId === regionId
-  ) ?? null;
-}
-
-function initials(name: string) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase() || "?";
-}
-
-function ScoreRows({
-  profile,
-  type,
-  metric,
-}: {
-  profile: NonNullable<Awaited<ReturnType<typeof loadPersonProfile>>>;
-  type: RankingType;
-  metric: "sum" | "kinch";
-}) {
-  const scores = (["world", "continent", "country"] as const)
-    .map((scope) => metricScore(profile, type, scope))
-    .filter((score): score is PersonProfileMetricScore => Boolean(score));
-  if (!scores.length) return <p className="profileEmpty">No {type} score yet.</p>;
-  return (
-    <ul className="profileScoreRows">
-      {scores.map((score) => {
-        const isKinch = metric === "kinch";
-        return (
-          <li key={`${score.resultType}:${score.scope}:${score.regionId}`}>
-            <Link
-              href={metricHref({
-                metric: isKinch ? "sor-kinch" : "SOR",
-                resultType: type,
-                scope: score.scope,
-                regionId: score.regionId,
-                wcaId: profile.person.id,
-              })}
-            >
-              <span>{scopeLabel(score.scope, score.regionId, profile)}</span>
-              <strong>
-                {isKinch
-                  ? formatWcaResult("sor-kinch", score.kinchScore / 17)
-                  : formatWcaResult("SOR", score.score)}
-              </strong>
-              <span>
-                #{formatRankingNumber(isKinch ? score.kinchRank : score.rank)}
-              </span>
-              <span>{score.coverage}/{score.requiredCoverage} events</span>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+function formatKinchScore(value: number | null) {
+  if (value === null) return "—";
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(
+    value,
   );
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { wcaId } = await params;
-  const normalized = normalizeProfileWcaId(wcaId);
-  if (!normalized) return { title: "Competitor profile" };
-  const profile = await loadPersonProfile(normalized);
-  if (!profile) return { title: `${normalized} | WCA Rankings` };
-  return {
-    title: `${profile.person.name} | WCA Rankings`,
-    description: `WCA rankings profile for ${profile.person.name} (${profile.person.id}).`,
-  };
+function ProfileLoading({ error }: { error: string | null }) {
+  return (
+    <StatPageLayout
+      hasScrolled={false}
+      exportDate={null}
+      staticFooter
+      showFreshness={false}
+    >
+      <main className="profileHub">
+        <section className="profileHubHero">
+          <div className="profileHubIdentity">
+            <p className="profileHubEyebrow">Competitor profile</p>
+            <h1>{error ?? "Loading profile…"}</h1>
+            {error ? <p className="profileStatsMessage">{error}</p> : null}
+          </div>
+        </section>
+      </main>
+    </StatPageLayout>
+  );
 }
 
-export default async function PersonProfilePage({ params }: PageProps) {
-  const { wcaId } = await params;
-  const profile = await loadPersonProfile(wcaId);
-  if (!profile) notFound();
-  const singleBestResults = bestResults(profile, "single");
-  const averageBestResults = bestResults(profile, "average");
+export default function PersonProfilePage() {
+  const params = useParams<{ wcaId: string }>();
+  const wcaId = Array.isArray(params.wcaId) ? params.wcaId[0] : params.wcaId;
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [error, setError] = useState<{
+    wcaId: string;
+    message: string;
+  } | null>(null);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/people/${encodeURIComponent(wcaId)}/profile`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const body = (await response.json()) as ProfileResponse;
+        if (!response.ok)
+          throw new Error(body.error ?? "Profile is unavailable.");
+        setProfile(body);
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return;
+        setError({
+          wcaId,
+          message:
+            cause instanceof Error ? cause.message : "Profile is unavailable.",
+        });
+      });
+    return () => controller.abort();
+  }, [wcaId]);
+
+  const normalizedWcaId = wcaId.toUpperCase();
+  if (!profile || profile.person.id !== normalizedWcaId) {
+    return (
+      <ProfileLoading
+        error={error && error.wcaId === normalizedWcaId ? error.message : null}
+      />
+    );
+  }
+
+  const { person } = profile;
+  const region = [person.continentName, person.countryName]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <main className="app profilePage">
-      <header className="profileHero">
-        <div className="profileIdentity">
-          <span className="profileAvatar" aria-hidden="true">
-            {profile.person.avatarUrl ? (
-              <Image src={profile.person.avatarUrl} alt="" width={64} height={64} unoptimized referrerPolicy="no-referrer" />
-            ) : initials(profile.person.name)}
-          </span>
+    <StatPageLayout
+      hasScrolled={false}
+      exportDate={null}
+      staticFooter
+      showFreshness={false}
+    >
+      <main className="profileHub">
+        <section className="profileHubHero" aria-labelledby="profile-name">
+          <ProfileAvatar
+            personId={person.id}
+            name={person.name}
+            initialAvatarUrl={person.avatarUrl}
+          />
+          <div className="profileHubIdentity">
+            <h2 id="profile-name">{person.name}</h2>
+            <p className="profileHubLocation">
+              <span
+                role="img"
+                aria-label={person.countryName || "Country unavailable"}
+              >
+                {flagEmoji(person.countryIso2)}
+              </span>
+              <span>{region || "Region unavailable"}</span>
+            </p>
+            <p className="profileHubWcaId">{person.id}</p>
+          </div>
+          <a
+            className="profileHubWcaLink"
+            href={`https://www.worldcubeassociation.org/persons/${person.id}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            WCA profile
+          </a>
+        </section>
+        <section className="profileHubCounts" aria-label="Profile summary">
           <div>
-          <Link href="/" className="profileBackLink">WCA Rankings</Link>
-          <h1>{profile.person.name}</h1>
-          <p>
-            <span
-              className="profileFlag"
-              role="img"
-              aria-label={profile.person.countryName || "Country unavailable"}
-            >
-              {flagEmoji(profile.person.countryIso2)}
-            </span>
-            <span>{profile.person.id}</span>
-            {profile.person.countryName && <span>{profile.person.countryName}</span>}
-          </p>
+            <strong>{formatCount(profile.competitionCount)}</strong>
+            <span>competitions</span>
           </div>
-        </div>
-        <a
-          className="profileExternalLink"
-          href={`https://www.worldcubeassociation.org/persons/${profile.person.id}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          WCA profile
-        </a>
-      </header>
-
-      <section className="profileFreshness" aria-label="Export freshness">
-        <span>Snapshot</span>
-        <strong>{profile.exportDate ? formatExportDate(profile.exportDate) : "Export date unavailable"}</strong>
-      </section>
-
-      <section className="profileSummaryGrid" aria-label="Profile summary">
-        <section className="profilePanel">
-          <h2>Best Single Rankings</h2>
-          {singleBestResults.length ? (
-            <ul className="profileBestList">
-              {singleBestResults.map(({ event, result }) => (
-                <li key={event.eventId}>
-                  <Link href={rankingHref({ eventId: event.eventId, resultType: "single", wcaId: profile.person.id })}>
-                    <span>{event.eventShortName}</span>
-                    <strong>{result.formatted}</strong>
-                    <span>World #{formatRankingNumber(result.worldRank)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="profileEmpty">No single results yet.</p>}
-        </section>
-        <section className="profilePanel">
-          <h2>Best Average Rankings</h2>
-          {averageBestResults.length ? (
-            <ul className="profileBestList">
-              {averageBestResults.map(({ event, result }) => (
-                <li key={event.eventId}>
-                  <Link href={rankingHref({ eventId: event.eventId, resultType: "average", wcaId: profile.person.id })}>
-                    <span>{event.eventShortName}</span>
-                    <strong>{result.formatted}</strong>
-                    <span>World #{formatRankingNumber(result.worldRank)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="profileEmpty">No average results yet.</p>}
-        </section>
-        <section className="profilePanel">
-          <h2>Kinch</h2>
-          <h3>Single</h3>
-          <ScoreRows profile={profile} type="single" metric="kinch" />
-        </section>
-        <section className="profilePanel">
-          <h2>Sum of Ranks</h2>
-          <h3>Single</h3>
-          <ScoreRows profile={profile} type="single" metric="sum" />
-          <h3>Average</h3>
-          <ScoreRows profile={profile} type="average" metric="sum" />
-        </section>
-        <section className="profilePanel profilePanel--wide">
-          <h2>Event Coverage</h2>
-          <div className="coverageMeters">
-            <div>
-              <span>Single</span>
-              <strong>
-                {profile.eventRows.filter((row) => row.single).length}/17
-              </strong>
-            </div>
-            <div>
-              <span>Average</span>
-              <strong>
-                {profile.eventRows.filter((row) => row.average).length}/16
-              </strong>
-            </div>
+          <div>
+            <strong>{formatCount(profile.solveCount)}</strong>
+            <span>solves</span>
+          </div>
+          <div>
+            <strong>{formatCount(profile.countryCount)}</strong>
+            <span>countries</span>
+          </div>
+          <div>
+            <strong>{formatKinchScore(profile.kinchScore)}</strong>
+            <span>Kinch</span>
           </div>
         </section>
-      </section>
-
-      <section className="profileMatrixSection">
-        <h2>Event Matrix</h2>
-        <div className="profileMatrixScroller">
-          <table className="profileMatrix">
-            <thead>
-              <tr>
-                <th>Event</th>
-                <th>Single</th>
-                <th>Average</th>
-                <th>Kinch</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profile.eventRows.map((row) => (
-                <tr key={row.eventId}>
-                  <th scope="row">
-                    <span>{row.eventShortName}</span>
-                    <small>{row.eventName}</small>
-                  </th>
-                  <td>{row.single ? (
-                    <Link href={rankingHref({ eventId: row.eventId, resultType: "single", wcaId: profile.person.id })}>
-                      <strong>{row.single.formatted}</strong>
-                      <span className="rankScopes">
-                        {rankLine(row.single, profile).map((rank) => <span key={rank.scope} className={`rankScope rankScope--${rank.scope}`} aria-label={rank.ariaLabel} title={rank.ariaLabel}>{rank.label}</span>)}
-                      </span>
-                      {row.single.competitionName && <small>{row.single.competitionName}</small>}
-                    </Link>
-                  ) : <span className="profileMissing">No single</span>}</td>
-                  <td>{row.average ? (
-                    <Link href={rankingHref({ eventId: row.eventId, resultType: "average", wcaId: profile.person.id })}>
-                      <strong>{row.average.formatted}</strong>
-                      <span className="rankScopes">
-                        {rankLine(row.average, profile).map((rank) => <span key={rank.scope} className={`rankScope rankScope--${rank.scope}`} aria-label={rank.ariaLabel} title={rank.ariaLabel}>{rank.label}</span>)}
-                      </span>
-                      {row.average.competitionName && <small>{row.average.competitionName}</small>}
-                    </Link>
-                  ) : <span className="profileMissing">{row.eventId === "333mbf" ? "No average ranking" : "No average"}</span>}</td>
-                  <td>
-                    {row.singleMetric?.kinchValue !== null && row.singleMetric?.kinchValue !== undefined
-                      ? <span className="profileMetricValue">{formatWcaResult("sor-kinch", row.singleMetric.kinchValue)}</span>
-                      : <span className="profileMissing">No Kinch</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </main>
+        <section className="profileHubStats" aria-label="Profile statistics">
+          <PersonalBestsPreview personId={person.id} />
+          <PersonMedalPreview personId={person.id} />
+          <PersonResultsPreview personId={person.id} />
+          <PersonResultProgressPreview personId={person.id} />
+          <PersonTopRankingHighlights personId={person.id} />
+        </section>
+      </main>
+    </StatPageLayout>
   );
 }

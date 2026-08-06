@@ -7,7 +7,10 @@ export type PersonSearchInput = {
 
 export type PersonSearchDatabaseInput = PersonSearchInput;
 
-export type PersonIdSearchInput = Pick<PersonSearchInput, "search" | "regexSearch" | "limit">;
+export type PersonIdSearchInput = Pick<
+  PersonSearchInput,
+  "search" | "regexSearch" | "limit"
+>;
 
 export type PersonSearchRow = {
   wca_id: string;

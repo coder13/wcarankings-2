@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
+import { formatRankingDocumentTitle } from "@/lib/ranking-document-title";
 import { getAuthUser } from "@/services/auth/auth";
 import { loadListRankings } from "@/services/lists/rankings";
 import {
@@ -15,28 +18,65 @@ import {
   resolveList,
 } from "@/services/lists/lists";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
-import { isEventId, isRankingType, normalizeGenderFilters, parseRegionQuery, type GenderFilter } from "@/lib/wca";
+import {
+  isEventId,
+  isRankingType,
+  normalizeGenderFilters,
+  parseRegionQuery,
+  type GenderFilter,
+} from "@/lib/wca";
 
 export const dynamic = "force-dynamic";
 
-async function getListPageData(listId: string) {
+const getListPageData = cache(async (listId: string) => {
   try {
     const [list, user] = await Promise.all([
       resolveList(listId),
-      getAuthUser(new Request("http://localhost", { headers: await headers() })),
+      getAuthUser(
+        new Request("http://localhost", { headers: await headers() }),
+      ),
     ]);
     assertCanViewList(list, user);
     const isOwner = list.kind === "user" && list.owner?.id === user?.id;
     const [regions, membershipState, membershipRequests] = await Promise.all([
       getListRegions(list),
       getListMembershipState(list, user),
-      isOwner && user ? listMembershipRequests(user, listId) : Promise.resolve([]),
+      isOwner && user
+        ? listMembershipRequests(user, listId)
+        : Promise.resolve([]),
     ]);
-    return { list, regions, user, isOwner, membershipState, membershipRequests };
+    return {
+      list,
+      regions,
+      user,
+      isOwner,
+      membershipState,
+      membershipRequests,
+    };
   } catch (error) {
     if (error instanceof ListNotFoundError) notFound();
     throw error;
   }
+});
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ listId: string }>;
+}): Promise<Metadata> {
+  const { listId } = await params;
+  const { list } = await getListPageData(listId);
+
+  return {
+    title: formatRankingDocumentTitle({
+      subject: "people",
+      eventId: "333",
+      rankingType: "single",
+      competitionRanking: "best-result",
+      cityRanking: "fastest-single",
+      listName: list.name,
+    }),
+  };
 }
 
 export default async function ListPage({
@@ -49,20 +89,25 @@ export default async function ListPage({
   const { listId } = await params;
   const query = await searchParams;
   const eventValue = typeof query.eventId === "string" ? query.eventId : "333";
-  const resultValue = typeof query.result === "string" ? query.result : "single";
+  const resultValue =
+    typeof query.result === "string" ? query.result : "single";
   const eventId = isEventId(eventValue) ? eventValue : "333";
-  const rankingType = eventId !== "333mbf" && isRankingType(resultValue)
-    ? resultValue
-    : "single";
+  const rankingType =
+    eventId !== "333mbf" && isRankingType(resultValue) ? resultValue : "single";
   let genderValues: string[];
   if (Array.isArray(query.gender)) genderValues = query.gender;
   else if (query.gender === undefined) genderValues = [];
   else genderValues = [query.gender];
   const gender = normalizeGenderFilters(
-    genderValues.flatMap((value) => value.split(","))
-      .filter((value): value is GenderFilter => value === "m" || value === "f" || value === "o"),
+    genderValues
+      .flatMap((value) => value.split(","))
+      .filter(
+        (value): value is GenderFilter =>
+          value === "m" || value === "f" || value === "o",
+      ),
   );
-  const { list, regions, user, isOwner, membershipState, membershipRequests } = await getListPageData(listId);
+  const { list, regions, user, isOwner, membershipState, membershipRequests } =
+    await getListPageData(listId);
   const regionSelection = normalizeListRegionSelection(
     parseRegionQuery(typeof query.region === "string" ? query.region : null),
     regions,
@@ -72,40 +117,39 @@ export default async function ListPage({
     result: rankingType,
     limit: "50",
   });
-  if (regionSelection.scope !== "world") rankingParams.set("region", regionSelection.regionId);
+  if (regionSelection.scope !== "world")
+    rankingParams.set("region", regionSelection.regionId);
   if (gender.length) rankingParams.set("gender", gender.join(","));
   const rankings = await loadListRankings(list, rankingParams);
   const rankingListId = list.systemAlias ?? list.publicId;
   if (!rankingListId) notFound();
   return (
     <RankingsExplorer
-        initial={{
-          data: {
-            entries: rankings.entries,
-            hasMore: rankings.hasMore,
-            nextPageStart: rankings.nextStart === null
-              ? null
-              : rankings.nextStart + 1,
-            previousPageStart: null,
-            startPosition: 0,
-            lastRank: rankings.entries.at(-1)?.subRank ?? null,
-            total: rankings.total,
-            exportDate: rankings.exportDate,
-            cacheMembershipVersion: rankings.cacheMembershipVersion,
-            cacheDataVersion: rankings.cacheDataVersion,
-            startRank: 1,
-          },
-          regions,
-        }}
-        source={{ kind: "saved", listId: rankingListId, listName: list.name }}
-        options={{
-          showMyRank: membershipState === "member",
-          regionSelectionDisabled: !hasMultipleListCountries(regions),
-        }}
-        list={{
-          owner: list.kind === "user" &&
-              list.owner?.id === user?.id &&
-              list.publicId
+      initial={{
+        data: {
+          entries: rankings.entries,
+          hasMore: rankings.hasMore,
+          nextPageStart:
+            rankings.nextStart === null ? null : rankings.nextStart + 1,
+          previousPageStart: null,
+          startPosition: 0,
+          lastRank: rankings.entries.at(-1)?.subRank ?? null,
+          total: rankings.total,
+          exportDate: rankings.exportDate,
+          cacheMembershipVersion: rankings.cacheMembershipVersion,
+          cacheDataVersion: rankings.cacheDataVersion,
+          startRank: 1,
+        },
+        regions,
+      }}
+      source={{ kind: "saved", listId: rankingListId, listName: list.name }}
+      options={{
+        showMyRank: membershipState === "member",
+        regionSelectionDisabled: !hasMultipleListCountries(regions),
+      }}
+      list={{
+        owner:
+          list.kind === "user" && list.owner?.id === user?.id && list.publicId
             ? {
                 listId: list.publicId,
                 visibility: list.visibility,
@@ -113,25 +157,23 @@ export default async function ListPage({
                 memberCount: list.memberCount,
               }
             : undefined,
-          membership: list.kind === "user" &&
-              list.owner?.id !== user?.id &&
-              list.publicId &&
-              membershipState
+        membership:
+          list.kind === "user" &&
+          list.owner?.id !== user?.id &&
+          list.publicId &&
+          membershipState
             ? {
                 listId: list.publicId,
                 joinPolicy: list.joinPolicy,
                 state: membershipState,
               }
             : undefined,
-          membershipRequests: list.kind === "user" &&
-              list.owner?.id === user?.id &&
-              list.publicId
+        membershipRequests:
+          list.kind === "user" && list.owner?.id === user?.id && list.publicId
             ? { listId: list.publicId, requests: membershipRequests }
             : undefined,
-          actions: list.publicId
-            ? { listId: list.publicId, isOwner }
-            : undefined,
-        }}
+        actions: list.publicId ? { listId: list.publicId, isOwner } : undefined,
+      }}
     />
   );
 }

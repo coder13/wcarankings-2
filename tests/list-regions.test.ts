@@ -42,7 +42,10 @@ test("disables list region changes when every member has one country", () => {
   assert.deepEqual(
     normalizeListRegionSelection(
       { scope: "country", regionId: "USA" },
-      { continents: northAmerica.continents, countries: [northAmerica.countries[0]] },
+      {
+        continents: northAmerica.continents,
+        countries: [northAmerica.countries[0]],
+      },
     ),
     { scope: "world", regionId: "" },
   );

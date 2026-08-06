@@ -17,18 +17,20 @@ The files use these status labels:
 - [Average result rankings](average-result-rankings.md)
 - [Gender-filtered result rankings](gender-filtered-result-rankings.md)
 - [Person-event rankings](person-event-rankings.md)
+- [Person event result history](person-event-result-history.md)
 - [Person-year rankings](person-year-rankings.md)
 - [Sum of Ranks and Kinch](sum-of-ranks-and-kinch.md)
 - [Person-competition rankings](person-competition-rankings.md)
+- [Medal rankings](medal-rankings.md)
 - [Competition rankings](competition-rankings.md)
 - [City-event statistics](city-event-stats.md)
 - [Ranking counts and list metadata](ranking-counts-and-metadata.md)
 
-## Foundation and planned work
+## Foundation tables
 
+- [Person activity rankings](person-activity-rankings.md)
 - [Result facts](result-facts.md)
-- [WCA best and compatibility lists](wca-best-and-compatibility.md)
-- [Weekly rank changes and record streaks](weekly-rank-changes-and-record-streaks.md)
+- [Ranking tables](ranking-tables.md)
 
 The canonical architecture document gives the shared contracts and naming rules.
 These files add the stat-specific operating record:

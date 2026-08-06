@@ -17,9 +17,9 @@ export function ProfileMenu() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const profileQuery = useWcaProfile();
-  const state = profileQuery.data ?? (profileQuery.isError
-    ? { profile: null, configured: true }
-    : null);
+  const state =
+    profileQuery.data ??
+    (profileQuery.isError ? { profile: null, configured: true } : null);
 
   useEffect(() => {
     if (!open) return;
@@ -29,7 +29,9 @@ export function ProfileMenu() {
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
-        rootRef.current?.querySelector<HTMLButtonElement>(".profileButton")?.focus();
+        rootRef.current
+          ?.querySelector<HTMLButtonElement>(".profileButton")
+          ?.focus();
       }
     };
     document.addEventListener("pointerdown", close);
@@ -41,7 +43,9 @@ export function ProfileMenu() {
   }, [open]);
 
   const profile = state?.profile ?? null;
-  const label = profile ? `Open profile menu for ${profile.name}` : "Open profile menu";
+  const label = profile
+    ? `Open profile menu for ${profile.name}`
+    : "Open profile menu";
   const avatar = profile?.avatarUrl ? (
     // WCA controls this authenticated profile URL; preserving it avoids proxying user avatars.
     // eslint-disable-next-line @next/next/no-img-element
@@ -51,7 +55,9 @@ export function ProfileMenu() {
   );
 
   let menuContent = (
-    <p className="profileStatus" role="status">Loading profile…</p>
+    <p className="profileStatus" role="status">
+      Loading profile…
+    </p>
   );
   if (state && profile) {
     menuContent = (
@@ -60,16 +66,21 @@ export function ProfileMenu() {
           <strong>{profile.name}</strong>
           <span>{profile.wcaId}</span>
         </div>
-        <Link role="menuitem" href="/lists/mine">My lists</Link>
-        <Link role="menuitem" href="/settings">Settings</Link>
+        <Link role="menuitem" href="/lists/mine">
+          My lists
+        </Link>
         <form action="/api/auth/wca/logout" method="post">
-          <button role="menuitem" type="submit">Sign out</button>
+          <button role="menuitem" type="submit">
+            Sign out
+          </button>
         </form>
       </>
     );
   } else if (state?.configured) {
     menuContent = (
-      <a role="menuitem" href="/api/auth/wca">Sign in with WCA</a>
+      <a role="menuitem" href="/api/auth/wca">
+        Sign in with WCA
+      </a>
     );
   } else if (state) {
     menuContent = (

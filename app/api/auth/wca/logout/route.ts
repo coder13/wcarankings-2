@@ -1,4 +1,7 @@
-import { clearAuthSessionCookie, deleteAuthSession } from "@/services/auth/auth";
+import {
+  clearAuthSessionCookie,
+  deleteAuthSession,
+} from "@/services/auth/auth";
 import { getSameOriginDestination } from "@/services/auth/wca";
 
 export function getLogoutDestination(request: Request) {

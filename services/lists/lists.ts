@@ -94,7 +94,10 @@ export class ListConflictError extends Error {
 
 function isDuplicateKey(error: unknown) {
   return Boolean(
-    error && typeof error === "object" && "code" in error && error.code === "ER_DUP_ENTRY",
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "ER_DUP_ENTRY",
   );
 }
 
@@ -112,7 +115,9 @@ function toListSummary(row: ListRow): ListSummary {
     memberCount: Number(row.member_count),
     membershipVersion: Number(row.membership_version),
     systemDefinitionVersion:
-      row.system_definition_version === null ? null : Number(row.system_definition_version),
+      row.system_definition_version === null
+        ? null
+        : Number(row.system_definition_version),
     owner:
       row.owner_user_id && row.owner_name && row.owner_wca_id
         ? {
@@ -132,7 +137,9 @@ function validateName(value: unknown) {
   }
   const name = value.trim();
   if (!name || name.length > 100) {
-    throw new ListValidationError("List name must be between 1 and 100 characters.");
+    throw new ListValidationError(
+      "List name must be between 1 and 100 characters.",
+    );
   }
   return name;
 }
@@ -140,7 +147,9 @@ function validateName(value: unknown) {
 function validateDescription(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value !== "string" || value.trim().length > 500) {
-    throw new ListValidationError("List description must be 500 characters or fewer.");
+    throw new ListValidationError(
+      "List description must be 500 characters or fewer.",
+    );
   }
   return value.trim();
 }
@@ -187,7 +196,11 @@ async function selectListForUpdate(
   if (!normalized) throw new ListNotFoundError();
   const publicId = normalizeListPublicId(normalized);
   const [rows] = await connection.execute<(ListRow & RowDataPacket)[]>(
-    listLookupQuery({ listColumns: LIST_COLUMNS, byPublicId: Boolean(publicId), forUpdate: true }),
+    listLookupQuery({
+      listColumns: LIST_COLUMNS,
+      byPublicId: Boolean(publicId),
+      forUpdate: true,
+    }),
     [normalized],
   );
   if (!rows[0]) throw new ListNotFoundError();
@@ -199,7 +212,10 @@ export async function resolveList(lookup: string) {
   if (!normalized) throw new ListNotFoundError();
   const publicId = normalizeListPublicId(normalized);
   const result = await query<ListRow>(
-    listLookupQuery({ listColumns: LIST_COLUMNS, byPublicId: Boolean(publicId) }),
+    listLookupQuery({
+      listColumns: LIST_COLUMNS,
+      byPublicId: Boolean(publicId),
+    }),
     [normalized],
   );
   if (!result.rows[0]) throw new ListNotFoundError();
@@ -260,9 +276,13 @@ export async function createList(
   const name = validateName(input.name);
   const description = validateDescription(input.description);
   const visibility =
-    input.visibility === undefined ? "private" : validateVisibility(input.visibility);
+    input.visibility === undefined
+      ? "private"
+      : validateVisibility(input.visibility);
   const joinPolicy =
-    input.joinPolicy === undefined ? "closed" : validateJoinPolicy(input.joinPolicy);
+    input.joinPolicy === undefined
+      ? "closed"
+      : validateJoinPolicy(input.joinPolicy);
   const slug = slugifyListName(name);
   const rawPersonIds = Array.isArray(input.personIds) ? input.personIds : [];
   const normalizedPersonIds = [
@@ -281,31 +301,29 @@ export async function createList(
     const publicId = generateListPublicId();
     try {
       const membership = await withTransaction(async (connection) => {
-        const [result] = await connection.execute<ResultSetHeader>(createListQuery(), [
-          publicId,
-          user.id,
-          name,
-          slug,
-          description,
-          visibility,
-          joinPolicy,
-        ]);
+        const [result] = await connection.execute<ResultSetHeader>(
+          createListQuery(),
+          [publicId, user.id, name, slug, description, visibility, joinPolicy],
+        );
         const listId = Number(result.insertId);
         const valid = new Set<string>();
         const blocked = new Set<string>();
         let addedCount = 0;
         if (normalizedPersonIds.length) {
-          const [people] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
+          const [people] = await connection.execute<
+            (RowDataPacket & { wca_id: string })[]
+          >(
             personIdsForListQuery(normalizedPersonIds.length),
             normalizedPersonIds,
           );
           people.forEach((person) => valid.add(person.wca_id));
-          const validIds = normalizedPersonIds.filter((personId) => valid.has(personId));
+          const validIds = normalizedPersonIds.filter((personId) =>
+            valid.has(personId),
+          );
           if (validIds.length) {
-            const [optedOut] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
-              optedOutPersonIdsQuery(validIds.length),
-              validIds,
-            );
+            const [optedOut] = await connection.execute<
+              (RowDataPacket & { wca_id: string })[]
+            >(optedOutPersonIdsQuery(validIds.length), validIds);
             optedOut.forEach((person) => blocked.add(person.wca_id));
             const added = validIds.filter((personId) => !blocked.has(personId));
             if (added.length) {
@@ -314,7 +332,10 @@ export async function createList(
                 insertBulkListMembersQuery(added.length),
                 added.flatMap((personId) => [listId, personId, user.id]),
               );
-              await connection.execute(updateListMemberCountQuery(), [added.length, listId]);
+              await connection.execute(updateListMemberCountQuery(), [
+                added.length,
+                listId,
+              ]);
             }
           }
         }
@@ -322,7 +343,11 @@ export async function createList(
           listId,
           actorUserId: user.id,
           eventType: "list.created",
-          eventData: { visibility, joinPolicy, memberCount: normalizedPersonIds.length },
+          eventData: {
+            visibility,
+            joinPolicy,
+            memberCount: normalizedPersonIds.length,
+          },
         });
         await enqueueListRankingRebuild(connection, {
           id: listId,
@@ -330,7 +355,10 @@ export async function createList(
           kind: "user",
         });
         return {
-          invalid: [...invalid, ...normalizedPersonIds.filter((personId) => !valid.has(personId))],
+          invalid: [
+            ...invalid,
+            ...normalizedPersonIds.filter((personId) => !valid.has(personId)),
+          ],
           blocked: [...blocked],
         };
       });
@@ -354,20 +382,19 @@ export async function cloneList(user: AuthUser, source: ListSummary) {
     const publicId = generateListPublicId();
     try {
       await withTransaction(async (connection) => {
-        const [created] = await connection.execute<ResultSetHeader>(cloneListQuery(), [
-          publicId,
-          user.id,
-          name,
-          slug,
-          source.description,
-        ]);
+        const [created] = await connection.execute<ResultSetHeader>(
+          cloneListQuery(),
+          [publicId, user.id, name, slug, source.description],
+        );
         const listId = Number(created.insertId);
-        const [members] = await connection.execute<ResultSetHeader>(cloneListMembersQuery(), [
+        const [members] = await connection.execute<ResultSetHeader>(
+          cloneListMembersQuery(),
+          [listId, user.id, source.id],
+        );
+        await connection.execute(updateListMemberCountQuery(), [
+          members.affectedRows,
           listId,
-          user.id,
-          source.id,
         ]);
-        await connection.execute(updateListMemberCountQuery(), [members.affectedRows, listId]);
         await activity(connection, {
           listId,
           actorUserId: user.id,
@@ -392,9 +419,10 @@ export async function cloneList(user: AuthUser, source: ListSummary) {
 }
 
 export async function listMemberIds(list: ListSummary) {
-  const result = await query<RowDataPacket & { person_id: string }>(listMemberIdsQuery(), [
-    list.id,
-  ]);
+  const result = await query<RowDataPacket & { person_id: string }>(
+    listMemberIdsQuery(),
+    [list.id],
+  );
   return result.rows.map((row) => row.person_id);
 }
 
@@ -413,11 +441,17 @@ export async function updateList(
     assertOwner(row, user);
     const name = input.name === undefined ? row.name : validateName(input.name);
     const description =
-      input.description === undefined ? row.description : validateDescription(input.description);
+      input.description === undefined
+        ? row.description
+        : validateDescription(input.description);
     const visibility =
-      input.visibility === undefined ? row.visibility : validateVisibility(input.visibility);
+      input.visibility === undefined
+        ? row.visibility
+        : validateVisibility(input.visibility);
     const joinPolicy =
-      input.joinPolicy === undefined ? row.join_policy : validateJoinPolicy(input.joinPolicy);
+      input.joinPolicy === undefined
+        ? row.join_policy
+        : validateJoinPolicy(input.joinPolicy);
     await connection.execute(updateListQuery(), [
       name,
       slugifyListName(name),
@@ -465,7 +499,8 @@ export async function listPublicLists() {
       name: list.name,
       memberCount: list.memberCount,
       kind: list.kind,
-      createdBy: list.kind === "system" ? null : (list.owner?.name ?? "WCA member"),
+      createdBy:
+        list.kind === "system" ? null : (list.owner?.name ?? "WCA member"),
     };
   });
 }
@@ -480,7 +515,10 @@ export async function getListMembershipState(
   user: AuthUser | null,
 ): Promise<ListMembershipState | null> {
   if (!user) return null;
-  const membership = await query<RowDataPacket>(listMembershipQuery(), [list.id, user.wcaId]);
+  const membership = await query<RowDataPacket>(listMembershipQuery(), [
+    list.id,
+    user.wcaId,
+  ]);
   if (membership.rows.length > 0) return "member";
 
   // System lists do not accept membership requests, but their membership is
@@ -519,7 +557,8 @@ export async function listMembers(
       source: row.source,
       addedAt: String(row.created_at),
     })),
-    nextCursor: result.rows.length > pageSize ? (rows.at(-1)?.person_id ?? null) : null,
+    nextCursor:
+      result.rows.length > pageSize ? (rows.at(-1)?.person_id ?? null) : null,
   };
 }
 
@@ -533,9 +572,13 @@ export async function addListMembers(
     throw new ListValidationError("Provide at least one WCA ID.");
   }
   if (rawPersonIds.length > 1000) {
-    throw new ListValidationError("A single request can add at most 1,000 people.");
+    throw new ListValidationError(
+      "A single request can add at most 1,000 people.",
+    );
   }
-  const normalized = [...new Set(rawPersonIds.map(normalizeWcaId).filter(Boolean))] as string[];
+  const normalized = [
+    ...new Set(rawPersonIds.map(normalizeWcaId).filter(Boolean)),
+  ] as string[];
   const invalid = rawPersonIds
     .filter((value) => !normalizeWcaId(value))
     .map((value) => String(value).slice(0, 40));
@@ -546,10 +589,9 @@ export async function addListMembers(
     if (normalized.length === 0) {
       return { added: [], duplicates: [], invalid, blocked: [] };
     }
-    const [personRows] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
-      validPersonIdsQuery(normalized.length),
-      normalized,
-    );
+    const [personRows] = await connection.execute<
+      (RowDataPacket & { wca_id: string })[]
+    >(validPersonIdsQuery(normalized.length), normalized);
     const valid = new Set(personRows.map((person) => person.wca_id));
     for (const personId of normalized) {
       if (!valid.has(personId)) invalid.push(personId);
@@ -558,18 +600,15 @@ export async function addListMembers(
     if (candidates.length === 0) {
       return { added: [], duplicates: [], invalid, blocked: [] };
     }
-    const [blockedRows] = await connection.execute<(RowDataPacket & { wca_id: string })[]>(
-      blockedPersonIdsQuery(candidates.length),
-      candidates,
-    );
-    const [excludedRows] = await connection.execute<(RowDataPacket & { person_id: string })[]>(
-      excludedPersonIdsQuery(candidates.length),
-      [row.id, ...candidates],
-    );
-    const [existingRows] = await connection.execute<(RowDataPacket & { person_id: string })[]>(
-      existingListMemberIdsQuery(candidates.length),
-      [row.id, ...candidates],
-    );
+    const [blockedRows] = await connection.execute<
+      (RowDataPacket & { wca_id: string })[]
+    >(blockedPersonIdsQuery(candidates.length), candidates);
+    const [excludedRows] = await connection.execute<
+      (RowDataPacket & { person_id: string })[]
+    >(excludedPersonIdsQuery(candidates.length), [row.id, ...candidates]);
+    const [existingRows] = await connection.execute<
+      (RowDataPacket & { person_id: string })[]
+    >(existingListMemberIdsQuery(candidates.length), [row.id, ...candidates]);
     const blockedSet = new Set([
       ...blockedRows.map((blocked) => blocked.wca_id),
       ...excludedRows.map((excluded) => excluded.person_id),
@@ -584,7 +623,10 @@ export async function addListMembers(
         insertListMembersQuery(added.length),
         added.flatMap((personId) => [row.id, personId, user.id, source]),
       );
-      await connection.execute(incrementListMemberCountQuery(), [added.length, row.id]);
+      await connection.execute(incrementListMemberCountQuery(), [
+        added.length,
+        row.id,
+      ]);
       await activity(connection, {
         listId: Number(row.id),
         actorUserId: user.id,
@@ -606,16 +648,20 @@ export async function addListMembers(
   });
 }
 
-export async function removeListMember(user: AuthUser, lookup: string, rawPersonId: string) {
+export async function removeListMember(
+  user: AuthUser,
+  lookup: string,
+  rawPersonId: string,
+) {
   const personId = normalizeWcaId(rawPersonId);
   if (!personId) throw new ListValidationError("Invalid WCA ID.");
   return withTransaction(async (connection) => {
     const row = await selectListForUpdate(connection, lookup);
     assertOwner(row, user);
-    const [result] = await connection.execute<ResultSetHeader>(deleteListMemberQuery(), [
-      row.id,
-      personId,
-    ]);
+    const [result] = await connection.execute<ResultSetHeader>(
+      deleteListMemberQuery(),
+      [row.id, personId],
+    );
     if (result.affectedRows > 0) {
       await connection.execute(decrementListMemberCountQuery(), [row.id]);
       await activity(connection, {
@@ -637,12 +683,14 @@ export async function removeListMember(user: AuthUser, lookup: string, rawPerson
 export async function removeSelfFromList(user: AuthUser, lookup: string) {
   return withTransaction(async (connection) => {
     const row = await selectListForUpdate(connection, lookup);
-    const [result] = await connection.execute<ResultSetHeader>(deleteListMemberQuery(), [
-      row.id,
-      user.wcaId,
-    ]);
+    const [result] = await connection.execute<ResultSetHeader>(
+      deleteListMemberQuery(),
+      [row.id, user.wcaId],
+    );
     if (result.affectedRows === 0) {
-      throw new ListConflictError("You are not currently included in this list.");
+      throw new ListConflictError(
+        "You are not currently included in this list.",
+      );
     }
     await connection.execute(insertListExclusionQuery(), [row.id, user.wcaId]);
     await connection.execute(decrementListMemberCountQuery(), [row.id]);
@@ -662,28 +710,32 @@ export async function removeSelfFromList(user: AuthUser, lookup: string) {
 
 export async function requestListMembership(user: AuthUser, lookup: string) {
   if (!user.allowListInclusion) {
-    throw new ListConflictError("Enable list inclusion before requesting membership.");
+    throw new ListConflictError(
+      "Enable list inclusion before requesting membership.",
+    );
   }
   return withTransaction(async (connection) => {
     const row = await selectListForUpdate(connection, lookup);
     if (row.kind !== "user" || row.visibility !== "public") {
       throw new ListNotFoundError();
     }
-    const [memberRows] = await connection.execute<RowDataPacket[]>(listMembershipQuery(), [
-      row.id,
-      user.wcaId,
-    ]);
+    const [memberRows] = await connection.execute<RowDataPacket[]>(
+      listMembershipQuery(),
+      [row.id, user.wcaId],
+    );
     if (memberRows.length > 0) {
       throw new ListConflictError("You are already included in this list.");
     }
     if (row.join_policy === "open") {
       ensureListMemberCapacity(row.kind, Number(row.member_count), 1);
-      await connection.execute(deleteListExclusionQuery(), [row.id, user.wcaId]);
-      const [insert] = await connection.execute<ResultSetHeader>(insertSelfRequestMemberQuery(), [
+      await connection.execute(deleteListExclusionQuery(), [
         row.id,
         user.wcaId,
-        user.id,
       ]);
+      const [insert] = await connection.execute<ResultSetHeader>(
+        insertSelfRequestMemberQuery(),
+        [row.id, user.wcaId, user.id],
+      );
       if (insert.affectedRows > 0) {
         await connection.execute(incrementListMemberCountQuery(), [row.id]);
         await enqueueListRankingRebuild(connection, {
@@ -700,7 +752,11 @@ export async function requestListMembership(user: AuthUser, lookup: string) {
       });
       return { status: "joined" as const };
     }
-    await connection.execute(insertMembershipRequestQuery(), [row.id, user.id, user.wcaId]);
+    await connection.execute(insertMembershipRequestQuery(), [
+      row.id,
+      user.id,
+      user.wcaId,
+    ]);
     await activity(connection, {
       listId: Number(row.id),
       actorUserId: user.id,
@@ -742,7 +798,9 @@ export async function decideMembershipRequest(
     );
     const request = requests[0];
     if (!request || request.status !== "pending") {
-      throw new ListConflictError("This membership request is no longer pending.");
+      throw new ListConflictError(
+        "This membership request is no longer pending.",
+      );
     }
 
     let added = false;
@@ -754,12 +812,14 @@ export async function decideMembershipRequest(
       if (!preferenceRows[0]?.allow_list_inclusion) {
         throw new ListConflictError("This person cannot be added.");
       }
-      await connection.execute(deleteListExclusionQuery(), [list.id, request.person_id]);
-      const [insert] = await connection.execute<ResultSetHeader>(insertSelfRequestMemberQuery(), [
+      await connection.execute(deleteListExclusionQuery(), [
         list.id,
         request.person_id,
-        user.id,
       ]);
+      const [insert] = await connection.execute<ResultSetHeader>(
+        insertSelfRequestMemberQuery(),
+        [list.id, request.person_id, user.id],
+      );
       added = insert.affectedRows > 0;
       if (added) {
         await connection.execute(incrementListMemberCountQuery(), [list.id]);
@@ -770,7 +830,11 @@ export async function decideMembershipRequest(
         });
       }
     }
-    await connection.execute(updateMembershipRequestQuery(), [decision, user.id, request.id]);
+    await connection.execute(updateMembershipRequestQuery(), [
+      decision,
+      user.id,
+      request.id,
+    ]);
     await activity(connection, {
       listId: Number(list.id),
       actorUserId: user.id,
@@ -781,13 +845,23 @@ export async function decideMembershipRequest(
   });
 }
 
-export async function setListInclusionPreference(user: AuthUser, allowListInclusion: boolean) {
+export async function setListInclusionPreference(
+  user: AuthUser,
+  allowListInclusion: boolean,
+) {
   await withTransaction(async (connection) => {
-    await connection.execute(updateListInclusionPreferenceQuery(), [allowListInclusion, user.id]);
+    await connection.execute(updateListInclusionPreferenceQuery(), [
+      allowListInclusion,
+      user.id,
+    ]);
     if (allowListInclusion) return;
 
     const [affectedLists] = await connection.execute<
-      (RowDataPacket & { id: number; kind: "user" | "system"; membership_version: number })[]
+      (RowDataPacket & {
+        id: number;
+        kind: "user" | "system";
+        membership_version: number;
+      })[]
     >(
       `SELECT list_record.id, list_record.kind, list_record.membership_version
        FROM lists AS list_record
@@ -804,7 +878,10 @@ export async function setListInclusionPreference(user: AuthUser, allowListInclus
         kind: list.kind,
       });
     }
-    await connection.execute(cancelUserMembershipRequestsQuery(), [user.id, user.wcaId]);
+    await connection.execute(cancelUserMembershipRequestsQuery(), [
+      user.id,
+      user.wcaId,
+    ]);
     await activity(connection, {
       listId: null,
       actorUserId: user.id,

@@ -22,10 +22,7 @@ export function resolveListAddSubmission(
   if (!value.trim()) return { type: "commit-buffer" };
 
   const personIds = parseListMemberIds(value);
-  if (
-    personIds.length > 1 ||
-    /^\d{4}[A-Za-z0-9]{4}\d{2}$/.test(value.trim())
-  ) {
+  if (personIds.length > 1 || /^\d{4}[A-Za-z0-9]{4}\d{2}$/.test(value.trim())) {
     return { type: "commit-person-ids", personIds };
   }
 

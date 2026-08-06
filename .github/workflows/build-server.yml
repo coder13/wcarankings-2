@@ -66,6 +66,10 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
       - name: Resolve source identity
         id: source
         run: |
@@ -75,7 +79,7 @@ jobs:
       - name: Resolve independent component identities
         id: components
         run: |
-          fingerprints=$(node scripts/server-component-fingerprints.mjs)
+          fingerprints=$(bun scripts/server-component-fingerprints.ts)
           echo "app=$(jq -r '.app' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
           echo "flyway=$(jq -r '.flyway' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
           echo "data_tools=$(jq -r '.dataTools' <<<"$fingerprints")" >> "$GITHUB_OUTPUT"
@@ -207,7 +211,7 @@ jobs:
               docker pull "$app_tag"
               app=$(docker image inspect "$app_tag" --format '{{index .RepoDigests 0}}')
               docker run --rm --entrypoint sh "$app" -c \
-                'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.mjs && css=$(find /app/dist/standalone/dist/client -name "*.css" -type f -print -quit) && test -n "$css" && test -s "$css"'
+                'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.ts && css=$(find /app/dist/standalone/dist/client -name "*.css" -type f -print -quit) && test -n "$css" && test -s "$css"'
               ;;
           esac
           case ",${{ inputs.components }}," in
@@ -223,7 +227,7 @@ jobs:
               docker pull "$data_tools_tag"
               data_tools=$(docker image inspect "$data_tools_tag" --format '{{index .RepoDigests 0}}')
               docker run --rm --entrypoint sh "$data_tools" -c \
-                'test -f /app/release-compatibility.json && test -f /app/scripts/activate-ranking-generation.mjs && test -f /app/scripts/publish-projection-transfer.mjs && test -f /app/scripts/sync-wca-export.mjs'
+                'test -f /app/release-compatibility.json && test -f /app/scripts/projections/generation/activate-ranking-generation.ts && test -f /app/scripts/projections/transfer/publish-projection-transfer.ts && test -f /app/scripts/sync-wca-export.ts'
               ;;
           esac
           echo "app=$app" >> "$GITHUB_OUTPUT"

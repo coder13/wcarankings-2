@@ -64,9 +64,7 @@ virtualized row or accordion motion. It documents the shared geometry contract,
 cached-detail behavior, and regression checks.
 
 See [docs/deployment.md](docs/deployment.md) for Docker Compose setup, server
-prerequisites, the GitHub Actions-owned WCA refresh flow, and deployment flow. See
-[docs/cloudflare-cache.md](docs/cloudflare-cache.md) for the source-controlled
-public API edge-cache policy and setup.
+prerequisites, the GitHub Actions-owned WCA refresh flow, and deployment flow.
 
 ## WCA sign-in
 
@@ -90,7 +88,7 @@ db/                          MySQL connection pool
 migrations/mysql/            Flyway versioned MariaDB migrations
 sql/ranking-projections/     Readable SQL for daily derived ranking projections
 Dockerfile.flyway             Pinned Flyway migration image
-scripts/sync-wca-export.mjs  WCA SQL export downloader and importer
+scripts/sync-wca-export.ts  WCA SQL export downloader and importer
 Dockerfile                   Multi-stage production image
 docker-compose.yml           MariaDB + app services
 ```

@@ -11,10 +11,7 @@ try {
   await query(`DROP TABLE IF EXISTS ${table}`);
   await query(`CREATE TABLE ${table} (id INT NOT NULL PRIMARY KEY)`);
 
-  await assert.rejects(
-    query("SELECT SLEEP(1) AS slept"),
-    isStatementTimeout,
-  );
+  await assert.rejects(query("SELECT SLEEP(1) AS slept"), isStatementTimeout);
   const healthy = await query<{ value: number }>("SELECT 1 AS value");
   assert.equal(Number(healthy.rows[0]?.value), 1);
 
@@ -25,7 +22,9 @@ try {
     }),
     isStatementTimeout,
   );
-  const rolledBack = await query<{ total: number }>(`SELECT COUNT(*) AS total FROM ${table}`);
+  const rolledBack = await query<{ total: number }>(
+    `SELECT COUNT(*) AS total FROM ${table}`,
+  );
   assert.equal(Number(rolledBack.rows[0]?.total), 0);
 } finally {
   await query(`DROP TABLE IF EXISTS ${table}`).catch(() => undefined);

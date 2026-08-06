@@ -22,7 +22,7 @@ fields are copied from `result_facts`; the stage does not join `persons` or
 steps finish. `solve_facts` is no longer a persistent published table.
 
 The ranking table is
-[result_rankings_single.sql](../../sql/ranking-projections/result_rankings_single.sql).
+[result_rankings_single.sql](../../data-tools/projection-catalog/people/result-rankings/result_rankings_single.sql).
 
 ## Indexes
 

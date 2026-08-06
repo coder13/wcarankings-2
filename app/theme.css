@@ -29,6 +29,7 @@
   --table-row-time-font-size: var(--font-size-base);
   --table-row-secondary-font-size: var(--font-size-small);
   --table-row-record-font-size: var(--font-size-small);
+  --input-result-type-width: 5.25em;
 
   --primary: #2878ae;
   --primary-strong: #1d5d87;

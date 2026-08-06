@@ -13,14 +13,22 @@ test("maps capability state to the tables each feature actually owns", () => {
     "competition_event_stats",
     "competition_stats",
   ]);
-  assert.deepEqual(capabilityTables.cityEventStats, [
-    "city_event_stats",
-    "entity_ranking_counts",
+  assert.deepEqual(capabilityTables.cityEventStats, ["city_event_stats"]);
+  assert.deepEqual(capabilityTables.personActivityRankings, [
+    "person_activity_counts",
+    "person_activity_rankings",
+    "person_activity_ranking_counts",
   ]);
   assert.deepEqual(capabilityTables.personCompetitionRankings, [
     "person_competition_counts",
+    "person_competition_year_counts",
     "person_competition_rankings",
     "person_competition_ranking_counts",
+  ]);
+  assert.deepEqual(capabilityTables.personMedalRankings, [
+    "person_medal_scores",
+    "person_medal_rankings",
+    "person_medal_ranking_counts",
   ]);
 });
 

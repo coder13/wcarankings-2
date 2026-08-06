@@ -14,7 +14,7 @@ A list row represents one official Average result.
 
 The build reads normalized gender and Average values directly from
 `result_facts`. Only positive Average values enter the ranking. The SQL is in
-[result_rankings_average.sql](../../sql/ranking-projections/result_rankings_average.sql).
+[result_rankings_average.sql](../../data-tools/projection-catalog/people/result-rankings/result_rankings_average.sql).
 
 ## Indexes
 

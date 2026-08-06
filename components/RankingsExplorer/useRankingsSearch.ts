@@ -76,9 +76,10 @@ export function useRankingsSearch({
     staleTime: 60_000,
   });
   const matches = useMemo(
-    () => activeDebouncedQuery === normalizedQuery && queryResult.data
-      ? orderSearchMatches(queryResult.data.entries)
-      : [],
+    () =>
+      activeDebouncedQuery === normalizedQuery && queryResult.data
+        ? orderSearchMatches(queryResult.data.entries)
+        : [],
     [activeDebouncedQuery, normalizedQuery, queryResult.data],
   );
   const resultKey = queryResult.dataUpdatedAt
@@ -89,12 +90,12 @@ export function useRankingsSearch({
     index = Math.min(selection.index, matches.length - 1);
   }
 
-  const patchSearch = useCallback((patch: {
-    search?: string;
-    regexSearch?: boolean;
-  }) => {
-    patchFilters(patch);
-  }, [patchFilters]);
+  const patchSearch = useCallback(
+    (patch: { search?: string; regexSearch?: boolean }) => {
+      patchFilters(patch);
+    },
+    [patchFilters],
+  );
 
   const reset = useCallback(() => {
     patchSearch({ search: "", regexSearch: false });
@@ -114,37 +115,46 @@ export function useRankingsSearch({
     setOpen(true);
   }, [patchSearch, regexSearch, reset]);
 
-  const changeQuery = useCallback((value: string) => {
-    if (!query.trim() && value.trim()) {
-      trackGoogleAnalyticsEvent("ranking_search_used", {
-        search_mode: "standard",
-      });
-    }
-    if (value !== query) onReset();
-    if (!value.trim()) setDebouncedQuery("");
-    patchSearch({ search: value, regexSearch: false });
-  }, [onReset, patchSearch, query]);
+  const changeQuery = useCallback(
+    (value: string) => {
+      if (!query.trim() && value.trim()) {
+        trackGoogleAnalyticsEvent("ranking_search_used", {
+          search_mode: "standard",
+        });
+      }
+      if (value !== query) onReset();
+      if (!value.trim()) setDebouncedQuery("");
+      patchSearch({ search: value, regexSearch: false });
+    },
+    [onReset, patchSearch, query],
+  );
 
-  const startRegexSearch = useCallback((value: string) => {
-    const normalized = value.trim();
-    if (!normalized) return;
-    trackGoogleAnalyticsEvent("ranking_search_used", { search_mode: "vim" });
-    onReset();
-    patchSearch({ search: normalized, regexSearch: true });
-    setOpen(false);
-  }, [onReset, patchSearch]);
+  const startRegexSearch = useCallback(
+    (value: string) => {
+      const normalized = value.trim();
+      if (!normalized) return;
+      trackGoogleAnalyticsEvent("ranking_search_used", { search_mode: "vim" });
+      onReset();
+      patchSearch({ search: normalized, regexSearch: true });
+      setOpen(false);
+    },
+    [onReset, patchSearch],
+  );
 
-  const cycle = useCallback((direction: -1 | 1 = 1) => {
-    if (!matches.length) return;
-    const currentMatch = index >= 0 ? matches[index] : null;
-    let nextIndex = (index + direction + matches.length) % matches.length;
-    if (index < 0) nextIndex = direction > 0 ? 0 : matches.length - 1;
-    const nextMatch = matches[nextIndex];
-    if (!nextMatch) return;
-    setSelection({ resultKey, index: nextIndex });
-    onPrefetch?.(matches, nextIndex);
-    onMatch(nextMatch, direction, currentMatch);
-  }, [index, matches, onMatch, onPrefetch, resultKey]);
+  const cycle = useCallback(
+    (direction: -1 | 1 = 1) => {
+      if (!matches.length) return;
+      const currentMatch = index >= 0 ? matches[index] : null;
+      let nextIndex = (index + direction + matches.length) % matches.length;
+      if (index < 0) nextIndex = direction > 0 ? 0 : matches.length - 1;
+      const nextMatch = matches[nextIndex];
+      if (!nextMatch) return;
+      setSelection({ resultKey, index: nextIndex });
+      onPrefetch?.(matches, nextIndex);
+      onMatch(nextMatch, direction, currentMatch);
+    },
+    [index, matches, onMatch, onPrefetch, resultKey],
+  );
 
   const preserveOnNextRequest = useCallback(() => {
     preserveResetRef.current = true;
@@ -163,7 +173,8 @@ export function useRankingsSearch({
       !matches.length ||
       activeDebouncedQuery !== normalizedQuery ||
       handledResultKeyRef.current === resultKey
-    ) return;
+    )
+      return;
     handledResultKeyRef.current = resultKey;
     onPrefetch?.(matches, 0);
     onMatch(matches[0]);
@@ -177,9 +188,9 @@ export function useRankingsSearch({
   ]);
 
   const open = openRequested || Boolean(query.trim() && !regexSearch);
-  const pending = Boolean(normalizedQuery) && (
-    activeDebouncedQuery !== normalizedQuery || queryResult.isFetching
-  );
+  const pending =
+    Boolean(normalizedQuery) &&
+    (activeDebouncedQuery !== normalizedQuery || queryResult.isFetching);
   let error = "";
   if (queryResult.error instanceof Error) error = queryResult.error.message;
   else if (queryResult.isError) error = "Search is unavailable.";
@@ -188,7 +199,8 @@ export function useRankingsSearch({
     [matches],
   );
 
-  const state = useMemo(() => ({
+  const state = useMemo(
+    () => ({
       query,
       regexSearch,
       open,
@@ -199,7 +211,8 @@ export function useRankingsSearch({
       error,
       activeMatch: matches[index] ?? null,
       matchPersonIds,
-    }), [
+    }),
+    [
       error,
       index,
       matchPersonIds,
@@ -209,8 +222,10 @@ export function useRankingsSearch({
       query,
       queryResult.isFetching,
       regexSearch,
-    ]);
-  const actions = useMemo(() => ({
+    ],
+  );
+  const actions = useMemo(
+    () => ({
       activate,
       changeQuery,
       close,
@@ -219,7 +234,8 @@ export function useRankingsSearch({
       setOpen,
       startRegexSearch,
       preserveOnNextRequest,
-    }), [
+    }),
+    [
       activate,
       changeQuery,
       close,
@@ -227,7 +243,8 @@ export function useRankingsSearch({
       preserveOnNextRequest,
       reset,
       startRegexSearch,
-    ]);
+    ],
+  );
 
   return useMemo(() => ({ state, actions }), [actions, state]);
 }

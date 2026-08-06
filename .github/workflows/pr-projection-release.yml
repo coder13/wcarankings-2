@@ -42,5 +42,4 @@ jobs:
       fingerprints: ${{ needs.plan.outputs.fingerprints }}
       available_artifacts: ${{ needs.plan.outputs.available_artifacts }}
       include_raw: ${{ needs.plan.outputs.raw_required == 'true' }}
-      run_benchmark: true
     secrets: inherit

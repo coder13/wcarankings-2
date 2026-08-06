@@ -22,7 +22,7 @@ Single and Average bests and represented region, and `ranks_single` and
 cohort, event-value, penalty, and Kinch tables.
 
 The only published score table is
-[person_sum_of_ranks_scores.sql](../../sql/ranking-projections/person_sum_of_ranks_scores.sql).
+[person_sum_of_ranks_scores.sql](../../data-tools/projection-catalog/people/sum-of-ranks/person_sum_of_ranks_scores.sql).
 The event-value stages are dropped after the build.
 
 ## Indexes
@@ -67,3 +67,10 @@ World, continent, and country common windows are stored and deployment-warmed
 for default World Single, Average, and Kinch views. Gender and uncommon region
 windows are lazy and cached by generation, metric version, result type, scope,
 region, gender, order, and window start.
+
+## Profile summary
+
+The profile summary reads the all-time World Single Kinch row directly from
+`person_sum_of_ranks_scores`. It divides the stored combined score by the
+17-event metric set before display. This is a primary-key lookup and does not
+need another projection or a scroll path.

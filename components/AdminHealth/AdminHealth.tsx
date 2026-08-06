@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { AdminHealthSnapshot } from "@/lib/admin-health";
-import styles from "../ImportHealth/ImportHealth.module.css";
+import styles from "./AdminHealth.module.css";
 
 const capabilityLabels: Record<string, string> = {
   core: "Core rankings",
   resultRankings: "Result rankings",
   competitionRankings: "Competition rankings",
+  personActivityRankings: "Person activity rankings",
   personCompetitionRankings: "Person competition rankings",
+  personMedalRankings: "Person medal rankings",
   cityEventStats: "City/event statistics",
   sumOfRanks: "Sum of Ranks",
   yearlyPersonRankings: "Yearly person rankings",
@@ -101,7 +103,7 @@ export function AdminHealth({
           <Link href="/" className={styles.back}>
             ← WCA Rankings
           </Link>
-          <h1>Import health</h1>
+          <h1>Ranking service health</h1>
           <p>
             Read-only diagnostics for ranking data freshness and publication.
           </p>
