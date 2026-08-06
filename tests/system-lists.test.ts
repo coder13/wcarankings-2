@@ -4,17 +4,57 @@ import {
   primaryNameToken,
   SYSTEM_LIST_DEFINITIONS,
 } from "../scripts/lib/system-list-definitions.mjs";
-import { boardMemberIds, roleMemberIds } from "../scripts/refresh-board-list.mjs";
+import {
+  boardMemberIds,
+  roleMemberIds,
+} from "../scripts/refresh-board-list.mjs";
 
 test("system list aliases are stable and unique", () => {
-  assert.deepEqual(
-    SYSTEM_LIST_DEFINITIONS.map((definition) => definition.alias),
-    ["max", "luke"],
+  assert.ok(
+    SYSTEM_LIST_DEFINITIONS.some((definition) => definition.alias === "max"),
+  );
+  assert.ok(
+    SYSTEM_LIST_DEFINITIONS.some((definition) => definition.alias === "luke"),
   );
   assert.equal(
     new Set(SYSTEM_LIST_DEFINITIONS.map((definition) => definition.alias)).size,
     SYSTEM_LIST_DEFINITIONS.length,
   );
+});
+
+test("only the top 25 names in each system-list group are public", () => {
+  for (const group of [
+    SYSTEM_LIST_DEFINITIONS.filter(
+      (definition) =>
+        definition.match === "first-name" && definition.gender === "m",
+    ),
+    SYSTEM_LIST_DEFINITIONS.filter(
+      (definition) =>
+        definition.match === "first-name" && definition.gender === "f",
+    ),
+    SYSTEM_LIST_DEFINITIONS.filter(
+      (definition) => definition.match === "last-name",
+    ),
+  ]) {
+    assert.equal(group.length >= 25, true);
+    assert.ok(
+      group
+        .slice(0, 25)
+        .every((definition) => definition.visibility === "public"),
+    );
+    assert.ok(
+      group
+        .slice(25)
+        .every((definition) => definition.visibility === "private"),
+    );
+  }
+});
+
+test("private system lists remain direct-link lists", () => {
+  const max = SYSTEM_LIST_DEFINITIONS.find(
+    (definition) => definition.alias === "max",
+  );
+  assert.equal(max?.visibility, "private");
 });
 
 test("board refresh normalizes unique WCA IDs from public role records", () => {
