@@ -84,21 +84,23 @@ function personalScore(
   return 0;
 }
 
+function rankForRegion(candidate: FeedInterestingResult) {
+  if (candidate.region.scope === "world") return candidate.worldRank;
+  if (candidate.region.scope === "continent") return candidate.continentRank;
+  return candidate.countryRank;
+}
+
+function baseForRegion(candidate: FeedInterestingResult) {
+  if (candidate.region.scope === "world") return FEED_SORT_CONSTANTS.worldRank;
+  if (candidate.region.scope === "continent")
+    return FEED_SORT_CONSTANTS.continentRank;
+  return FEED_SORT_CONSTANTS.countryRank;
+}
+
 export function feedNotabilityScore(candidate: FeedInterestingResult) {
-  return Math.max(
-    candidate.worldRank !== null && candidate.worldRank <= 10
-      ? FEED_SORT_CONSTANTS.worldRank +
-          (11 - candidate.worldRank) * FEED_SORT_CONSTANTS.rankStep
-      : 0,
-    candidate.continentRank !== null && candidate.continentRank <= 10
-      ? FEED_SORT_CONSTANTS.continentRank +
-          (11 - candidate.continentRank) * FEED_SORT_CONSTANTS.rankStep
-      : 0,
-    candidate.countryRank !== null && candidate.countryRank <= 10
-      ? FEED_SORT_CONSTANTS.countryRank +
-          (11 - candidate.countryRank) * FEED_SORT_CONSTANTS.rankStep
-      : 0,
-  );
+  const rank = rankForRegion(candidate);
+  if (rank === null || rank > 10) return 0;
+  return baseForRegion(candidate) + (11 - rank) * FEED_SORT_CONSTANTS.rankStep;
 }
 
 export function sortFeedCandidates(

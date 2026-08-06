@@ -28,7 +28,14 @@ import type { FeedUserPreferences } from "./preferences";
 
 const PAGE_SIZE = FEED_PAGE_SIZE;
 const TOP_SCAN_SIZE = FEED_TOP_SCAN_SIZE;
+const PREVIEW_CANDIDATE_SCAN_SIZE = 20;
 const SOURCE_READ_CONCURRENCY = 2;
+
+function sourceRegionRank(source: FeedInterestingResult) {
+  if (source.region.scope === "world") return source.worldRank;
+  if (source.region.scope === "continent") return source.continentRank;
+  return source.countryRank;
+}
 
 export type FeedStatPreview = FeedInventoryStat & {
   entries: RankingEntry[];
@@ -179,7 +186,13 @@ async function loadInterestingResultPage(
 ) {
   const loaded = await loadSourcePage(
     sortFeedCandidates(
-      addFeedStatPopularity(candidates, popularity),
+      addFeedStatPopularity(
+        candidates.filter((candidate) => {
+          const rank = sourceRegionRank(candidate);
+          return rank !== null && rank <= TOP_SCAN_SIZE;
+        }),
+        popularity,
+      ),
       preferences,
     ),
   );
@@ -292,12 +305,13 @@ export async function loadFeedStatPreviews({
     console.warn("Feed stat popularity is unavailable.", error);
     return [];
   });
-  const candidates = snapshot.candidates.slice(cursor, cursor + PAGE_SIZE);
-  const previews = await loadInterestingResultPage(
-    candidates,
-    preferences,
-    popularity,
+  const candidates = snapshot.candidates.slice(
+    cursor,
+    cursor + PREVIEW_CANDIDATE_SCAN_SIZE,
   );
+  const previews = (
+    await loadInterestingResultPage(candidates, preferences, popularity)
+  ).slice(0, PAGE_SIZE);
   const nextCursor =
     cursor + candidates.length < snapshot.candidates.length
       ? cursor + candidates.length
