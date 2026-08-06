@@ -36,6 +36,7 @@ export type RankingsUrlState = {
   cityRanking: CityRanking;
   personCompetitionRanking: boolean;
   personMedalRanking: boolean;
+  personPrStreakRanking: boolean;
   medalType: MedalRankingType;
   year: number | null;
   eventId: string;
@@ -57,6 +58,7 @@ export type RankingsFilterState = Pick<
   | "cityRanking"
   | "personCompetitionRanking"
   | "personMedalRanking"
+  | "personPrStreakRanking"
   | "medalType"
   | "year"
   | "eventId"
@@ -84,6 +86,7 @@ export function rankingsFilterStateFromUrl(
     cityRanking,
     personCompetitionRanking,
     personMedalRanking,
+    personPrStreakRanking,
     medalType,
     year,
     eventId,
@@ -100,6 +103,7 @@ export function rankingsFilterStateFromUrl(
     cityRanking,
     personCompetitionRanking,
     personMedalRanking,
+    personPrStreakRanking,
     medalType,
     year,
     eventId,
@@ -139,6 +143,10 @@ function personCompetitionRankingFromPathname(pathname: string) {
 
 function personMedalRankingFromPathname(pathname: string) {
   return pathname === "/persons/medals";
+}
+
+function personPrStreakRankingFromPathname(pathname: string) {
+  return pathname === "/persons/pr-streak";
 }
 
 function validEventForSubject(
@@ -192,6 +200,7 @@ function normalizeState(
   const personCompetitionRanking =
     personCompetitionRankingFromPathname(pathname);
   const personMedalRanking = personMedalRankingFromPathname(pathname);
+  const personPrStreakRanking = personPrStreakRankingFromPathname(pathname);
   const eventId = validEventForSubject(
     subject,
     state.eventId,
@@ -213,6 +222,7 @@ function normalizeState(
     cityRanking,
     personCompetitionRanking,
     personMedalRanking,
+    personPrStreakRanking,
     medalType: isMedalRankingType(state.medalType)
       ? state.medalType
       : "overall",
@@ -257,6 +267,7 @@ export function parseRankingsUrl(
   const personCompetitionRanking =
     personCompetitionRankingFromPathname(pathname);
   const personMedalRanking = personMedalRankingFromPathname(pathname);
+  const personPrStreakRanking = personPrStreakRankingFromPathname(pathname);
   const rawRankingType = params.get("result");
   const search = (params.get("search") ?? "")
     .trim()
@@ -268,6 +279,7 @@ export function parseRankingsUrl(
     cityRanking,
     personCompetitionRanking,
     personMedalRanking,
+    personPrStreakRanking,
     medalType: isMedalRankingType(params.get("medal") ?? "")
       ? (params.get("medal") as MedalRankingType)
       : "overall",
@@ -303,6 +315,7 @@ export function serializeRankingsUrl(
   const params = new URLSearchParams();
   const hidesEvent =
     state.personCompetitionRanking ||
+    state.personPrStreakRanking ||
     (state.subject === "competitions" &&
       (state.competitionRanking === "latitude" ||
         state.competitionRanking === "competitor-count"));

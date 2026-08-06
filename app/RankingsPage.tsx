@@ -90,6 +90,10 @@ export async function getRankingsPageMetadata({
     "personMedalRanking",
     String(metadataInput.personMedalRanking === true),
   );
+  imageParams.set(
+    "personPrStreakRanking",
+    String(metadataInput.personPrStreakRanking === true),
+  );
   imageParams.set("medal", metadataInput.medalType);
   if (metadataInput.year) imageParams.set("year", String(metadataInput.year));
   if (metadataInput.eventId === "all") imageParams.delete("eventId");
@@ -120,6 +124,7 @@ export async function RankingsPage({
   requiresCompetitionRankings = false,
   requiresPersonCompetitionRankings = false,
   requiresPersonMedalRankings = false,
+  requiresPersonPrStreakRankings = false,
   requiresCityRankings = false,
 }: {
   searchParams?: Promise<RankingsSearchParams>;
@@ -128,6 +133,7 @@ export async function RankingsPage({
   requiresCompetitionRankings?: boolean;
   requiresPersonCompetitionRankings?: boolean;
   requiresPersonMedalRankings?: boolean;
+  requiresPersonPrStreakRankings?: boolean;
   requiresCityRankings?: boolean;
 } = {}) {
   const featureSwitch = await getProjectionFeatureSwitch();
@@ -143,6 +149,7 @@ export async function RankingsPage({
     (requiresPersonCompetitionRankings &&
       !featureSwitch.personCompetitionRankings) ||
     (requiresPersonMedalRankings && !featureSwitch.personMedalRankings) ||
+    (requiresPersonPrStreakRankings && !featureSwitch.personPrStreakRankings) ||
     (requiresCityRankings && !featureSwitch.cityEventStats) ||
     (["SOR", "sor-kinch"].includes(requestedEvent) && !featureSwitch.sumOfRanks)
   ) {

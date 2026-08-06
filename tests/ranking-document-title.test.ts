@@ -22,10 +22,7 @@ test("formats specific titles for people rankings and results", () => {
     formatRankingDocumentTitle({ ...defaults, subject: "results" }),
     "3x3x3 Cube Single Results | WCA Rankings",
   );
-  assert.equal(
-    formatRankingDocumentDescription(defaults),
-    "",
-  );
+  assert.equal(formatRankingDocumentDescription(defaults), "");
   assert.equal(
     formatRankingDocumentDescription({ ...defaults, subject: "results" }),
     "",
@@ -79,6 +76,14 @@ test("formats titles for non-person ranking views and saved lists", () => {
       medalType: "gold",
     }),
     "Gold Medal Rankings | WCA Rankings",
+  );
+  assert.equal(
+    formatRankingDocumentTitle({
+      ...defaults,
+      personPrStreakRanking: true,
+      year: 2024,
+    }),
+    "PR Streak 2024 | WCA Rankings",
   );
 });
 

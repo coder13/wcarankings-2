@@ -259,6 +259,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     "sum-of-ranks",
     "person-competition-rankings",
     "person-medal-rankings",
+    "person-pr-streak-rankings",
     "person-event-rankings",
   ]) {
     const projection = PROJECTION_REGISTRY.find(

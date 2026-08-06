@@ -118,6 +118,8 @@ export function RankingsTopRail() {
   if (filters.personCompetitionRanking)
     personRankingPeriod = filters.year ? String(filters.year) : "competitions";
   else if (filters.personMedalRanking) personRankingPeriod = filters.medalType;
+  else if (filters.personPrStreakRanking)
+    personRankingPeriod = filters.year ? String(filters.year) : "pr-streak";
   else if (filters.year) personRankingPeriod = String(filters.year);
   let personRankingYears = rankings.availableYears;
   if (personRankingYears.length === 0 && rankings.loading) {
@@ -130,6 +132,17 @@ export function RankingsTopRail() {
     personRankingPeriodOptions = [
       {
         value: "competitions",
+        label: t("rankingsRail.period.allTime"),
+      },
+      ...personRankingYears.map((year) => ({
+        value: String(year),
+        label: String(year),
+      })),
+    ];
+  } else if (filters.personPrStreakRanking) {
+    personRankingPeriodOptions = [
+      {
+        value: "pr-streak",
         label: t("rankingsRail.period.allTime"),
       },
       ...personRankingYears.map((year) => ({
@@ -165,6 +178,7 @@ export function RankingsTopRail() {
   const hidesResultType =
     filters.personCompetitionRanking ||
     filters.personMedalRanking ||
+    filters.personPrStreakRanking ||
     (filters.subject === "competitions" &&
       ["podiums", "latitude", "competitor-count"].includes(
         filters.competitionRanking,
@@ -174,6 +188,7 @@ export function RankingsTopRail() {
     ["fastest-single", "fastest-average"].includes(filters.cityRanking);
   const hidesEventPicker =
     filters.personCompetitionRanking ||
+    filters.personPrStreakRanking ||
     (filters.subject === "competitions" &&
       ["latitude", "competitor-count"].includes(filters.competitionRanking));
   return (
@@ -216,6 +231,7 @@ export function RankingsTopRail() {
             eventLeadingOptions,
             additionalEventOptions:
               !filters.personMedalRanking &&
+              !filters.personPrStreakRanking &&
               options.showAllEventRankingOptions &&
               featureSwitch.sumOfRanks
                 ? ALL_EVENT_RANKING_OPTIONS
@@ -233,6 +249,8 @@ export function RankingsTopRail() {
                       if (filters.personCompetitionRanking)
                         actions.changeYear(null);
                       else actions.changePersonCompetitionRanking(true);
+                    } else if (value === "pr-streak") {
+                      actions.changeYear(null);
                     } else if (value === "medals")
                       actions.changePersonMedalRanking(true);
                     else if (filters.personMedalRanking)

@@ -22,6 +22,7 @@ export type RankingResource =
   | "people"
   | "person-competition-count"
   | "person-medal-rankings"
+  | "person-pr-streak"
   | "results"
   | "competitions"
   | "podiums"

@@ -82,6 +82,7 @@ function metadataInput(params: URLSearchParams): RankingDocumentTitleInput {
       "personCompetitionRanking",
     ),
     personMedalRanking,
+    personPrStreakRanking: booleanParam(params, "personPrStreakRanking"),
     medalType: isMedalRankingType(medal) ? medal : "overall",
   };
 }
