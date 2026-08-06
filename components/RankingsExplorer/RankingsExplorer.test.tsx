@@ -36,6 +36,7 @@ function pathnameForFilters(filters: RankingsFilterState) {
   }
   if (filters.subject === "cities") return `/cities/${filters.cityRanking}`;
   if (filters.personCompetitionRanking) return "/persons/competitions";
+  if (filters.personActivityRanking) return "/persons/activity";
   if (filters.personMedalRanking) return "/persons/medals";
   if (filters.year) return `/persons/year/${filters.year}`;
   return "/";
@@ -50,6 +51,8 @@ function renderExplorerMarkup(
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
     personCompetitionRanking: false,
+    personActivityRanking: false,
+    personActivityMetric: "competitions",
     personMedalRanking: false,
     medalType: "overall",
     year: null,
@@ -200,8 +203,21 @@ test("renders a separate person ranking picker", () => {
   assert.match(markup, /aria-label="Person ranking"/);
   assert.match(
     markup,
-    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button><button[^>]*>Competitions<\/button>/,
+    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button><button[^>]*>Competitions<\/button><button[^>]*>Activity<\/button>/,
   );
+});
+
+test("renders activity statistic controls", () => {
+  const markup = renderExplorerMarkup(
+    { options: { showSubjectSwitch: true } },
+    { personActivityRanking: true, personActivityMetric: "rounds" },
+  );
+  assert.match(markup, /aria-label="Activity statistic"/);
+  assert.match(markup, />Competition count</);
+  assert.match(markup, />Countries</);
+  assert.match(markup, />Rounds</);
+  assert.match(markup, />Official solves</);
+  assert.doesNotMatch(markup, /Switch to average rankings/);
 });
 
 test("keeps a competition-ranking year in its query string", () => {
@@ -210,6 +226,8 @@ test("keeps a competition-ranking year in its query string", () => {
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
     personCompetitionRanking: true,
+    personActivityRanking: false,
+    personActivityMetric: "competitions",
     personMedalRanking: false,
     medalType: "overall",
     year: 2023,

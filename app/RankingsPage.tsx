@@ -39,6 +39,7 @@ export async function getRankingsPageMetadata({
   const requestedEvent = searchParam(params, "eventId");
   const requestedResult = searchParam(params, "result");
   const requestedMedal = searchParam(params, "medal");
+  const requestedActivityMetric = searchParam(params, "metric");
   let eventId = "333";
   if (options.personMedalRanking) {
     eventId = isEventId(requestedEvent) ? requestedEvent : "all";
@@ -49,6 +50,15 @@ export async function getRankingsPageMetadata({
   const medalType = isMedalRankingType(requestedMedal)
     ? requestedMedal
     : "overall";
+  const personActivityMetric = [
+    "competitions",
+    "countries",
+    "rounds",
+    "solves",
+  ].includes(requestedActivityMetric)
+    ? (requestedActivityMetric as
+        "competitions" | "countries" | "rounds" | "solves")
+    : "competitions";
 
   return {
     title: formatRankingDocumentTitle({
@@ -56,6 +66,7 @@ export async function getRankingsPageMetadata({
       eventId,
       rankingType,
       medalType,
+      personActivityMetric,
     }),
   };
 }
@@ -66,6 +77,7 @@ export async function RankingsPage({
   requiresResultRankings = false,
   requiresCompetitionRankings = false,
   requiresPersonCompetitionRankings = false,
+  requiresPersonActivityRankings = false,
   requiresPersonMedalRankings = false,
   requiresCityRankings = false,
 }: {
@@ -74,6 +86,7 @@ export async function RankingsPage({
   requiresResultRankings?: boolean;
   requiresCompetitionRankings?: boolean;
   requiresPersonCompetitionRankings?: boolean;
+  requiresPersonActivityRankings?: boolean;
   requiresPersonMedalRankings?: boolean;
   requiresCityRankings?: boolean;
 } = {}) {
@@ -89,6 +102,7 @@ export async function RankingsPage({
     (requiresCompetitionRankings && !featureSwitch.competitionRankings) ||
     (requiresPersonCompetitionRankings &&
       !featureSwitch.personCompetitionRankings) ||
+    (requiresPersonActivityRankings && !featureSwitch.personActivityRankings) ||
     (requiresPersonMedalRankings && !featureSwitch.personMedalRankings) ||
     (requiresCityRankings && !featureSwitch.cityEventStats) ||
     (["SOR", "sor-kinch"].includes(requestedEvent) && !featureSwitch.sumOfRanks)

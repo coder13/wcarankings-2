@@ -47,6 +47,13 @@ type PersonRankingPeriodOption = {
   label: string;
 };
 
+const PERSON_ACTIVITY_OPTIONS: readonly PersonRankingPeriodOption[] = [
+  { value: "competitions", label: "Competition count" },
+  { value: "countries", label: "Countries" },
+  { value: "rounds", label: "Rounds" },
+  { value: "solves", label: "Official solves" },
+];
+
 function subscribeMobileControls(listener: () => void) {
   const media = window.matchMedia(MOBILE_CONTROLS_QUERY);
   media.addEventListener("change", listener);
@@ -117,6 +124,8 @@ export function RankingsTopRail() {
   let personRankingPeriod = "";
   if (filters.personCompetitionRanking)
     personRankingPeriod = filters.year ? String(filters.year) : "competitions";
+  else if (filters.personActivityRanking)
+    personRankingPeriod = filters.personActivityMetric;
   else if (filters.personMedalRanking) personRankingPeriod = filters.medalType;
   else if (filters.year) personRankingPeriod = String(filters.year);
   let personRankingYears = rankings.availableYears;
@@ -124,8 +133,10 @@ export function RankingsTopRail() {
     personRankingYears = FALLBACK_PERSON_RANKING_YEARS;
   }
   let personRankingPeriodOptions: readonly PersonRankingPeriodOption[];
+  let personRankingPeriodAriaLabel: string | undefined;
   if (filters.personMedalRanking) {
     personRankingPeriodOptions = MEDAL_RANKING_OPTIONS;
+    personRankingPeriodAriaLabel = "Medal statistic";
   } else if (filters.personCompetitionRanking) {
     personRankingPeriodOptions = [
       {
@@ -137,6 +148,9 @@ export function RankingsTopRail() {
         label: String(year),
       })),
     ];
+  } else if (filters.personActivityRanking) {
+    personRankingPeriodOptions = PERSON_ACTIVITY_OPTIONS;
+    personRankingPeriodAriaLabel = "Activity statistic";
   } else {
     personRankingPeriodOptions = [
       ...(featureSwitch.personCompetitionRankings
@@ -164,6 +178,7 @@ export function RankingsTopRail() {
     personRankingPeriodOptions.length > 1;
   const hidesResultType =
     filters.personCompetitionRanking ||
+    filters.personActivityRanking ||
     filters.personMedalRanking ||
     (filters.subject === "competitions" &&
       ["podiums", "latitude", "competitor-count"].includes(
@@ -174,6 +189,7 @@ export function RankingsTopRail() {
     ["fastest-single", "fastest-average"].includes(filters.cityRanking);
   const hidesEventPicker =
     filters.personCompetitionRanking ||
+    filters.personActivityRanking ||
     (filters.subject === "competitions" &&
       ["latitude", "competitor-count"].includes(filters.competitionRanking));
   return (
@@ -216,6 +232,7 @@ export function RankingsTopRail() {
             eventLeadingOptions,
             additionalEventOptions:
               !filters.personMedalRanking &&
+              !filters.personActivityRanking &&
               options.showAllEventRankingOptions &&
               featureSwitch.sumOfRanks
                 ? ALL_EVENT_RANKING_OPTIONS
@@ -232,7 +249,13 @@ export function RankingsTopRail() {
                     if (value === "competitions") {
                       if (filters.personCompetitionRanking)
                         actions.changeYear(null);
+                      else if (filters.personActivityRanking)
+                        actions.changePersonActivityMetric("competitions");
                       else actions.changePersonCompetitionRanking(true);
+                    } else if (filters.personActivityRanking) {
+                      actions.changePersonActivityMetric(
+                        value as typeof filters.personActivityMetric,
+                      );
                     } else if (value === "medals")
                       actions.changePersonMedalRanking(true);
                     else if (filters.personMedalRanking)
@@ -241,9 +264,7 @@ export function RankingsTopRail() {
                       );
                     else actions.changeYear(value ? Number(value) : null);
                   },
-                  ariaLabel: filters.personMedalRanking
-                    ? "Medal statistic"
-                    : undefined,
+                  ariaLabel: personRankingPeriodAriaLabel,
                 }
               : undefined,
             gender: filters.gender,
@@ -257,6 +278,7 @@ export function RankingsTopRail() {
               filters.eventId !== "SOR" &&
               filters.eventId !== "sor-kinch" &&
               !filters.personMedalRanking &&
+              !filters.personActivityRanking &&
               !hidesResultType &&
               (filters.subject !== "cities" || cityUsesResultType),
             showEventPicker: !hidesEventPicker,

@@ -29,12 +29,23 @@ const COMPETITION_RANKINGS = new Set<string>(
 const CITY_RANKINGS = new Set<string>(
   CITY_RANKING_OPTIONS.map(({ value }) => value),
 );
+const PERSON_ACTIVITY_METRICS = new Set([
+  "competitions",
+  "countries",
+  "rounds",
+  "solves",
+]);
+
+export type PersonActivityMetric =
+  "competitions" | "countries" | "rounds" | "solves";
 
 export type RankingsUrlState = {
   subject: ExplorerSubject;
   competitionRanking: CompetitionRanking;
   cityRanking: CityRanking;
   personCompetitionRanking: boolean;
+  personActivityRanking: boolean;
+  personActivityMetric: PersonActivityMetric;
   personMedalRanking: boolean;
   medalType: MedalRankingType;
   year: number | null;
@@ -56,6 +67,8 @@ export type RankingsFilterState = Pick<
   | "competitionRanking"
   | "cityRanking"
   | "personCompetitionRanking"
+  | "personActivityRanking"
+  | "personActivityMetric"
   | "personMedalRanking"
   | "medalType"
   | "year"
@@ -83,6 +96,8 @@ export function rankingsFilterStateFromUrl(
     competitionRanking,
     cityRanking,
     personCompetitionRanking,
+    personActivityRanking,
+    personActivityMetric,
     personMedalRanking,
     medalType,
     year,
@@ -99,6 +114,8 @@ export function rankingsFilterStateFromUrl(
     competitionRanking,
     cityRanking,
     personCompetitionRanking,
+    personActivityRanking,
+    personActivityMetric,
     personMedalRanking,
     medalType,
     year,
@@ -135,6 +152,19 @@ function cityRankingFromPathname(pathname: string) {
 
 function personCompetitionRankingFromPathname(pathname: string) {
   return pathname === "/persons/competitions";
+}
+
+function personActivityRankingFromPathname(pathname: string) {
+  return pathname === "/persons/activity";
+}
+
+function personActivityMetricFromParams(
+  params: URLSearchParams,
+): PersonActivityMetric {
+  const value = params.get("metric") ?? "competitions";
+  return PERSON_ACTIVITY_METRICS.has(value)
+    ? (value as PersonActivityMetric)
+    : "competitions";
 }
 
 function personMedalRankingFromPathname(pathname: string) {
@@ -191,6 +221,7 @@ function normalizeState(
   const cityRanking = cityRankingFromPathname(pathname);
   const personCompetitionRanking =
     personCompetitionRankingFromPathname(pathname);
+  const personActivityRanking = personActivityRankingFromPathname(pathname);
   const personMedalRanking = personMedalRankingFromPathname(pathname);
   const eventId = validEventForSubject(
     subject,
@@ -212,11 +243,15 @@ function normalizeState(
     competitionRanking,
     cityRanking,
     personCompetitionRanking,
+    personActivityRanking,
+    personActivityMetric: personActivityRanking
+      ? state.personActivityMetric
+      : "competitions",
     personMedalRanking,
     medalType: isMedalRankingType(state.medalType)
       ? state.medalType
       : "overall",
-    year: subject === "people" ? state.year : null,
+    year: subject === "people" && !personActivityRanking ? state.year : null,
     eventId: podiumEventId,
     rankingType: rankingTypeForSubject(
       subject,
@@ -256,6 +291,7 @@ export function parseRankingsUrl(
   const cityRanking = cityRankingFromPathname(pathname);
   const personCompetitionRanking =
     personCompetitionRankingFromPathname(pathname);
+  const personActivityRanking = personActivityRankingFromPathname(pathname);
   const personMedalRanking = personMedalRankingFromPathname(pathname);
   const rawRankingType = params.get("result");
   const search = (params.get("search") ?? "")
@@ -267,6 +303,8 @@ export function parseRankingsUrl(
     competitionRanking,
     cityRanking,
     personCompetitionRanking,
+    personActivityRanking,
+    personActivityMetric: personActivityMetricFromParams(params),
     personMedalRanking,
     medalType: isMedalRankingType(params.get("medal") ?? "")
       ? (params.get("medal") as MedalRankingType)
@@ -303,6 +341,7 @@ export function serializeRankingsUrl(
   const params = new URLSearchParams();
   const hidesEvent =
     state.personCompetitionRanking ||
+    state.personActivityRanking ||
     (state.subject === "competitions" &&
       (state.competitionRanking === "latitude" ||
         state.competitionRanking === "competitor-count"));
@@ -327,6 +366,12 @@ export function serializeRankingsUrl(
   if (state.gender.length) params.set("gender", state.gender.join(","));
   if (state.personMedalRanking && state.medalType !== "overall") {
     params.set("medal", state.medalType);
+  }
+  if (
+    state.personActivityRanking &&
+    state.personActivityMetric !== "competitions"
+  ) {
+    params.set("metric", state.personActivityMetric);
   }
   if (
     state.subject === "people" &&

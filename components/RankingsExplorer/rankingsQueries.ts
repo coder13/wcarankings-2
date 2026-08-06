@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import type { GenderFilter } from "@/lib/wca";
 import type { MedalRankingType } from "@/lib/medal-rankings";
+import type { PersonActivityMetric } from "./rankingsUrl";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
   InitialRankingData,
@@ -26,6 +27,7 @@ export type RankingQueryFilters = {
   gender: readonly GenderFilter[];
   year: number | null;
   medalType: MedalRankingType;
+  personActivityMetric: PersonActivityMetric;
   membershipVersion?: number;
   rankingsDataVersion?: string | null;
 };
@@ -76,11 +78,13 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     filters.eventId,
     filters.rankingType,
     filters.medalType,
+    filters.personActivityMetric,
     filters.regionSelection.scope,
     filters.regionSelection.regionId,
     filters.gender.join(","),
     filters.resource === "people" ||
     filters.resource === "person-competition-count" ||
+    filters.resource === "person-activity-rankings" ||
     filters.resource === "person-medal-rankings"
       ? (filters.year ?? "all")
       : "all",
@@ -119,6 +123,7 @@ function addRankingFilterParams(
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
+      filters.resource === "person-activity-rankings" ||
       filters.resource === "person-medal-rankings") &&
     filters.year
   ) {
@@ -127,6 +132,7 @@ function addRankingFilterParams(
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
+      filters.resource === "person-activity-rankings" ||
       filters.resource === "person-medal-rankings" ||
       filters.resource === "results") &&
     filters.gender.length
@@ -182,11 +188,16 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
   if (filters.resource === "person-medal-rankings") {
     params.set("medal", filters.medalType);
   }
+  if (filters.resource === "person-activity-rankings") {
+    params.set("metric", filters.personActivityMetric);
+  }
 
   let endpoint = "/api/rankings";
   if (filters.resource === "results") endpoint = "/api/rankings/results";
   else if (filters.resource === "person-competition-count") {
     endpoint = "/api/rankings/people/competitions";
+  } else if (filters.resource === "person-activity-rankings") {
+    endpoint = "/api/rankings/people/activity";
   } else if (filters.resource === "person-medal-rankings") {
     endpoint = "/api/rankings/people/medals";
   } else if (filters.resource.startsWith("city-"))

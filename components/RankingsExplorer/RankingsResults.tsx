@@ -99,11 +99,13 @@ export function RankingsResults() {
           enablePersonDetails:
             filters.subject === "people" &&
             !filters.personCompetitionRanking &&
+            !filters.personActivityRanking &&
             !filters.personMedalRanking &&
             WCA_EVENTS.some((event) => event.id === filters.eventId),
           onFocusedPersonChange:
             filters.subject === "people" &&
             !filters.personCompetitionRanking &&
+            !filters.personActivityRanking &&
             !filters.personMedalRanking
               ? focus.updateFocusedPerson
               : undefined,

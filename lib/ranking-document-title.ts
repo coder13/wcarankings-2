@@ -15,6 +15,8 @@ export type RankingDocumentTitleInput = {
     | "solves";
   year?: number | null;
   personCompetitionRanking?: boolean;
+  personActivityRanking?: boolean;
+  personActivityMetric?: "competitions" | "countries" | "rounds" | "solves";
   personMedalRanking?: boolean;
   medalType?: MedalRankingType;
   listName?: string;
@@ -63,6 +65,8 @@ export function formatRankingDocumentTitle({
   cityRanking,
   year,
   personCompetitionRanking,
+  personActivityRanking,
+  personActivityMetric = "competitions",
   personMedalRanking,
   medalType = "overall",
   listName,
@@ -111,6 +115,16 @@ export function formatRankingDocumentTitle({
 
   if (personCompetitionRanking) {
     return titleWithSite("People by Competition Count");
+  }
+
+  if (personActivityRanking) {
+    const titles = {
+      competitions: "People by Competition Count",
+      countries: "People by Country Count",
+      rounds: "People by Round Count",
+      solves: "People by Official Solve Count",
+    };
+    return titleWithSite(titles[personActivityMetric]);
   }
 
   if (personMedalRanking) {

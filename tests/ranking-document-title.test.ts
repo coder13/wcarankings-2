@@ -54,3 +54,14 @@ test("formats titles for non-person ranking views and saved lists", () => {
     "Gold Medal Rankings | WCA Rankings",
   );
 });
+
+test("formats person activity ranking titles", () => {
+  assert.equal(
+    formatRankingDocumentTitle({
+      ...defaults,
+      personActivityRanking: true,
+      personActivityMetric: "solves",
+    }),
+    "People by Official Solve Count | WCA Rankings",
+  );
+});

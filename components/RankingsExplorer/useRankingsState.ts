@@ -19,6 +19,7 @@ import {
   type RankingsUrlNavigation,
   type RankingsUrlUpdate,
 } from "./rankingsUrl";
+import type { PersonActivityMetric } from "./rankingsUrl";
 import type { RegionOption } from "./types";
 
 export type PatchRankingsFilters = (
@@ -148,6 +149,8 @@ export function useRankingsState() {
         if (nextSubject === "people") {
           if (filters.personCompetitionRanking)
             nextPath = "/persons/competitions";
+          else if (filters.personActivityRanking)
+            nextPath = "/persons/activity";
           else if (filters.personMedalRanking) nextPath = "/persons/medals";
           else if (filters.year) nextPath = `/persons/year/${filters.year}`;
         }
@@ -176,6 +179,7 @@ export function useRankingsState() {
           {
             year: nextYear,
             personCompetitionRanking: false,
+            personActivityRanking: false,
             personMedalRanking: false,
           },
           {
@@ -190,6 +194,7 @@ export function useRankingsState() {
         patchFilters(
           {
             personCompetitionRanking: enabled,
+            personActivityRanking: false,
             personMedalRanking: false,
             year: null,
           },
@@ -200,11 +205,33 @@ export function useRankingsState() {
           { search: "", wcaId: "", focusMe: false },
         );
       },
+      changePersonActivityRanking(enabled: boolean) {
+        if (enabled === filters.personActivityRanking) return;
+        patchFilters(
+          {
+            personCompetitionRanking: false,
+            personActivityRanking: enabled,
+            personMedalRanking: false,
+            personActivityMetric: "competitions",
+            year: null,
+          },
+          {
+            history: "push",
+            pathname: enabled ? "/persons/activity" : "/",
+          },
+          { search: "", wcaId: "", focusMe: false },
+        );
+      },
+      changePersonActivityMetric(metric: PersonActivityMetric) {
+        if (metric === filters.personActivityMetric) return;
+        patchFilters({ personActivityMetric: metric });
+      },
       changePersonMedalRanking(enabled: boolean) {
         if (enabled === filters.personMedalRanking) return;
         patchFilters(
           {
             personCompetitionRanking: false,
+            personActivityRanking: false,
             personMedalRanking: enabled,
             year: null,
             eventId: enabled ? "all" : "333",
