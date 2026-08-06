@@ -65,6 +65,7 @@ export default async function FeedPage() {
             </li>
           ))}
         </ol>
+        {cards.length === 0 && <p className="feedEmpty">No recent changes.</p>}
       </main>
     </div>
   );

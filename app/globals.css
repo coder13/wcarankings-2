@@ -612,6 +612,12 @@ main {
   font-weight: 500;
 }
 
+.feedEmpty {
+  margin: 2rem 0;
+  color: var(--text-subtle);
+  text-align: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-old(*),
