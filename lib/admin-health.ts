@@ -18,6 +18,8 @@ export const capabilityTables = {
   ],
   personActivityRankings: [
     "person_activity_counts",
+    "person_activity_year_counts",
+    "person_activity_event_counts",
     "person_activity_rankings",
     "person_activity_ranking_counts",
   ],

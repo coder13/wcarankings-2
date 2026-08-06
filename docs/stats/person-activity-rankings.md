@@ -4,7 +4,8 @@ Status: **Active**
 
 ## What it ranks
 
-This statistic ranks people by four all-time activity values.
+This statistic ranks people by four activity values. The API supports all-time
+and yearly values. Rounds and solves also support event filters.
 
 - `competitions` counts distinct competition IDs.
 - `countries` counts distinct host-country IDs for competitions with a stored result.
@@ -35,6 +36,9 @@ projection drops this table after it creates `person_activity_counts`.
 
 `person_activity_counts` stores one compact all-time row for each person. It
 contains the three new values plus current gender, country, and continent fields.
+`person_activity_year_counts` stores the same values by competition year.
+`person_activity_event_counts` stores round and solve values by event and year.
+The event table uses year `0` for all-time event totals.
 `person_activity_rankings` stores the common World, all-gender ranking for
 each new metric. `person_activity_ranking_counts` stores its row totals.
 
@@ -42,6 +46,9 @@ each new metric. `person_activity_ranking_counts` stores its row totals.
 
 The API is `/api/rankings/people/activity`. Its `metric` value is one of
 `competitions`, `countries`, `rounds`, or `solves`.
+
+The `year` parameter selects a yearly row. The `eventId` parameter is valid
+for `rounds` and `solves`.
 
 The `competitions` metric delegates to the existing person-competition ranking
 service. It reuses `person_competition_counts` and its stored World ranking.
@@ -128,6 +135,9 @@ two filesorts and one temporary table. Their measured p95 values meet the
 200 ms target, so no additional count-table index is justified.
 
 ### Pending
+
+- Rebuild the projection before activating the year and event filters.
+- Measure the new year and event query plans and request times.
 
 - Measure a cold database buffer pool on the release environment.
 - Record the first production projection build and request measurements.

@@ -159,9 +159,12 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
     limit: String(PAGE_SIZE),
     paged: "1",
   });
+  const activityUsesEvent =
+    filters.resource === "person-activity-rankings" &&
+    ["rounds", "solves"].includes(filters.personActivityMetric);
   if (
-    filters.resource !== "person-medal-rankings" ||
-    filters.eventId !== "all"
+    (filters.resource !== "person-medal-rankings" || filters.eventId !== "all") &&
+    (filters.resource !== "person-activity-rankings" || activityUsesEvent)
   ) {
     params.set("eventId", filters.eventId);
   }
@@ -326,11 +329,16 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       signal: AbortSignal,
     ) => {
       const params = new URLSearchParams({
-        eventId: filters.eventId,
         result: filters.rankingType,
         search,
         searchLimit: "500",
       });
+      if (
+        filters.resource !== "person-activity-rankings" ||
+        ["rounds", "solves"].includes(filters.personActivityMetric)
+      ) {
+        params.set("eventId", filters.eventId);
+      }
       if (regexSearch) params.set("mode", "vim");
       addRankingFilterParams(params, filters);
       const response = await fetch(

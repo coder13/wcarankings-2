@@ -43,10 +43,74 @@ GROUP BY
   country_id,
   continent_id;
 
-DROP TEMPORARY TABLE person_activity_attempt_counts;
-
 ALTER TABLE person_activity_counts
 ADD PRIMARY KEY (person_id);
+
+-- phase: aggregate activity values by competition year
+CREATE TABLE person_activity_year_counts AS
+SELECT
+  facts.competition_year AS year,
+  facts.person_id,
+  CASE
+    WHEN person.gender IN ('m', 'f') THEN person.gender
+    ELSE 'o'
+  END AS person_gender,
+  COALESCE(person.country_id, '') AS country_id,
+  COALESCE(person_country.continent_id, '') AS continent_id,
+  COUNT(DISTINCT NULLIF(competition.country_id, '')) AS country_count,
+  COUNT(*) AS round_count,
+  COALESCE(SUM(attempts.official_solve_count), 0) AS official_solve_count
+FROM result_facts facts
+INNER JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1
+LEFT JOIN countries person_country ON person_country.id = person.country_id
+LEFT JOIN competitions competition ON competition.id = facts.competition_id
+LEFT JOIN person_activity_attempt_counts attempts ON attempts.result_id = facts.result_id
+GROUP BY facts.competition_year, facts.person_id, person_gender, country_id, continent_id;
+
+ALTER TABLE person_activity_year_counts
+ADD PRIMARY KEY (year, person_id),
+ADD INDEX idx_person_activity_year_gender (year, person_gender, person_id);
+
+-- phase: aggregate round and solve values by event and year
+CREATE TABLE person_activity_event_counts AS
+SELECT
+  facts.competition_year AS year,
+  facts.event_id,
+  facts.person_id,
+  CASE
+    WHEN person.gender IN ('m', 'f') THEN person.gender
+    ELSE 'o'
+  END AS person_gender,
+  COALESCE(person.country_id, '') AS country_id,
+  COALESCE(person_country.continent_id, '') AS continent_id,
+  COUNT(*) AS round_count,
+  COALESCE(SUM(attempts.official_solve_count), 0) AS official_solve_count
+FROM result_facts facts
+INNER JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1
+LEFT JOIN countries person_country ON person_country.id = person.country_id
+LEFT JOIN person_activity_attempt_counts attempts ON attempts.result_id = facts.result_id
+GROUP BY facts.competition_year, facts.event_id, facts.person_id, person_gender, country_id, continent_id
+UNION ALL
+SELECT
+  0 AS year,
+  facts.event_id,
+  facts.person_id,
+  CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END,
+  COALESCE(person.country_id, ''),
+  COALESCE(person_country.continent_id, ''),
+  COUNT(*),
+  COALESCE(SUM(attempts.official_solve_count), 0)
+FROM result_facts facts
+INNER JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1
+LEFT JOIN countries person_country ON person_country.id = person.country_id
+LEFT JOIN person_activity_attempt_counts attempts ON attempts.result_id = facts.result_id
+GROUP BY facts.event_id, facts.person_id, person.gender, person.country_id, person_country.continent_id;
+
+ALTER TABLE person_activity_event_counts
+ADD PRIMARY KEY (year, event_id, person_id),
+ADD INDEX idx_person_activity_event_filter (year, event_id, person_gender, person_id);
+
+DROP TEMPORARY TABLE person_activity_attempt_counts;
 
 -- phase: rank the common World all-gender activity lists
 CREATE TABLE person_activity_rankings AS

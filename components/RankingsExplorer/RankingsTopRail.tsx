@@ -179,7 +179,8 @@ export function RankingsTopRail() {
     ["fastest-single", "fastest-average"].includes(filters.cityRanking);
   const hidesEventPicker =
     filters.personCompetitionRanking ||
-    filters.personActivityRanking ||
+    (filters.personActivityRanking &&
+      !["rounds", "solves"].includes(filters.personActivityMetric)) ||
     (filters.subject === "competitions" &&
       ["latitude", "competitor-count"].includes(filters.competitionRanking));
   return (
