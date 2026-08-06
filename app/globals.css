@@ -603,11 +603,15 @@ main {
 
 .feedLoadingLabel {
   width: 70%;
-  height: 1rem;
+  min-height: 2.05rem;
   margin-bottom: 0.45rem;
   border-radius: 0.35rem;
   animation: feedLoadingPulse 1.4s ease-in-out infinite;
   background: var(--surface-raised);
+}
+
+.feedCards .profilePreviewLabel {
+  min-height: 2.05rem;
 }
 
 .feedLoadingCard {
