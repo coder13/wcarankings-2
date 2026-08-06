@@ -67,3 +67,11 @@ An ambiguous connection failure can duplicate a small count when the service ret
 The registry identifies a semantic ranking list. The daily table counts views of that list.
 
 Neither table stores projection generation data, pagination data, ranking results, list memberships, or cached ranking rows. A later feed slice can join popularity totals to current ranking data.
+
+## Reading popular descriptors
+
+The read service returns recent descriptors with their metadata, seven-day views, thirty-day views, and issue-217 score.
+
+It uses inclusive UTC windows. It returns descriptors with recent views in score order. Ties use seven-day views, thirty-day views, and then the descriptor key.
+
+The service accepts a bounded limit. It does not select feeds or expose an HTTP route.
