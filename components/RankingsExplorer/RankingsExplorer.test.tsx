@@ -210,7 +210,7 @@ test("renders a separate person ranking picker", () => {
   assert.match(markup, /aria-label="Person ranking"/);
   assert.match(
     markup,
-    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Competition count<\/button><button[^>]*>Countries<\/button><button[^>]*>Rounds<\/button><button[^>]*>Official solves<\/button><button[^>]*>Medals<\/button>/,
+    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Competition count<\/button><button[^>]*>Countries<\/button><button[^>]*>Rounds<\/button><button[^>]*>Solves<\/button><button[^>]*>Medals<\/button>/,
   );
 });
 
@@ -219,7 +219,7 @@ test("adds activity statistics to the person ranking selector", () => {
 
   assert.match(markup, />Countries</);
   assert.match(markup, />Rounds</);
-  assert.match(markup, />Official solves</);
+  assert.match(markup, />Solves</);
 });
 
 test("keeps the activity metric in the person ranking selector", () => {
@@ -231,7 +231,7 @@ test("keeps the activity metric in the person ranking selector", () => {
   assert.match(markup, />Competition count</);
   assert.match(markup, />Countries</);
   assert.match(markup, />Rounds</);
-  assert.match(markup, />Official solves</);
+  assert.match(markup, />Solves</);
   assert.doesNotMatch(markup, /aria-label="Person ranking statistic"/);
   assert.doesNotMatch(markup, /Find ranking/);
 });

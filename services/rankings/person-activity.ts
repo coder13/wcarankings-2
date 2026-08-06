@@ -73,13 +73,6 @@ const metricColumn: Record<PersonActivityMetric, string> = {
   solves: "official_solve_count",
 };
 
-const metricLabel: Record<PersonActivityMetric, string> = {
-  competitions: "competitions",
-  countries: "countries",
-  rounds: "rounds",
-  solves: "official solves",
-};
-
 export function parsePersonActivityMetric(
   params: URLSearchParams,
 ): PersonActivityMetric {
@@ -119,7 +112,7 @@ function toEntry(input: PersonActivityInput, row: PersonActivityRankingRow) {
     countryName: row.country_name,
     countryIso2: row.country_iso2,
     best: value,
-    formattedValue: `${countFormatter.format(value)} ${metricLabel[input.metric]}`,
+    formattedValue: countFormatter.format(value),
     competitionId: "",
     competitionName: "",
     recordBadges: [],

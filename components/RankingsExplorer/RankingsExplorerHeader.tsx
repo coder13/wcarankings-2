@@ -15,7 +15,7 @@ const PERSON_RANKING_OPTIONS = [
   { value: "competitions", label: "Competition count" },
   { value: "countries", label: "Countries" },
   { value: "rounds", label: "Rounds" },
-  { value: "solves", label: "Official solves" },
+  { value: "solves", label: "Solves" },
   { value: "medals", label: "Medals" },
 ] as const;
 
