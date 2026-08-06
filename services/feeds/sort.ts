@@ -38,9 +38,14 @@ export function feedStatPopularityScore(
   source: FeedInventoryStat,
   popularity: readonly PopularRankingDescriptor[],
 ) {
-  const descriptor = feedDescriptor(source);
-  const key = rankingListKey(descriptor);
-  return popularityScores(popularity).get(key) ?? 0;
+  try {
+    const descriptor = feedDescriptor(source);
+    const key = rankingListKey(descriptor);
+    return popularityScores(popularity).get(key) ?? 0;
+  } catch {
+    // Some events, such as Multi-Blind, do not support every result type.
+    return 0;
+  }
 }
 
 function personalScore(

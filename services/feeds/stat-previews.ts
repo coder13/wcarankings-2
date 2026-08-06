@@ -3,7 +3,11 @@ import { getRegions } from "@/services/regions/service";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
 import { generateBatchedFeedCandidates } from "./batched-candidates";
-import { FEED_PAGE_SIZE, FEED_TOP_SCAN_SIZE } from "./constants";
+import {
+  FEED_ITEM_PAGE_SIZE,
+  FEED_PAGE_SIZE,
+  FEED_TOP_SCAN_SIZE,
+} from "./constants";
 import {
   buildRecentFeedStatInventory,
   prioritizeFeedStatInventory,
@@ -29,6 +33,8 @@ const SOURCE_READ_CONCURRENCY = 2;
 export type FeedStatPreview = FeedInventoryStat & {
   entries: RankingEntry[];
   highlightedCompetitionIds: string[];
+  interestingEntityId?: string;
+  interestingResultId?: number;
 };
 
 export type FeedInterestingResult = FeedInventoryStat & {
@@ -42,6 +48,11 @@ export type FeedInterestingResult = FeedInventoryStat & {
 
 export type FeedStatPreviewPage = {
   previews: FeedStatPreview[];
+  nextCursor: number | null;
+};
+
+export type FeedInterestingItemPage = {
+  items: FeedInterestingResult[];
   nextCursor: number | null;
 };
 
@@ -254,4 +265,37 @@ export async function loadFeedStatPreviews({
       ? cursor + candidates.length
       : null;
   return { previews, nextCursor };
+}
+
+export async function loadFeedInterestingItems({
+  cursor = 0,
+  now,
+  preferences = null,
+}: {
+  cursor?: number;
+  now?: Date;
+  preferences?: FeedUserPreferences | null;
+} = {}): Promise<FeedInterestingItemPage> {
+  if (!Number.isInteger(cursor) || cursor < 0) {
+    throw new Error("The feed item cursor must be a non-negative integer.");
+  }
+  const snapshot = await readFeedSnapshot();
+  if (!snapshot) {
+    startBackgroundBuild(now);
+    return { items: [], nextCursor: null };
+  }
+  const popularity = await readPopularRankingDescriptors({
+    limit: 100,
+    viewedAt: now ?? new Date(),
+  }).catch(() => []);
+  const candidates = sortFeedCandidates(
+    addFeedStatPopularity(snapshot.candidates, popularity),
+    preferences,
+  );
+  const items = candidates.slice(cursor, cursor + FEED_ITEM_PAGE_SIZE);
+  return {
+    items,
+    nextCursor:
+      cursor + items.length < candidates.length ? cursor + items.length : null,
+  };
 }

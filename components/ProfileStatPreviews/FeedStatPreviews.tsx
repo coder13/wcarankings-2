@@ -14,9 +14,28 @@ export function FeedStatPreviews({
   initialCursor: number | null;
 }) {
   const [previews, setPreviews] = useState([...initialPreviews]);
-  const [nextCursor, setNextCursor] = useState(initialCursor);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [loadingNextPage, setLoadingNextPage] = useState(false);
   const loading = useRef(false);
+  const itemCursor = useRef<number | null>(0);
   const sentinel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (initialPreviews.length > 0 || initialCursor === null) return;
+    void fetch(`/api/feed?items=${initialCursor}`)
+      .then((response) => response.json())
+      .then((page: { nextCursor: number | null }) => {
+        itemCursor.current = page.nextCursor;
+      });
+    void fetch(`/api/feed?cursor=0`)
+      .then((response) => response.json())
+      .then(
+        (page: { previews: FeedStatPreview[]; nextCursor: number | null }) => {
+          setPreviews(page.previews);
+          setNextCursor(page.nextCursor);
+        },
+      );
+  }, [initialCursor, initialPreviews.length]);
 
   useEffect(() => {
     const element = sentinel.current;
@@ -26,6 +45,17 @@ export function FeedStatPreviews({
         if (!entry.isIntersecting || loading.current || nextCursor === null)
           return;
         loading.current = true;
+        setLoadingNextPage(true);
+        if (
+          itemCursor.current !== null &&
+          nextCursor >= itemCursor.current - 10
+        ) {
+          void fetch(`/api/feed?items=${itemCursor.current}`)
+            .then((response) => response.json())
+            .then((page: { nextCursor: number | null }) => {
+              itemCursor.current = page.nextCursor;
+            });
+        }
         fetch(`/api/feed?cursor=${nextCursor}`)
           .then((response) => response.json())
           .then(
@@ -39,6 +69,7 @@ export function FeedStatPreviews({
           )
           .finally(() => {
             loading.current = false;
+            setLoadingNextPage(false);
           });
       },
       { rootMargin: "800px" },
@@ -50,8 +81,8 @@ export function FeedStatPreviews({
   return (
     <>
       <ol className="feedCards">
-        {previews.map((preview) => (
-          <li key={preview.id}>
+        {previews.map((preview, index) => (
+          <li key={`${preview.id}:${preview.interestingEntityId ?? index}`}>
             <StatPreviewTable
               tableName={preview.title}
               surfaceClassName="profileRankingHighlightPreviewTable"
@@ -88,6 +119,11 @@ export function FeedStatPreviews({
           </li>
         ))}
       </ol>
+      {loadingNextPage && (
+        <div className="feedLoadingMore" role="status">
+          Loading more feed stats
+        </div>
+      )}
       <div ref={sentinel} aria-hidden="true" />
     </>
   );

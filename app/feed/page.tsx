@@ -1,11 +1,6 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
 import { FeedStatPreviews } from "@/components/ProfileStatPreviews/FeedStatPreviews";
-import { getAuthUser } from "@/services/auth/auth";
-import { getRegions } from "@/services/regions/service";
-import { loadFeedUserPreferences } from "@/services/feeds/preferences";
-import { loadFeedStatPreviews } from "@/services/feeds/stat-previews";
 
 export const dynamic = "force-dynamic";
 
@@ -15,24 +10,10 @@ export const metadata: Metadata = {
 };
 
 async function getFeedPageData() {
-  try {
-    const [user, countries] = await Promise.all([
-      getAuthUser(
-        new Request("http://localhost", { headers: await headers() }),
-      ),
-      getRegions("country"),
-    ]);
-    const preferences = await loadFeedUserPreferences(user, countries);
-    return {
-      page: await loadFeedStatPreviews({ preferences }),
-      unavailable: false,
-    } as const;
-  } catch {
-    return {
-      page: { previews: [], nextCursor: null },
-      unavailable: true,
-    } as const;
-  }
+  return {
+    page: { previews: [], nextCursor: 0 },
+    unavailable: false,
+  } as const;
 }
 
 export default async function FeedPage() {
@@ -46,9 +27,7 @@ export default async function FeedPage() {
           initialPreviews={page.previews}
           initialCursor={page.nextCursor}
         />
-        {(unavailable || page.previews.length === 0) && (
-          <p className="feedEmpty">No recent changes.</p>
-        )}
+        {unavailable && <p className="feedEmpty">Feed unavailable.</p>}
       </main>
     </div>
   );

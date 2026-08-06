@@ -13,4 +13,5 @@ export const FEED_SORT_CONSTANTS = {
 } as const;
 
 export const FEED_PAGE_SIZE = 5;
+export const FEED_ITEM_PAGE_SIZE = 50;
 export const FEED_TOP_SCAN_SIZE = 10;
