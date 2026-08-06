@@ -561,33 +561,6 @@ main {
   margin: 0 auto;
 }
 
-.feedIntro {
-  max-width: 42rem;
-  margin: 2rem auto 2.5rem;
-  text-align: center;
-}
-
-.feedIntro h2 {
-  margin: 0.25rem 0 0.5rem;
-  font-size: clamp(2rem, 6vw, 3.5rem);
-  font-weight: 300;
-}
-
-.feedIntro p {
-  margin: 0;
-  color: var(--text-subtle);
-  font-size: 1.1rem;
-}
-
-.feedEyebrow,
-.feedCardType {
-  color: var(--accent);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .feedCards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
@@ -597,8 +570,7 @@ main {
   list-style: none;
 }
 
-.feedCard,
-.feedEmpty {
+.feedCard {
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   background: var(--surface);
@@ -609,35 +581,34 @@ main {
   padding: 1.25rem;
 }
 
-.feedCard h3,
-.feedEmpty h3 {
-  margin: 0.4rem 0;
+.feedCardHeader h2 {
+  margin: 0;
   font-size: 1.2rem;
   font-weight: 500;
 }
 
-.feedCard p,
-.feedEmpty p {
+.feedCardHeader p {
+  margin: 0.35rem 0 0;
   color: var(--text-subtle);
 }
 
-.feedCardType,
-.feedCard p,
-.feedEmpty p {
-  margin-block: 0.5rem;
+.feedPreview {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.feedEmpty {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+.feedPreviewRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border-subtle);
 }
 
-.feedLink {
-  display: inline-block;
-  margin-top: 0.75rem;
-  color: var(--accent);
+.feedPreviewRow strong {
+  color: var(--text-strong);
   font-weight: 500;
 }
 

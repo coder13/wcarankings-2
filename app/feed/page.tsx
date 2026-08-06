@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { AppHeader } from "@/components/AppHeader/AppHeader";
 import { loadHomeFeed } from "@/services/feeds/home-feed";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Recent changes | WCA Rankings",
-  description: "Recent changes in World Cube Association rankings.",
+  title: "Feed | WCA Rankings",
+  description: "Recent WCA Rankings stat previews.",
 };
 
 async function getFeedPageData() {
@@ -18,58 +16,55 @@ async function getFeedPageData() {
   }
 }
 
+function previewLabel(row: Record<string, unknown>, index: number) {
+  return String(
+    row.name ??
+      row.personName ??
+      row.entityName ??
+      row.personId ??
+      row.entityId ??
+      row.id ??
+      `#${index + 1}`,
+  );
+}
+
+function previewValue(row: Record<string, unknown>) {
+  return String(row.value ?? row.result ?? row.score ?? row.time ?? "");
+}
+
 export default async function FeedPage() {
   const { feed, unavailable } = await getFeedPageData();
-  let content;
-
-  if (unavailable) {
-    content = (
-      <section className="feedEmpty" aria-live="polite">
-        <h3>The feed is not ready yet.</h3>
-        <p>
-          Recent ranking changes will appear here when feed data is available.
-        </p>
-        <Link className="feedLink" href="/">
-          Browse rankings
-        </Link>
-      </section>
-    );
-  } else if (feed?.cards.length) {
-    content = (
-      <ol className="feedCards">
-        {feed.cards.map((card) => (
-          <li className="feedCard" key={card.cardId}>
-            <p className="feedCardType">
-              {card.change?.type ?? "Recent change"}
-            </p>
-            <h3>{card.title}</h3>
-            <p>{card.change?.summary ?? "This ranking changed."}</p>
-            <Link className="feedLink" href={card.exploreUrl}>
-              Open ranking
-            </Link>
-          </li>
-        ))}
-      </ol>
-    );
-  } else {
-    content = (
-      <section className="feedEmpty" aria-live="polite">
-        <h3>No recent changes.</h3>
-        <p>Check again after the next competition results update.</p>
-      </section>
-    );
-  }
+  const cards = unavailable ? [] : (feed?.cards ?? []);
 
   return (
     <div className="app">
-      <AppHeader />
-      <main className="feedPage">
-        <section className="feedIntro" aria-labelledby="feed-title">
-          <p className="feedEyebrow">Home feed</p>
-          <h2 id="feed-title">Recent changes</h2>
-          <p>Browse ranking lists that changed after a recent competition.</p>
-        </section>
-        {content}
+      <main className="feedPage" aria-label="Recent ranking changes">
+        <ol className="feedCards">
+          {cards.map((card) => (
+            <li className="feedCard" key={card.cardId}>
+              <div className="feedCardHeader">
+                <h2>{card.title}</h2>
+                {card.change && <p>{card.change.summary}</p>}
+              </div>
+              {card.previewRows.length > 0 && (
+                <ol
+                  className="feedPreview"
+                  aria-label={`${card.title} preview`}
+                >
+                  {card.previewRows.slice(0, 5).map((row, index) => (
+                    <li
+                      className="feedPreviewRow"
+                      key={`${card.cardId}-${index}`}
+                    >
+                      <span>{previewLabel(row, index)}</span>
+                      <strong>{previewValue(row)}</strong>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </li>
+          ))}
+        </ol>
       </main>
     </div>
   );
