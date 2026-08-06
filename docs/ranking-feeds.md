@@ -36,4 +36,6 @@ The first experiment checks a fixed catalog of person and result rankings. A sta
 
 The page returns five qualifying stats per request. A scroll sentinel fetches the next bounded source page before it enters view. The feed has no user-specific state.
 
-The current catalog contains 20 ranking sources. It does not scan all event, year, gender, region, or list combinations. A later change can replace the recent-result signal with the completed previous-generation comparator.
+The inventory contains person and result variants for the selected events and result types. It expands each variant across world, all continents, all countries, all three gender filters, and all-time plus 2026 rankings. It does not include prior-year lazy variants.
+
+The inventory is lazy. Each request scans five inventory entries and returns at most five previews. A later change can replace the recent-result signal with the completed previous-generation comparator.
