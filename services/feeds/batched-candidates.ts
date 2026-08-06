@@ -103,11 +103,20 @@ function addRowCandidates(
   if (!isTopTen(row)) return;
   const gender = rowGender(row, reference);
   const regions = [
-    ["world", ""],
-    ["continent", row.continent_id ?? reference.continentId],
-    ["country", row.country_id ?? reference.countryId],
+    ["world", "", number(row.world_position ?? row.world_sub_rank)],
+    [
+      "continent",
+      row.continent_id ?? reference.continentId,
+      number(row.continent_position ?? row.continent_sub_rank),
+    ],
+    [
+      "country",
+      row.country_id ?? reference.countryId,
+      number(row.country_position ?? row.country_sub_rank),
+    ],
   ] as const;
-  for (const [scope, regionId] of regions) {
+  for (const [scope, regionId, rank] of regions) {
+    if (rank === null || rank < 1 || rank > 10) continue;
     if (scope !== "world" && !regionId) continue;
     for (const selectedGender of [null, gender]) {
       for (const statKind of FEED_STAT_KINDS) {
@@ -165,6 +174,9 @@ async function groupedPersonRows(
   const result = await query(
     `SELECT ranking.event_id, ranking.person_id, person.gender,
        ranking.country_id, ranking.continent_id, ranking.competition_id,
+       ranking.world_rank AS world_position,
+       ranking.continent_rank AS continent_position,
+       ranking.country_rank AS country_position,
        ranking.world_sub_rank, ranking.continent_sub_rank, ranking.country_sub_rank
      FROM ranking_entries_${resultType} ranking
      LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
@@ -187,12 +199,17 @@ async function groupedCurrentYearPersonRows(
     `SELECT ranking.event_id, ranking.person_id, ranking.result_id,
        person.gender, facts.person_country_id AS country_id,
        country.continent_id, facts.competition_id,
-       ranking.position AS world_sub_rank
+       ranking.position AS world_position
      FROM person_year_rankings_${resultType} ranking
      INNER JOIN result_facts facts ON facts.result_id = ranking.result_id
      LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
      LEFT JOIN countries country ON country.id = facts.person_country_id
      WHERE ranking.year = 2026
+       AND ranking.cohort_id = (
+         SELECT cohort_id
+         FROM person_year_ranking_cohorts
+         WHERE scope = 'world' AND region_id = ''
+       )
        AND ranking.result_id IN (${placeholders(resultIds.length)})
        AND ranking.position <= 10`,
     resultIds,
