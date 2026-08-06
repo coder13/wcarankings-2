@@ -89,6 +89,6 @@ test("includes the top three results in ranking descriptions", () => {
       "Xuanyi Geng (2.80)",
       "Yiheng Wang (3.06)",
     ]),
-    "Browse 3x3x3 cube single rankings from the World Cube Association. Top 3 results: Teodor Zajder (2.76); Xuanyi Geng (2.80); Yiheng Wang (3.06).",
+    "Browse 3x3x3 cube single rankings from the World Cube Association.\nTop 3 results:\nTeodor Zajder (2.76)\nXuanyi Geng (2.80)\nYiheng Wang (3.06).",
   );
 });
