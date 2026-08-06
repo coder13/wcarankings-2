@@ -75,8 +75,17 @@ export async function getRankingsPageMetadata({
   return {
     title,
     description,
-    openGraph: { title, description },
-    twitter: { title, description },
+    openGraph: {
+      title,
+      description,
+      images: [{ url: "/icon-512.png", width: 512, height: 512 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/icon-512.png"],
+    },
   };
 }
 
