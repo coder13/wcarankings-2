@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AppHeader } from "@/components/AppHeader/AppHeader";
 import { loadHomeFeed } from "@/services/feeds/home-feed";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export default async function FeedPage() {
 
   return (
     <div className="app">
+      <AppHeader />
       <main className="feedPage" aria-label="Recent ranking changes">
         <ol className="feedCards">
           {cards.map((card) => (
