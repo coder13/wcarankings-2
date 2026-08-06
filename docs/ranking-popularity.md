@@ -48,6 +48,10 @@ The person activity endpoints use person-activity descriptors. The competitions 
 
 The medals endpoint uses person-medals descriptors with medal type, event, year, region, and gender filters. These endpoints collect only global first pages. They exclude saved lists, dynamic WCA-ID lists, locate requests, and later pages. They use the same threshold flush and failure handling.
 
+Competition rankings use competition descriptors for fastest, podium, competitor-count, and latitude metrics. City rankings use city descriptors for fastest, competitors, competitions, and solves metrics.
+
+These endpoints collect only successful global first pages. They exclude list, dynamic WCA-ID, locate, and later-page requests. They use the same best-effort threshold flush and failure handling.
+
 ## Reading totals
 
 Daily rows store successful first-page view counts. The service reads inclusive seven-day and thirty-day UTC totals.
