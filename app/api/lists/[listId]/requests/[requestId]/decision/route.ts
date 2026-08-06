@@ -4,6 +4,9 @@ import {
   withListErrors,
 } from "@/services/lists/controller";
 
-export function POST(request: Request, context: MembershipDecisionRouteContext) {
+export function POST(
+  request: Request,
+  context: MembershipDecisionRouteContext,
+) {
   return withListErrors(() => decideMembershipRequestForUser(request, context));
 }

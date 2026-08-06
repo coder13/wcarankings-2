@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
+import { formatRankingDocumentTitle } from "@/lib/ranking-document-title";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
 import { ViewportEdgeGradients } from "../ViewportEdgeGradients/ViewportEdgeGradients";
 import { RankingsExplorerContext } from "./RankingsExplorerContext";
@@ -9,10 +10,7 @@ import { RankingsExplorerHeader } from "./RankingsExplorerHeader";
 import { RankingsNavigationFooter } from "./RankingsNavigationFooter";
 import { RankingsResults } from "./RankingsResults";
 import { RankingsTopRail } from "./RankingsTopRail";
-import {
-  RankingsAppShell,
-  VimNavigationOverlay,
-} from "./VimNavigation";
+import { RankingsAppShell, VimNavigationOverlay } from "./VimNavigation";
 import { useExplorerKeyboardShortcuts } from "./useExplorerKeyboardShortcuts";
 import {
   ListMemberManagementOverlays,
@@ -53,6 +51,31 @@ export function RankingsExplorer({
   list,
 }: RankingsExplorerProps) {
   const state = useRankingsState();
+  useEffect(() => {
+    document.title = formatRankingDocumentTitle({
+      subject: state.filters.subject,
+      eventId: state.filters.eventId,
+      rankingType: state.filters.rankingType,
+      competitionRanking: state.filters.competitionRanking,
+      cityRanking: state.filters.cityRanking,
+      year: state.filters.year,
+      personCompetitionRanking: state.filters.personCompetitionRanking,
+      personMedalRanking: state.filters.personMedalRanking,
+      medalType: state.filters.medalType,
+      listName: source?.listName,
+    });
+  }, [
+    source?.listName,
+    state.filters.cityRanking,
+    state.filters.competitionRanking,
+    state.filters.eventId,
+    state.filters.medalType,
+    state.filters.personCompetitionRanking,
+    state.filters.personMedalRanking,
+    state.filters.rankingType,
+    state.filters.subject,
+    state.filters.year,
+  ]);
   const api = useRankingsApi({
     filters: state.filters,
     initialData: initial?.data,
@@ -65,12 +88,12 @@ export function RankingsExplorer({
   const rankings = useVirtualRankings({
     datasetKey: api.datasetKey,
     api: api.range,
-    initialData: initialDataset.key === api.datasetKey
-      ? initialDataset.data
-      : undefined,
+    initialData:
+      initialDataset.key === api.datasetKey ? initialDataset.data : undefined,
     expandableRows:
       state.filters.subject === "people" &&
-      !state.filters.personCompetitionRanking,
+      !state.filters.personCompetitionRanking &&
+      !state.filters.personMedalRanking,
   });
   const listMembers = useListMemberManagement({
     listId: list?.owner?.listId,
@@ -92,17 +115,23 @@ export function RankingsExplorer({
     patchFilters: state.patchFilters,
   });
 
-  const toRank = useCallback((rank: number, animate = true) => {
-    focus.clear();
-    rankings.jumpToIndex(rank - 1, animate);
-  }, [focus, rankings]);
-  const navigation = useMemo(() => ({
-    toRank,
-    toTop: () => toRank(1),
-    toEnd: () => toRank(rankings.total),
-    up: () => toRank(rankings.currentIndex + 1 - 5_000),
-    down: () => toRank(rankings.currentIndex + 1 + 5_000),
-  }), [rankings.currentIndex, rankings.total, toRank]);
+  const toRank = useCallback(
+    (rank: number, animate = true) => {
+      focus.clear();
+      rankings.jumpToIndex(rank - 1, animate);
+    },
+    [focus, rankings],
+  );
+  const navigation = useMemo(
+    () => ({
+      toRank,
+      toTop: () => toRank(1),
+      toEnd: () => toRank(rankings.total),
+      up: () => toRank(rankings.currentIndex + 1 - 5_000),
+      down: () => toRank(rankings.currentIndex + 1 + 5_000),
+    }),
+    [rankings.currentIndex, rankings.total, toRank],
+  );
   const commands = useRankingCommands();
   const vim = useVimNavigation({
     getCurrentRank: () => rankings.currentIndex + 1,
@@ -147,8 +176,7 @@ export function RankingsExplorer({
               options?.showAllEventRankingOptions ?? false,
             showSubjectSwitch: options?.showSubjectSwitch ?? false,
             showMyRank: options?.showMyRank ?? true,
-            regionSelectionDisabled:
-              options?.regionSelectionDisabled ?? false,
+            regionSelectionDisabled: options?.regionSelectionDisabled ?? false,
           },
           release: initial?.release,
         },
@@ -167,7 +195,9 @@ export function RankingsExplorer({
       <RankingsAppShell>
         <ViewportEdgeGradients
           topVisible={hasScrolled}
-          bottomVisible={pagerEnabled && (rankings.jumpAnimating || hasScrolled)}
+          bottomVisible={
+            pagerEnabled && (rankings.jumpAnimating || hasScrolled)
+          }
         />
         <RankingsExplorerHeader />
         <RankingsTopRail />

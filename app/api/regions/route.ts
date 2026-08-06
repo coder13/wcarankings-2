@@ -5,7 +5,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const kind: RegionKind =
-    new URL(request.url).searchParams.get("kind") === "continent" ? "continent" : "country";
+    new URL(request.url).searchParams.get("kind") === "continent"
+      ? "continent"
+      : "country";
   const regions = await getRegions(kind);
   return Response.json(
     { regions },

@@ -1,4 +1,5 @@
 @import "../components/EventPicker/cubing-icons.css";
+@import "../components/InputContainer/InputContainer.css";
 @import "./theme.css";
 @import "../components/EventPicker/EventPicker.css";
 @import "../components/Dropdown/Dropdown.css";
@@ -6,7 +7,6 @@
 @import "../components/RankingsRail/RankingsRail.css";
 @import "../components/JumpControlsVisibility/JumpControlsVisibility.css";
 @import "../components/LoadingSpinner/LoadingSpinner.css";
-@import "../components/PlaceholderPage/PlaceholderPage.css";
 @import "../components/ListBrowse/ListBrowse.css";
 @import "../components/ListMine/ListMine.css";
 @import "../components/ListOwnerControls/ListOwnerControls.css";
@@ -218,7 +218,11 @@
 }
 .stickyRankingsRail {
   --rail-scroll-progress-clamped: clamp(0, var(--rail-scroll-progress, 0), 1);
-  --rail-lift-progress: clamp(0, calc(var(--rail-scroll-progress-clamped) * 2), 1);
+  --rail-lift-progress: clamp(
+    0,
+    calc(var(--rail-scroll-progress-clamped) * 2),
+    1
+  );
   --rail-shrink-progress: clamp(
     0,
     calc((var(--rail-scroll-progress-clamped) - 0.5) * 2),
@@ -600,10 +604,7 @@ main {
 @media (max-width: 759px) {
   .stickyRankingsRail > .RankingsRailTransition > .Jump--rankings {
     min-width: min(
-      max(
-        80vw,
-        calc(var(--rail-settings-width) + var(--rail-icon-slot-width))
-      ),
+      max(80vw, calc(var(--rail-settings-width) + var(--rail-icon-slot-width))),
       calc(100vw - 2rem)
     );
     max-width: calc(100vw - 2rem);
@@ -633,7 +634,8 @@ main {
 }
 
 .ViewportEdgeGradients[data-top-visible="true"] .ViewportEdgeGradient--top,
-.ViewportEdgeGradients[data-bottom-visible="true"] .ViewportEdgeGradient--bottom {
+.ViewportEdgeGradients[data-bottom-visible="true"]
+  .ViewportEdgeGradient--bottom {
   opacity: 1;
 }
 

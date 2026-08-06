@@ -10,8 +10,5 @@ test("labels the WCA export date ahead of the local import time", () => {
 });
 
 test("does not label local projection time as result freshness", () => {
-  assert.equal(
-    formatRankingsFreshness(null),
-    "WCA export date unavailable",
-  );
+  assert.equal(formatRankingsFreshness(null), "WCA export date unavailable");
 });

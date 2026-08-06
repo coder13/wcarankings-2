@@ -2,12 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   primaryNameToken,
+  PUBLIC_SYSTEM_LIST_LIMIT,
   SYSTEM_LIST_DEFINITIONS,
-} from "../scripts/lib/system-list-definitions.mjs";
-import {
-  boardMemberIds,
-  roleMemberIds,
-} from "../scripts/refresh-board-list.mjs";
+} from "../scripts/lib/system-list-definitions.ts";
+import { roleMemberIds } from "../scripts/lib/board-lists.ts";
 
 test("system list aliases are stable and unique", () => {
   assert.ok(
@@ -36,15 +34,15 @@ test("only the top 25 names in each system-list group are public", () => {
       (definition) => definition.match === "last-name",
     ),
   ]) {
-    assert.equal(group.length >= 25, true);
+    assert.equal(group.length >= PUBLIC_SYSTEM_LIST_LIMIT, true);
     assert.ok(
       group
-        .slice(0, 25)
+        .slice(0, PUBLIC_SYSTEM_LIST_LIMIT)
         .every((definition) => definition.visibility === "public"),
     );
     assert.ok(
       group
-        .slice(25)
+        .slice(PUBLIC_SYSTEM_LIST_LIMIT)
         .every((definition) => definition.visibility === "private"),
     );
   }
@@ -59,7 +57,7 @@ test("private system lists remain direct-link lists", () => {
 
 test("board refresh normalizes unique WCA IDs from public role records", () => {
   assert.deepEqual(
-    boardMemberIds([
+    roleMemberIds([
       { user: { wca_id: "2012PARK03" } },
       { user: { wca_id: "2012park03" } },
       { user: { wca_id: "not-a-wca-id" } },

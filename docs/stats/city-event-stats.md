@@ -25,7 +25,7 @@ Normalized gender comes from `result_facts`. It materializes:
 6. the published table.
 
 The SQL is in
-[city_event_stats.sql](../../sql/ranking-projections/city_event_stats.sql).
+[city_event_stats.sql](../../data-tools/projection-catalog/cities/event-stats/city_event_stats.sql).
 
 ## Indexes
 

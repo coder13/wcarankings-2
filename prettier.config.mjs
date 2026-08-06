@@ -1,6 +1,6 @@
 /** @type {import("prettier").Config} */
 const config = {
-  plugins: ["prettier-plugin-sql"],
+  plugins: ["prettier-plugin-sh", "prettier-plugin-sql"],
   overrides: [
     {
       files: ["**/*.sql"],

@@ -91,13 +91,17 @@ test("reports cache pressure and generation reset metrics", async () => {
 
 test("keeps explicitly primed ranking windows until the generation changes", async () => {
   const cache = new RankingsWindowCache<{ value: number }>();
-  await cache.getWithStatus("SOR:world:1", async () => ({ value: 1 }), { pin: true });
+  await cache.getWithStatus("SOR:world:1", async () => ({ value: 1 }), {
+    pin: true,
+  });
   for (let index = 0; index < 150; index += 1) {
     await cache.getWithStatus(`lazy:${index}`, async () => ({ value: index }));
   }
 
   assert.equal(cache.has("SOR:world:1"), true);
-  const hit = await cache.getWithStatus("SOR:world:1", async () => ({ value: 2 }));
+  const hit = await cache.getWithStatus("SOR:world:1", async () => ({
+    value: 2,
+  }));
   assert.equal(hit.outcome, "hit");
   assert.equal(hit.value.value, 1);
 
@@ -117,14 +121,19 @@ test("coalesces lazy ranking windows and permits retry after failure", async () 
     Array.from({ length: 20 }, () => cache.getWithStatus("gender:333:f", load)),
   );
   assert.equal(loads, 1);
-  assert.equal(results.filter(({ outcome }) => outcome === "coalesced").length, 19);
+  assert.equal(
+    results.filter(({ outcome }) => outcome === "coalesced").length,
+    19,
+  );
 
   await assert.rejects(
     cache.getWithStatus("year:333:2025", async () => {
       throw new Error("nope");
     }),
   );
-  const retry = await cache.getWithStatus("year:333:2025", async () => ({ value: 8 }));
+  const retry = await cache.getWithStatus("year:333:2025", async () => ({
+    value: 8,
+  }));
   assert.equal(retry.outcome, "miss");
   assert.equal(retry.value.value, 8);
 });

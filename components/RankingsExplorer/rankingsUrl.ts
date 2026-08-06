@@ -7,6 +7,10 @@ import {
   parseRegionQuery,
   type GenderFilter,
 } from "@/lib/wca";
+import {
+  isMedalRankingType,
+  type MedalRankingType,
+} from "@/lib/medal-rankings";
 import type { ExplorerSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import {
   COMPETITION_RANKING_OPTIONS,
@@ -31,6 +35,8 @@ export type RankingsUrlState = {
   competitionRanking: CompetitionRanking;
   cityRanking: CityRanking;
   personCompetitionRanking: boolean;
+  personMedalRanking: boolean;
+  medalType: MedalRankingType;
   year: number | null;
   eventId: string;
   rankingType: "single" | "average";
@@ -50,6 +56,8 @@ export type RankingsFilterState = Pick<
   | "competitionRanking"
   | "cityRanking"
   | "personCompetitionRanking"
+  | "personMedalRanking"
+  | "medalType"
   | "year"
   | "eventId"
   | "rankingType"
@@ -75,6 +83,8 @@ export function rankingsFilterStateFromUrl(
     competitionRanking,
     cityRanking,
     personCompetitionRanking,
+    personMedalRanking,
+    medalType,
     year,
     eventId,
     rankingType,
@@ -89,6 +99,8 @@ export function rankingsFilterStateFromUrl(
     competitionRanking,
     cityRanking,
     personCompetitionRanking,
+    personMedalRanking,
+    medalType,
     year,
     eventId,
     rankingType,
@@ -125,7 +137,18 @@ function personCompetitionRankingFromPathname(pathname: string) {
   return pathname === "/persons/competitions";
 }
 
-function validEventForSubject(subject: ExplorerSubject, eventId: string) {
+function personMedalRankingFromPathname(pathname: string) {
+  return pathname === "/persons/medals";
+}
+
+function validEventForSubject(
+  subject: ExplorerSubject,
+  eventId: string,
+  personMedalRanking: boolean,
+) {
+  if (subject === "people" && personMedalRanking) {
+    return eventId === "all" || isEventId(eventId) ? eventId : "all";
+  }
   if (subject === "people") return isRankingEventId(eventId) ? eventId : "333";
   return isEventId(eventId) ? eventId : "333";
 }
@@ -145,9 +168,7 @@ function rankingTypeForSubject(
   if (subject !== "competitions" || competitionRanking !== "podiums") {
     return requested;
   }
-  return ["333bf", "444bf", "555bf"].includes(eventId)
-    ? "single"
-    : "average";
+  return ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average";
 }
 
 function yearFromUrl(pathname: string, params: URLSearchParams) {
@@ -168,8 +189,14 @@ function normalizeState(
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
   const cityRanking = cityRankingFromPathname(pathname);
-  const personCompetitionRanking = personCompetitionRankingFromPathname(pathname);
-  const eventId = validEventForSubject(subject, state.eventId);
+  const personCompetitionRanking =
+    personCompetitionRankingFromPathname(pathname);
+  const personMedalRanking = personMedalRankingFromPathname(pathname);
+  const eventId = validEventForSubject(
+    subject,
+    state.eventId,
+    personMedalRanking,
+  );
   const podiumEventId =
     subject === "competitions" &&
     competitionRanking === "podiums" &&
@@ -185,7 +212,11 @@ function normalizeState(
     competitionRanking,
     cityRanking,
     personCompetitionRanking,
-    year: subject === "people" && !personCompetitionRanking ? state.year : null,
+    personMedalRanking,
+    medalType: isMedalRankingType(state.medalType)
+      ? state.medalType
+      : "overall",
+    year: subject === "people" ? state.year : null,
     eventId: podiumEventId,
     rankingType: rankingTypeForSubject(
       subject,
@@ -203,7 +234,8 @@ function normalizeState(
         ? state.latitudeHemisphere
         : "north",
     search,
-    regexSearch: state.regexSearch && Boolean(search) && isValidRegexPattern(search),
+    regexSearch:
+      state.regexSearch && Boolean(search) && isValidRegexPattern(search),
     wcaId: WCA_ID_PATTERN.test(wcaId) ? wcaId : "",
     focusMe: !WCA_ID_PATTERN.test(wcaId) && state.focusMe,
     kinchOrder:
@@ -222,17 +254,29 @@ export function parseRankingsUrl(
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
   const cityRanking = cityRankingFromPathname(pathname);
-  const personCompetitionRanking = personCompetitionRankingFromPathname(pathname);
+  const personCompetitionRanking =
+    personCompetitionRankingFromPathname(pathname);
+  const personMedalRanking = personMedalRankingFromPathname(pathname);
   const rawRankingType = params.get("result");
-  const search = (params.get("search") ?? "").trim().slice(0, MAX_SEARCH_LENGTH);
+  const search = (params.get("search") ?? "")
+    .trim()
+    .slice(0, MAX_SEARCH_LENGTH);
 
   return normalizeState(pathname, {
     subject,
     competitionRanking,
     cityRanking,
     personCompetitionRanking,
+    personMedalRanking,
+    medalType: isMedalRankingType(params.get("medal") ?? "")
+      ? (params.get("medal") as MedalRankingType)
+      : "overall",
     year: yearFromUrl(pathname, params),
-    eventId: validEventForSubject(subject, params.get("eventId") ?? "333"),
+    eventId: validEventForSubject(
+      subject,
+      params.get("eventId") ?? (personMedalRanking ? "all" : "333"),
+      personMedalRanking,
+    ),
     rankingType: isRankingType(rawRankingType) ? rawRankingType : "single",
     regionSelection: parseRegionQuery(params.get("region")),
     gender: normalizeGenderFilters(
@@ -241,7 +285,8 @@ export function parseRankingsUrl(
           value === "m" || value === "f" || value === "o",
       ),
     ),
-    latitudeHemisphere: params.get("hemisphere") === "south" ? "south" : "north",
+    latitudeHemisphere:
+      params.get("hemisphere") === "south" ? "south" : "north",
     search,
     regexSearch: params.get("mode") === "vim",
     wcaId: params.get("wcaId") ?? "",
@@ -261,12 +306,17 @@ export function serializeRankingsUrl(
     (state.subject === "competitions" &&
       (state.competitionRanking === "latitude" ||
         state.competitionRanking === "competitor-count"));
-  if (!hidesEvent && state.eventId !== "333") params.set("eventId", state.eventId);
+  if (
+    !hidesEvent &&
+    state.eventId !== (state.personMedalRanking ? "all" : "333")
+  )
+    params.set("eventId", state.eventId);
   if (
     !hidesEvent &&
     state.eventId !== "sor-kinch" &&
-    !(state.subject === "competitions" &&
-      state.competitionRanking === "podiums") &&
+    !(
+      state.subject === "competitions" && state.competitionRanking === "podiums"
+    ) &&
     state.rankingType !== "single"
   ) {
     params.set("result", state.rankingType);
@@ -275,6 +325,9 @@ export function serializeRankingsUrl(
     params.set("region", state.regionSelection.regionId);
   }
   if (state.gender.length) params.set("gender", state.gender.join(","));
+  if (state.personMedalRanking && state.medalType !== "overall") {
+    params.set("medal", state.medalType);
+  }
   if (
     state.subject === "people" &&
     state.year &&

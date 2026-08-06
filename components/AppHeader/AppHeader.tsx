@@ -10,18 +10,22 @@ import { ProfileMenu } from "@/components/ProfileMenu/ProfileMenu";
 import { ThemeToggle } from "@/components/ThemeToggle/ThemeToggle";
 
 export function AppHeader({
+  actions,
   children,
   className = "",
   subject,
   onSubjectChange,
 }: {
+  actions?: ReactNode;
   children?: ReactNode;
   className?: string;
   subject?: NavigationSubject;
   onSubjectChange?: (subject: NavigationSubject) => void;
 }) {
   return (
-    <header className={`header header--subjectMenu${className ? ` ${className}` : ""}`}>
+    <header
+      className={`header header--subjectMenu${className ? ` ${className}` : ""}`}
+    >
       <div className="headerTopRow">
         <div className="headerTitle">
           <h1 className="title">
@@ -38,6 +42,7 @@ export function AppHeader({
         </div>
         <div className="headerDropdowns">{children}</div>
         <div className="headerActions">
+          {actions}
           <ThemeToggle />
           <ProfileMenu />
         </div>

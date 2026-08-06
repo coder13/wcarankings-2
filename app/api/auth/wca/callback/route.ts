@@ -17,8 +17,12 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const state = requestUrl.searchParams.get("state");
   const storedState = readCookie(request, "wca_oauth_state");
-  const returnTo = getSameOriginDestination(request, readCookie(request, "wca_oauth_return_to"));
-  const { clientId, clientSecret, redirectUri, wcaOrigin } = getWcaAuthConfig(request);
+  const returnTo = getSameOriginDestination(
+    request,
+    readCookie(request, "wca_oauth_return_to"),
+  );
+  const { clientId, clientSecret, redirectUri, wcaOrigin } =
+    getWcaAuthConfig(request);
 
   if (!code || !state || state !== storedState || !clientId || !clientSecret) {
     console.warn("WCA OAuth callback rejected before token exchange", {
@@ -44,7 +48,9 @@ export async function GET(request: Request) {
       body,
     });
     if (!tokenResponse.ok) {
-      throw new Error(`WCA token exchange failed with status ${tokenResponse.status}`);
+      throw new Error(
+        `WCA token exchange failed with status ${tokenResponse.status}`,
+      );
     }
     const token = (await tokenResponse.json()) as WcaOAuthTokenResponse;
     if (!token.access_token) throw new Error("Token was missing");
@@ -53,7 +59,9 @@ export async function GET(request: Request) {
       headers: { Authorization: `Bearer ${token.access_token}` },
     });
     if (!meResponse.ok) {
-      throw new Error(`WCA profile request failed with status ${meResponse.status}`);
+      throw new Error(
+        `WCA profile request failed with status ${meResponse.status}`,
+      );
     }
     const profile = toWcaProfile(await meResponse.json());
     if (!profile) throw new Error("Profile was missing a WCA ID");
@@ -64,8 +72,14 @@ export async function GET(request: Request) {
       "Cache-Control": "no-store",
     });
     headers.append("Set-Cookie", authSessionCookie(session.token, request));
-    headers.append("Set-Cookie", makeCookie("wca_oauth_state", "", request, { maxAge: 0 }));
-    headers.append("Set-Cookie", makeCookie("wca_oauth_return_to", "", request, { maxAge: 0 }));
+    headers.append(
+      "Set-Cookie",
+      makeCookie("wca_oauth_state", "", request, { maxAge: 0 }),
+    );
+    headers.append(
+      "Set-Cookie",
+      makeCookie("wca_oauth_return_to", "", request, { maxAge: 0 }),
+    );
     return new Response(null, { status: 302, headers });
   } catch (error) {
     console.error("WCA OAuth callback failed", error);

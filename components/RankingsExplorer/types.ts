@@ -17,12 +17,11 @@ export type RankingEntry = {
   competitionId: string;
   competitionName: string;
   recordBadges: RecordBadgeCode[];
-  rankDelta?: number | null;
-  rankDeltaState?: "changed" | "new" | null;
-  recordStreakWeeks?: number | null;
 };
 
-export function rankingEntryKey(entry: Pick<RankingEntry, "entryKey" | "personId">) {
+export function rankingEntryKey(
+  entry: Pick<RankingEntry, "entryKey" | "personId">,
+) {
   return entry.entryKey ?? entry.personId;
 }
 
@@ -133,7 +132,7 @@ export function rankingScope(
   return { scope, label, ariaLabel: `${regionLabel} ${label}` };
 }
 
-export function formatExportDate(value: string) {
+function formatExportDate(value: string) {
   const exportDate = new Date(`${value.slice(0, 10)}T00:00:00Z`);
   if (!Number.isFinite(exportDate.getTime())) return "date unavailable";
   return new Intl.DateTimeFormat(undefined, {

@@ -13,7 +13,7 @@ Every push to `main` starts two GitHub Actions workflows:
   deploys the application and configuration. It uses the
   `production-server-release` queue.
 - **Projection Production Release** first checks whether a projection's
-  *semantic* inputs changed. It uses the independent
+  _semantic_ inputs changed. It uses the independent
   `production-projection-release` queue.
 
 They have separate queues so a long projection build does not make an ordinary
@@ -77,11 +77,12 @@ restored instead of regenerated.
 
 ## Build, staging, and activation safety
 
-Projection SQL runs only in runner-local MariaDB. The scheduler has a default
-`WCA_PROJECTION_BUILD_CONCURRENCY=2`, gives workers separate connections, and
-starts a dependent only after its prerequisites built or hydrated successfully.
-It favors long ready work while pairing it with short independent work. Cached
-and hydrated tables are not counted as pending work.
+Projection SQL runs only in runner-local MariaDB. The planner checks task names,
+dependencies, and cycles. It then returns tasks in dependency order. The builder
+has a default `WCA_PROJECTION_BUILD_CONCURRENCY=2` and gives each worker a
+separate connection. It starts a dependent task only after its prerequisites
+finish. It favors long ready work and pairs it with short independent work.
+Cached and hydrated tables are not pending work.
 
 Production imports are deliberately sequential. Each artifact is prepared in a
 unique candidate schema; active tables continue serving throughout upload,
@@ -111,12 +112,6 @@ restore the exact prior image/configuration if a release fails or is cancelled.
 It never removes explicitly protected current/previous service tags or
 artifact-scoped data-tools/Flyway tags during cleanup.
 
-The first release after the Flyway history split repairs both copied history
-tables before migration. It writes
-`/srv/wcarankings/flyway-history-repair-v1.complete` only after both migration
-lanes finish. Later releases skip repair and fail if Flyway detects new history
-drift.
-
 The release verifies local readiness and core rankings, retries the SSR root
 request and its extracted CSS asset with bounded diagnostics, then verifies the
 public proxy. The root/CSS retries protect against startup routing races without
@@ -124,12 +119,12 @@ silently accepting an unavailable page.
 
 ## Observed production evidence
 
-| Date / run | Evidence | Result |
-| --- | --- | --- |
-| 2026-08-01, server run `30708219708` | Sum-of-Ranks server fix with app migration V13 | Switched successfully. Public root, readiness, core rankings, results, yearly, Sum of Ranks, and competition endpoints all returned 200; the new `(wca_id, sub_id)` person lookup index was present. |
-| 2026-08-01, projection run `30705975286`, retry attempt 2 | Reused existing artifact `8820359138` after a prior Sum-of-Ranks timeout | All 25 group artifacts restored; no projection SQL or raw WCA import was repeated. The already-prepared candidate completed safely and all six capabilities became active. |
-| 2026-08-01, PR #149 / server run `30709139959` | CSS-only ranking-rail shadow polish | Merged at `16:53:42Z`; the new public CSS asset returned 200 at `16:57:00.643Z`, an observed merge-to-public latency of **3m 19s**. The server workflow completed at `16:57:05Z` (3m 23s after merge). |
-| 2026-08-01, projection run `30709139971` | Projection control path for the same CSS-only merge | Completed in 27 seconds. It calculated semantic fingerprints, emitted the cosmetic-gate message, and skipped WCA resolution, artifacts, build, and deployment. |
+| Date / run                                                | Evidence                                                                 | Result                                                                                                                                                                                                 |
+| --------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-08-01, server run `30708219708`                      | Sum-of-Ranks server fix with app migration V13                           | Switched successfully. Public root, readiness, core rankings, results, yearly, Sum of Ranks, and competition endpoints all returned 200; the new `(wca_id, sub_id)` person lookup index was present.   |
+| 2026-08-01, projection run `30705975286`, retry attempt 2 | Reused existing artifact `8820359138` after a prior Sum-of-Ranks timeout | All 25 group artifacts restored; no projection SQL or raw WCA import was repeated. The already-prepared candidate completed safely and all six capabilities became active.                             |
+| 2026-08-01, PR #149 / server run `30709139959`            | CSS-only ranking-rail shadow polish                                      | Merged at `16:53:42Z`; the new public CSS asset returned 200 at `16:57:00.643Z`, an observed merge-to-public latency of **3m 19s**. The server workflow completed at `16:57:05Z` (3m 23s after merge). |
+| 2026-08-01, projection run `30709139971`                  | Projection control path for the same CSS-only merge                      | Completed in 27 seconds. It calculated semantic fingerprints, emitted the cosmetic-gate message, and skipped WCA resolution, artifacts, build, and deployment.                                         |
 
 The cosmetic benchmark recorded four timestamps:
 
@@ -161,3 +156,17 @@ index and exceeded 20 seconds without it. Removing rows did not reclaim InnoDB
 disk space without a table rebuild. Therefore this is not an active
 optimization: retain history and the index unless a future measured
 rebuild-and-swap change makes the tradeoff worthwhile.
+
+## Validate public pages after a release
+
+Run the page validator after a server release:
+
+```bash
+bun scripts/validate-pages.ts --base-url=https://wcarankings.com
+```
+
+The validator checks the public persons, results, competitions, cities, and
+person-profile routes. It requires a 2xx response and checks the expected SSR
+title or profile content. A 404 for a disabled projection capability is still
+reported as a failure. Use `--person-id=YYYYXXXXNN` to test a different person
+profile. Use `--timeout-ms=30000` when the release needs a longer startup window.

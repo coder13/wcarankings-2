@@ -13,17 +13,35 @@ export async function GET(
     return Response.json({ error: "Person was not found." }, { status: 404 });
   }
   if (!request.headers.get("accept")?.includes("text/event-stream")) {
-    const thumbs = await fetchPersonThumbnailsFromWca(normalized, [normalized], 1, 1).catch(() => new Map<string, string | null>());
-    return Response.json({ personId: normalized, avatarUrl: thumbs.get(normalized) ?? null });
+    const thumbs = await fetchPersonThumbnailsFromWca(
+      normalized,
+      [normalized],
+      1,
+      1,
+    ).catch(() => new Map<string, string | null>());
+    return Response.json({
+      personId: normalized,
+      avatarUrl: thumbs.get(normalized) ?? null,
+    });
   }
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: string, data: unknown) => {
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        controller.enqueue(
+          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+        );
       };
-      const thumbs = await fetchPersonThumbnailsFromWca(normalized, [normalized], 1, 1).catch(() => new Map<string, string | null>());
-      send("thumb", { personId: normalized, avatarUrl: thumbs.get(normalized) ?? null });
+      const thumbs = await fetchPersonThumbnailsFromWca(
+        normalized,
+        [normalized],
+        1,
+        1,
+      ).catch(() => new Map<string, string | null>());
+      send("thumb", {
+        personId: normalized,
+        avatarUrl: thumbs.get(normalized) ?? null,
+      });
       controller.close();
     },
   });

@@ -9,6 +9,7 @@ const description: Record<ExplorerSubject, string> = {
   people: "All-person rankings such as Sum of Ranks and SoR Kinch.",
   results: "Official individual results for the selected event and result type.",
   competitions: "Competition bests for the selected event and result type.",
+  cities: "City rankings for the selected event and result type.",
 };
 
 function InteractiveSwitch({

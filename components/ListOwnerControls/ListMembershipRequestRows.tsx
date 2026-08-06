@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Checkbox } from "@/components/Checkbox";
 
-export type MembershipRequest = {
+type MembershipRequest = {
   id: number;
   personId: string;
   name: string;

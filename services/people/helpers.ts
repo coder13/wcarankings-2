@@ -1,12 +1,20 @@
 import { ApiInputError } from "@/lib/api/projection";
 import { isValidRegexPattern } from "@/lib/wca";
-import type { PersonSearchInput, PersonSearchRow } from "@/services/people/types";
+import type {
+  PersonSearchInput,
+  PersonSearchRow,
+} from "@/services/people/types";
 
 export function escapeLikePrefix(value: string) {
-  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll("%", "\\%")
+    .replaceAll("_", "\\_");
 }
 
-export function parsePersonSearchInput(params: URLSearchParams): PersonSearchInput {
+export function parsePersonSearchInput(
+  params: URLSearchParams,
+): PersonSearchInput {
   const search = (params.get("q") ?? "").trim().slice(0, 80);
   if (!search) throw new ApiInputError("q is required.");
   const mode = params.get("mode") ?? "prefix";
@@ -36,10 +44,18 @@ export function buildPersonSearchPayload(
         name: row.name,
         avatarUrl: row.avatar_url,
         competitionCount: Number(row.competition_count),
-        country: { id: row.country_id, name: row.country_name, iso2: row.country_iso2 },
+        country: {
+          id: row.country_id,
+          name: row.country_name,
+          iso2: row.country_iso2,
+        },
       })),
       context: { resource: "person-search", query: input.search, mode },
-      page: { limit: input.limit, hasMore: rows.length === input.limit, next: null },
+      page: {
+        limit: input.limit,
+        hasMore: rows.length === input.limit,
+        next: null,
+      },
       total: Number(rows[0]?.total_count ?? 0),
     },
   };

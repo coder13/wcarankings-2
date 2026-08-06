@@ -3,10 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import type { PersonEventDetails } from "@/lib/person-event-details";
-import {
-  rankingEntryKey,
-  type RankingEntry,
-} from "../RankingsExplorer/types";
+import { rankingEntryKey, type RankingEntry } from "../RankingsExplorer/types";
 
 const DETAIL_PREFETCH_DELAY_MS = 120;
 const PERSON_DETAILS_STALE_TIME_MS = 5 * 60_000;
@@ -25,7 +22,9 @@ async function fetchPersonEventDetails(
     { headers: { Accept: "application/json" }, signal },
   );
   if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { error?: string };
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
     throw new Error(body.error ?? "Could not load this competitor.");
   }
   return response.json() as Promise<PersonEventDetails>;
@@ -45,36 +44,33 @@ export function usePersonRowDetails({
   const prefetchTimersRef = useRef(new Map<string, number>());
   const detailsQuery = useQuery({
     queryKey: personDetailsQueryKey(activeEntry?.personId ?? "", eventId),
-    queryFn: ({ signal }) => fetchPersonEventDetails(
-      activeEntry!.personId,
-      eventId,
-      signal,
-    ),
+    queryFn: ({ signal }) =>
+      fetchPersonEventDetails(activeEntry!.personId, eventId, signal),
     enabled: enabled && Boolean(activeEntry),
     staleTime: PERSON_DETAILS_STALE_TIME_MS,
   });
 
-  const prefetch = useCallback((entry: RankingEntry) => {
-    if (!enabled) return;
-    const key = rankingEntryKey(entry);
-    const queryKey = personDetailsQueryKey(entry.personId, eventId);
-    if (queryClient.getQueryData(queryKey)) return;
-    const existingTimer = prefetchTimersRef.current.get(key);
-    if (existingTimer !== undefined) window.clearTimeout(existingTimer);
-    const timer = window.setTimeout(() => {
-      prefetchTimersRef.current.delete(key);
-      void queryClient.prefetchQuery({
-        queryKey,
-        queryFn: ({ signal }) => fetchPersonEventDetails(
-          entry.personId,
-          eventId,
-          signal,
-        ),
-        staleTime: PERSON_DETAILS_STALE_TIME_MS,
-      });
-    }, DETAIL_PREFETCH_DELAY_MS);
-    prefetchTimersRef.current.set(key, timer);
-  }, [enabled, eventId, queryClient]);
+  const prefetch = useCallback(
+    (entry: RankingEntry) => {
+      if (!enabled) return;
+      const key = rankingEntryKey(entry);
+      const queryKey = personDetailsQueryKey(entry.personId, eventId);
+      if (queryClient.getQueryData(queryKey)) return;
+      const existingTimer = prefetchTimersRef.current.get(key);
+      if (existingTimer !== undefined) window.clearTimeout(existingTimer);
+      const timer = window.setTimeout(() => {
+        prefetchTimersRef.current.delete(key);
+        void queryClient.prefetchQuery({
+          queryKey,
+          queryFn: ({ signal }) =>
+            fetchPersonEventDetails(entry.personId, eventId, signal),
+          staleTime: PERSON_DETAILS_STALE_TIME_MS,
+        });
+      }, DETAIL_PREFETCH_DELAY_MS);
+      prefetchTimersRef.current.set(key, timer);
+    },
+    [enabled, eventId, queryClient],
+  );
 
   const cancelPrefetch = useCallback((entry: RankingEntry) => {
     const key = rankingEntryKey(entry);
@@ -84,12 +80,15 @@ export function usePersonRowDetails({
     prefetchTimersRef.current.delete(key);
   }, []);
 
-  useEffect(() => () => {
-    for (const timer of prefetchTimersRef.current.values()) {
-      window.clearTimeout(timer);
-    }
-    prefetchTimersRef.current.clear();
-  }, []);
+  useEffect(
+    () => () => {
+      for (const timer of prefetchTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+      prefetchTimersRef.current.clear();
+    },
+    [],
+  );
 
   useEffect(() => {
     const details = detailsQuery.data;
@@ -110,12 +109,13 @@ export function usePersonRowDetails({
       image.onload = () => {
         queryClient.setQueryData<PersonEventDetails>(
           personDetailsQueryKey(details.person.id, eventId),
-          (current) => current
-            ? {
-                ...current,
-                person: { ...current.person, avatarUrl: body.avatarUrl! },
-              }
-            : current,
+          (current) =>
+            current
+              ? {
+                  ...current,
+                  person: { ...current.person, avatarUrl: body.avatarUrl! },
+                }
+              : current,
         );
       };
       image.src = body.avatarUrl;

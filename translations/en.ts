@@ -4,7 +4,8 @@ export const en = {
       addToList: "+ Add",
       average: "Average",
       latitudeFirst: "Latitude: {{hemisphere}} first",
-      latitudeSwitch: "Latitude: {{hemisphere}} first. Switch to {{nextHemisphere}} first",
+      latitudeSwitch:
+        "Latitude: {{hemisphere}} first. Switch to {{nextHemisphere}} first",
       north: "North",
       personRankingPeriod: "Person ranking period",
       single: "Single",

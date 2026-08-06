@@ -6,12 +6,24 @@ import {
   fetchPersonThumbnailsFromWca,
   getCachedPersonThumbnail,
 } from "@/services/thumbnails/wca-person-thumbnails";
-import { buildPersonSearchPayload, parsePersonSearchInput } from "@/services/people/helpers";
+import {
+  buildPersonSearchPayload,
+  parsePersonSearchInput,
+} from "@/services/people/helpers";
 import { isValidRegexPattern } from "@/lib/wca";
 
-export async function searchPersonIds(search: string, regexSearch: boolean, limit: number) {
-  if (regexSearch && !isValidRegexPattern(search)) throw new Error("Invalid regular expression.");
-  const result = await fetchPersonIdsFromDatabase({ search, regexSearch, limit });
+export async function searchPersonIds(
+  search: string,
+  regexSearch: boolean,
+  limit: number,
+) {
+  if (regexSearch && !isValidRegexPattern(search))
+    throw new Error("Invalid regular expression.");
+  const result = await fetchPersonIdsFromDatabase({
+    search,
+    regexSearch,
+    limit,
+  });
   return {
     personIds: result.rows.map((row) => row.wca_id),
     timings: result.timings,
@@ -38,7 +50,11 @@ export async function loadPersonSearchParts(params: URLSearchParams) {
     thumbs: thumbs.then((values) => Object.fromEntries(values)),
     payload: {
       ...buildPersonSearchPayload(rows, input, mode),
-      diagnostics: { timings: result.timings, queryCount: 2, returnedRows: rows.length },
+      diagnostics: {
+        timings: result.timings,
+        queryCount: 2,
+        returnedRows: rows.length,
+      },
     },
   };
 }

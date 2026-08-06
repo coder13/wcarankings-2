@@ -5,7 +5,10 @@ import {
   readJsonObject,
 } from "@/lib/api";
 import { requireAuthUser } from "@/services/auth/auth";
-import { ListValidationError, setListInclusionPreference } from "@/services/lists/lists";
+import {
+  ListValidationError,
+  setListInclusionPreference,
+} from "@/services/lists/lists";
 
 function buildPrivatePreferenceResponse(allowListInclusion: boolean) {
   return buildApiJsonResponse(
@@ -30,7 +33,9 @@ export async function updateListInclusionPreference(request: Request) {
   return buildPrivatePreferenceResponse(body.allowListInclusion);
 }
 
-export async function withAccountErrors(operation: () => Promise<Response>): Promise<Response> {
+export async function withAccountErrors(
+  operation: () => Promise<Response>,
+): Promise<Response> {
   try {
     return await operation();
   } catch (error) {

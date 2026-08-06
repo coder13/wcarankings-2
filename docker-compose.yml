@@ -12,7 +12,11 @@ services:
     ports:
       - "127.0.0.1:13307:3306"
     healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u$$MARIADB_USER -p$$MARIADB_PASSWORD --silent"]
+      test:
+        [
+          "CMD-SHELL",
+          "mariadb-admin ping -h 127.0.0.1 -u$$MARIADB_USER -p$$MARIADB_PASSWORD --silent",
+        ]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -73,7 +77,7 @@ services:
   list-ranking-worker:
     image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
     restart: unless-stopped
-    command: ["/app/scripts/list-ranking-worker.mjs"]
+    command: ["/app/scripts/list-ranking-worker.ts"]
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}

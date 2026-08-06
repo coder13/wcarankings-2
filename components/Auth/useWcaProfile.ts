@@ -2,19 +2,19 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-export type WcaProfile = {
+type WcaProfile = {
   wcaId: string;
   name: string;
   countryIso2: string;
   avatarUrl: string | null;
 };
 
-export type WcaProfileResponse = {
+type WcaProfileResponse = {
   profile: WcaProfile | null;
   configured: boolean;
 };
 
-export async function fetchWcaProfile(signal?: AbortSignal) {
+async function fetchWcaProfile(signal?: AbortSignal) {
   const response = await fetch("/api/auth/wca/me", {
     cache: "no-store",
     headers: { Accept: "application/json" },

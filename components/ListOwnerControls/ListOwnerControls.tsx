@@ -13,7 +13,6 @@ export { ListAddPeopleRail } from "./ListAddPeopleRail";
 export { ListMembershipControls } from "./ListMembershipControls";
 export {
   ListMembershipRequestRows,
-  type MembershipRequest,
 } from "./ListMembershipRequestRows";
 
 export function ListCreateTrigger() {

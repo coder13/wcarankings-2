@@ -21,8 +21,8 @@ competitor counts and fastest result values, and `competition_podium_members`
 for official podium components. The current competition group does not require
 `result_facts`.
 
-The SQL files are listed in
-[projection-groups.mjs](../../scripts/projection-groups.mjs).
+The projection catalog is in
+[groups.ts](../../data-tools/projection-catalog/groups.ts).
 
 ## Indexes
 

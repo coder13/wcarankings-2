@@ -1,12 +1,10 @@
 "use client";
 
-import {
-  queryOptions,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import type { GenderFilter } from "@/lib/wca";
+import type { MedalRankingType } from "@/lib/medal-rankings";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
   InitialRankingData,
@@ -27,6 +25,7 @@ export type RankingQueryFilters = {
   source?: RankingSource;
   gender: readonly GenderFilter[];
   year: number | null;
+  medalType: MedalRankingType;
   membershipVersion?: number;
   rankingsDataVersion?: string | null;
 };
@@ -47,14 +46,19 @@ export function seedSavedListVersionWindow(
   initialData?: InitialRankingData,
 ) {
   const key = savedListVersionKey(filters);
-  if (!key || !initialData?.cacheMembershipVersion || !initialData.cacheDataVersion) return;
+  if (
+    !key ||
+    !initialData?.cacheMembershipVersion ||
+    !initialData.cacheDataVersion
+  )
+    return;
   savedListVersionWindows.set(key, {
     membershipVersion: initialData.cacheMembershipVersion,
     rankingsDataVersion: initialData.cacheDataVersion,
   });
 }
 
-export function rankingPageStart(subRank: number) {
+function rankingPageStart(subRank: number) {
   return Math.floor((Math.max(1, subRank) - 1) / PAGE_SIZE) * PAGE_SIZE;
 }
 
@@ -71,10 +75,15 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     rankingSourceKey(filters.source),
     filters.eventId,
     filters.rankingType,
+    filters.medalType,
     filters.regionSelection.scope,
     filters.regionSelection.regionId,
     filters.gender.join(","),
-    filters.resource === "people" ? filters.year ?? "all" : "all",
+    filters.resource === "people" ||
+    filters.resource === "person-competition-count" ||
+    filters.resource === "person-medal-rankings"
+      ? (filters.year ?? "all")
+      : "all",
     filters.membershipVersion ?? "current",
     filters.rankingsDataVersion ?? "current",
   ] as const;
@@ -96,7 +105,9 @@ function addRankingFilterParams(
 ) {
   addSourceParams(params, filters.source);
   const versionKey = savedListVersionKey(filters);
-  const versionWindow = versionKey ? savedListVersionWindows.get(versionKey) : null;
+  const versionWindow = versionKey
+    ? savedListVersionWindows.get(versionKey)
+    : null;
   if (
     versionWindow &&
     filters.regionSelection.scope === "world" &&
@@ -105,12 +116,18 @@ function addRankingFilterParams(
     params.set("membershipVersion", String(versionWindow.membershipVersion));
     params.set("rankingsDataVersion", versionWindow.rankingsDataVersion);
   }
-  if (filters.resource === "people" && filters.year) {
+  if (
+    (filters.resource === "people" ||
+      filters.resource === "person-competition-count" ||
+      filters.resource === "person-medal-rankings") &&
+    filters.year
+  ) {
     params.set("year", String(filters.year));
   }
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
+      filters.resource === "person-medal-rankings" ||
       filters.resource === "results") &&
     filters.gender.length
   ) {
@@ -123,12 +140,21 @@ function addRankingFilterParams(
 
 function pageRequest(filters: RankingQueryFilters, start: number) {
   const params = new URLSearchParams({
-    eventId: filters.eventId,
     result: filters.rankingType,
-    start: String(rankingPageStart(start)),
+    start: String(
+      filters.resource === "person-medal-rankings"
+        ? start
+        : rankingPageStart(start),
+    ),
     limit: String(PAGE_SIZE),
     paged: "1",
   });
+  if (
+    filters.resource !== "person-medal-rankings" ||
+    filters.eventId !== "all"
+  ) {
+    params.set("eventId", filters.eventId);
+  }
   addRankingFilterParams(params, filters);
   if (filters.resource === "podiums") params.set("ranking", "podium");
   if (filters.resource === "competitor-count") {
@@ -140,19 +166,31 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
   }
   if (filters.resource.startsWith("city-")) {
     const cityRanking = filters.resource.slice("city-".length);
-    if (cityRanking === "competitors" || cityRanking === "competitions" || cityRanking === "solves") {
+    if (
+      cityRanking === "competitors" ||
+      cityRanking === "competitions" ||
+      cityRanking === "solves"
+    ) {
       params.set("stat", cityRanking);
     } else {
-      params.set("result", cityRanking === "fastest-average" ? "average" : "single");
+      params.set(
+        "result",
+        cityRanking === "fastest-average" ? "average" : "single",
+      );
     }
+  }
+  if (filters.resource === "person-medal-rankings") {
+    params.set("medal", filters.medalType);
   }
 
   let endpoint = "/api/rankings";
   if (filters.resource === "results") endpoint = "/api/rankings/results";
   else if (filters.resource === "person-competition-count") {
     endpoint = "/api/rankings/people/competitions";
-  }
-  else if (filters.resource.startsWith("city-")) endpoint = "/api/rankings/cities";
+  } else if (filters.resource === "person-medal-rankings") {
+    endpoint = "/api/rankings/people/medals";
+  } else if (filters.resource.startsWith("city-"))
+    endpoint = "/api/rankings/cities";
   else if (filters.resource !== "people") {
     endpoint = "/api/rankings/competitions";
   }
@@ -195,19 +233,20 @@ async function requestRankingPage(
     availableYears: data.availableYears,
     cacheMembershipVersion: data.cacheMembershipVersion,
     cacheDataVersion:
-      data.cacheDataVersion ??
-      response.headers.get("X-Rankings-Data-Version"),
+      data.cacheDataVersion ?? response.headers.get("X-Rankings-Data-Version"),
     offlineStale: response.headers.get("X-Rankings-Offline-Stale") === "1",
   } satisfies RankingPage;
 }
 
-function rankingPageQueryOptions(
-  filters: RankingQueryFilters,
-  start: number,
-) {
+function rankingPageQueryOptions(filters: RankingQueryFilters, start: number) {
   const pageStart = rankingPageStart(start);
   return queryOptions({
-    queryKey: ["rankings", "page", ...rankingFilterKey(filters), pageStart] as const,
+    queryKey: [
+      "rankings",
+      "page",
+      ...rankingFilterKey(filters),
+      pageStart,
+    ] as const,
     queryFn: ({ signal }) => requestRankingPage(filters, pageStart + 1, signal),
     staleTime: PAGE_STALE_TIME_MS,
   });
@@ -217,9 +256,8 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
   const queryClient = useQueryClient();
 
   return useMemo(() => {
-    const getPage = (start: number) => queryClient.fetchQuery(
-      rankingPageQueryOptions(filters, start),
-    );
+    const getPage = (start: number) =>
+      queryClient.fetchQuery(rankingPageQueryOptions(filters, start));
 
     const getRange = async (
       start: number,
@@ -229,9 +267,8 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       signal?.throwIfAborted();
       const end = Math.max(start, start + count);
       const firstPageStart = Math.floor(start / PAGE_SIZE) * PAGE_SIZE;
-      const finalPageStart = Math.floor(
-        Math.max(start, end - 1) / PAGE_SIZE,
-      ) * PAGE_SIZE;
+      const finalPageStart =
+        Math.floor(Math.max(start, end - 1) / PAGE_SIZE) * PAGE_SIZE;
       const pageStarts = Array.from(
         { length: (finalPageStart - firstPageStart) / PAGE_SIZE + 1 },
         (_, index) => firstPageStart + index * PAGE_SIZE,
@@ -243,9 +280,10 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       const rows: Record<number, RankingEntry> = {};
       for (const page of pages) {
         page.entries.forEach((entry, entryIndex) => {
-          const globalIndex = entry.subRank > 0
-            ? entry.subRank - 1
-            : page.startPosition + entryIndex;
+          const globalIndex =
+            entry.subRank > 0
+              ? entry.subRank - 1
+              : page.startPosition + entryIndex;
           if (globalIndex >= start && globalIndex < end) {
             rows[globalIndex] = entry;
           }
@@ -263,7 +301,10 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       };
     };
 
-    const peopleFilters = { ...filters, resource: "people" } satisfies RankingQueryFilters;
+    const peopleFilters = {
+      ...filters,
+      resource: "people",
+    } satisfies RankingQueryFilters;
     const searchRankings = async (
       search: string,
       regexSearch: boolean,
@@ -278,9 +319,11 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       if (regexSearch) params.set("mode", "vim");
       addRankingFilterParams(params, filters);
       const response = await fetch(
-        `${filters.resource === "results"
-          ? "/api/rankings/results"
-          : "/api/rankings"}?${params}`,
+        `${
+          filters.resource === "results"
+            ? "/api/rankings/results"
+            : "/api/rankings"
+        }?${params}`,
         { signal },
       );
       if (!response.ok) {
@@ -290,8 +333,14 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       return response.json() as Promise<{ entries: RankingEntry[] }>;
     };
 
-    const locateRanking = (wcaId: string) => queryClient.fetchQuery({
-        queryKey: ["rankings", "locate", ...rankingFilterKey(peopleFilters), wcaId] as const,
+    const locateRanking = (wcaId: string) =>
+      queryClient.fetchQuery({
+        queryKey: [
+          "rankings",
+          "locate",
+          ...rankingFilterKey(peopleFilters),
+          wcaId,
+        ] as const,
         queryFn: async ({ signal }) => {
           const params = new URLSearchParams({
             eventId: filters.eventId,
@@ -302,7 +351,9 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
           const response = await fetch(`/api/rankings?${params}`, { signal });
           if (!response.ok) {
             const body = (await response.json()) as { error?: string };
-            throw new Error(body.error ?? "Could not find this person in the rankings.");
+            throw new Error(
+              body.error ?? "Could not find this person in the rankings.",
+            );
           }
           return response.json() as Promise<{ located: RankingEntry | null }>;
         },

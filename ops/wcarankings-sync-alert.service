@@ -1,9 +1,0 @@
-[Unit]
-Description=Alert when CubeRanks WCA ranking sync fails
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-EnvironmentFile=-/etc/wcarankings/ntfy.env
-ExecStart=/usr/local/bin/wcarankings-sync-alert

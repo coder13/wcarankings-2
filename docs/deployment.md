@@ -71,14 +71,6 @@ host mutation lock coordinates only Compose changes, migrations, activation,
 smoke checks, and rollback; projection generation and candidate staging do not
 block server releases. Database activation also uses a MariaDB advisory lock.
 
-The included `ops/wcarankings-sync.service` and `.timer` files are deprecated
-stubs. They are retained only to prevent older operational notes from silently
-installing a live server-side data updater. Do not enable them for production DB
-refreshes.
-
-If an older production host has the timer installed, disable it as part of host
-maintenance and rely on the daily GitHub Actions schedule instead.
-
 ## GitHub Actions deployment
 
 `.github/workflows/server-production.yml` deploys the server after pushes to
@@ -177,34 +169,6 @@ definitions in transfer metadata. Production constructs those indexes once,
 after bulk loading. Builder-side `result_facts` indexes remain because downstream
 groups depend on them. Benchmark builds retain all indexes and run before
 packaging so request measurements reflect the production schema.
-
-## Ranking performance verification
-
-`GET /api/health/live` checks process liveness and `GET /api/health/ready`
-checks database and projection readiness. Both are `no-store`; deployment waits
-for readiness before rendering the page.
-
-Run the repeatable local traffic mix after starting the app:
-
-```bash
-pnpm run load:rankings
-```
-
-It covers normal browsing, distant pages, incremental search typing, and unique
-queries. It defaults to localhost; a remote target requires
-`--target=https://example.com --allow-remote`. Its JSON report includes request
-and status counts, p50/p95 latency, cache outcomes, and Server-Timing samples.
-
-Inspect an indexed production path without changing data (use a representative
-cohort):
-
-```sql
-EXPLAIN ANALYZE SELECT world_rank, world_sub_rank, person_id
-FROM ranking_entries_single
-WHERE event_id = '333' AND world_rank > 0
-  AND world_sub_rank >= 5001 AND world_sub_rank < 5051
-ORDER BY world_sub_rank;
-```
 
 The result-level single projection is paged with the same keyset pattern. Do not
 query or offset-scan the raw `results` table for the top-results page:

@@ -35,11 +35,13 @@ export function getWcaAuthConfig(request: Request) {
 
 export function getRequestOrigin(request: Request) {
   const requestUrl = new URL(request.url);
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
   const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const host = forwardedHost || requestUrl.host;
   if (forwardedProtocol === "https" || forwardedProtocol === "http") {
-    return `${forwardedProtocol}://${requestUrl.host}`;
+    return `${forwardedProtocol}://${host}`;
   }
-  return requestUrl.origin;
+  return forwardedHost ? `${requestUrl.protocol}//${host}` : requestUrl.origin;
 }
 
 export function getSameOriginDestination(request: Request, candidate: string | null) {
