@@ -15,6 +15,7 @@ type RankingRowDisplay = {
   alternate?: boolean;
   searchMatched?: boolean;
   highlighted?: boolean;
+  highlightedStyle?: "search" | "tint";
   rankIsDuplicate?: boolean;
   hideIdentityId?: boolean;
 };
@@ -61,6 +62,7 @@ export function RankingRow({
     alternate = false,
     searchMatched = false,
     highlighted = false,
+    highlightedStyle = "search",
     rankIsDuplicate = false,
     hideIdentityId = false,
   } = display;
@@ -172,7 +174,11 @@ export function RankingRow({
       <div
         className={`row${alternate ? " row--alternate" : ""}${
           searchMatched ? " row--searchResult" : ""
-        }${highlighted ? " row--searchMatch" : ""}${
+        }${
+          highlighted
+            ? ` row--${highlightedStyle === "tint" ? "feedHighlight" : "searchMatch"}`
+            : ""
+        }${
           onMemberContextMenu ? " row--contextMenu" : ""
         }${accordionVisible ? " row--expanded" : ""}`}
       >

@@ -121,6 +121,13 @@
   background-color: var(--search-match);
 }
 
+.row--feedHighlight {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--secondary-soft) 65%, transparent),
+    color-mix(in srgb, var(--secondary-soft) 65%, transparent)
+  );
+}
+
 :root[data-theme="dark"] .virtualRow:hover {
   filter: brightness(1.08);
 }

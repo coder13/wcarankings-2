@@ -181,6 +181,7 @@ export function FeedStatPreviews({
                         rankingType: preview.resultType,
                         animationIndex: index,
                         alternate: index % 2 === 1,
+                        highlightedStyle: "tint",
                         highlighted: preview.highlightedCompetitionIds.includes(
                           entry.competitionId,
                         ),

@@ -5,8 +5,9 @@ Each preview contains five ranking entries.
 
 When a visible entry comes from a competition that triggered the feed stat in
 the recent window, the feed passes the entry to the shared ranking row as a
-highlighted row. The row uses the same visual state as a focused or searched
-person.
+highlighted row. The row keeps its normal alternating table color and adds a
+yellow tint. It does not replace the row color with the focused or searched
+person color.
 
 The highlight does not change the ranking order or the result data. A recent
 record that is outside the visible top five has no visible row to highlight.
