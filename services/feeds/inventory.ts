@@ -135,3 +135,33 @@ export function buildFeedStatInventory({
   }
   return inventory;
 }
+
+export function prioritizeFeedStatInventory(
+  inventory: readonly FeedInventoryStat[],
+  triggers: readonly { countryId: string; eventIds: readonly string[] }[],
+) {
+  const recentCountries = new Set(
+    triggers.map((trigger) => trigger.countryId).filter(Boolean),
+  );
+  const recentEvents = new Set(triggers.flatMap((trigger) => trigger.eventIds));
+
+  return inventory
+    .map((source, index) => ({
+      source,
+      index,
+      priority:
+        (source.region.scope === "country" &&
+        recentCountries.has(source.region.regionId)
+          ? 1_000
+          : 0) +
+        (recentEvents.has(source.eventId) ? 100 : 0) +
+        (source.kind === "result" ? 10 : 0) +
+        (source.gender === null ? 4 : 0) +
+        (source.year === 2026 ? 2 : 0),
+    }))
+    .sort(
+      (left, right) =>
+        right.priority - left.priority || left.index - right.index,
+    )
+    .map(({ source }) => source);
+}

@@ -2,7 +2,11 @@ import type { RankingEntry } from "@/components/RankingsExplorer/types";
 import { getRegions } from "@/services/regions/service";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
-import { buildFeedStatInventory, type FeedInventoryStat } from "./inventory";
+import {
+  buildFeedStatInventory,
+  prioritizeFeedStatInventory,
+  type FeedInventoryStat,
+} from "./inventory";
 import { discoverRecentCompetitionTriggers } from "./recent-changes";
 
 const PAGE_SIZE = 5;
@@ -54,6 +58,31 @@ export function hasRecentTopFiveEntry(
     .some((entry) => competitionIds.has(entry.competitionId));
 }
 
+export function hasRecentFeedEntry(
+  source: FeedInventoryStat,
+  entries: readonly Pick<RankingEntry, "competitionId">[],
+  triggers: readonly {
+    competitionId: string;
+    countryId: string;
+    eventIds: readonly string[];
+    hasCountryRecord: boolean;
+  }[],
+) {
+  const competitionIds = new Set(
+    triggers.map((trigger) => trigger.competitionId),
+  );
+  if (hasRecentTopFiveEntry(entries, competitionIds)) return true;
+  return (
+    source.region.scope === "country" &&
+    triggers.some(
+      (trigger) =>
+        trigger.hasCountryRecord &&
+        trigger.countryId === source.region.regionId &&
+        trigger.eventIds.includes(source.eventId),
+    )
+  );
+}
+
 async function loadSourcePage(sourcePage: readonly FeedInventoryStat[]) {
   const loaded: Array<{ source: FeedInventoryStat; entries: RankingEntry[] }> =
     [];
@@ -93,14 +122,16 @@ export async function loadFeedStatPreviews({
     getRegions("continent"),
     getRegions("country"),
   ]);
-  const inventory = buildFeedStatInventory({ continents, countries });
-  const competitionIds = new Set(
-    triggers.map((trigger) => trigger.competitionId),
+  const inventory = prioritizeFeedStatInventory(
+    buildFeedStatInventory({ continents, countries }),
+    triggers,
   );
   const sourcePage = inventory.slice(cursor, cursor + MAX_SOURCE_SCAN);
   const loaded = await loadSourcePage(sourcePage);
   const previews = loaded
-    .filter(({ entries }) => hasRecentTopFiveEntry(entries, competitionIds))
+    .filter(({ source, entries }) =>
+      hasRecentFeedEntry(source, entries, triggers),
+    )
     .slice(0, PAGE_SIZE)
     .map(({ source, entries }) => ({
       ...source,

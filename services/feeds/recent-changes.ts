@@ -21,6 +21,7 @@ export type RecentCompetitionTrigger = {
   cityName: string;
   endDate: string;
   eventIds: string[];
+  hasCountryRecord: boolean;
 };
 
 type RecentChangeMeasurement = {
@@ -51,6 +52,7 @@ type TriggerRow = {
   end_month: number | string;
   end_day: number | string;
   event_id: string | null;
+  has_country_record: number | boolean;
 };
 
 function utcDate(value: Date) {
@@ -88,7 +90,9 @@ function recentCompetitionTriggersQuery() {
   return `
     SELECT competition.id AS competition_id, competition.name AS competition_name,
       competition.country_id, competition.city_name, competition.end_year,
-      competition.end_month, competition.end_day, result.event_id
+      competition.end_month, competition.end_day, result.event_id,
+      MAX(result.regional_single_record = 'NR' OR
+        result.regional_average_record = 'NR') AS has_country_record
     FROM competitions competition
     LEFT JOIN results result ON result.competition_id = competition.id
     WHERE STR_TO_DATE(CONCAT(competition.end_year, '-',
@@ -97,8 +101,9 @@ function recentCompetitionTriggersQuery() {
     GROUP BY competition.id, competition.name, competition.country_id,
       competition.city_name, competition.end_year, competition.end_month,
       competition.end_day, result.event_id
-    ORDER BY competition.end_year DESC, competition.end_month DESC,
-      competition.end_day DESC, competition.id, result.event_id
+    ORDER BY has_country_record DESC, competition.end_year DESC,
+      competition.end_month DESC, competition.end_day DESC,
+      competition.id, result.event_id
     LIMIT ?
   `;
 }
@@ -126,6 +131,8 @@ export async function discoverRecentCompetitionTriggers(
       if (eventId && existing.eventIds.length < MAX_EVENT_IDS) {
         existing.eventIds.push(eventId);
       }
+      existing.hasCountryRecord =
+        existing.hasCountryRecord || Boolean(raw.has_country_record);
       continue;
     }
     triggers.set(competitionId, {
@@ -137,6 +144,7 @@ export async function discoverRecentCompetitionTriggers(
         .map((value) => String(value).padStart(2, "0"))
         .join("-"),
       eventIds: eventId ? [eventId] : [],
+      hasCountryRecord: Boolean(raw.has_country_record),
     });
   }
   return {

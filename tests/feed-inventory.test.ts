@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildFeedStatInventory } from "@/services/feeds/inventory";
+import {
+  buildFeedStatInventory,
+  prioritizeFeedStatInventory,
+} from "@/services/feeds/inventory";
+import { hasRecentFeedEntry } from "@/services/feeds/stat-previews";
 import { hasRecentTopFiveEntry } from "@/services/feeds/stat-previews";
 
 test("builds the full bounded feed stat inventory", () => {
@@ -45,6 +49,50 @@ test("qualifies a stat only when a recent result is in the top five", () => {
     hasRecentTopFiveEntry(
       [{ competitionId: "old" }, { competitionId: "recent" }],
       new Set(["recent"]),
+    ),
+    true,
+  );
+});
+
+test("prioritizes recent national event sources", () => {
+  const inventory = buildFeedStatInventory({
+    continents: [{ id: "North America", name: "North America" }],
+    countries: [{ id: "USA", name: "United States" }],
+  });
+  const prioritized = prioritizeFeedStatInventory(inventory, [
+    { countryId: "USA", eventIds: ["333"] },
+  ]);
+
+  assert.equal(prioritized[0]?.region.scope, "country");
+  assert.equal(prioritized[0]?.region.regionId, "USA");
+  assert.equal(prioritized[0]?.eventId, "333");
+  assert.equal(prioritized[0]?.kind, "result");
+});
+
+test("accepts a recent national record even when it is not in the top five", () => {
+  const source = buildFeedStatInventory({
+    continents: [],
+    countries: [{ id: "USA", name: "United States" }],
+  }).find(
+    (candidate) =>
+      candidate.kind === "result" &&
+      candidate.eventId === "333" &&
+      candidate.region.regionId === "USA" &&
+      candidate.year === 2026,
+  );
+  assert.ok(source);
+  assert.equal(
+    hasRecentFeedEntry(
+      source,
+      [{ competitionId: "older" }],
+      [
+        {
+          competitionId: "HamptonBeachSummer2026",
+          countryId: "USA",
+          eventIds: ["333"],
+          hasCountryRecord: true,
+        },
+      ],
     ),
     true,
   );
