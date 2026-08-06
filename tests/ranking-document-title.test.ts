@@ -24,11 +24,11 @@ test("formats specific titles for people rankings and results", () => {
   );
   assert.equal(
     formatRankingDocumentDescription(defaults),
-    "Browse 3x3x3 cube single rankings from the World Cube Association.",
+    "",
   );
   assert.equal(
     formatRankingDocumentDescription({ ...defaults, subject: "results" }),
-    "Browse 3x3x3 cube single results from the World Cube Association.",
+    "",
   );
   assert.equal(
     formatRankingDocumentDescription({
@@ -36,7 +36,7 @@ test("formats specific titles for people rankings and results", () => {
       subject: "competitions",
       competitionRanking: "competitor-count",
     }),
-    "Browse competition competitor counts from the World Cube Association.",
+    "",
   );
   assert.equal(
     formatRankingDocumentDescription({
@@ -44,7 +44,7 @@ test("formats specific titles for people rankings and results", () => {
       subject: "cities",
       cityRanking: "fastest-single",
     }),
-    "Browse 3x3x3 cube fastest single cities from the World Cube Association.",
+    "",
   );
 });
 
@@ -89,6 +89,6 @@ test("includes the top three results in ranking descriptions", () => {
       "Xuanyi Geng (2.80)",
       "Yiheng Wang (3.06)",
     ]),
-    "Browse 3x3x3 cube single rankings from the World Cube Association.\nTop 3 results:\nTeodor Zajder (2.76)\nXuanyi Geng (2.80)\nYiheng Wang (3.06).",
+    "Top 3 results:\nTeodor Zajder (2.76)\nXuanyi Geng (2.80)\nYiheng Wang (3.06).",
   );
 });

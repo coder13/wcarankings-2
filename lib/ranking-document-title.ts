@@ -130,11 +130,7 @@ export function formatRankingDocumentDescription(
   input: RankingDocumentTitleInput,
   topResults: readonly string[] = [],
 ) {
-  const title = formatRankingDocumentTitle(input).replace(
-    / \| WCA Rankings$/,
-    "",
-  );
-  const description = `Browse ${title.toLowerCase()} from the World Cube Association.`;
-  if (topResults.length === 0) return description;
-  return `${description}\nTop 3 results:\n${topResults.join("\n")}.`;
+  void input;
+  if (topResults.length === 0) return "";
+  return `Top 3 results:\n${topResults.join("\n")}.`;
 }
