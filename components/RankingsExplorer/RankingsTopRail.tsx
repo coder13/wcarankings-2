@@ -161,6 +161,13 @@ export function RankingsTopRail() {
             },
           ]
         : []),
+      ...(featureSwitch.personActivityRankings
+        ? [
+            { value: "countries", label: "Countries" },
+            { value: "rounds", label: "Rounds" },
+            { value: "solves", label: "Official solves" },
+          ]
+        : []),
       ...(featureSwitch.personMedalRankings
         ? [{ value: "medals", label: "Medal rankings" }]
         : []),
@@ -252,6 +259,14 @@ export function RankingsTopRail() {
                       else if (filters.personActivityRanking)
                         actions.changePersonActivityMetric("competitions");
                       else actions.changePersonCompetitionRanking(true);
+                    } else if (
+                      filters.subject === "people" &&
+                      ["countries", "rounds", "solves"].includes(value)
+                    ) {
+                      actions.changePersonActivityRanking(
+                        true,
+                        value as typeof filters.personActivityMetric,
+                      );
                     } else if (filters.personActivityRanking) {
                       actions.changePersonActivityMetric(
                         value as typeof filters.personActivityMetric,

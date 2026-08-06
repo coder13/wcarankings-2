@@ -205,14 +205,17 @@ export function useRankingsState() {
           { search: "", wcaId: "", focusMe: false },
         );
       },
-      changePersonActivityRanking(enabled: boolean) {
+      changePersonActivityRanking(
+        enabled: boolean,
+        metric: PersonActivityMetric = filters.personActivityMetric,
+      ) {
         if (enabled === filters.personActivityRanking) return;
         patchFilters(
           {
             personCompetitionRanking: false,
             personActivityRanking: enabled,
             personMedalRanking: false,
-            personActivityMetric: "competitions",
+            personActivityMetric: metric,
             year: null,
           },
           {

@@ -207,6 +207,14 @@ test("renders a separate person ranking picker", () => {
   );
 });
 
+test("adds activity statistics to the people secondary selector", () => {
+  const markup = renderExplorerMarkup({ options: { showSubjectSwitch: true } });
+
+  assert.match(markup, />Countries</);
+  assert.match(markup, />Rounds</);
+  assert.match(markup, />Official solves</);
+});
+
 test("renders activity statistic controls", () => {
   const markup = renderExplorerMarkup(
     { options: { showSubjectSwitch: true } },
