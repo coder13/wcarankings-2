@@ -236,6 +236,7 @@ if (!applicationUrl && !adminUrl) {
         personEventRankings: true,
         personMedalRankings: true,
         cityEventStats: true,
+        countryEventStats: true,
         sumOfRanks: true,
         yearlyPersonRankings: true,
       });
@@ -285,6 +286,7 @@ if (!applicationUrl && !adminUrl) {
         personActivityRankings: true,
         personCompetitionRankings: true,
         cityEventStats: true,
+        countryEventStats: true,
         sumOfRanks: true,
         yearlyPersonRankings: true,
       },

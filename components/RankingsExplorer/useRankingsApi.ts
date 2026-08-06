@@ -7,6 +7,7 @@ import type { ExplorerSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSw
 import type {
   CityRanking,
   CompetitionRanking,
+  CountryRanking,
   RankingResource,
 } from "./helpers/rankingModes";
 import {
@@ -24,6 +25,7 @@ type RankingsApiFilters = {
   subject: ExplorerSubject;
   competitionRanking: CompetitionRanking;
   cityRanking: CityRanking;
+  countryRanking: CountryRanking;
   personCompetitionRanking: boolean;
   personMedalRanking: boolean;
   medalType: MedalRankingType;
@@ -39,11 +41,13 @@ function rankingResource({
   subject,
   competitionRanking,
   cityRanking,
+  countryRanking,
   personCompetitionRanking,
   personMedalRanking,
   latitudeHemisphere,
 }: RankingsApiFilters): RankingResource {
   if (subject === "results") return "results";
+  if (subject === "countries") return `country-${countryRanking}`;
   if (subject === "cities") return `city-${cityRanking}`;
   if (subject !== "competitions") {
     if (personCompetitionRanking) return "person-competition-count";

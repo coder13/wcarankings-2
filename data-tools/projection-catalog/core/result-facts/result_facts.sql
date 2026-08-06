@@ -1,3 +1,25 @@
+DROP TEMPORARY TABLE IF EXISTS result_solve_counts;
+
+-- phase: count valid attempts once for all downstream aggregate statistics
+CREATE TEMPORARY TABLE result_solve_counts (
+  result_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  official_solve_count TINYINT UNSIGNED NOT NULL
+) ENGINE = InnoDB;
+
+INSERT INTO
+  result_solve_counts
+SELECT
+  result_id,
+  COUNT(
+    CASE
+      WHEN value > 0 THEN 1
+    END
+  ) AS official_solve_count
+FROM
+  result_attempts
+GROUP BY
+  result_id;
+
 -- phase: materialize shared result facts
 CREATE TABLE result_facts AS
 SELECT
@@ -28,6 +50,7 @@ SELECT
   r.best,
   r.average,
   COALESCE(format.expected_solve_count, 0) AS attempt_count,
+  COALESCE(solves.official_solve_count, 0) AS official_solve_count,
   COALESCE(r.regional_single_record, '') AS regional_single_record,
   COALESCE(r.regional_average_record, '') AS regional_average_record
 FROM
@@ -37,7 +60,10 @@ FROM
   AND person.sub_id = 1
   LEFT JOIN countries country ON country.id = r.person_country_id
   LEFT JOIN round_types round_type ON round_type.id = r.round_type_id
-  LEFT JOIN formats format ON format.id = r.format_id;
+  LEFT JOIN formats format ON format.id = r.format_id
+  LEFT JOIN result_solve_counts solves ON solves.result_id = r.id;
+
+DROP TEMPORARY TABLE result_solve_counts;
 
 -- phase: index shared result facts
 ALTER TABLE result_facts

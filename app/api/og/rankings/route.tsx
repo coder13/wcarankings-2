@@ -19,6 +19,7 @@ const subjects = new Set<RankingDocumentTitleInput["subject"]>([
   "people",
   "results",
   "competitions",
+  "countries",
   "cities",
 ]);
 
@@ -34,13 +35,25 @@ const cityRankings = new Set<RankingDocumentTitleInput["cityRanking"]>([
   "solves",
 ]);
 
+const countryRankings = new Set<
+  NonNullable<RankingDocumentTitleInput["countryRanking"]>
+>([
+  "fastest-single",
+  "fastest-average",
+  "competitors",
+  "competitions",
+  "solves",
+]);
+
 function booleanParam(params: URLSearchParams, key: string) {
   return params.get(key) === "true";
 }
 
 function metadataInput(params: URLSearchParams): RankingDocumentTitleInput {
   const subjectValue = params.get("subject");
-  const subject = subjects.has(subjectValue as RankingDocumentTitleInput["subject"])
+  const subject = subjects.has(
+    subjectValue as RankingDocumentTitleInput["subject"],
+  )
     ? (subjectValue as RankingDocumentTitleInput["subject"])
     : "people";
   const personMedalRanking = booleanParam(params, "personMedalRanking");
@@ -55,7 +68,8 @@ function metadataInput(params: URLSearchParams): RankingDocumentTitleInput {
   const rankingType = isRankingType(requestedResult)
     ? requestedResult
     : "single";
-  const requestedCompetitionRanking = params.get("competitionRanking") ?? "best-result";
+  const requestedCompetitionRanking =
+    params.get("competitionRanking") ?? "best-result";
   const competitionRanking = competitionRankings.has(
     requestedCompetitionRanking as RankingDocumentTitleInput["competitionRanking"],
   )
@@ -67,6 +81,17 @@ function metadataInput(params: URLSearchParams): RankingDocumentTitleInput {
   )
     ? (requestedCityRanking as RankingDocumentTitleInput["cityRanking"])
     : "fastest-single";
+  const requestedCountryRanking =
+    params.get("countryRanking") ?? "fastest-single";
+  const countryRanking = countryRankings.has(
+    requestedCountryRanking as NonNullable<
+      RankingDocumentTitleInput["countryRanking"]
+    >,
+  )
+    ? (requestedCountryRanking as NonNullable<
+        RankingDocumentTitleInput["countryRanking"]
+      >)
+    : "fastest-single";
   const requestedYear = Number(params.get("year"));
   const medal = params.get("medal") ?? "overall";
 
@@ -76,11 +101,9 @@ function metadataInput(params: URLSearchParams): RankingDocumentTitleInput {
     rankingType,
     competitionRanking,
     cityRanking,
+    countryRanking,
     year: Number.isInteger(requestedYear) ? requestedYear : null,
-    personCompetitionRanking: booleanParam(
-      params,
-      "personCompetitionRanking",
-    ),
+    personCompetitionRanking: booleanParam(params, "personCompetitionRanking"),
     personMedalRanking,
     medalType: isMedalRankingType(medal) ? medal : "overall",
   };
@@ -138,10 +161,7 @@ export async function GET(request: Request) {
             minWidth: 0,
           }}
         >
-          <div
-            style={{ display: "flex", fontSize: 34 }}
-            aria-label={country}
-          >
+          <div style={{ display: "flex", fontSize: 34 }} aria-label={country}>
             {flagEmoji(entry.countryIso2 ?? "")}
           </div>
           <div

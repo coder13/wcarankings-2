@@ -7,6 +7,7 @@ import { subjectPath } from "./helpers/navigation";
 import { orderSearchMatches } from "./helpers/search";
 import { getTopRailScrollProgress } from "./useRailScrollProgress";
 import { competitionRankingPath } from "./useRankingsState";
+import { countryRankingPath } from "./useRankingsState";
 import type { RankingsFilterState } from "./rankingsUrl";
 import { serializeRankingsUrl, type RankingsUrlState } from "./rankingsUrl";
 import type { RankingEntry } from "./types";
@@ -34,6 +35,9 @@ function pathnameForFilters(filters: RankingsFilterState) {
   if (filters.subject === "competitions") {
     return `/competitions/${filters.competitionRanking}`;
   }
+  if (filters.subject === "countries") {
+    return `/countries/${filters.countryRanking}`;
+  }
   if (filters.subject === "cities") return `/cities/${filters.cityRanking}`;
   if (filters.personCompetitionRanking) return "/persons/competitions";
   if (filters.personMedalRanking) return "/persons/medals";
@@ -49,6 +53,7 @@ function renderExplorerMarkup(
     subject: "people",
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
+    countryRanking: "fastest-single",
     personCompetitionRanking: false,
     personMedalRanking: false,
     medalType: "overall",
@@ -104,6 +109,7 @@ test("gives each non-default subject and competition ranking a page", () => {
   assert.equal(subjectPath("people"), "/");
   assert.equal(subjectPath("results"), "/results");
   assert.equal(subjectPath("competitions"), "/competitions/best-result");
+  assert.equal(subjectPath("countries"), "/countries/fastest-single");
   assert.equal(subjectPath("cities"), "/cities/fastest-single");
   assert.equal(
     competitionRankingPath("best-result"),
@@ -115,12 +121,13 @@ test("gives each non-default subject and competition ranking a page", () => {
     "/competitions/competitor-count",
   );
   assert.equal(competitionRankingPath("latitude"), "/competitions/latitude");
+  assert.equal(countryRankingPath("solves"), "/countries/solves");
 });
 
 test("exposes active person, result, and competition ranking subjects", () => {
   assert.deepEqual(
     EXPLORER_SUBJECTS.map(({ id }) => id),
-    ["people", "results", "competitions", "cities"],
+    ["people", "results", "competitions", "countries", "cities"],
   );
 });
 
@@ -182,6 +189,25 @@ test("keeps gender filters available for Kinch", () => {
   assert.doesNotMatch(markup, /Switch to average rankings/);
 });
 
+test("renders country statistic, year, gender, event, and continent controls", () => {
+  const markup = renderExplorerMarkup(
+    { options: { showSubjectSwitch: true } },
+    {
+      subject: "countries",
+      countryRanking: "solves",
+      year: 2025,
+      gender: ["f", "o"],
+    },
+  );
+  assert.match(markup, /WCA Countries/);
+  assert.match(markup, /aria-label="Country ranking"/);
+  assert.match(markup, /aria-label="Country ranking period"/);
+  assert.match(markup, />2025</);
+  assert.match(markup, /aria-label="Gender"/);
+  assert.match(markup, /aria-label="Event"/);
+  assert.doesNotMatch(markup, /Switch to average rankings/);
+});
+
 test("renders medal event and statistic controls", () => {
   const markup = renderExplorerMarkup(
     { options: { showSubjectSwitch: true } },
@@ -209,6 +235,7 @@ test("keeps a competition-ranking year in its query string", () => {
     subject: "people",
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
+    countryRanking: "fastest-single",
     personCompetitionRanking: true,
     personMedalRanking: false,
     medalType: "overall",

@@ -1,4 +1,5 @@
 import { cityEventStatsJob } from "./cities/event-stats/definition.ts";
+import { countryEventStatsJob } from "./countries/event-stats/definition.ts";
 import { competitionEventStatsJob } from "./competitions/event-stats/definition.ts";
 import { competitionPodiumMembersJob } from "./competitions/podium-members/definition.ts";
 import { competitionStatsJob } from "./competitions/stats/definition.ts";
@@ -30,4 +31,5 @@ export const PROJECTION_JOBS: readonly ProjectionJob[] = [
   personActivityRankingsJob,
   personMedalRankingsJob,
   cityEventStatsJob,
+  countryEventStatsJob,
 ] as const;

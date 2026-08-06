@@ -7,6 +7,7 @@ export const EXPLORER_SUBJECTS = [
   { id: "people", label: "Rankings" },
   { id: "results", label: "Results" },
   { id: "competitions", label: "Competitions" },
+  { id: "countries", label: "Countries" },
   { id: "cities", label: "Cities" },
 ] as const;
 const NAVIGATION_SUBJECTS = [
@@ -32,6 +33,7 @@ export function ExplorerSubjectSwitch({
     if (!featureSwitch.core) return false;
     if (option.id === "results") return featureSwitch.resultRankings;
     if (option.id === "competitions") return featureSwitch.competitionRankings;
+    if (option.id === "countries") return featureSwitch.countryEventStats;
     if (option.id === "cities") return featureSwitch.cityEventStats;
     return true;
   });
@@ -76,7 +78,9 @@ export function ExplorerSubjectSwitch({
           }
         >
           {subjects.map((option) => (
-            <option key={option.id} value={option.id}>{option.label}</option>
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
           ))}
         </select>
       </label>

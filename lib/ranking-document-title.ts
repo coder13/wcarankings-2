@@ -2,12 +2,18 @@ import { WCA_EVENTS } from "@/lib/wca";
 import type { MedalRankingType } from "@/lib/medal-rankings";
 
 export type RankingDocumentTitleInput = {
-  subject: "people" | "results" | "competitions" | "cities";
+  subject: "people" | "results" | "competitions" | "countries" | "cities";
   eventId: string;
   rankingType: "single" | "average";
   competitionRanking:
     "best-result" | "podiums" | "competitor-count" | "latitude";
   cityRanking:
+    | "fastest-single"
+    | "fastest-average"
+    | "competitors"
+    | "competitions"
+    | "solves";
+  countryRanking?:
     | "fastest-single"
     | "fastest-average"
     | "competitors"
@@ -40,13 +46,23 @@ function normalizedRankingType({
   rankingType,
   competitionRanking,
   cityRanking,
+  countryRanking = "fastest-single",
 }: Pick<
   RankingDocumentTitleInput,
-  "subject" | "eventId" | "rankingType" | "competitionRanking" | "cityRanking"
+  | "subject"
+  | "eventId"
+  | "rankingType"
+  | "competitionRanking"
+  | "cityRanking"
+  | "countryRanking"
 >) {
   if (eventId === "333mbf" || eventId === "sor-kinch") return "single";
   if (subject === "cities" && cityRanking === "fastest-single") return "single";
   if (subject === "cities" && cityRanking === "fastest-average")
+    return "average";
+  if (subject === "countries" && countryRanking === "fastest-single")
+    return "single";
+  if (subject === "countries" && countryRanking === "fastest-average")
     return "average";
   if (subject === "competitions" && competitionRanking === "podiums") {
     if (["333bf", "444bf", "555bf"].includes(eventId)) return "single";
@@ -61,6 +77,7 @@ export function formatRankingDocumentTitle({
   rankingType,
   competitionRanking,
   cityRanking,
+  countryRanking = "fastest-single",
   year,
   personCompetitionRanking,
   personMedalRanking,
@@ -77,6 +94,7 @@ export function formatRankingDocumentTitle({
       rankingType,
       competitionRanking,
       cityRanking,
+      countryRanking,
     }) === "average"
       ? "Average"
       : "Single";
@@ -107,6 +125,18 @@ export function formatRankingDocumentTitle({
       solves: "Cities by Official Solve Count",
     };
     return titleWithSite(cityTitles[cityRanking]);
+  }
+
+  if (subject === "countries") {
+    const yearSuffix = year ? ` ${year}` : "";
+    const countryTitles = {
+      "fastest-single": `${event} Fastest Single Countries${yearSuffix}`,
+      "fastest-average": `${event} Fastest Average Countries${yearSuffix}`,
+      competitors: `${event} Countries by Competitor Count${yearSuffix}`,
+      competitions: `${event} Countries by Competition Count${yearSuffix}`,
+      solves: `${event} Countries by Official Solve Count${yearSuffix}`,
+    };
+    return titleWithSite(countryTitles[countryRanking]);
   }
 
   if (personCompetitionRanking) {

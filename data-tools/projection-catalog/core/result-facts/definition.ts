@@ -7,7 +7,7 @@ export const resultFactsJob = {
   tables: ["result_facts"],
   releaseGroup: "result-facts",
   releaseOrder: 1,
-  releaseSchemaVersion: 2,
+  releaseSchemaVersion: 3,
   estimatedDurationMs: 150_000,
   enabledByDefault: true,
 } as const satisfies ProjectionJob;

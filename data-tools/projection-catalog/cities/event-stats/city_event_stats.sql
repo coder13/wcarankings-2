@@ -1,5 +1,3 @@
-DROP TEMPORARY TABLE IF EXISTS city_event_attempt_counts;
-
 DROP TEMPORARY TABLE IF EXISTS city_event_base;
 
 DROP TEMPORARY TABLE IF EXISTS city_event_scoped;
@@ -7,23 +5,6 @@ DROP TEMPORARY TABLE IF EXISTS city_event_scoped;
 DROP TEMPORARY TABLE IF EXISTS city_event_aggregates;
 
 DROP TEMPORARY TABLE IF EXISTS city_event_winners;
-
--- phase: count valid attempts once
-CREATE TEMPORARY TABLE city_event_attempt_counts ENGINE = InnoDB AS
-SELECT
-  result_id,
-  COUNT(
-    CASE
-      WHEN value > 0 THEN 1
-    END
-  ) AS official_solve_count
-FROM
-  result_attempts
-GROUP BY
-  result_id;
-
-ALTER TABLE city_event_attempt_counts
-ADD PRIMARY KEY (result_id);
 
 -- phase: materialize city result facts once
 CREATE TEMPORARY TABLE city_event_base ENGINE = InnoDB AS
@@ -38,15 +19,12 @@ SELECT
   comp.city_name,
   comp.country_id,
   facts.gender AS person_gender,
-  COALESCE(attempts.official_solve_count, 0) AS official_solve_count
+  facts.official_solve_count
 FROM
   result_facts facts
   INNER JOIN competitions comp ON comp.id = facts.competition_id
-  LEFT JOIN city_event_attempt_counts attempts ON attempts.result_id = facts.result_id
 WHERE
   comp.city_name <> '';
-
-DROP TEMPORARY TABLE city_event_attempt_counts;
 
 -- phase: materialize gender scopes once
 CREATE TEMPORARY TABLE city_event_scoped ENGINE = InnoDB AS

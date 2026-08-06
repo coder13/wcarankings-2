@@ -18,6 +18,16 @@ export const CITY_RANKING_OPTIONS = [
 
 export type CityRanking = (typeof CITY_RANKING_OPTIONS)[number]["value"];
 
+export const COUNTRY_RANKING_OPTIONS = [
+  { value: "fastest-single", label: "Fastest single" },
+  { value: "fastest-average", label: "Fastest average" },
+  { value: "competitors", label: "Competitors" },
+  { value: "competitions", label: "Competitions" },
+  { value: "solves", label: "Official solves" },
+] as const;
+
+export type CountryRanking = (typeof COUNTRY_RANKING_OPTIONS)[number]["value"];
+
 export type RankingResource =
   | "people"
   | "person-competition-count"
@@ -28,4 +38,5 @@ export type RankingResource =
   | "competitor-count"
   | "latitude-north"
   | "latitude-south"
+  | `country-${CountryRanking}`
   | `city-${CityRanking}`;

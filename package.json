@@ -33,6 +33,7 @@
     "benchmark:ranking-scroll:results": "bun scripts/benchmark-ranking-results.ts",
     "benchmark:ranking-scroll:competitions": "bun scripts/benchmark-ranking-competitions.ts",
     "benchmark:ranking-scroll:cities": "bun scripts/benchmark-ranking-cities.ts",
+    "benchmark:ranking-scroll:countries": "bun scripts/benchmark-ranking-countries.ts",
     "benchmark:ranking-scroll:medals": "bun scripts/benchmark-ranking-medals.ts"
   },
   "dependencies": {

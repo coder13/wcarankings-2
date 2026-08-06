@@ -421,6 +421,94 @@ export const CITY_RANKING_SCENARIOS = [
   }),
 ];
 
+export const COUNTRY_RANKING_SCENARIOS = [
+  scenario(
+    "fastest-single-world",
+    "fastest country single world",
+    "/api/rankings/countries",
+    {
+      eventId: "333",
+      result: "single",
+    },
+  ),
+  scenario(
+    "fastest-average-world",
+    "fastest country average world",
+    "/api/rankings/countries",
+    {
+      eventId: "333",
+      result: "average",
+    },
+  ),
+  scenario(
+    "fastest-single-north-america",
+    "fastest country single North America",
+    "/api/rankings/countries",
+    {
+      eventId: "333",
+      result: "single",
+      region: "_North America",
+    },
+  ),
+  scenario(
+    "fastest-single-world-2023",
+    "fastest country single 2023",
+    "/api/rankings/countries",
+    {
+      eventId: "333",
+      result: "single",
+      year: "2023",
+    },
+  ),
+  scenario(
+    "fastest-single-world-f",
+    "fastest country single women",
+    "/api/rankings/countries",
+    {
+      eventId: "333",
+      result: "single",
+      gender: ["f"],
+    },
+  ),
+  scenario(
+    "fastest-single-north-america-2023-fo",
+    "fastest country single North America female-other 2023",
+    "/api/rankings/countries",
+    {
+      eventId: "333",
+      result: "single",
+      region: "_North America",
+      year: "2023",
+      gender: ["f", "o"],
+    },
+  ),
+  ...["competitors", "competitions", "solves"].map((stat) =>
+    scenario(
+      `${stat}-world`,
+      `country ${stat} world`,
+      "/api/rankings/countries",
+      {
+        eventId: "333",
+        result: "single",
+        stat,
+      },
+    ),
+  ),
+  scenario(
+    "solves-europe-2023-mf",
+    "country solves Europe male-female 2023",
+    "/api/rankings/countries",
+    {
+      eventId: "333",
+      result: "single",
+      stat: "solves",
+      region: "_Europe",
+      year: "2023",
+      gender: ["m", "f"],
+    },
+  ),
+];
+
 export const MEDAL_RANKING_SCENARIOS = [
   scenario(
     "overall-all-events-world",
@@ -466,6 +554,7 @@ export const RANKING_SCROLL_SUITES = {
   results: RESULT_RANKING_SCENARIOS,
   competitions: COMPETITION_RANKING_SCENARIOS,
   cities: CITY_RANKING_SCENARIOS,
+  countries: COUNTRY_RANKING_SCENARIOS,
   medals: MEDAL_RANKING_SCENARIOS,
 };
 

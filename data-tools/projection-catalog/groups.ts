@@ -12,6 +12,7 @@ export interface DeploymentProjectionGroup {
 export interface ProjectionCapabilities {
   [capability: string]: readonly string[];
   cityEventStats: readonly string[];
+  countryEventStats: readonly string[];
   competitionRankings: readonly string[];
   core: readonly string[];
   personActivityRankings: readonly string[];
@@ -75,6 +76,7 @@ export const PROJECTION_CAPABILITIES: ProjectionCapabilities = {
   personMedalRankings: ["person-medal-rankings"],
   personEventRankings: ["person-event-rankings"],
   cityEventStats: ["city-rankings"],
+  countryEventStats: ["country-rankings"],
   sumOfRanks: ["sum-of-ranks"],
   yearlyPersonRankings: ["yearly-person-rankings"],
 };

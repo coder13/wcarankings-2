@@ -260,6 +260,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     "person-competition-rankings",
     "person-medal-rankings",
     "person-event-rankings",
+    "country-event-stats",
   ]) {
     const projection = PROJECTION_REGISTRY.find(
       (candidate) => candidate.name === name,
@@ -285,7 +286,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
   }
 });
 
-test("person activity rankings keep only the three new activity metrics", async () => {
+test("person activity rankings reuse shared official solve counts", async () => {
   const sql = await readFile(
     new URL(
       "../data-tools/projection-catalog/people/activity-rankings/person_activity_rankings.sql",
@@ -295,11 +296,49 @@ test("person activity rankings keep only the three new activity metrics", async 
   );
   assert.match(sql, /COUNT\(DISTINCT NULLIF\(competition\.country_id, ''\)\)/);
   assert.match(sql, /COUNT\(\*\) AS round_count/);
-  assert.match(sql, /WHEN value > 0 THEN 1/);
+  assert.match(sql, /SUM\(facts\.official_solve_count\)/);
+  assert.doesNotMatch(sql, /FROM\s+result_attempts/);
   assert.match(sql, /'countries' AS metric/);
   assert.match(sql, /country_count AS metric_value/);
   assert.match(sql, /CAST\('' AS CHAR\(16\)\) AS region_id/);
   assert.doesNotMatch(sql, /competition_count/);
+});
+
+test("result facts count official solves once for aggregate consumers", async () => {
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/core/result-facts/result_facts.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(sql, /CREATE TEMPORARY TABLE result_solve_counts/);
+  assert.match(sql, /WHEN value > 0 THEN 1/);
+  assert.match(sql, /official_solve_count/);
+});
+
+test("country stats aggregate base genders before creating cohort rows", async () => {
+  const projection = PROJECTION_REGISTRY.find(
+    (candidate) => candidate.name === "country-event-stats",
+  );
+  assert.ok(projection);
+  assert.deepEqual(projection.dependencies, ["result-facts"]);
+  assert.deepEqual(projection.tables, ["country_event_stats"]);
+
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/countries/event-stats/country_event_stats.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(sql, /CREATE TEMPORARY TABLE country_event_gender_aggregates/);
+  assert.match(sql, /country_event_gender_masks/);
+  assert.match(
+    sql,
+    /VALUES\s+\(1\),\s+\(2\),\s+\(3\),\s+\(4\),\s+\(5\),\s+\(6\),\s+\(7\)/,
+  );
+  assert.doesNotMatch(sql, /sub_rank/i);
 });
 
 test("medal rankings keep event and medal type as independent dimensions", async () => {

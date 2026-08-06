@@ -3,6 +3,7 @@
 import { queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
+import { rankingStatSource } from "@/lib/ranking-stat-sources";
 import type { GenderFilter } from "@/lib/wca";
 import type { MedalRankingType } from "@/lib/medal-rankings";
 import type { RankingResource } from "./helpers/rankingModes";
@@ -16,6 +17,7 @@ import type {
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const PAGE_STALE_TIME_MS = 5 * 60 * 1000;
+const countryStats = rankingStatSource("country-event-stats");
 
 export type RankingQueryFilters = {
   eventId: string;
@@ -81,7 +83,8 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     filters.gender.join(","),
     filters.resource === "people" ||
     filters.resource === "person-competition-count" ||
-    filters.resource === "person-medal-rankings"
+    filters.resource === "person-medal-rankings" ||
+    filters.resource.startsWith("country-")
       ? (filters.year ?? "all")
       : "all",
     filters.membershipVersion ?? "current",
@@ -119,7 +122,8 @@ function addRankingFilterParams(
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
-      filters.resource === "person-medal-rankings") &&
+      filters.resource === "person-medal-rankings" ||
+      filters.resource.startsWith("country-")) &&
     filters.year
   ) {
     params.set("year", String(filters.year));
@@ -128,7 +132,8 @@ function addRankingFilterParams(
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
       filters.resource === "person-medal-rankings" ||
-      filters.resource === "results") &&
+      filters.resource === "results" ||
+      filters.resource.startsWith("country-")) &&
     filters.gender.length
   ) {
     params.set("gender", filters.gender.join(","));
@@ -179,6 +184,21 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
       );
     }
   }
+  if (filters.resource.startsWith("country-")) {
+    const countryRanking = filters.resource.slice("country-".length);
+    if (
+      countryRanking === "competitors" ||
+      countryRanking === "competitions" ||
+      countryRanking === "solves"
+    ) {
+      params.set("stat", countryRanking);
+    } else {
+      params.set(
+        "result",
+        countryRanking === "fastest-average" ? "average" : "single",
+      );
+    }
+  }
   if (filters.resource === "person-medal-rankings") {
     params.set("medal", filters.medalType);
   }
@@ -189,6 +209,8 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
     endpoint = "/api/rankings/people/competitions";
   } else if (filters.resource === "person-medal-rankings") {
     endpoint = "/api/rankings/people/medals";
+  } else if (filters.resource.startsWith("country-")) {
+    endpoint = countryStats.paths.api;
   } else if (filters.resource.startsWith("city-"))
     endpoint = "/api/rankings/cities";
   else if (filters.resource !== "people") {

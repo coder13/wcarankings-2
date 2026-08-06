@@ -13,6 +13,7 @@ const capabilityLabels: Record<string, string> = {
   personCompetitionRankings: "Person competition rankings",
   personMedalRankings: "Person medal rankings",
   cityEventStats: "City/event statistics",
+  countryEventStats: "Country/event statistics",
   sumOfRanks: "Sum of Ranks",
   yearlyPersonRankings: "Yearly person rankings",
 };

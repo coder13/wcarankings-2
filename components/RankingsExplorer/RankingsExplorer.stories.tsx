@@ -1,4 +1,5 @@
 import { useLayoutEffect, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Decorator, Meta, StoryObj } from "@storybook/react";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
 import type { RecordBadgeCode } from "@/lib/wca";
@@ -44,9 +45,10 @@ function makeMockRankings(): RankingEntry[] {
     personName: `${firstNames[index % firstNames.length]} ${
       lastNames[Math.floor(index / firstNames.length) % lastNames.length]
     }`,
-    personId: `${2000 + (index % 25)}${String(
-      Math.floor(index / 100)
-    ).padStart(4, "0")}${String(index % 100).padStart(2, "0")}`,
+    personId: `${2000 + (index % 25)}${String(Math.floor(index / 100)).padStart(
+      4,
+      "0",
+    )}${String(index % 100).padStart(2, "0")}`,
     best: Math.round((5 + random() * 395) * 100),
     competitionName: `Storybook Open ${2020 + (index % 7)}`,
   }))
@@ -78,11 +80,48 @@ function makeMockRankings(): RankingEntry[] {
 
 const allEntries = makeMockRankings();
 const entries = allEntries.slice(0, 100);
+const countryEntries: RankingEntry[] = FALLBACK_COUNTRIES.map(
+  (country, index) => ({
+    rank: index + 1,
+    subRank: index + 1,
+    personId: `country:${country.id}`,
+    personName: country.name,
+    identitySubtitle: index % 2 ? "competitions" : "official solves",
+    countryName: country.name,
+    countryIso2:
+      [
+        "AU",
+        "BR",
+        "CA",
+        "CN",
+        "FR",
+        "DE",
+        "IN",
+        "ID",
+        "JP",
+        "NL",
+        "PH",
+        "PL",
+        "KR",
+        "ES",
+        "GB",
+        "US",
+      ][index] ?? "",
+    best: 12_500 - index * 431,
+    formattedValue: new Intl.NumberFormat("en-US").format(12_500 - index * 431),
+    competitionId: "",
+    competitionName: "",
+    recordBadges: [],
+  }),
+);
 
 function makeMockResponse(url: URL, init?: RequestInit) {
   if (init?.signal?.aborted) {
     return Promise.reject(new DOMException("Request aborted", "AbortError"));
   }
+
+  const rankingEntries =
+    url.pathname === "/api/rankings/countries" ? countryEntries : allEntries;
 
   const search = url.searchParams.get("search")?.trim().toLocaleLowerCase();
   if (search) {
@@ -90,48 +129,51 @@ function makeMockResponse(url: URL, init?: RequestInit) {
     return Promise.resolve(
       new Response(
         JSON.stringify({
-          entries: allEntries
+          entries: rankingEntries
             .filter(
               (entry) =>
                 entry.personName.toLocaleLowerCase().includes(search) ||
-                entry.personId.toLocaleLowerCase().includes(search)
+                entry.personId.toLocaleLowerCase().includes(search),
             )
             .slice(0, searchLimit),
         }),
-        { headers: { "Content-Type": "application/json" } }
-      )
+        { headers: { "Content-Type": "application/json" } },
+      ),
     );
   }
 
   const requestedStart = Math.max(
     1,
-    Number(url.searchParams.get("start")) || 1
+    Number(url.searchParams.get("start")) || 1,
   );
   const limit = Math.max(1, Number(url.searchParams.get("limit")) || 100);
   const focusPersonId = url.searchParams.get("focus");
   const focusIndex = focusPersonId
-    ? allEntries.findIndex((entry) => entry.personId === focusPersonId)
+    ? rankingEntries.findIndex((entry) => entry.personId === focusPersonId)
     : -1;
   const focusBefore = Number(url.searchParams.get("focusBefore")) || 50;
-  const start = focusIndex >= 0 ? Math.max(1, focusIndex + 1 - focusBefore) : requestedStart;
-  const pageEntries = allEntries.slice(start - 1, start - 1 + limit);
+  const start =
+    focusIndex >= 0
+      ? Math.max(1, focusIndex + 1 - focusBefore)
+      : requestedStart;
+  const pageEntries = rankingEntries.slice(start - 1, start - 1 + limit);
 
   return Promise.resolve(
     new Response(
       JSON.stringify({
         entries: pageEntries,
-        hasMore: start - 1 + pageEntries.length < allEntries.length,
+        hasMore: start - 1 + pageEntries.length < rankingEntries.length,
         nextPageStart:
-          start - 1 + pageEntries.length < allEntries.length
+          start - 1 + pageEntries.length < rankingEntries.length
             ? start + pageEntries.length
             : null,
         previousPageStart: start > 1 ? Math.max(1, start - limit) : null,
         startPosition: start - 1,
         lastRank: pageEntries.at(-1)?.rank ?? null,
-        total: allEntries.length,
+        total: rankingEntries.length,
       }),
-      { headers: { "Content-Type": "application/json" } }
-    )
+      { headers: { "Content-Type": "application/json" } },
+    ),
   );
 }
 
@@ -166,6 +208,16 @@ const mockFetchDecorator: Decorator = (Story) => (
   </StorybookFetchMock>
 );
 
+const storybookQueryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+});
+
+const queryClientDecorator: Decorator = (Story) => (
+  <QueryClientProvider client={storybookQueryClient}>
+    <Story />
+  </QueryClientProvider>
+);
+
 const initialData = {
   entries,
   hasMore: true,
@@ -177,6 +229,17 @@ const initialData = {
   total: allEntries.length,
 };
 
+const countryInitialData = {
+  entries: countryEntries,
+  hasMore: false,
+  nextPageStart: null,
+  previousPageStart: null,
+  startRank: 1,
+  startPosition: 0,
+  lastRank: countryEntries.at(-1)?.rank ?? null,
+  total: countryEntries.length,
+};
+
 const meta = {
   title: "Pages/RankingsExplorer",
   component: RankingsExplorer,
@@ -185,7 +248,7 @@ const meta = {
       appDirectory: true,
     },
   },
-  decorators: [mockFetchDecorator],
+  decorators: [queryClientDecorator, mockFetchDecorator],
 } satisfies Meta<typeof RankingsExplorer>;
 
 export default meta;
@@ -214,7 +277,8 @@ export const PersonsInfiniteScroll: Story = {
   parameters: {
     docs: {
       description: {
-        story: "Scroll through this 10,000-person fixture to exercise virtual rendering, page prefetching, and infinite loading.",
+        story:
+          "Scroll through this 10,000-person fixture to exercise virtual rendering, page prefetching, and infinite loading.",
       },
     },
   },
@@ -245,6 +309,21 @@ export const CompetitionLatitude: Story = {
   args: sharedArgs,
   parameters: {
     nextjs: { navigation: { pathname: "/competitions/latitude" } },
+  },
+};
+
+export const Countries: Story = {
+  args: {
+    ...sharedArgs,
+    initial: { ...sharedArgs.initial, data: countryInitialData },
+  },
+  parameters: {
+    nextjs: {
+      navigation: {
+        pathname: "/countries/solves",
+        query: { eventId: "333", gender: "f,o", year: "2025" },
+      },
+    },
   },
 };
 

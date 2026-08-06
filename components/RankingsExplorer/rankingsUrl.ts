@@ -15,8 +15,10 @@ import type { ExplorerSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSw
 import {
   COMPETITION_RANKING_OPTIONS,
   CITY_RANKING_OPTIONS,
+  COUNTRY_RANKING_OPTIONS,
   type CityRanking,
   type CompetitionRanking,
+  type CountryRanking,
 } from "./helpers/rankingModes";
 import type { RegionSelection } from "./types";
 
@@ -29,11 +31,15 @@ const COMPETITION_RANKINGS = new Set<string>(
 const CITY_RANKINGS = new Set<string>(
   CITY_RANKING_OPTIONS.map(({ value }) => value),
 );
+const COUNTRY_RANKINGS = new Set<string>(
+  COUNTRY_RANKING_OPTIONS.map(({ value }) => value),
+);
 
 export type RankingsUrlState = {
   subject: ExplorerSubject;
   competitionRanking: CompetitionRanking;
   cityRanking: CityRanking;
+  countryRanking: CountryRanking;
   personCompetitionRanking: boolean;
   personMedalRanking: boolean;
   medalType: MedalRankingType;
@@ -55,6 +61,7 @@ export type RankingsFilterState = Pick<
   | "subject"
   | "competitionRanking"
   | "cityRanking"
+  | "countryRanking"
   | "personCompetitionRanking"
   | "personMedalRanking"
   | "medalType"
@@ -82,6 +89,7 @@ export function rankingsFilterStateFromUrl(
     subject,
     competitionRanking,
     cityRanking,
+    countryRanking,
     personCompetitionRanking,
     personMedalRanking,
     medalType,
@@ -98,6 +106,7 @@ export function rankingsFilterStateFromUrl(
     subject,
     competitionRanking,
     cityRanking,
+    countryRanking,
     personCompetitionRanking,
     personMedalRanking,
     medalType,
@@ -115,6 +124,7 @@ export function rankingsFilterStateFromUrl(
 function subjectFromPathname(pathname: string): ExplorerSubject {
   if (pathname.startsWith("/results")) return "results";
   if (pathname.startsWith("/competitions")) return "competitions";
+  if (pathname.startsWith("/countries")) return "countries";
   if (pathname.startsWith("/cities")) return "cities";
   return "people";
 }
@@ -130,6 +140,13 @@ function cityRankingFromPathname(pathname: string) {
   const value = pathname.match(/^\/cities\/([^/?#]+)/)?.[1];
   return value && CITY_RANKINGS.has(value)
     ? (value as CityRanking)
+    : "fastest-single";
+}
+
+function countryRankingFromPathname(pathname: string) {
+  const value = pathname.match(/^\/countries\/([^/?#]+)/)?.[1];
+  return value && COUNTRY_RANKINGS.has(value)
+    ? (value as CountryRanking)
     : "fastest-single";
 }
 
@@ -157,6 +174,7 @@ function rankingTypeForSubject(
   subject: ExplorerSubject,
   competitionRanking: CompetitionRanking,
   cityRanking: CityRanking,
+  countryRanking: CountryRanking,
   eventId: string,
   requested: "single" | "average",
 ) {
@@ -164,6 +182,10 @@ function rankingTypeForSubject(
   if (subject === "cities") {
     if (cityRanking === "fastest-single") return "single";
     if (cityRanking === "fastest-average") return "average";
+  }
+  if (subject === "countries") {
+    if (countryRanking === "fastest-single") return "single";
+    if (countryRanking === "fastest-average") return "average";
   }
   if (subject !== "competitions" || competitionRanking !== "podiums") {
     return requested;
@@ -189,6 +211,7 @@ function normalizeState(
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
   const cityRanking = cityRankingFromPathname(pathname);
+  const countryRanking = countryRankingFromPathname(pathname);
   const personCompetitionRanking =
     personCompetitionRankingFromPathname(pathname);
   const personMedalRanking = personMedalRankingFromPathname(pathname);
@@ -211,22 +234,28 @@ function normalizeState(
     subject,
     competitionRanking,
     cityRanking,
+    countryRanking,
     personCompetitionRanking,
     personMedalRanking,
     medalType: isMedalRankingType(state.medalType)
       ? state.medalType
       : "overall",
-    year: subject === "people" ? state.year : null,
+    year: subject === "people" || subject === "countries" ? state.year : null,
     eventId: podiumEventId,
+    regionSelection:
+      subject === "countries" && state.regionSelection.scope === "country"
+        ? { scope: "world", regionId: "" }
+        : state.regionSelection,
     rankingType: rankingTypeForSubject(
       subject,
       competitionRanking,
       cityRanking,
+      countryRanking,
       podiumEventId,
       state.rankingType,
     ),
     gender:
-      subject === "people" || subject === "results"
+      subject === "people" || subject === "results" || subject === "countries"
         ? normalizeGenderFilters(state.gender)
         : [],
     latitudeHemisphere:
@@ -254,6 +283,7 @@ export function parseRankingsUrl(
   const subject = subjectFromPathname(pathname);
   const competitionRanking = competitionRankingFromPathname(pathname);
   const cityRanking = cityRankingFromPathname(pathname);
+  const countryRanking = countryRankingFromPathname(pathname);
   const personCompetitionRanking =
     personCompetitionRankingFromPathname(pathname);
   const personMedalRanking = personMedalRankingFromPathname(pathname);
@@ -266,6 +296,7 @@ export function parseRankingsUrl(
     subject,
     competitionRanking,
     cityRanking,
+    countryRanking,
     personCompetitionRanking,
     personMedalRanking,
     medalType: isMedalRankingType(params.get("medal") ?? "")
@@ -333,6 +364,9 @@ export function serializeRankingsUrl(
     state.year &&
     !pathname.startsWith("/persons/year/")
   ) {
+    params.set("year", String(state.year));
+  }
+  if (state.subject === "countries" && state.year) {
     params.set("year", String(state.year));
   }
   if (state.latitudeHemisphere === "south") params.set("hemisphere", "south");
