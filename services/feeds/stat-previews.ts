@@ -2,7 +2,9 @@ import type { RankingEntry } from "@/components/RankingsExplorer/types";
 import { getRegions } from "@/services/regions/service";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
+import { readPopularRankingDescriptors } from "@/services/ranking-popularity/read-service";
 import { generateBatchedFeedCandidates } from "./batched-candidates";
+import { FEED_PAGE_SIZE, FEED_TOP_SCAN_SIZE } from "./constants";
 import {
   buildRecentFeedStatInventory,
   prioritizeFeedStatInventory,
@@ -17,9 +19,11 @@ import {
   readFeedSnapshot,
   writeFeedSnapshot,
 } from "./snapshot";
+import { addFeedStatPopularity, sortFeedCandidates } from "./sort";
+import type { FeedUserPreferences } from "./preferences";
 
-const PAGE_SIZE = 5;
-const TOP_SCAN_SIZE = 10;
+const PAGE_SIZE = FEED_PAGE_SIZE;
+const TOP_SCAN_SIZE = FEED_TOP_SCAN_SIZE;
 const SOURCE_READ_CONCURRENCY = 2;
 
 export type FeedStatPreview = FeedInventoryStat & {
@@ -30,6 +34,8 @@ export type FeedStatPreview = FeedInventoryStat & {
 export type FeedInterestingResult = FeedInventoryStat & {
   interestingEntityId: string;
   interestingResultId: number | undefined;
+  notabilityScore: number;
+  statPopularityScore: number;
 };
 
 export type FeedStatPreviewPage = {
@@ -147,13 +153,20 @@ export async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
     buildRecentFeedStatInventory({ references, continents, countries }),
     triggers,
   );
-  return generateBatchedFeedCandidates({ references, inventory });
+  const [candidates, popularity] = await Promise.all([
+    generateBatchedFeedCandidates({ references, inventory }),
+    readPopularRankingDescriptors({ limit: 100, viewedAt: now ?? new Date() }),
+  ]);
+  return addFeedStatPopularity(candidates, popularity);
 }
 
 async function loadInterestingResultPage(
   candidates: readonly FeedInterestingResult[],
+  preferences: Parameters<typeof sortFeedCandidates>[1],
 ) {
-  const loaded = await loadSourcePage(candidates);
+  const loaded = await loadSourcePage(
+    sortFeedCandidates(candidates, preferences),
+  );
   return loaded.flatMap(({ source, entries }) => {
     const interestingIndex = entries
       .slice(0, TOP_SCAN_SIZE)
@@ -204,9 +217,11 @@ function startBackgroundBuild(now?: Date) {
 export async function loadFeedStatPreviews({
   cursor = 0,
   now,
+  preferences = null,
 }: {
   cursor?: number;
   now?: Date;
+  preferences?: FeedUserPreferences | null;
 } = {}): Promise<FeedStatPreviewPage> {
   if (!Number.isInteger(cursor) || cursor < 0) {
     throw new Error("The feed cursor must be a non-negative integer.");
@@ -217,7 +232,7 @@ export async function loadFeedStatPreviews({
     return { previews: [], nextCursor: null };
   }
   const candidates = snapshot.candidates.slice(cursor, cursor + PAGE_SIZE);
-  const previews = await loadInterestingResultPage(candidates);
+  const previews = await loadInterestingResultPage(candidates, preferences);
   const nextCursor =
     cursor + candidates.length < snapshot.candidates.length
       ? cursor + candidates.length
