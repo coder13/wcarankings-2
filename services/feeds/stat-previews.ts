@@ -197,7 +197,8 @@ export function selectFeedPreviewEntries<
   const changedIndex =
     preferredIndex ??
     topTen.findIndex((entry) => competitionIds.has(entry.competitionId));
-  if (changedIndex < 0 || topTen.length < PAGE_SIZE) return [];
+  if (topTen.length < PAGE_SIZE) return [];
+  if (changedIndex < 0) return topTen.slice(0, PAGE_SIZE);
   const start = Math.max(
     0,
     Math.min(changedIndex - 2, topTen.length - PAGE_SIZE),
@@ -285,20 +286,20 @@ async function loadInterestingResultPage(
       .findIndex(
         (entry) => sourceEntityId(source, entry) === source.interestingEntityId,
       );
-    if (interestingIndex < 0) return [];
     const interestingEntry = entries[interestingIndex];
-    if (!interestingEntry) return [];
     const previewEntries = selectFeedPreviewEntries(
       entries,
-      new Set([interestingEntry.competitionId]),
-      interestingIndex,
+      interestingEntry ? new Set([interestingEntry.competitionId]) : new Set(),
+      interestingEntry ? interestingIndex : undefined,
     );
     if (previewEntries.length < PAGE_SIZE) return [];
     return [
       {
         ...source,
         entries: previewEntries,
-        highlightedCompetitionIds: [interestingEntry.competitionId],
+        highlightedCompetitionIds: interestingEntry
+          ? [interestingEntry.competitionId]
+          : [],
       },
     ];
   });
