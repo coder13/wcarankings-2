@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { sortFeedCandidates } from "@/services/feeds/sort";
 import type { FeedInterestingResult } from "@/services/feeds/stat-previews";
+import { dedupeInterestingResults } from "@/services/feeds/stat-previews";
 
 function candidate(
   id: string,
@@ -88,5 +89,39 @@ test("uses stat popularity after the ranking signals", () => {
   assert.deepEqual(
     sorted.map((item) => item.id),
     ["popular", "quiet"],
+  );
+});
+
+test("keeps only the most notable stat for each result", () => {
+  const [mostNotable] = sortFeedCandidates(
+    [
+      candidate("country-stat", {
+        region: { scope: "country", regionId: "USA", name: "United States" },
+        countryRank: 1,
+      }),
+      candidate("world-stat", { worldRank: 1 }),
+    ],
+    null,
+  );
+
+  assert.deepEqual(dedupeInterestingResults([mostNotable]), [mostNotable]);
+  assert.equal(
+    dedupeInterestingResults(
+      sortFeedCandidates(
+        [
+          candidate("country-stat", {
+            region: {
+              scope: "country",
+              regionId: "USA",
+              name: "United States",
+            },
+            countryRank: 1,
+          }),
+          candidate("world-stat", { worldRank: 1 }),
+        ],
+        null,
+      ),
+    ).length,
+    1,
   );
 });

@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { ensureFeedSnapshot } from "../services/feeds/stat-previews";
+import { ensureFeedItems } from "../services/feeds/stat-previews";
 import { runListRankingWorker } from "./list-ranking-worker";
 
 const HOST = process.env.WORKER_HOST ?? "127.0.0.1";
@@ -9,16 +9,16 @@ let feedBuild: Promise<unknown> | null = null;
 
 function startFeedBuild() {
   if (feedBuild) return feedBuild;
-  feedBuild = ensureFeedSnapshot()
+  feedBuild = ensureFeedItems()
     .then((result) => {
       process.stdout.write(
-        `Feed snapshot ${result.written ? "written" : "discarded"}: ${result.candidateCount} candidates (${result.exportVersion})\n`,
+        `Feed items ${result.written ? "written" : "already current"}: ${result.candidateCount} candidates (${result.exportVersion})\n`,
       );
       return result;
     })
     .catch((error) => {
       process.stderr.write(
-        `Feed snapshot build failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        `Feed item build failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
       );
       throw error;
     })

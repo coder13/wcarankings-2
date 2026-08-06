@@ -21,11 +21,8 @@ import {
   discoverRecentCompetitionTriggers,
   discoverRecentResultReferences,
 } from "./recent-changes";
-import {
-  currentFeedExportVersion,
-  readFeedSnapshot,
-  writeFeedSnapshot,
-} from "./snapshot";
+import { currentFeedExportVersion } from "./snapshot";
+import { readFeedItems, replaceFeedItems } from "./items";
 import { addFeedStatPopularity, sortFeedCandidates } from "./sort";
 import { readPopularRankingDescriptors } from "@/services/ranking-popularity/read-service";
 import type { FeedUserPreferences } from "./preferences";
@@ -86,7 +83,7 @@ export type FeedInterestingItemPage = {
   nextCursor: number | null;
 };
 
-function uniqueInterestingResults(
+export function dedupeInterestingResults(
   candidates: readonly FeedInterestingResult[],
 ) {
   const seen = new Set<string>();
@@ -106,7 +103,7 @@ function sortedFeedCandidates(
   preferences: Parameters<typeof sortFeedCandidates>[1],
   popularity: Awaited<ReturnType<typeof readPopularRankingDescriptors>>,
 ) {
-  return uniqueInterestingResults(
+  return dedupeInterestingResults(
     sortFeedCandidates(
       addFeedStatPopularity(candidates, popularity),
       preferences,
@@ -249,7 +246,7 @@ async function loadSourcePage<T extends FeedInventoryStat>(
   );
 }
 
-export async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
+async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
   const [{ triggers }, { references }, continents, countries] =
     await Promise.all([
       discoverRecentCompetitionTriggers({ now }),
@@ -309,26 +306,34 @@ async function loadInterestingResultPage(
 
 let backgroundBuild: Promise<void> | null = null;
 
-export async function buildFeedSnapshot({ now }: { now?: Date } = {}) {
+async function buildFeedItems({ now }: { now?: Date } = {}) {
   const exportVersion = await currentFeedExportVersion();
   const candidates = await generateFeedStatPreviews({ now });
   if ((await currentFeedExportVersion()) !== exportVersion) {
     return { exportVersion, candidateCount: candidates.length, written: false };
   }
-  await writeFeedSnapshot({ exportVersion, candidates });
+  const selected = dedupeInterestingResults(
+    sortFeedCandidates(candidates, null),
+  );
+  await replaceFeedItems(selected, { exportVersion });
   return { exportVersion, candidateCount: candidates.length, written: true };
 }
 
-export async function ensureFeedSnapshot({ now }: { now?: Date } = {}) {
-  const snapshot = await readFeedSnapshot();
-  if (snapshot) {
+export async function ensureFeedItems({ now }: { now?: Date } = {}) {
+  const exportVersion = await currentFeedExportVersion();
+  const result = await readFeedItems({
+    cursor: 0,
+    limit: 1,
+    now,
+  });
+  if (result.length > 0) {
     return {
-      exportVersion: snapshot.exportVersion,
+      exportVersion,
       written: false,
-      candidateCount: snapshot.candidates.length,
+      candidateCount: result.length,
     };
   }
-  return buildFeedSnapshot({ now });
+  return buildFeedItems({ now });
 }
 
 function startBackgroundBuild(now?: Date) {
@@ -353,7 +358,7 @@ function startBackgroundBuild(now?: Date) {
     return;
   }
   backgroundBuild = (async () => {
-    await buildFeedSnapshot({ now });
+    await buildFeedItems({ now });
   })()
     .catch((error) => {
       console.error("The feed snapshot build failed.", error);
@@ -375,28 +380,18 @@ export async function loadFeedStatPreviews({
   if (!Number.isInteger(cursor) || cursor < 0) {
     throw new Error("The feed cursor must be a non-negative integer.");
   }
-  const snapshot = await readFeedSnapshot();
-  if (!snapshot) {
-    startBackgroundBuild(now);
-    return { previews: [], nextCursor: null };
-  }
-  const popularity = await readPopularRankingDescriptors({
-    limit: 100,
-    viewedAt: now ?? new Date(),
-  }).catch((error) => {
-    console.warn("Feed stat popularity is unavailable.", error);
-    return [];
-  });
-  const candidates = sortedFeedCandidates(
-    snapshot.candidates,
+  const candidates = await readFeedItems({
+    cursor,
+    limit: PREVIEW_CANDIDATE_SCAN_SIZE,
+    now,
     preferences,
-    popularity,
-  ).slice(cursor, cursor + PREVIEW_CANDIDATE_SCAN_SIZE);
+  });
+  if (candidates.length === 0 && cursor === 0) startBackgroundBuild(now);
   const previews = (
-    await loadInterestingResultPage(candidates, preferences, popularity)
+    await loadInterestingResultPage(candidates, preferences, [])
   ).slice(0, PAGE_SIZE);
   const nextCursor =
-    cursor + candidates.length < snapshot.candidates.length
+    candidates.length === PREVIEW_CANDIDATE_SCAN_SIZE
       ? cursor + candidates.length
       : null;
   return { previews, nextCursor };
@@ -414,24 +409,16 @@ export async function loadFeedInterestingItems({
   if (!Number.isInteger(cursor) || cursor < 0) {
     throw new Error("The feed item cursor must be a non-negative integer.");
   }
-  const snapshot = await readFeedSnapshot();
-  if (!snapshot) {
-    startBackgroundBuild(now);
-    return { items: [], nextCursor: null };
-  }
-  const popularity = await readPopularRankingDescriptors({
-    limit: 100,
-    viewedAt: now ?? new Date(),
-  }).catch(() => []);
-  const candidates = sortedFeedCandidates(
-    snapshot.candidates,
+  const items = await readFeedItems({
+    cursor,
+    limit: FEED_ITEM_PAGE_SIZE,
+    now,
     preferences,
-    popularity,
-  );
-  const items = candidates.slice(cursor, cursor + FEED_ITEM_PAGE_SIZE);
+  });
+  if (items.length === 0 && cursor === 0) startBackgroundBuild(now);
   return {
     items,
     nextCursor:
-      cursor + items.length < candidates.length ? cursor + items.length : null,
+      items.length === FEED_ITEM_PAGE_SIZE ? cursor + items.length : null,
   };
 }

@@ -23,3 +23,7 @@
 - When the user gives a feature behavior or product detail, add a small note to the relevant file in `docs/features/`.
 - Keep feature notes focused on one behavior, data rule, or local-development detail.
 - Update the relevant feature note when the behavior changes.
+- Feed rows must remain individually queryable. Do not replace `feed_items`
+  with a single JSON snapshot row.
+- Feed sorting must stay in SQL so country, continent, notability, and
+  popularity rules can change at request time.

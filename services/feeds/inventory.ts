@@ -194,7 +194,8 @@ export function buildRecentFeedStatInventory({
     }
     const genders = [null, reference.gender].filter(
       (gender, index, values): gender is GenderFilter | null =>
-        gender !== null || index === 0 || values.indexOf(gender) === index,
+        (gender === null || gender === "f" || gender === "o") &&
+        values.indexOf(gender) === index,
     );
     for (const resultType of ["single", "average"] as const) {
       for (const region of affectedRegions) {

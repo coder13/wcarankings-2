@@ -1,5 +1,4 @@
 import {
-  canonicalRankingListDescriptorJson,
   rankingListKey,
   type RankingListDescriptor,
 } from "@/lib/ranking-list-descriptor";
@@ -10,17 +9,62 @@ import type { FeedUserPreferences } from "./preferences";
 import type { FeedInterestingResult } from "./stat-previews";
 
 function feedDescriptor(source: FeedInventoryStat): RankingListDescriptor {
+  const region = {
+    scope: source.region.scope,
+    regionId: source.region.regionId,
+  };
+  const genders = source.gender === null ? [] : [source.gender];
+
+  if (source.kind === "person-competition") {
+    return {
+      version: 1,
+      family: "person-activity",
+      metric: "competitions",
+      year: source.year,
+      region,
+      genders,
+    };
+  }
+  if (source.kind === "person-medals") {
+    return {
+      version: 1,
+      family: "person-medals",
+      medalType: "overall",
+      eventId: source.eventId,
+      year: source.year,
+      region,
+      genders,
+    };
+  }
+  if (source.kind === "competition") {
+    return {
+      version: 1,
+      family: "competition",
+      metric: "fastest",
+      eventId: source.eventId,
+      resultType: source.resultType,
+    };
+  }
+  if (source.kind === "city") {
+    return {
+      version: 1,
+      family: "city",
+      metric: "fastest",
+      eventId: source.eventId,
+      resultType: source.resultType,
+      region,
+      genders,
+    };
+  }
+
   return {
     version: 1,
     family: source.kind === "person" ? "person-event" : "person-result",
     eventId: source.eventId,
     resultType: source.resultType,
     year: source.year,
-    region: {
-      scope: source.region.scope,
-      regionId: source.region.regionId,
-    },
-    genders: source.gender === null ? [] : [source.gender],
+    region,
+    genders,
     population: { kind: "everyone" },
   };
 }
@@ -34,7 +78,7 @@ function popularityScores(popularity: readonly PopularRankingDescriptor[]) {
   );
 }
 
-export function feedStatPopularityScore(
+function feedStatPopularityScore(
   source: FeedInventoryStat,
   popularity: readonly PopularRankingDescriptor[],
 ) {
@@ -97,7 +141,7 @@ function baseForRegion(candidate: FeedInterestingResult) {
   return FEED_SORT_CONSTANTS.countryRank;
 }
 
-export function feedNotabilityScore(candidate: FeedInterestingResult) {
+function feedNotabilityScore(candidate: FeedInterestingResult) {
   const rank = rankForRegion(candidate);
   if (rank === null || rank > 10) return 0;
   return baseForRegion(candidate) + (11 - rank) * FEED_SORT_CONSTANTS.rankStep;
@@ -132,6 +176,11 @@ export function addFeedStatPopularity(
   }));
 }
 
-export function descriptorJsonForFeedStat(source: FeedInventoryStat) {
-  return canonicalRankingListDescriptorJson(feedDescriptor(source));
+export function rankingListKeyForFeedStat(source: FeedInventoryStat) {
+  try {
+    return rankingListKey(feedDescriptor(source));
+  } catch {
+    // Some event/result combinations are not valid ranking descriptors.
+    return null;
+  }
 }
