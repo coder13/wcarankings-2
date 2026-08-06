@@ -40,6 +40,10 @@ After collection adds a view, it starts a best-effort flush when buffered views 
 
 A process restart can lose buffered views when the buffer has fewer views than the threshold.
 
+The result rankings endpoint uses the same boundary for person-result descriptors. It collects only successful global first-page responses.
+
+It excludes list requests, dynamic WCA-ID requests, locate requests, and later pages. It uses the same best-effort threshold flush.
+
 ## Reading totals
 
 Daily rows store successful first-page view counts. The service reads inclusive seven-day and thirty-day UTC totals.
