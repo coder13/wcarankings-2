@@ -122,16 +122,12 @@
 }
 
 .row--feedHighlight {
-  background-color: color-mix(in srgb, rgb(250 204 21) 14%, var(--surface));
+  background-color: var(--search-match);
   box-shadow: inset 4px 0 0 var(--secondary);
 }
 
 .row--alternate.row--feedHighlight {
-  background-color: color-mix(
-    in srgb,
-    rgb(250 204 21) 14%,
-    color-mix(in srgb, var(--primary) 8%, var(--surface))
-  );
+  background-image: linear-gradient(rgb(0 0 0 / 8%), rgb(0 0 0 / 8%));
 }
 
 :root[data-theme="dark"] .virtualRow:hover {
