@@ -58,6 +58,7 @@ if (!applicationUrl && !adminUrl) {
     groups: {
       "ranking-tables": release("ranking-tables", "new"),
       "result-facts": release("result-facts", "new"),
+      "person-shared-grains": release("person-shared-grains", "new"),
       "result-rankings": release("result-rankings", "new"),
       "person-event-rankings": release("person-event-rankings", "new"),
       "competition-rankings": release("competition-rankings", "new"),
@@ -67,10 +68,7 @@ if (!applicationUrl && !adminUrl) {
       ),
       "person-activity-rankings": release("person-activity-rankings", "new"),
       "person-medal-rankings": release("person-medal-rankings", "new"),
-      "person-pr-streak-rankings": release(
-        "person-pr-streak-rankings",
-        "new",
-      ),
+      "person-pr-streak-rankings": release("person-pr-streak-rankings", "new"),
       "city-rankings": release("city-rankings", "new"),
       "sum-of-ranks": release("sum-of-ranks", "new"),
       "yearly-person-rankings": release("yearly-person-rankings", "new"),

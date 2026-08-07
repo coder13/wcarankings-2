@@ -41,7 +41,6 @@ export async function getRankingsPageMetadata({
   const requestedEvent = searchParam(params, "eventId");
   const requestedResult = searchParam(params, "result");
   const requestedMedal = searchParam(params, "medal");
-  const requestedActivityMetric = searchParam(params, "metric");
   let eventId = "333";
   if (options.personMedalRanking) {
     eventId = isEventId(requestedEvent) ? requestedEvent : "all";
@@ -52,18 +51,6 @@ export async function getRankingsPageMetadata({
   const medalType = isMedalRankingType(requestedMedal)
     ? requestedMedal
     : "overall";
-  const personActivityMetric =
-    options.personActivityMetric ??
-    (["competitions", "countries", "rounds", "solves"].includes(
-      requestedActivityMetric,
-    )
-      ? (requestedActivityMetric as
-          | "competitions"
-          | "countries"
-          | "rounds"
-          | "solves")
-      : "competitions");
-
   const metadataInput = {
     ...options,
     eventId,
@@ -73,7 +60,9 @@ export async function getRankingsPageMetadata({
   const topResults = await loadTopRankingResultLabels(
     new URLSearchParams(
       Object.entries(params).flatMap(([key, value]) =>
-        Array.isArray(value) ? value.map((item) => [key, item]) : [[key, value ?? ""]],
+        Array.isArray(value)
+          ? value.map((item) => [key, item])
+          : [[key, value ?? ""]],
       ),
     ),
     metadataInput,
