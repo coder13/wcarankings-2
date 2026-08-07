@@ -25,9 +25,7 @@ SET
   @person_period_metrics_upgrade_sql = IF (
     @person_period_metrics_needs_upgrade,
     'ALTER TABLE person_period_metrics
-      DROP PRIMARY KEY,
-      ADD COLUMN is_provisional TINYINT(1) NOT NULL DEFAULT 0,
-      ADD PRIMARY KEY (period_year, person_id, is_provisional)',
+      ADD COLUMN is_provisional TINYINT(1) NOT NULL DEFAULT 0',
     'SELECT 1'
   );
 

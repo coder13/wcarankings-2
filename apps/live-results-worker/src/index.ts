@@ -14,6 +14,11 @@ import type {
   LiveResultsSnapshot,
   LiveResultsSourceRow,
 } from "@wcarankings/live-results";
+import {
+  partitionJobs,
+  type AffectedResultScope,
+  type SnapshotResultIdentity,
+} from "./job-partitions.ts";
 
 const POLL_MS = Math.max(
   60_000,
@@ -53,6 +58,17 @@ type ActiveCompetition = RowDataPacket & {
 };
 
 type ProviderStatus = "supported" | "unsupported" | "unknown";
+type AffectedPersonRow = RowDataPacket & {
+  continentId: string | null;
+  countryId: string | null;
+  gender: string | null;
+  personId: string;
+};
+type CountryScopeRow = RowDataPacket & {
+  continentId: string;
+  countryId: string;
+  iso2: string;
+};
 
 function providerCompatibility(scoretakingSoftware: string | null): {
   enabled: number;
@@ -76,6 +92,58 @@ function providerCompatibility(scoretakingSoftware: string | null): {
 
 function utcDay(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function normalizedGender(value: string | null): "m" | "f" | "o" {
+  return value === "m" || value === "f" ? value : "o";
+}
+
+async function loadAffectedResultScopes(
+  connection: Connection,
+  results: SnapshotResultIdentity[],
+): Promise<AffectedResultScope[]> {
+  const personIds = [...new Set(results.map((result) => result.personId))];
+  const countryIso2 = [
+    ...new Set(
+      results
+        .map((result) => result.countryIso2)
+        .filter((iso2): iso2 is string => iso2 !== null),
+    ),
+  ];
+  const people = new Map<string, AffectedPersonRow>();
+  const countries = new Map<string, CountryScopeRow>();
+  if (personIds.length > 0) {
+    const [rows] = await connection.query<AffectedPersonRow[]>(
+      `SELECT person.wca_id AS personId, person.gender,
+        person.country_id AS countryId, country.continent_id AS continentId
+       FROM persons person
+       LEFT JOIN countries country ON country.id = person.country_id
+       WHERE person.sub_id = 1 AND person.wca_id IN (?)`,
+      [personIds],
+    );
+    for (const person of rows) people.set(person.personId, person);
+  }
+  if (countryIso2.length > 0) {
+    const [rows] = await connection.query<CountryScopeRow[]>(
+      `SELECT iso2, id AS countryId, continent_id AS continentId
+       FROM countries
+       WHERE iso2 IN (?)`,
+      [countryIso2],
+    );
+    for (const country of rows) countries.set(country.iso2, country);
+  }
+  return results.map((result) => {
+    const person = people.get(result.personId);
+    const country = result.countryIso2
+      ? countries.get(result.countryIso2)
+      : undefined;
+    return {
+      ...result,
+      continentId: country?.continentId ?? person?.continentId ?? null,
+      countryId: country?.countryId ?? person?.countryId ?? null,
+      gender: normalizedGender(person?.gender ?? null),
+    };
+  });
 }
 
 async function reconcileActiveSources(connection: Connection): Promise<void> {
@@ -230,45 +298,6 @@ async function claimSource(
   }
 }
 
-function partitionJobs(
-  source: LiveResultsSourceRow,
-  snapshot: LiveResultsSnapshot,
-  version: number,
-) {
-  const jobs = new Map<string, Record<string, string>>();
-  const add = (key: string, payload: Record<string, string>) =>
-    jobs.set(key, payload);
-  add(`competition-stats:${source.competition_id}`, {
-    competitionId: source.competition_id,
-    year: String(source.competition_year),
-  });
-  for (const result of snapshot.results) {
-    add(`person-stats:${result.personId}:${source.competition_year}`, {
-      personId: result.personId,
-      year: String(source.competition_year),
-    });
-    const region = result.countryIso2 ?? "unknown";
-    for (const resultType of ["single", "average"]) {
-      add(
-        `rankings:${result.eventId}:${resultType}:country:${region}:${source.competition_year}`,
-        {
-          eventId: result.eventId,
-          resultType,
-          region,
-          year: String(source.competition_year),
-          provisional: "true",
-        },
-      );
-    }
-  }
-  return [...jobs].map(([key, payload]) => ({
-    kind: "projection-rebuild" as const,
-    key,
-    version,
-    payload,
-  }));
-}
-
 async function saveSnapshot(
   connection: Connection,
   source: LiveResultsSourceRow,
@@ -277,6 +306,7 @@ async function saveSnapshot(
   let hash: string;
   let version: number | null = null;
   let needsQueue: boolean;
+  let previousResults: SnapshotResultIdentity[] = [];
   let transactionOpen = false;
   try {
     snapshot = await fetchLiveResults(
@@ -294,6 +324,16 @@ async function saveSnapshot(
     if (!state[0]) throw new Error("Live result source lease was lost.");
     needsQueue = stateNeedsQueue(state[0], hash);
     if (state[0].snapshot_hash !== hash) {
+      const [rows] = await connection.query<
+        (SnapshotResultIdentity & RowDataPacket)[]
+      >(
+        `SELECT person_id AS personId, event_id AS eventId,
+          country_iso2 AS countryIso2
+         FROM provisional_live_results
+         WHERE source_name = ? AND competition_id = ?`,
+        [source.source_name, source.competition_id],
+      );
+      previousResults = rows;
       await connection.query(
         "DELETE FROM provisional_live_results WHERE source_name = ? AND competition_id = ?",
         [source.source_name, source.competition_id],
@@ -368,7 +408,25 @@ async function saveSnapshot(
   if (needsQueue) {
     if (!snapshot) throw new Error("Live result snapshot is missing.");
     const queuedVersion = version ?? (await currentSourceVersion(connection));
-    for (const job of partitionJobs(source, snapshot, queuedVersion))
+    const resultIdentities = [
+      ...previousResults,
+      ...snapshot.results.map((result) => ({
+        countryIso2: result.countryIso2,
+        eventId: result.eventId,
+        personId: result.personId,
+      })),
+    ];
+    const affectedResults = await loadAffectedResultScopes(
+      connection,
+      resultIdentities,
+    );
+    for (const job of partitionJobs(
+      source,
+      snapshot,
+      queuedVersion,
+      previousResults,
+      affectedResults,
+    ))
       await enqueueProjectionJob(job);
     await connection.query(
       `UPDATE provisional_live_result_sources SET queued_snapshot_hash = ?

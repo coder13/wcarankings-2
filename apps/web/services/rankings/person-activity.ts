@@ -129,6 +129,12 @@ function toEntry(input: PersonActivityInput, row: PersonActivityRankingRow) {
 function lazyConditions(input: PersonActivityInput) {
   const conditions = [
     "counts.period_year = 0",
+    `counts.is_provisional = COALESCE((
+      SELECT MAX(provisional.is_provisional)
+      FROM person_period_metrics provisional
+      WHERE provisional.period_year = counts.period_year
+        AND provisional.person_id = counts.person_id
+    ), 0)`,
     `counts.${metricColumn[input.metric]} > 0`,
   ];
   const values: unknown[] = [];

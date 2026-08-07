@@ -43,6 +43,28 @@ function jobId(job: ProjectionJob): string {
   return `${job.kind}-${job.key}`.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
+function mergeDelimitedValues(current = "", next = ""): string {
+  return [...new Set([...current.split(","), ...next.split(",")])]
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
+
+function mergeJobData(
+  current: ProjectionJob,
+  next: ProjectionJob,
+): ProjectionJob {
+  const payload = { ...current.payload, ...next.payload };
+  for (const key of Object.keys(payload)) {
+    if (!key.endsWith("Ids")) continue;
+    payload[key] = mergeDelimitedValues(
+      current.payload[key],
+      next.payload[key],
+    );
+  }
+  return { ...next, payload };
+}
+
 const jobOptions: JobsOptions = {
   attempts: 8,
   backoff: { type: "exponential", delay: 5_000 },
@@ -61,7 +83,8 @@ export async function enqueueProjectionJob(job: ProjectionJob): Promise<void> {
   const existing = await queue.getJob(id);
   if (existing) {
     const current = existing.data;
-    if (job.version > current.version) await existing.updateData(job);
+    if (job.version > current.version)
+      await existing.updateData(mergeJobData(current, job));
     return;
   }
   await queue.add(job.kind, job, { ...jobOptions, jobId: id });

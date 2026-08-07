@@ -18,6 +18,12 @@ export function personSearchRowsQuery(
     ? sqlFragment`
         LEFT JOIN person_period_metrics competition_counts ON competition_counts.person_id = person.wca_id
           AND competition_counts.period_year = 0
+          AND competition_counts.is_provisional = COALESCE((
+            SELECT MAX(provisional.is_provisional)
+            FROM person_period_metrics provisional
+            WHERE provisional.person_id = competition_counts.person_id
+              AND provisional.period_year = competition_counts.period_year
+          ), 0)
       `
     : sqlFragment``;
   return sqlFragment`

@@ -8,9 +8,11 @@ import {
 } from "@wcarankings/projection-jobs";
 import { processProjectionJob } from "@wcarankings/projection-jobs/processor";
 import { retryIfSourceChanged } from "./jobs.ts";
+import { ProjectionWorkerLogger } from "./logging.ts";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const HEARTBEAT_TIMEOUT_SECONDS = 90;
+const SLOW_JOB_THRESHOLD_MS = 5_000;
 
 export async function startProjectionWorker(): Promise<void> {
   const connection = await mysql.createConnection(databaseOptions());
@@ -26,6 +28,7 @@ export async function startProjectionWorker(): Promise<void> {
     lastHeartbeatAt = now;
   };
   await heartbeat(true);
+  const logger = new ProjectionWorkerLogger();
   const heartbeatTimer = setInterval(
     () => void heartbeat(),
     HEARTBEAT_INTERVAL_MS,
@@ -34,9 +37,18 @@ export async function startProjectionWorker(): Promise<void> {
   const worker = new Worker<ProjectionJob>(
     PROJECTION_JOB_QUEUE_NAME,
     async (job) => {
+      const startedAt = performance.now();
       await heartbeat();
-      await processProjectionJob(connection, job.data);
-      await retryIfSourceChanged(job);
+      try {
+        await processProjectionJob(connection, job.data);
+        await retryIfSourceChanged(job);
+      } finally {
+        const durationMs = Math.round(performance.now() - startedAt);
+        const level = durationMs > SLOW_JOB_THRESHOLD_MS ? "slow" : "complete";
+        logger.write(
+          `[projection-worker] ${level} ${job.data.key} in ${durationMs}ms.\n`,
+        );
+      }
     },
     { connection: projectionJobConnection(), concurrency: 1 },
   );
@@ -45,6 +57,7 @@ export async function startProjectionWorker(): Promise<void> {
   const stop = async () => {
     clearInterval(heartbeatTimer);
     await worker.close();
+    await logger.flush();
     await connection.end();
   };
   process.once("SIGINT", () => void stop());

@@ -167,18 +167,9 @@ ADD PRIMARY KEY (
   year,
   event_id,
   cohort_id,
-  person_id,
-  is_provisional
-),
-ADD INDEX idx_person_year_single_browse (year, event_id, cohort_id, position, person_id),
-ADD INDEX idx_person_year_single_provisional_scope (
-  is_provisional,
-  year,
-  event_id,
-  cohort_id,
-  position,
   person_id
 ),
+ADD INDEX idx_person_year_single_browse (year, event_id, cohort_id, position, person_id),
 ADD INDEX idx_person_year_single_value (
   year,
   event_id,

@@ -8,7 +8,15 @@ interface PersonCompetitionQueryPlan {
 }
 
 function lazyConditions(input: PersonCompetitionRankingInput) {
-  const conditions = ["counts.competition_count > 0"];
+  const conditions = [
+    "counts.competition_count > 0",
+    `counts.is_provisional = COALESCE((
+      SELECT MAX(provisional.is_provisional)
+      FROM person_period_metrics provisional
+      WHERE provisional.period_year = counts.period_year
+        AND provisional.person_id = counts.person_id
+    ), 0)`,
+  ];
   const values: unknown[] = [];
   conditions.push(
     input.year === null ? "counts.period_year = 0" : "counts.period_year = ?",

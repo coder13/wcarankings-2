@@ -92,8 +92,7 @@ export const deleteProvisionalYearlyScopeQuery = ({
   year: number;
 }) => SQL`
   DELETE FROM ${raw(tableFor(resultType))}
-  WHERE is_provisional = 1
-    AND year = ${year}
+  WHERE year = ${year}
     AND event_id = ${eventId}
     AND cohort_id = ${cohortId}
 `;

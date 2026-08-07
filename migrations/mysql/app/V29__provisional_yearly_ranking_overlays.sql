@@ -26,11 +26,7 @@ SET
   @single_upgrade_sql = IF (
     @single_needs_upgrade,
     'ALTER TABLE person_year_rankings_single
-    DROP PRIMARY KEY,
-    ADD COLUMN is_provisional TINYINT(1) NOT NULL DEFAULT 0,
-    ADD PRIMARY KEY (year, event_id, cohort_id, person_id, is_provisional),
-    ADD INDEX idx_person_year_single_provisional_scope
-      (is_provisional, year, event_id, cohort_id, position, person_id)',
+    ADD COLUMN is_provisional TINYINT(1) NOT NULL DEFAULT 0',
     'SELECT 1'
   );
 
@@ -67,11 +63,7 @@ SET
   @average_upgrade_sql = IF (
     @average_needs_upgrade,
     'ALTER TABLE person_year_rankings_average
-    DROP PRIMARY KEY,
-    ADD COLUMN is_provisional TINYINT(1) NOT NULL DEFAULT 0,
-    ADD PRIMARY KEY (year, event_id, cohort_id, person_id, is_provisional),
-    ADD INDEX idx_person_year_average_provisional_scope
-      (is_provisional, year, event_id, cohort_id, position, person_id)',
+    ADD COLUMN is_provisional TINYINT(1) NOT NULL DEFAULT 0',
     'SELECT 1'
   );
 

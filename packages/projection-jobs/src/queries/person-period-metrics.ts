@@ -10,7 +10,6 @@ export const deleteProvisionalPersonPeriodMetricsQuery = ({
   DELETE FROM person_period_metrics
   WHERE person_id = ${personId}
     AND period_year IN (0, ${year})
-    AND is_provisional = 1
 `;
 
 export const insertProvisionalPersonPeriodMetricsQuery = ({
@@ -32,22 +31,30 @@ export const insertProvisionalPersonPeriodMetricsQuery = ({
     round_count,
     official_solve_count
   )
-  WITH facts AS (
+  WITH official_results AS (
     SELECT
+      facts.result_id,
       facts.competition_year,
       facts.competition_id,
-      competition.country_id AS competition_country_id,
-      COALESCE(attempts.official_solve_count, 0) AS official_solve_count
+      competition.country_id AS competition_country_id
     FROM result_facts facts
     INNER JOIN competitions competition ON competition.id = facts.competition_id
-    LEFT JOIN (
-      SELECT result_id, COUNT(*) AS official_solve_count
-      FROM result_attempts
-      WHERE value > 0
-      GROUP BY result_id
-    ) attempts ON attempts.result_id = facts.result_id
     WHERE facts.person_id = ${personId}
       AND facts.result_id > 0
+  ), official_attempts AS (
+    SELECT attempts.result_id, COUNT(*) AS official_solve_count
+    FROM result_attempts attempts
+    INNER JOIN official_results results ON results.result_id = attempts.result_id
+    WHERE attempts.value > 0
+    GROUP BY attempts.result_id
+  ), facts AS (
+    SELECT
+      results.competition_year,
+      results.competition_id,
+      results.competition_country_id,
+      COALESCE(attempts.official_solve_count, 0) AS official_solve_count
+    FROM official_results results
+    LEFT JOIN official_attempts attempts ON attempts.result_id = results.result_id
     UNION ALL
     SELECT
       competition.year AS competition_year,

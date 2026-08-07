@@ -27,6 +27,7 @@ SELECT
   best.country_id,
   best.continent_id,
   best.gender,
+  0 AS is_provisional,
   DENSE_RANK() OVER (
     PARTITION BY
       best.event_id,
