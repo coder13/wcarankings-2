@@ -1,12 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "bun:test";
-import {
-  argumentList,
-  argumentPresent,
-  argumentValue,
-} from "../scripts/lib/arguments.ts";
+import { argumentList, argumentPresent, argumentValue } from "@wcarankings/cli";
 import { runPool } from "../scripts/lib/async.ts";
-import { databaseOptions } from "../scripts/lib/database.ts";
+import { databaseOptions } from "@wcarankings/database";
 
 test("script argument helpers read scalar and comma-separated values", () => {
   const values = ["bun", "script.ts", "--groups=city,result", "--empty="];

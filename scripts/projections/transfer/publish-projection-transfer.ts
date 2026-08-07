@@ -1,10 +1,6 @@
 import mysql from "mysql2/promise";
-import {
-  argumentList,
-  argumentPresent,
-  argumentValue,
-} from "../../lib/arguments.ts";
-import { databaseOptions } from "../../lib/database.ts";
+import { argumentList, argumentPresent, argumentValue } from "@wcarankings/cli";
+import { databaseOptions } from "@wcarankings/database";
 import {
   DEPLOYMENT_PROJECTION_GROUPS,
   projectionGroup,

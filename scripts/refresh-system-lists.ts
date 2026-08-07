@@ -1,4 +1,4 @@
-import { databaseOptions } from "./lib/database.ts";
+import { databaseOptions } from "@wcarankings/database";
 import { refreshSystemLists } from "./lib/system-lists.ts";
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";

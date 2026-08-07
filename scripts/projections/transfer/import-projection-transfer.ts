@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
-import { argumentValue } from "../../lib/arguments.ts";
-import { databaseOptions } from "../../lib/database.ts";
+import { argumentValue } from "@wcarankings/cli";
+import { databaseOptions } from "@wcarankings/database";
 import { importProjectionTransfer } from "../../../data-tools/projections/transfer/import.ts";
 
 async function main(): Promise<void> {

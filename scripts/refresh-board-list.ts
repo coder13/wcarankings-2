@@ -1,6 +1,6 @@
-import { argumentPresent } from "./lib/arguments.ts";
+import { argumentPresent } from "@wcarankings/cli";
 import { refreshBoardList, refreshDelegatesList } from "./lib/board-lists.ts";
-import { databaseOptions } from "./lib/database.ts";
+import { databaseOptions } from "@wcarankings/database";
 import { pathToFileURL } from "node:url";
 import mysql from "mysql2/promise";
 

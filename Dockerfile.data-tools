@@ -3,6 +3,7 @@ FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages ./packages
 RUN corepack enable \
   && pnpm install --frozen-lockfile --prod \
   && pnpm store prune
@@ -19,6 +20,7 @@ RUN useradd --system --uid 10001 --create-home data-tools \
 COPY --from=dependencies /app/node_modules ./node_modules
 
 COPY --chown=data-tools:data-tools release-compatibility.json ./
+COPY --chown=data-tools:data-tools apps/live-results-worker ./apps/live-results-worker
 COPY --chown=data-tools:data-tools data-tools ./data-tools
 COPY --chown=data-tools:data-tools packages ./packages
 COPY --chown=data-tools:data-tools scripts ./scripts

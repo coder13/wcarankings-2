@@ -1,5 +1,5 @@
 {
-  "name": "@wcarankings/live-results",
+  "name": "@wcarankings/cli",
   "private": true,
   "type": "module",
   "exports": "./src/index.ts"

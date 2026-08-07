@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { argumentValue } from "../../lib/arguments.ts";
+import { argumentValue } from "@wcarankings/cli";
 import { planProjectionDeployment } from "../../../data-tools/projections/deployment/plan.ts";
 
 async function main(): Promise<void> {

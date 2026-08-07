@@ -6,7 +6,7 @@ import {
 } from "../shared/database.ts";
 import type { ProjectionConnection } from "../shared/database-types.ts";
 import { elapsedMs, createTableProgress, writeBuildLog } from "./progress.ts";
-import { prepareLiveProjectionInputs } from "../../../scripts/live-results/projection-inputs.ts";
+import { prepareLiveProjectionInputs } from "./live-results-inputs.ts";
 import type { TableProgress } from "./progress-types.ts";
 import {
   CORE_RANKING_TABLE_TASK_COUNT,

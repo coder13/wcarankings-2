@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import mysql from "mysql2/promise";
 import type { Connection, RowDataPacket } from "mysql2/promise";
-import { argumentPresent, argumentValue } from "./lib/arguments.ts";
-import { databaseOptions } from "./lib/database.ts";
-import { enqueueProjectionJob } from "../packages/projection-jobs/src/queue.ts";
-import { fetchLiveResults, snapshotHash } from "./live-results/providers.ts";
+import { argumentPresent, argumentValue } from "@wcarankings/cli";
+import { databaseOptions } from "@wcarankings/database";
+import { enqueueProjectionJob } from "@wcarankings/projection-jobs";
+import { fetchLiveResults, snapshotHash } from "@wcarankings/live-results";
 import type {
   LiveResultsSnapshot,
   LiveResultsSourceRow,
-} from "./live-results/types.ts";
+} from "@wcarankings/live-results";
 
 const POLL_MS = Math.max(
   250,

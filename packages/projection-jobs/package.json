@@ -2,5 +2,8 @@
   "name": "@wcarankings/projection-jobs",
   "private": true,
   "type": "module",
-  "exports": { "./queue": "./src/queue.ts" }
+  "dependencies": {
+    "bullmq": "^6.0.8"
+  },
+  "exports": "./src/queue.ts"
 }

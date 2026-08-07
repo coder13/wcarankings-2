@@ -86,13 +86,14 @@ services:
       db:
         condition: service_healthy
 
-  provisional-ranking-worker:
+  live-results-worker:
     image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
     restart: unless-stopped
-    command: ["/app/scripts/provisional-ranking-worker.ts"]
+    command: ["/app/apps/live-results-worker/src/index.ts"]
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL must be set}
       PROVISIONAL_RANKING_WORKER_POLL_MS: ${PROVISIONAL_RANKING_WORKER_POLL_MS:-2000}
       PROVISIONAL_RANKING_WORKER_LEASE_SECONDS: ${PROVISIONAL_RANKING_WORKER_LEASE_SECONDS:-120}
     depends_on:

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { argumentList, argumentValue } from "../../lib/arguments.ts";
+import { argumentList, argumentValue } from "@wcarankings/cli";
 import {
   createProjectionReleaseCoordinate,
   PROJECTION_RELEASE_MANIFEST,

@@ -2,12 +2,18 @@
   "name": "@wcarankings/live-results-worker",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@wcarankings/cli": "workspace:*",
+    "@wcarankings/database": "workspace:*",
+    "@wcarankings/live-results": "workspace:*",
+    "@wcarankings/projection-jobs": "workspace:*"
+  },
   "scripts": {
-    "run": "bun ../../scripts/provisional-ranking-worker.ts",
-    "dev": "bun --watch ../../scripts/provisional-ranking-worker.ts",
-    "poll": "bun ../../scripts/provisional-ranking-worker.ts --once",
-    "build": "bun ../../scripts/register-live-results-source.ts --help",
-    "lint": "eslint ../../scripts/live-results ../../scripts/provisional-ranking-worker.ts",
+    "run": "bun src/index.ts",
+    "dev": "bun --watch src/index.ts",
+    "poll": "bun src/index.ts --once",
+    "register": "bun src/register-source.ts",
+    "lint": "eslint src",
     "typecheck": "bunx tsc --project ../../tsconfig.data-tools.json"
   }
 }
