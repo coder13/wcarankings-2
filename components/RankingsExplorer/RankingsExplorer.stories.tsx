@@ -309,7 +309,10 @@ export const SearchOpen: Story = {
   args: sharedArgs,
   parameters: {
     nextjs: {
-      navigation: { pathname: "/persons", query: { search: "Avery" } },
+      navigation: {
+        pathname: "/persons/rankings",
+        query: { search: "Avery" },
+      },
     },
   },
 };

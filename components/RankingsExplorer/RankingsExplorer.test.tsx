@@ -47,7 +47,7 @@ function pathnameForFilters(filters: RankingsFilterState) {
   }
   if (filters.personMedalRanking) return "/persons/medals";
   if (filters.personPrStreakRanking) return "/persons/pr-streak";
-  return "/persons";
+  return "/persons/rankings";
 }
 
 function renderExplorerMarkup(
@@ -113,7 +113,7 @@ test("ignores empty search-result slots", () => {
 });
 
 test("gives each non-default subject and competition ranking a page", () => {
-  assert.equal(subjectPath("people"), "/persons");
+  assert.equal(subjectPath("people"), "/persons/rankings");
   assert.equal(subjectPath("results"), "/persons/results");
   assert.equal(subjectPath("competitions"), "/competitions/best-result");
   assert.equal(subjectPath("cities"), "/cities/fastest-single");

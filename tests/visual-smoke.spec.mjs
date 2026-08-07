@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("renders rankings from the migrated database", async ({ page }) => {
-  await page.goto("/persons", { waitUntil: "networkidle" });
+  await page.goto("/persons/rankings", { waitUntil: "networkidle" });
 
   await expect(page).toHaveTitle("3x3x3 Cube Single Rankings | WCA Rankings");
   await expect(

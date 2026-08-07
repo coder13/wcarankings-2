@@ -30,12 +30,12 @@ function pageChecks(personId: string): PageCheck[] {
   const checks: PageCheck[] = [
     {
       name: "people: 3x3 single",
-      path: "/persons?eventId=333&result=single",
+      path: "/persons/rankings?eventId=333&result=single",
       expected: ["3x3x3 Cube Single Rankings | WCA Rankings"],
     },
     {
       name: "people: 3x3 average",
-      path: "/persons?eventId=333&result=average",
+      path: "/persons/rankings?eventId=333&result=average",
       expected: ["3x3x3 Cube Average Rankings | WCA Rankings"],
     },
     {
@@ -57,7 +57,7 @@ function pageChecks(personId: string): PageCheck[] {
     },
     {
       name: "persons: yearly rankings",
-      path: "/persons?year=2024&eventId=333&result=single",
+      path: "/persons/rankings?year=2024&eventId=333&result=single",
       expected: ["3x3x3 Cube Single Rankings 2024 | WCA Rankings"],
     },
     {
