@@ -228,6 +228,15 @@
   overflow-wrap: anywhere;
 }
 
+.unsupported {
+  display: block;
+  color: var(--error);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;

@@ -37,9 +37,10 @@ const connection = await mysql.createConnection(databaseOptions());
 try {
   await connection.query(
     `INSERT INTO provisional_live_result_sources
-     (source_name, competition_id, remote_competition_id, competition_year, poll_seconds, next_poll_at)
-     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))
+     (source_name, competition_id, remote_competition_id, competition_year, provider_status, provider_message, poll_seconds, next_poll_at)
+     VALUES (?, ?, ?, ?, 'supported', NULL, ?, CURRENT_TIMESTAMP(6))
      ON DUPLICATE KEY UPDATE remote_competition_id = VALUES(remote_competition_id), enabled = 1,
+       provider_status = 'supported', provider_message = NULL,
        poll_seconds = VALUES(poll_seconds), next_poll_at = CURRENT_TIMESTAMP(6), last_error = NULL`,
     [source, competitionId, remoteCompetitionId, year, poll],
   );

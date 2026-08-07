@@ -6,6 +6,7 @@ import { databaseOptions, recordWorkerHeartbeat } from "@wcarankings/database";
 import { enqueueProjectionJob } from "@wcarankings/projection-jobs";
 import {
   fetchLiveResults,
+  fetchWcaCompetitionScoretakingSoftware,
   LiveResultsNotPublishedError,
   snapshotHash,
 } from "@wcarankings/live-results";
@@ -45,11 +46,66 @@ const activeCompetitionPredicate = `
       '%Y-%c-%e'
     )`;
 
+type ActiveCompetition = RowDataPacket & {
+  id: string;
+  year: number;
+};
+
+type ProviderStatus = "supported" | "unsupported" | "unknown";
+
+function providerCompatibility(scoretakingSoftware: string | null): {
+  enabled: number;
+  status: ProviderStatus;
+  message: string | null;
+} {
+  if (scoretakingSoftware === "wca_live")
+    return { enabled: 1, status: "supported", message: null };
+  if (!scoretakingSoftware)
+    return {
+      enabled: 0,
+      status: "unknown",
+      message: "WCA did not report scoretaking software.",
+    };
+  return {
+    enabled: 0,
+    status: "unsupported",
+    message: `Unsupported scoretaking software: ${scoretakingSoftware}`,
+  };
+}
+
 function utcDay(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 async function reconcileActiveSources(connection: Connection): Promise<void> {
+  const [activeCompetitions] = await connection.query<ActiveCompetition[]>(
+    `SELECT competition.id, competition.year
+     FROM competitions competition
+     WHERE ${activeCompetitionPredicate}`,
+  );
+  const discovered = await Promise.all(
+    activeCompetitions.map(async (competition) => {
+      try {
+        const scoretakingSoftware =
+          await fetchWcaCompetitionScoretakingSoftware(competition.id);
+        return {
+          ...competition,
+          scoretakingSoftware,
+          metadataAvailable: true,
+          ...providerCompatibility(scoretakingSoftware),
+        };
+      } catch {
+        return {
+          ...competition,
+          scoretakingSoftware: null,
+          metadataAvailable: false,
+          enabled: 0,
+          status: "unknown" as const,
+          message: "WCA scoretaking software is unavailable.",
+        };
+      }
+    }),
+  );
   await connection.beginTransaction();
   try {
     await connection.query(
@@ -67,25 +123,49 @@ async function reconcileActiveSources(connection: Connection): Promise<void> {
        JOIN competitions competition
          ON competition.id = source.competition_id
         AND ${activeCompetitionPredicate}
-       SET source.next_poll_at = IF(
-             source.enabled = 0,
-             CURRENT_TIMESTAMP(6),
-             source.next_poll_at
-           ),
-           source.enabled = 1`,
+       SET source.provider_status = 'supported', source.provider_message = NULL
+       WHERE source.source_name = 'cubing-china'`,
     );
-    await connection.query(
-      `INSERT INTO provisional_live_result_sources
-         (source_name, competition_id, remote_competition_id, competition_year)
-       SELECT 'wca-live', competition.id, competition.id, competition.year
-       FROM competitions competition
-       WHERE ${activeCompetitionPredicate}
-         AND NOT EXISTS (
-           SELECT 1
-           FROM provisional_live_result_sources source
-           WHERE source.competition_id = competition.id
+    for (const competition of discovered) {
+      await connection.query(
+        `UPDATE provisional_live_result_sources
+         SET scoretaking_software = IF(? = 1, ?, scoretaking_software),
+             provider_status = ?, provider_message = ?,
+             next_poll_at = IF(? = 1 AND enabled = 0 AND ? = 1, CURRENT_TIMESTAMP(6), next_poll_at),
+             enabled = IF(? = 1, ?, enabled)
+         WHERE source_name = 'wca-live' AND competition_id = ?`,
+        [
+          competition.metadataAvailable ? 1 : 0,
+          competition.scoretakingSoftware,
+          competition.status,
+          competition.message,
+          competition.metadataAvailable ? 1 : 0,
+          competition.enabled,
+          competition.metadataAvailable ? 1 : 0,
+          competition.enabled,
+          competition.id,
+        ],
+      );
+      await connection.query(
+        `INSERT INTO provisional_live_result_sources
+           (source_name, competition_id, remote_competition_id, competition_year, enabled, scoretaking_software, provider_status, provider_message)
+         SELECT 'wca-live', ?, ?, ?, ?, ?, ?, ?
+         WHERE NOT EXISTS (
+           SELECT 1 FROM provisional_live_result_sources source
+           WHERE source.competition_id = ?
          )`,
-    );
+        [
+          competition.id,
+          competition.id,
+          competition.year,
+          competition.enabled,
+          competition.scoretakingSoftware,
+          competition.status,
+          competition.message,
+          competition.id,
+        ],
+      );
+    }
     await connection.commit();
   } catch (error) {
     await connection.rollback();

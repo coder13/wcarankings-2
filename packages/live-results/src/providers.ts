@@ -8,8 +8,19 @@ import type {
 const WCA_LIVE_BASE_URL = "https://live.worldcubeassociation.org";
 const CUBING_CHINA_BASE_URL = "https://cubing.com";
 const FETCH_TIMEOUT_MS = 30_000;
+const WCA_COMPETITION_API_URL =
+  "https://www.worldcubeassociation.org/api/v0/competitions";
 
 type JsonObject = Record<string, unknown>;
+
+export async function fetchWcaCompetitionScoretakingSoftware(
+  competitionId: string,
+): Promise<string | null> {
+  const payload = await fetchJson(
+    `${WCA_COMPETITION_API_URL}/${encodeURIComponent(competitionId)}`,
+  );
+  return isObject(payload) ? asString(payload.scoretaking_software) : null;
+}
 
 export class LiveResultsNotPublishedError extends Error {
   constructor() {

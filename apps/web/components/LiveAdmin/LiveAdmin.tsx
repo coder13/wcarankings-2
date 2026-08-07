@@ -6,6 +6,10 @@ type Source = {
   source_name: string;
   competition_id: string;
   name: string | null;
+  enabled: number;
+  scoretaking_software: string | null;
+  provider_status: "supported" | "unsupported" | "unknown";
+  provider_message: string | null;
   start_date: string;
   end_date: string;
   poll_seconds: number;
@@ -60,6 +64,10 @@ function resultsNotPublished(source: Source) {
     (source.last_error === "Results not published yet." ||
       source.last_error?.startsWith("404 Not Found:") === true)
   );
+}
+
+function providerUnavailable(source: Source) {
+  return source.provider_status !== "supported";
 }
 
 export function LiveAdmin() {
@@ -159,6 +167,7 @@ export function LiveAdmin() {
                     <input
                       aria-label={`Select ${source.competition_id}`}
                       type="checkbox"
+                      disabled={providerUnavailable(source)}
                       checked={selected.includes(source.competition_id)}
                       onChange={() =>
                         setSelected((items) =>
@@ -186,7 +195,12 @@ export function LiveAdmin() {
                     <DateTime value={source.last_success_at} />
                   </td>
                   <td className={styles.statusCell}>
-                    {resultsNotPublished(source) ? (
+                    {providerUnavailable(source) ? (
+                      <span className={styles.unsupported}>
+                        {source.provider_message ??
+                          "Live results provider is not supported."}
+                      </span>
+                    ) : resultsNotPublished(source) ? (
                       <span className={styles.pending}>
                         Results not published yet
                       </span>
