@@ -18,6 +18,7 @@ type QueueItem = {
 };
 
 type QueueResponse = { items: QueueItem[]; limited: boolean; error?: string };
+type AlertMessage = { text: string; tone: "success" | "error" };
 
 function DateTime({ value }: { value: string | null }) {
   if (!value) return <span className={styles.empty}>—</span>;
@@ -48,7 +49,7 @@ function queueSummary(data: QueueResponse | null, activeCount: number) {
 
 export function ProjectionQueueAdmin() {
   const [data, setData] = useState<QueueResponse | null>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<AlertMessage | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
@@ -84,7 +85,7 @@ export function ProjectionQueueAdmin() {
 
   async function remove(jobId: string) {
     setRemoving(jobId);
-    setMessage("");
+    setMessage(null);
     try {
       const response = await fetch("/api/admin/queue", {
         method: "DELETE",
@@ -92,14 +93,15 @@ export function ProjectionQueueAdmin() {
         body: JSON.stringify({ jobId }),
       });
       const result = (await response.json()) as { error?: string };
-      setMessage(
-        response.ok
+      setMessage({
+        text: response.ok
           ? "Queue item removed."
           : (result.error ?? "The queue item could not be removed."),
-      );
+        tone: response.ok ? "success" : "error",
+      });
       await load();
     } catch {
-      setMessage("The queue item could not be removed.");
+      setMessage({ text: "The queue item could not be removed.", tone: "error" });
     } finally {
       setRemoving(null);
     }
@@ -107,7 +109,7 @@ export function ProjectionQueueAdmin() {
 
   async function clear() {
     setClearing(true);
-    setMessage("");
+    setMessage(null);
     try {
       const response = await fetch("/api/admin/queue", {
         method: "POST",
@@ -119,14 +121,15 @@ export function ProjectionQueueAdmin() {
         active?: number;
         error?: string;
       };
-      setMessage(
-        response.ok
+      setMessage({
+        text: response.ok
           ? `Removed ${result.removed ?? 0} queue items. ${result.active ?? 0} active items remain.`
           : (result.error ?? "The queue could not be cleared."),
-      );
+        tone: response.ok ? "success" : "error",
+      });
       await load();
     } catch {
-      setMessage("The queue could not be cleared.");
+      setMessage({ text: "The queue could not be cleared.", tone: "error" });
     } finally {
       setClearing(false);
       setConfirmingClear(false);
@@ -147,8 +150,20 @@ export function ProjectionQueueAdmin() {
         </strong>
       }
     >
-      {message && <p className={styles.alert}>{message}</p>}
-      {data?.error && <p className={styles.alert}>{data.error}</p>}
+      {message && (
+        <p
+          className={`${styles.alert} ${
+            message.tone === "success"
+              ? styles.alertSuccess
+              : styles.alertError
+          }`}
+        >
+          {message.text}
+        </p>
+      )}
+      {data?.error && (
+        <p className={`${styles.alert} ${styles.alertError}`}>{data.error}</p>
+      )}
       <section
         className={styles.tableSection}
         aria-labelledby="queue-items-heading"
@@ -169,7 +184,7 @@ export function ProjectionQueueAdmin() {
           </button>
         </div>
         {data?.limited && (
-          <p className={styles.alert}>
+          <p className={`${styles.alert} ${styles.alertInfo}`}>
             Only the 1,000 most recent queue items are shown.
           </p>
         )}

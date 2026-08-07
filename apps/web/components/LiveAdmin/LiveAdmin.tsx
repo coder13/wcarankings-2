@@ -23,6 +23,7 @@ type Snapshot = {
   scheduler: { discoveryCron: string; pollerIntervalMs: number };
   sources: Source[];
 };
+type AlertMessage = { text: string; tone: "success" | "error" };
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -93,7 +94,7 @@ function SourceStatus({ source }: { source: Source }) {
 export function LiveAdmin() {
   const [data, setData] = useState<Snapshot | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<AlertMessage | null>(null);
   const load = async () =>
     setData(
       await (await fetch("/api/admin/live", { cache: "no-store" })).json(),
@@ -116,11 +117,12 @@ export function LiveAdmin() {
       scheduled?: string[];
       error?: string;
     };
-    setMessage(
-      response.ok
+    setMessage({
+      text: response.ok
         ? `Scheduled ${payload.scheduled?.length ?? 0} manual imports.`
         : (payload.error ?? "Import scheduling failed."),
-    );
+      tone: response.ok ? "success" : "error",
+    });
     if (response.ok) {
       setSelected([]);
       await load();
@@ -138,7 +140,17 @@ export function LiveAdmin() {
         </div>
       }
     >
-      {message && <p className={styles.alert}>{message}</p>}
+      {message && (
+        <p
+          className={`${styles.alert} ${
+            message.tone === "success"
+              ? styles.alertSuccess
+              : styles.alertError
+          }`}
+        >
+          {message.text}
+        </p>
+      )}
       <section className={styles.card} aria-labelledby="schedule-heading">
         <h2 id="schedule-heading">Worker schedule</h2>
         <dl className={styles.grid}>

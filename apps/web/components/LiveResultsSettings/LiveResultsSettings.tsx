@@ -5,6 +5,8 @@ import { AdminPage } from "@/components/AdminPage/AdminPage";
 import { ListDialog } from "@/components/ListOwnerControls/shared";
 import styles from "@/components/AdminHealth/AdminHealth.module.css";
 
+type AlertMessage = { text: string; tone: "success" | "error" };
+
 async function loadSettings() {
   const response = await fetch("/api/admin/live/settings", {
     cache: "no-store",
@@ -15,7 +17,7 @@ async function loadSettings() {
 
 export function LiveResultsSettings() {
   const [pollMinutes, setPollMinutes] = useState(60);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<AlertMessage | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmingSave, setConfirmingSave] = useState(false);
 
@@ -23,11 +25,13 @@ export function LiveResultsSettings() {
     void loadSettings()
       .then(({ pollSeconds }) => setPollMinutes(pollSeconds / 60))
       .catch((error: unknown) =>
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : "Live-results settings are unavailable.",
-        ),
+        setMessage({
+          text:
+            error instanceof Error
+              ? error.message
+              : "Live-results settings are unavailable.",
+          tone: "error",
+        }),
       );
   }, []);
 
@@ -39,7 +43,10 @@ export function LiveResultsSettings() {
       pollSeconds < 60 ||
       pollSeconds > 86_400
     ) {
-      setMessage("Enter a whole number of minutes from 1 through 1440.");
+      setMessage({
+        text: "Enter a whole number of minutes from 1 through 1440.",
+        tone: "error",
+      });
       return;
     }
     setConfirmingSave(true);
@@ -61,11 +68,16 @@ export function LiveResultsSettings() {
       if (!response.ok)
         throw new Error(payload.error ?? "Settings could not be saved.");
       setPollMinutes((payload.pollSeconds ?? pollSeconds) / 60);
-      setMessage("Saved. The poller applies this setting within one minute.");
+      setMessage({
+        text: "Saved. The poller applies this setting within one minute.",
+        tone: "success",
+      });
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Settings could not be saved.",
-      );
+      setMessage({
+        text:
+          error instanceof Error ? error.message : "Settings could not be saved.",
+        tone: "error",
+      });
     } finally {
       setSaving(false);
       setConfirmingSave(false);
@@ -77,7 +89,17 @@ export function LiveResultsSettings() {
       title="Live results settings"
       description="Configuration for active live-results polling."
     >
-      {message && <p className={styles.alert}>{message}</p>}
+      {message && (
+        <p
+          className={`${styles.alert} ${
+            message.tone === "success"
+              ? styles.alertSuccess
+              : styles.alertError
+          }`}
+        >
+          {message.text}
+        </p>
+      )}
       <section className={styles.card} aria-labelledby="polling-heading">
         <h2 id="polling-heading">Polling</h2>
         <form className={styles.settingsForm} onSubmit={save}>
