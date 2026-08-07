@@ -18,6 +18,7 @@ test("person profile renders from the server profile loader", async () => {
   assert.doesNotMatch(page, /"use client"/);
   assert.match(page, /generateMetadata/);
   assert.match(page, /loadPersonProfileHeader/);
-  assert.match(loader, /STRAIGHT_JOIN result_attempts/);
+  assert.match(loader, /person_period_metrics/);
+  assert.doesNotMatch(loader, /result_attempts/);
   assert.match(route, /loadPersonProfileHeader/);
 });
