@@ -21,6 +21,72 @@ const LEASE_SECONDS = Math.max(
 const selectedCompetition = argumentValue("competition");
 const once = argumentPresent("once");
 
+const activeCompetitionPredicate = `
+  competition.cancelled = 0
+  AND CURRENT_DATE() BETWEEN
+    STR_TO_DATE(
+      CONCAT(competition.year, '-', competition.month, '-', competition.day),
+      '%Y-%c-%e'
+    )
+    AND STR_TO_DATE(
+      CONCAT(
+        competition.end_year,
+        '-',
+        competition.end_month,
+        '-',
+        competition.end_day
+      ),
+      '%Y-%c-%e'
+    )`;
+
+function utcDay(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function reconcileActiveSources(connection: Connection): Promise<void> {
+  await connection.beginTransaction();
+  try {
+    await connection.query(
+      `UPDATE provisional_live_result_sources source
+       LEFT JOIN competitions competition
+         ON competition.id = source.competition_id
+        AND ${activeCompetitionPredicate}
+       SET source.enabled = 0,
+           source.lease_token = NULL,
+           source.leased_until = NULL
+       WHERE competition.id IS NULL AND source.enabled = 1`,
+    );
+    await connection.query(
+      `UPDATE provisional_live_result_sources source
+       JOIN competitions competition
+         ON competition.id = source.competition_id
+        AND ${activeCompetitionPredicate}
+       SET source.next_poll_at = IF(
+             source.enabled = 0,
+             CURRENT_TIMESTAMP(6),
+             source.next_poll_at
+           ),
+           source.enabled = 1`,
+    );
+    await connection.query(
+      `INSERT INTO provisional_live_result_sources
+         (source_name, competition_id, remote_competition_id, competition_year)
+       SELECT 'wca-live', competition.id, competition.id, competition.year
+       FROM competitions competition
+       WHERE ${activeCompetitionPredicate}
+         AND NOT EXISTS (
+           SELECT 1
+           FROM provisional_live_result_sources source
+           WHERE source.competition_id = competition.id
+         )`,
+    );
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  }
+}
+
 async function claimSource(
   connection: Connection,
 ): Promise<LiveResultsSourceRow | null> {
@@ -104,15 +170,19 @@ async function saveSnapshot(
   connection: Connection,
   source: LiveResultsSourceRow,
 ): Promise<void> {
-  const snapshot = await fetchLiveResults(
-    source.source_name,
-    source.remote_competition_id,
-  );
-  const hash = snapshotHash(snapshot);
+  let snapshot: LiveResultsSnapshot | undefined;
+  let hash: string;
   let version: number | null = null;
   let needsQueue: boolean;
-  await connection.beginTransaction();
+  let transactionOpen = false;
   try {
+    snapshot = await fetchLiveResults(
+      source.source_name,
+      source.remote_competition_id,
+    );
+    hash = snapshotHash(snapshot);
+    await connection.beginTransaction();
+    transactionOpen = true;
     const [state] = await connection.query<RowDataPacket[]>(
       `SELECT snapshot_hash, queued_snapshot_hash FROM provisional_live_result_sources
        WHERE source_name = ? AND competition_id = ? AND lease_token = ? FOR UPDATE`,
@@ -162,8 +232,9 @@ async function saveSnapshot(
       [hash, source.source_name, source.competition_id, source.lease_token],
     );
     await connection.commit();
+    transactionOpen = false;
   } catch (error) {
-    await connection.rollback();
+    if (transactionOpen) await connection.rollback();
     await connection.query(
       `UPDATE provisional_live_result_sources SET lease_token = NULL, leased_until = NULL,
       next_poll_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 60 SECOND), last_error = ?
@@ -178,6 +249,7 @@ async function saveSnapshot(
     throw error;
   }
   if (needsQueue) {
+    if (!snapshot) throw new Error("Live result snapshot is missing.");
     const queuedVersion = version ?? (await currentSourceVersion(connection));
     for (const job of partitionJobs(source, snapshot, queuedVersion))
       await enqueueProjectionJob(job);
@@ -203,10 +275,28 @@ async function currentSourceVersion(connection: Connection): Promise<number> {
 async function main(): Promise<void> {
   const connection = await mysql.createConnection(databaseOptions());
   try {
-    await logActiveSources(connection);
+    let reconciledDay = "";
+    async function reconcileForToday(): Promise<void> {
+      const day = utcDay();
+      if (day === reconciledDay) return;
+      await reconcileActiveSources(connection);
+      reconciledDay = day;
+      await logActiveSources(connection);
+    }
+
+    await reconcileForToday();
     do {
+      await reconcileForToday();
       const source = await claimSource(connection);
-      if (source) await saveSnapshot(connection, source);
+      if (source) {
+        try {
+          await saveSnapshot(connection, source);
+        } catch (error) {
+          process.stderr.write(
+            `Live poll failed for ${source.source_name}:${source.competition_id}: ${error instanceof Error ? error.message : String(error)}\n`,
+          );
+        }
+      }
       if (once || selectedCompetition) return;
       if (!source) await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     } while (true);
