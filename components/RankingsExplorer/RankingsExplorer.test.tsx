@@ -7,6 +7,7 @@ import { subjectPath } from "./helpers/navigation";
 import { orderSearchMatches } from "./helpers/search";
 import { getTopRailScrollProgress } from "./useRailScrollProgress";
 import { competitionRankingPath } from "./useRankingsState";
+import { rankingPageRequestUrl } from "./rankingsQueries";
 import type { RankingsFilterState } from "./rankingsUrl";
 import { serializeRankingsUrl, type RankingsUrlState } from "./rankingsUrl";
 import type { RankingEntry } from "./types";
@@ -37,6 +38,7 @@ function pathnameForFilters(filters: RankingsFilterState) {
   if (filters.subject === "cities") return `/cities/${filters.cityRanking}`;
   if (filters.personCompetitionRanking) return "/persons/competitions";
   if (filters.personMedalRanking) return "/persons/medals";
+  if (filters.personPrStreakRanking) return "/persons/pr-streak";
   if (filters.year) return `/persons/year/${filters.year}`;
   return "/";
 }
@@ -51,6 +53,7 @@ function renderExplorerMarkup(
     cityRanking: "fastest-single",
     personCompetitionRanking: false,
     personMedalRanking: false,
+    personPrStreakRanking: false,
     medalType: "overall",
     year: null,
     eventId: "333",
@@ -200,7 +203,7 @@ test("renders a separate person ranking picker", () => {
   assert.match(markup, /aria-label="Person ranking"/);
   assert.match(
     markup,
-    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button><button[^>]*>Competitions<\/button>/,
+    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button><button[^>]*>Competitions<\/button><button[^>]*>PR Streak<\/button>/,
   );
 });
 
@@ -211,6 +214,7 @@ test("keeps a competition-ranking year in its query string", () => {
     cityRanking: "fastest-single",
     personCompetitionRanking: true,
     personMedalRanking: false,
+    personPrStreakRanking: false,
     medalType: "overall",
     year: 2023,
     eventId: "333",
@@ -235,4 +239,39 @@ test("keeps a competition-ranking year in its query string", () => {
   assert.match(markup, /aria-label="Person ranking period"/);
   assert.match(markup, />All time</);
   assert.match(markup, />2023</);
+});
+
+test("renders PR Streak without event or result controls", () => {
+  const markup = renderExplorerMarkup(
+    { options: { showSubjectSwitch: true } },
+    { personPrStreakRanking: true, year: 2023 },
+  );
+  assert.match(markup, />PR Streak</);
+  assert.match(markup, /aria-label="Person ranking period"/);
+  assert.match(markup, />All time</);
+  assert.match(markup, />2023</);
+  assert.doesNotMatch(markup, /aria-label="Event"/);
+  assert.doesNotMatch(markup, /Switch to average rankings/);
+});
+
+test("requests PR Streak with one-based positions and no event dimensions", () => {
+  const url = new URL(
+    rankingPageRequestUrl(
+      {
+        eventId: "333",
+        rankingType: "single",
+        regionSelection: { scope: "world", regionId: "" },
+        resource: "person-pr-streak",
+        gender: [],
+        year: null,
+        medalType: "overall",
+      },
+      1,
+    ),
+    "http://localhost",
+  );
+  assert.equal(url.pathname, "/api/rankings/people/pr-streak");
+  assert.equal(url.searchParams.get("start"), "1");
+  assert.equal(url.searchParams.has("eventId"), false);
+  assert.equal(url.searchParams.has("result"), false);
 });

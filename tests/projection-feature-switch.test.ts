@@ -27,6 +27,10 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
       "person_medal_scores",
       "person_medal_rankings",
       "person_medal_ranking_counts",
+      "person_pr_streak_counts",
+      "person_pr_streak_year_counts",
+      "person_pr_streak_rankings",
+      "person_pr_streak_ranking_counts",
       "person_activity_counts",
       "person_activity_rankings",
       "person_activity_ranking_counts",
@@ -45,6 +49,7 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
     yearlyPersonRankings: true,
     personCompetitionRankings: true,
     personMedalRankings: true,
+    personPrStreakRankings: true,
   });
 });
 
@@ -60,6 +65,7 @@ test("keeps core ranking tables available without semantic projections", () => {
   assert.equal(featureSwitch.personActivityRankings, false);
   assert.equal(featureSwitch.personCompetitionRankings, false);
   assert.equal(featureSwitch.personMedalRankings, false);
+  assert.equal(featureSwitch.personPrStreakRankings, false);
 });
 
 test("competition capability does not depend on city counts", () => {

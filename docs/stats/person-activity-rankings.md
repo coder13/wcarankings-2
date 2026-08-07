@@ -25,9 +25,11 @@ competition-round key.
 
 ## Source data
 
-The projection reuses `person_competition_counts` for competition totals. It
-does not count competitions again. It reads `result_facts`, `competitions`,
-`persons`, `countries`, and `result_attempts` for the other values.
+The projection builds the three new metrics from `result_facts`,
+`competitions`, `persons`, `countries`, and `result_attempts`. The separate
+`competitions` request metric delegates to the person-competition ranking
+service, so it does not create a build dependency between the two projection
+groups.
 
 `person_activity_attempt_counts` is a temporary table. It scans
 `result_attempts` once and counts positive values for each result ID. The

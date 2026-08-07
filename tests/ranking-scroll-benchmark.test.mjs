@@ -9,16 +9,19 @@ import {
   CITY_RANKING_SCENARIOS,
   COMPETITION_RANKING_SCENARIOS,
   PERSON_RANKING_SCENARIOS,
+  PR_STREAK_RANKING_SCENARIOS,
   RANKING_SCROLL_SUITES,
   RESULT_RANKING_SCENARIOS,
 } from "../scripts/lib/ranking-scroll-scenarios.ts";
 
-test("ranking scroll scenarios are divided into the four primary stats", () => {
+test("ranking scroll scenarios are divided into the supported stat suites", () => {
   assert.deepEqual(Object.keys(RANKING_SCROLL_SUITES), [
     "persons",
     "results",
     "competitions",
     "cities",
+    "medals",
+    "prStreak",
   ]);
   for (const scenarios of Object.values(RANKING_SCROLL_SUITES))
     assert.ok(scenarios.length > 0);
@@ -65,6 +68,11 @@ test("scenario URLs preserve scenario-specific filters and pagination", () => {
 test("each primary stat covers its distinct ranking modes", () => {
   assert.ok(
     PERSON_RANKING_SCENARIOS.some(({ params }) => params.eventId === "SOR"),
+  );
+  assert.ok(
+    PR_STREAK_RANKING_SCENARIOS.every(
+      ({ path }) => path === "/api/rankings/people/pr-streak",
+    ),
   );
   assert.ok(
     PERSON_RANKING_SCENARIOS.some(

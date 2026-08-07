@@ -2,7 +2,7 @@ import type { ProjectionJob } from "../../types.ts";
 
 export const personActivityRankingsJob = {
   id: "person-activity-rankings",
-  dependencies: ["person-competition-rankings"],
+  dependencies: ["result-facts"],
   sqlFiles: ["people/activity-rankings/person_activity_rankings.sql"],
   tables: [
     "person_activity_counts",

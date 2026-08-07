@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { RankingsExplorer } from "@/components/RankingsExplorer/RankingsExplorer";
 import {
+  formatRankingDocumentDescription,
   formatRankingDocumentTitle,
   type RankingDocumentTitleInput,
 } from "@/lib/ranking-document-title";
@@ -9,6 +10,7 @@ import { isMedalRankingType } from "@/lib/medal-rankings";
 import { isEventId, isRankingEventId, isRankingType } from "@/lib/wca";
 import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
+import { loadTopRankingResultLabels } from "@/services/rankings/page-metadata";
 import { getRegions } from "@/services/regions/service";
 
 const LIVE_COMMIT_SHA =
@@ -50,13 +52,68 @@ export async function getRankingsPageMetadata({
     ? requestedMedal
     : "overall";
 
+  const metadataInput = {
+    ...options,
+    eventId,
+    rankingType,
+    medalType,
+  } satisfies RankingDocumentTitleInput;
+  const topResults = await loadTopRankingResultLabels(
+    new URLSearchParams(
+      Object.entries(params).flatMap(([key, value]) =>
+        Array.isArray(value) ? value.map((item) => [key, item]) : [[key, value ?? ""]],
+      ),
+    ),
+    metadataInput,
+  );
+  const title = formatRankingDocumentTitle(metadataInput);
+  const description = formatRankingDocumentDescription(
+    metadataInput,
+    topResults,
+  );
+  const imageParams = new URLSearchParams(
+    Object.entries(params).flatMap(([key, value]) =>
+      Array.isArray(value)
+        ? value.map((item) => [key, item])
+        : [[key, value ?? ""]],
+    ),
+  );
+  imageParams.set("subject", metadataInput.subject);
+  imageParams.set("result", metadataInput.rankingType);
+  imageParams.set("competitionRanking", metadataInput.competitionRanking);
+  imageParams.set("cityRanking", metadataInput.cityRanking);
+  imageParams.set(
+    "personCompetitionRanking",
+    String(metadataInput.personCompetitionRanking === true),
+  );
+  imageParams.set(
+    "personMedalRanking",
+    String(metadataInput.personMedalRanking === true),
+  );
+  imageParams.set(
+    "personPrStreakRanking",
+    String(metadataInput.personPrStreakRanking === true),
+  );
+  imageParams.set("medal", metadataInput.medalType);
+  if (metadataInput.year) imageParams.set("year", String(metadataInput.year));
+  if (metadataInput.eventId === "all") imageParams.delete("eventId");
+  else imageParams.set("eventId", metadataInput.eventId);
+  const imageUrl = `/api/og/rankings?${imageParams.toString()}`;
+
   return {
-    title: formatRankingDocumentTitle({
-      ...options,
-      eventId,
-      rankingType,
-      medalType,
-    }),
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: [{ url: imageUrl, width: 1200, height: 348 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [imageUrl],
+    },
   };
 }
 
@@ -67,6 +124,7 @@ export async function RankingsPage({
   requiresCompetitionRankings = false,
   requiresPersonCompetitionRankings = false,
   requiresPersonMedalRankings = false,
+  requiresPersonPrStreakRankings = false,
   requiresCityRankings = false,
 }: {
   searchParams?: Promise<RankingsSearchParams>;
@@ -75,6 +133,7 @@ export async function RankingsPage({
   requiresCompetitionRankings?: boolean;
   requiresPersonCompetitionRankings?: boolean;
   requiresPersonMedalRankings?: boolean;
+  requiresPersonPrStreakRankings?: boolean;
   requiresCityRankings?: boolean;
 } = {}) {
   const featureSwitch = await getProjectionFeatureSwitch();
@@ -90,6 +149,7 @@ export async function RankingsPage({
     (requiresPersonCompetitionRankings &&
       !featureSwitch.personCompetitionRankings) ||
     (requiresPersonMedalRankings && !featureSwitch.personMedalRankings) ||
+    (requiresPersonPrStreakRankings && !featureSwitch.personPrStreakRankings) ||
     (requiresCityRankings && !featureSwitch.cityEventStats) ||
     (["SOR", "sor-kinch"].includes(requestedEvent) && !featureSwitch.sumOfRanks)
   ) {

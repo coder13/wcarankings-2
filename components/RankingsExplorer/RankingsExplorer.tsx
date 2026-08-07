@@ -61,6 +61,7 @@ export function RankingsExplorer({
       year: state.filters.year,
       personCompetitionRanking: state.filters.personCompetitionRanking,
       personMedalRanking: state.filters.personMedalRanking,
+      personPrStreakRanking: state.filters.personPrStreakRanking,
       medalType: state.filters.medalType,
       listName: source?.listName,
     });
@@ -72,6 +73,7 @@ export function RankingsExplorer({
     state.filters.medalType,
     state.filters.personCompetitionRanking,
     state.filters.personMedalRanking,
+    state.filters.personPrStreakRanking,
     state.filters.rankingType,
     state.filters.subject,
     state.filters.year,
@@ -93,7 +95,8 @@ export function RankingsExplorer({
     expandableRows:
       state.filters.subject === "people" &&
       !state.filters.personCompetitionRanking &&
-      !state.filters.personMedalRanking,
+      !state.filters.personMedalRanking &&
+      !state.filters.personPrStreakRanking,
   });
   const listMembers = useListMemberManagement({
     listId: list?.owner?.listId,

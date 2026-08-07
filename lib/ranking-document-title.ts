@@ -16,6 +16,7 @@ export type RankingDocumentTitleInput = {
   year?: number | null;
   personCompetitionRanking?: boolean;
   personMedalRanking?: boolean;
+  personPrStreakRanking?: boolean;
   medalType?: MedalRankingType;
   listName?: string;
 };
@@ -64,6 +65,7 @@ export function formatRankingDocumentTitle({
   year,
   personCompetitionRanking,
   personMedalRanking,
+  personPrStreakRanking,
   medalType = "overall",
   listName,
 }: RankingDocumentTitleInput) {
@@ -122,6 +124,20 @@ export function formatRankingDocumentTitle({
     return titleWithSite(`${eventPrefix}${medalPrefix}Medal Rankings`);
   }
 
+  if (personPrStreakRanking) {
+    const yearSuffix = year ? ` ${year}` : "";
+    return titleWithSite(`PR Streak${yearSuffix}`);
+  }
+
   const yearSuffix = year ? ` ${year}` : "";
   return titleWithSite(`${event} ${resultType} Rankings${yearSuffix}`);
+}
+
+export function formatRankingDocumentDescription(
+  input: RankingDocumentTitleInput,
+  topResults: readonly string[] = [],
+) {
+  void input;
+  if (topResults.length === 0) return "";
+  return `${topResults.join("\n")}.`;
 }

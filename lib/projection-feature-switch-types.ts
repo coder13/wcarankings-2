@@ -7,6 +7,7 @@ export type ProjectionFeatureSwitch = {
   personActivityRankings: boolean;
   personCompetitionRankings: boolean;
   personMedalRankings: boolean;
+  personPrStreakRankings: boolean;
   cityEventStats: boolean;
   sumOfRanks: boolean;
   yearlyPersonRankings: boolean;
@@ -21,6 +22,7 @@ export const DEFAULT_PROJECTION_FEATURE_SWITCH: ProjectionFeatureSwitch = {
   personActivityRankings: true,
   personCompetitionRankings: true,
   personMedalRankings: true,
+  personPrStreakRankings: true,
   cityEventStats: true,
   sumOfRanks: true,
   yearlyPersonRankings: true,
@@ -35,6 +37,7 @@ export const UNAVAILABLE_PROJECTION_FEATURE_SWITCH: ProjectionFeatureSwitch = {
   personActivityRankings: false,
   personCompetitionRankings: false,
   personMedalRankings: false,
+  personPrStreakRankings: false,
   cityEventStats: false,
   sumOfRanks: false,
   yearlyPersonRankings: false,

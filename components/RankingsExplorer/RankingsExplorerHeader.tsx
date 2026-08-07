@@ -14,6 +14,7 @@ const PERSON_RANKING_OPTIONS = [
   { value: "rankings", label: "Rankings" },
   { value: "medals", label: "Medals" },
   { value: "competitions", label: "Competitions" },
+  { value: "pr-streak", label: "PR Streak" },
 ] as const;
 
 export function RankingsExplorerHeader() {
@@ -41,11 +42,14 @@ export function RankingsExplorerHeader() {
       if (option.value === "medals") return featureSwitch.personMedalRankings;
       if (option.value === "competitions")
         return featureSwitch.personCompetitionRankings;
+      if (option.value === "pr-streak")
+        return featureSwitch.personPrStreakRankings;
       return true;
     });
     let personRankingValue = "rankings";
     if (filters.personCompetitionRanking) personRankingValue = "competitions";
     else if (filters.personMedalRanking) personRankingValue = "medals";
+    else if (filters.personPrStreakRanking) personRankingValue = "pr-streak";
     contextualControl = (
       <TextDropdown
         options={personRankingOptions}
@@ -55,8 +59,12 @@ export function RankingsExplorerHeader() {
             actions.changePersonCompetitionRanking(true);
           } else if (value === "medals") {
             actions.changePersonMedalRanking(true);
+          } else if (value === "pr-streak") {
+            actions.changePersonPrStreakRanking(true);
           } else if (filters.personCompetitionRanking) {
             actions.changePersonCompetitionRanking(false);
+          } else if (filters.personPrStreakRanking) {
+            actions.changePersonPrStreakRanking(false);
           } else {
             actions.changePersonMedalRanking(false);
           }

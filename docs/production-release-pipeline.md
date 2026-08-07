@@ -156,3 +156,17 @@ index and exceeded 20 seconds without it. Removing rows did not reclaim InnoDB
 disk space without a table rebuild. Therefore this is not an active
 optimization: retain history and the index unless a future measured
 rebuild-and-swap change makes the tradeoff worthwhile.
+
+## Validate public pages after a release
+
+Run the page validator after a server release:
+
+```bash
+bun scripts/validate-pages.ts --base-url=https://wcarankings.com
+```
+
+The validator checks the public persons, results, competitions, cities, and
+person-profile routes. It requires a 2xx response and checks the expected SSR
+title or profile content. A 404 for a disabled projection capability is still
+reported as a failure. Use `--person-id=YYYYXXXXNN` to test a different person
+profile. Use `--timeout-ms=30000` when the release needs a longer startup window.
