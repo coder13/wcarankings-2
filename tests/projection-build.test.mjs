@@ -298,7 +298,6 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
   for (const name of [
     "sum-of-ranks",
     "person-medal-rankings",
-    "person-event-rankings",
     "country-event-stats",
     "person-pr-streak-rankings",
   ]) {

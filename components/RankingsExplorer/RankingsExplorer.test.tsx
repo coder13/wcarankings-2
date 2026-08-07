@@ -216,7 +216,7 @@ test("renders country statistic, year, gender, event, and continent controls", (
   assert.match(markup, /aria-label="Country ranking period"/);
   assert.match(markup, />2025</);
   assert.match(markup, /aria-label="Gender"/);
-  assert.match(markup, /aria-label="Event"/);
+  assert.match(markup, /aria-label="3x3x3 Cube"/);
   assert.doesNotMatch(markup, /Switch to average rankings/);
 });
 
