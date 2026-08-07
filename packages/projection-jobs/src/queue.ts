@@ -1,4 +1,4 @@
-import { Queue, type JobsOptions } from "bullmq";
+import { Queue, QueueEvents, type JobsOptions } from "bullmq";
 
 export type ProjectionJobKind = "projection-rebuild" | "list-ranking-rebuild";
 
@@ -31,6 +31,12 @@ export function projectionJobQueue(): Queue<ProjectionJob> {
     connection: projectionJobConnection(),
   });
   return queue;
+}
+
+export function projectionJobEvents(): QueueEvents {
+  return new QueueEvents(PROJECTION_JOB_QUEUE_NAME, {
+    connection: projectionJobConnection(),
+  });
 }
 
 function jobId(job: ProjectionJob): string {

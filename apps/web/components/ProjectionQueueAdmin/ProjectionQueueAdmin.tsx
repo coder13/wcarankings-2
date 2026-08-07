@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AdminPage } from "@/components/AdminPage/AdminPage";
 import { ListDialog } from "@/components/ListOwnerControls/shared";
 import styles from "@/components/AdminHealth/AdminHealth.module.css";
@@ -40,6 +40,12 @@ function payload(item: QueueItem) {
     : "—";
 }
 
+function queueSummary(data: QueueResponse | null, activeCount: number) {
+  if (!data) return "Loading…";
+  if (activeCount) return `${activeCount} processing`;
+  return `${data.items.length} items`;
+}
+
 export function ProjectionQueueAdmin() {
   const [data, setData] = useState<QueueResponse | null>(null);
   const [message, setMessage] = useState("");
@@ -47,22 +53,34 @@ export function ProjectionQueueAdmin() {
   const [clearing, setClearing] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     const response = await fetch("/api/admin/queue", { cache: "no-store" });
     const next = (await response.json()) as QueueResponse;
     setData(
       response.ok ? next : { items: [], limited: false, error: next.error },
     );
-  }
+  }, []);
 
   useEffect(() => {
+    let refreshTimer: number | undefined;
+    const refresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void load(), 50);
+    };
+    const source = new EventSource("/api/admin/queue/events");
+    source.addEventListener("queue", refresh);
     const initial = window.setTimeout(() => void load(), 0);
     const interval = window.setInterval(() => void load(), 10_000);
     return () => {
+      source.close();
+      window.clearTimeout(refreshTimer);
       window.clearTimeout(initial);
       window.clearInterval(interval);
     };
-  }, []);
+  }, [load]);
+
+  const activeCount =
+    data?.items.filter((item) => item.state === "active").length ?? 0;
 
   async function remove(jobId: string) {
     setRemoving(jobId);
@@ -120,8 +138,12 @@ export function ProjectionQueueAdmin() {
       title="Projection queue"
       description=""
       aside={
-        <strong className={`${styles.status} ${styles.unknown}`}>
-          {data ? `${data.items.length} items` : "Loading…"}
+        <strong
+          className={`${styles.status} ${
+            activeCount ? styles.healthy : styles.unknown
+          }`}
+        >
+          {queueSummary(data, activeCount)}
         </strong>
       }
     >
