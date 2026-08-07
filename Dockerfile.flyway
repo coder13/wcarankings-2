@@ -1,4 +1,4 @@
-FROM redgate/flyway:11.20.0-alpine
+FROM docker.io/redgate/flyway:11.20.0-alpine
 
 COPY migrations/mysql/app /flyway/migrations/app
 COPY migrations/mysql/results /flyway/migrations/results
