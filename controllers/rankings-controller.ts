@@ -13,7 +13,10 @@ import {
 import { assertCanViewList, resolveList } from "@/services/lists/lists";
 import { collectGlobalRankingPopularity } from "@/services/ranking-popularity/global-rankings";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
-import { ApiInputError } from "@/lib/api/projection";
+import {
+  ApiInputError,
+  assertCanonicalRankingParams,
+} from "@/lib/api/projection";
 import {
   isRankingEventId,
   isRankingType,
@@ -34,8 +37,9 @@ type RankingsQuery = {
 function parseRankingsQuery(request: Request): RankingsQuery {
   const requestUrl = new URL(request.url);
   const searchParams = requestUrl.searchParams;
-  const rawEventId = searchParams.get("eventId") ?? searchParams.get("event");
-  const rawType = searchParams.get("result") ?? searchParams.get("type");
+  assertCanonicalRankingParams(searchParams);
+  const rawEventId = searchParams.get("eventId");
+  const rawType = searchParams.get("result");
   const eventId = isRankingEventId(rawEventId) ? rawEventId : "333";
   let type: RankingType = "single";
   if (

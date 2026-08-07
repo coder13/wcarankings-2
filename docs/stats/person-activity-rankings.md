@@ -44,8 +44,8 @@ each new metric. The API derives row totals from the serving table.
 
 ## Request policy
 
-The API is `/api/rankings/people/activity`. Its `metric` value is one of
-`competitions`, `countries`, `rounds`, or `solves`.
+The APIs are `/api/persons/competitions`, `/api/persons/countries`,
+`/api/persons/rounds`, and `/api/persons/solves`.
 
 The `year` parameter selects a yearly row. The `eventId` parameter is valid
 for `rounds` and `solves`.

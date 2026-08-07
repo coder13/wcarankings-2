@@ -91,7 +91,7 @@ export function PersonalBestsPreview({ personId }: { personId: string }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/people/${personId}/personal-bests`, {
+    fetch(`/api/person/${personId}/personal-bests`, {
       signal: controller.signal,
     })
       .then(async (response) => {

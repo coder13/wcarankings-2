@@ -12,7 +12,7 @@ const change = {
 
 test("rejects a home feed limit above five", async () => {
   const response = await handleHomeFeedRequest(
-    new Request("https://example.test/feed?limit=6"),
+    new Request("https://example.test/api/feed?limit=6"),
   );
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), {
@@ -35,7 +35,7 @@ test("returns bounded recent-change cards from injected feed sources", async () 
       population: { kind: "everyone" as const },
     },
     title: "Changed ranking",
-    exploreUrl: "/api/rankings?eventId=333",
+    exploreUrl: "/api/persons/rankings?eventId=333",
     previewRows: [],
     sourceFamily: "person-event" as const,
     diversityKey: "333",
@@ -52,7 +52,7 @@ test("returns bounded recent-change cards from injected feed sources", async () 
     },
   };
   const response = await handleHomeFeedRequest(
-    new Request("https://example.test/feed?limit=1"),
+    new Request("https://example.test/api/feed?limit=1"),
     {
       generationId: "generation-test",
       now: new Date("2026-08-05T12:00:00.000Z"),

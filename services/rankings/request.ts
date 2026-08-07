@@ -1,5 +1,9 @@
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
-import { parseGender, parseYear } from "@/lib/api/projection";
+import {
+  assertCanonicalRankingParams,
+  parseGender,
+  parseYear,
+} from "@/lib/api/projection";
 import {
   isRankingEventId,
   isRankingType,
@@ -12,10 +16,10 @@ import type { QueryInput } from "@/services/rankings/types";
 const MAX_SEARCH_RESULTS = 500;
 
 export function parseRankingInput(searchParams: URLSearchParams): QueryInput {
-  const requestedEvent =
-    searchParams.get("eventId") ?? searchParams.get("event");
+  assertCanonicalRankingParams(searchParams);
+  const requestedEvent = searchParams.get("eventId");
   const eventId = isRankingEventId(requestedEvent) ? requestedEvent : "333";
-  const rawType = searchParams.get("result") ?? searchParams.get("type");
+  const rawType = searchParams.get("result");
   let type: RankingType = "single";
   if (
     eventId !== "333mbf" &&

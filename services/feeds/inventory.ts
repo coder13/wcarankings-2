@@ -131,19 +131,17 @@ function exploreUrl({
   if (kind === "person" && eventId === "pr-streak") {
     return `/persons/pr-streak?${params.toString()}`;
   }
-  if (kind === "person") return `/?${params.toString()}`;
-  if (kind === "result") return `/results?${params.toString()}`;
+  if (kind === "person") return `/persons?${params.toString()}`;
+  if (kind === "result") return `/persons/results?${params.toString()}`;
   if (kind === "person-competition") return "/persons/competitions";
   if (kind === "person-medals") return "/persons/medals?medal=overall";
   if (isActivityKind(kind)) {
-    params.set("metric", kind.replace("person-activity-", ""));
-    return `/api/rankings/people/activity?${params.toString()}`;
+    return `/persons/${kind.replace("person-activity-", "")}?${params.toString()}`;
   }
   if (kind === "competition") {
-    params.set("ranking", "fastest");
-    return `/competitions?${params.toString()}`;
+    return `/competitions/best-result?${params.toString()}`;
   }
-  return `/cities?${params.toString()}`;
+  return `/cities/fastest-single?${params.toString()}`;
 }
 
 export function buildFeedStatInventory({

@@ -20,10 +20,26 @@ const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const PAGE_STALE_TIME_MS = 5 * 60 * 1000;
 const PR_STREAK_API = rankingStatSource("person-pr-streak").paths.api;
 
-function personSearchEndpoint(resource: RankingResource) {
-  if (resource === "results") return "/api/rankings/results";
+function rankingEndpoint(
+  resource: RankingResource,
+  activityMetric: PersonActivityMetric,
+) {
+  if (resource === "people") return "/api/persons/rankings";
+  if (resource === "results") return "/api/persons/results";
+  if (resource === "person-competition-count")
+    return "/api/persons/competitions";
+  if (resource === "person-activity-rankings") {
+    return `/api/persons/${activityMetric}`;
+  }
+  if (resource === "person-medal-rankings") return "/api/persons/medals";
   if (resource === "person-pr-streak") return PR_STREAK_API;
-  return "/api/rankings";
+  if (resource === "competitions") return "/api/competitions/best-result";
+  if (resource === "podiums") return "/api/competitions/podiums";
+  if (resource === "competitor-count") {
+    return "/api/competitions/competitor-count";
+  }
+  if (resource.startsWith("latitude-")) return "/api/competitions/latitude";
+  return `/api/cities/${resource.slice("city-".length)}`;
 }
 
 export type RankingQueryFilters = {
@@ -153,9 +169,6 @@ function addRankingFilterParams(
   if (filters.regionSelection.scope !== "world") {
     params.set("region", filters.regionSelection.regionId);
   }
-  if (filters.resource === "person-activity-rankings") {
-    params.set("metric", filters.personActivityMetric);
-  }
 }
 
 export function rankingPageRequestUrl(
@@ -173,11 +186,16 @@ export function rankingPageRequestUrl(
     limit: String(PAGE_SIZE),
     paged: "1",
   });
-  if (filters.resource !== "person-pr-streak") {
+  if (
+    filters.resource === "people" ||
+    filters.resource === "results" ||
+    filters.resource === "competitions"
+  ) {
     params.set("result", filters.rankingType);
   }
   if (
-    (filters.resource !== "person-medal-rankings" || filters.eventId !== "all") &&
+    (filters.resource !== "person-medal-rankings" ||
+      filters.eventId !== "all") &&
     filters.resource !== "person-pr-streak" &&
     (filters.resource !== "person-activity-rankings" ||
       ["rounds", "solves"].includes(filters.personActivityMetric))
@@ -185,51 +203,16 @@ export function rankingPageRequestUrl(
     params.set("eventId", filters.eventId);
   }
   addRankingFilterParams(params, filters);
-  if (filters.resource === "podiums") params.set("ranking", "podium");
-  if (filters.resource === "competitor-count") {
-    params.set("ranking", "competitor-count");
-  }
   if (filters.resource.startsWith("latitude-")) {
-    params.set("ranking", "latitude");
     params.set("hemisphere", filters.resource.slice("latitude-".length));
-  }
-  if (filters.resource.startsWith("city-")) {
-    const cityRanking = filters.resource.slice("city-".length);
-    if (
-      cityRanking === "competitors" ||
-      cityRanking === "competitions" ||
-      cityRanking === "solves"
-    ) {
-      params.set("stat", cityRanking);
-    } else {
-      params.set(
-        "result",
-        cityRanking === "fastest-average" ? "average" : "single",
-      );
-    }
   }
   if (filters.resource === "person-medal-rankings") {
     params.set("medal", filters.medalType);
   }
-  if (filters.resource === "person-activity-rankings") {
-    params.set("metric", filters.personActivityMetric);
-  }
-
-  let endpoint = "/api/rankings";
-  if (filters.resource === "results") endpoint = "/api/rankings/results";
-  else if (filters.resource === "person-competition-count") {
-    endpoint = "/api/rankings/people/competitions";
-  } else if (filters.resource === "person-activity-rankings") {
-    endpoint = "/api/rankings/people/activity";
-  } else if (filters.resource === "person-medal-rankings") {
-    endpoint = "/api/rankings/people/medals";
-  } else if (filters.resource === "person-pr-streak") {
-    endpoint = PR_STREAK_API;
-  } else if (filters.resource.startsWith("city-"))
-    endpoint = "/api/rankings/cities";
-  else if (filters.resource !== "people") {
-    endpoint = "/api/rankings/competitions";
-  }
+  const endpoint = rankingEndpoint(
+    filters.resource,
+    filters.personActivityMetric,
+  );
   return `${endpoint}?${params}`;
 }
 
@@ -348,11 +331,14 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       regexSearch: boolean,
       signal: AbortSignal,
     ) => {
-      const params = new URLSearchParams({
-        result: filters.rankingType,
-        search,
-        searchLimit: "500",
-      });
+      const params = new URLSearchParams({ search, searchLimit: "500" });
+      if (
+        filters.resource === "people" ||
+        filters.resource === "results" ||
+        filters.resource === "competitions"
+      ) {
+        params.set("result", filters.rankingType);
+      }
       if (
         filters.resource !== "person-activity-rankings" ||
         ["rounds", "solves"].includes(filters.personActivityMetric)
@@ -361,7 +347,10 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       }
       if (regexSearch) params.set("mode", "vim");
       addRankingFilterParams(params, filters);
-      const endpoint = personSearchEndpoint(filters.resource);
+      const endpoint = rankingEndpoint(
+        filters.resource,
+        filters.personActivityMetric,
+      );
       const response = await fetch(`${endpoint}?${params}`, { signal });
       if (!response.ok) {
         const body = (await response.json()) as { error?: string };
@@ -388,7 +377,7 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
           const endpoint =
             filters.resource === "person-pr-streak"
               ? PR_STREAK_API
-              : "/api/rankings";
+              : "/api/persons/rankings";
           const response = await fetch(`${endpoint}?${params}`, { signal });
           if (!response.ok) {
             const body = (await response.json()) as { error?: string };

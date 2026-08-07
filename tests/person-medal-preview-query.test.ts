@@ -9,7 +9,7 @@ test("the medal preview normalizes the person ID and accepts an event", () => {
   assert.deepEqual(
     parsePersonMedalPreviewInput(
       "2014niel03",
-      new URLSearchParams({ event: "333" }),
+      new URLSearchParams({ eventId: "333" }),
     ),
     { personId: "2014NIEL03", eventId: "333" },
   );

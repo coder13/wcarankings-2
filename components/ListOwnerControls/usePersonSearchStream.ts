@@ -108,7 +108,7 @@ export function usePersonSearchStream(query: string, enabled: boolean) {
   const openStream = useCallback(
     (offset: number, append: boolean) => {
       const source = new EventSource(
-        `/api/people/search?q=${encodeURIComponent(normalizedQuery)}` +
+        `/api/persons/search?q=${encodeURIComponent(normalizedQuery)}` +
           `&limit=${PAGE_SIZE}&offset=${offset}`,
       );
       sourcesRef.current.add(source);

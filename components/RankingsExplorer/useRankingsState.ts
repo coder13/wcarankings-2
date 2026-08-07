@@ -154,10 +154,9 @@ export function useRankingsState() {
           if (filters.personCompetitionRanking)
             nextPath = "/persons/competitions";
           else if (filters.personActivityRanking)
-            nextPath = "/persons/activity";
+            nextPath = personActivityRankingPath(filters.personActivityMetric);
           else if (filters.personMedalRanking) nextPath = "/persons/medals";
           else if (filters.personPrStreakRanking) nextPath = PR_STREAK_PATH;
-          else if (filters.year) nextPath = `/persons/year/${filters.year}`;
         }
         patchFilters(
           { subject: nextSubject },
@@ -190,9 +189,7 @@ export function useRankingsState() {
             { year: nextYear },
             {
               history: "push",
-              pathname: personActivityRankingPath(
-                filters.personActivityMetric,
-              ),
+              pathname: personActivityRankingPath(filters.personActivityMetric),
             },
             { search: "", wcaId: "", focusMe: false },
           );
@@ -208,7 +205,7 @@ export function useRankingsState() {
           },
           {
             history: "push",
-            pathname: nextYear ? `/persons/year/${nextYear}` : "/",
+            pathname: "/persons/rankings",
           },
           { search: "", wcaId: "", focusMe: false },
         );
@@ -225,7 +222,7 @@ export function useRankingsState() {
           },
           {
             history: "push",
-            pathname: enabled ? "/persons/competitions" : "/",
+            pathname: enabled ? "/persons/competitions" : "/persons/rankings",
           },
           { search: "", wcaId: "", focusMe: false },
         );
@@ -249,7 +246,9 @@ export function useRankingsState() {
           },
           {
             history: "push",
-            pathname: enabled ? personActivityRankingPath(metric) : "/",
+            pathname: enabled
+              ? personActivityRankingPath(metric)
+              : "/persons/rankings",
           },
           { search: "", wcaId: "", focusMe: false },
         );
@@ -271,7 +270,7 @@ export function useRankingsState() {
           },
           {
             history: "push",
-            pathname: enabled ? "/persons/medals" : "/",
+            pathname: enabled ? "/persons/medals" : "/persons/rankings",
           },
           { search: "", wcaId: "", focusMe: false },
         );
@@ -288,7 +287,7 @@ export function useRankingsState() {
           },
           {
             history: "push",
-            pathname: enabled ? PR_STREAK_PATH : "/",
+            pathname: enabled ? PR_STREAK_PATH : "/persons/rankings",
           },
           { search: "", wcaId: "", focusMe: false },
         );
