@@ -18,7 +18,7 @@ function candidate(
     gender: null,
     year: null,
     title: id,
-    exploreUrl: "/results?eventId=333",
+    exploreUrl: "/persons/results?eventId=333",
     interestingEntityId: id,
     interestingResultId: 1,
     worldRank: null,

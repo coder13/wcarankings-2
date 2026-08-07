@@ -20,6 +20,12 @@ export class ApiInputError extends Error {
   }
 }
 
+export function assertCanonicalRankingParams(params: URLSearchParams) {
+  if (params.has("event") || params.has("type")) {
+    throw new ApiInputError("Use eventId and result query parameters.");
+  }
+}
+
 export type QueryTimings = { queueMs: number; statementMs: number };
 export type ApiDiagnostics = {
   timings: QueryTimings;
@@ -34,17 +40,6 @@ type NumericQueryParamGuard = (value: number) => boolean;
 
 function getQueryParam(params: URLSearchParams, name: string) {
   return params.get(name);
-}
-
-function getQueryParamWithAliases(
-  params: URLSearchParams,
-  names: readonly string[],
-) {
-  for (const name of names) {
-    const value = getQueryParam(params, name);
-    if (value !== null) return value;
-  }
-  return null;
 }
 
 function validateQueryParam<T extends string>(
@@ -167,7 +162,7 @@ export function parseYear(params: URLSearchParams) {
 }
 
 export function parseEvent(params: URLSearchParams, { required = true } = {}) {
-  const value = getQueryParamWithAliases(params, ["eventId", "event"]);
+  const value = getQueryParam(params, "eventId");
   if ((value === null || value === "") && !required) return null;
   return validateQueryParam(value, isEventId, "eventId is invalid.");
 }
@@ -177,7 +172,7 @@ export function parseResultType(
   eventId?: string | null,
 ): RankingType {
   const value = validateQueryParam(
-    getQueryParamWithAliases(params, ["result", "type"]),
+    getQueryParam(params, "result"),
     isRankingType,
     "result must be single or average.",
   );

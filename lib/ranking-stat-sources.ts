@@ -34,7 +34,7 @@ export const RANKING_STAT_SOURCES = [
     feedEligibility: { home: true, person: true },
     paths: {
       page: "/persons/pr-streak",
-      api: "/api/rankings/people/pr-streak",
+      api: "/api/persons/pr-streak",
     },
   },
 ] as const satisfies readonly RankingStatSourceDefinition[];

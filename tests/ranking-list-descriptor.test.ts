@@ -107,10 +107,7 @@ test("rejects unsupported combinations and excluded populations", () => {
     }),
   );
   assert.throws(
-    () =>
-      parseRankingListDescriptorUrl(
-        "/api/rankings/people/activity?metric=solves&year=2025",
-      ),
+    () => parseRankingListDescriptorUrl("/api/persons/solves?year=2025"),
     RankingListDescriptorError,
   );
   assert.throws(
@@ -190,9 +187,9 @@ test("limits list populations to event and result rankings", () => {
   }
 
   for (const url of [
-    "/api/rankings?eventId=SOR&result=single&list=7K3M9Q2D",
-    "/api/rankings/people/activity?metric=competitions&list=7K3M9Q2D",
-    "/api/rankings/people/medals?list=7K3M9Q2D",
+    "/api/persons/rankings?eventId=SOR&result=single&list=7K3M9Q2D",
+    "/api/persons/competitions?list=7K3M9Q2D",
+    "/api/persons/medals?list=7K3M9Q2D",
   ]) {
     assert.throws(
       () => parseRankingListDescriptorUrl(url),
@@ -308,7 +305,7 @@ test("writes one deterministic URL for equivalent descriptor inputs", () => {
       genders: ["f", "m", "f"],
       population: { kind: "public-list", publicId: "7k3m9q2d" },
     }),
-    "/api/rankings?eventId=333&result=single&year=2025&region=_Europe&gender=m%2Cf&list=7K3M9Q2D",
+    "/api/persons/rankings?eventId=333&result=single&year=2025&region=_Europe&gender=m%2Cf&list=7K3M9Q2D",
   );
 });
 
@@ -346,7 +343,7 @@ test("keeps result windows and projection generations outside the list key", () 
 
 test("ignores pagination and search state while parsing a ranking-list URL", () => {
   const parsed = parseRankingListDescriptorUrl(
-    "/api/rankings?eventId=333&result=single&start=100&limit=50&cursorRank=99&search=Avery&locate=2024AVERY01",
+    "/api/persons/rankings?eventId=333&result=single&start=100&limit=50&cursorRank=99&search=Avery&locate=2024AVERY01",
   );
   assert.deepEqual(
     parsed,

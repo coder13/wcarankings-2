@@ -20,8 +20,8 @@ function resultWindowKey(
 ): string {
   return JSON.stringify({
     dataVersion,
-    eventId: params.get("eventId") ?? params.get("event"),
-    result: params.get("result") ?? params.get("type"),
+    eventId: params.get("eventId"),
+    result: params.get("result"),
     region: params.get("region") ?? "world",
     gender: params.getAll("gender").sort(),
     year: params.get("year"),

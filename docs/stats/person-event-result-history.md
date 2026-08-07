@@ -11,7 +11,7 @@ Position gives each row a stable order.
 The API route is:
 
 ```text
-GET /api/people/{wcaId}/event/{eventId}/results?result=single|average&year=2023
+GET /api/person/{wcaId}/results?eventId={eventId}&result=single|average&year=2023
 ```
 
 `start` is one-based. `limit` is from 1 through 100. The UI does not link to
@@ -20,7 +20,7 @@ the API route directly.
 The page route is:
 
 ```text
-/profile/{wcaId}/results?eventId=333&resultType=single&year=2023
+/person/{wcaId}/results?eventId=333&result=single&year=2023
 ```
 
 The URL selects the person. The page uses the normal rankings header, rail,

@@ -34,7 +34,7 @@ person rank.
 The endpoint is:
 
 ```text
-GET /api/people/{wcaId}/top-ranking-highlights?cursor=0&shown={statId}
+GET /api/person/{wcaId}/top-ranking-highlights?cursor=0&shown={statId}
 ```
 
 Each response contains at most five cards. Every card contains five ranking
