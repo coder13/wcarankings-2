@@ -60,7 +60,9 @@ export async function getRankingsPageMetadata({
   const topResults = await loadTopRankingResultLabels(
     new URLSearchParams(
       Object.entries(params).flatMap(([key, value]) =>
-        Array.isArray(value) ? value.map((item) => [key, item]) : [[key, value ?? ""]],
+        Array.isArray(value)
+          ? value.map((item) => [key, item])
+          : [[key, value ?? ""]],
       ),
     ),
     metadataInput,

@@ -68,10 +68,7 @@ if (!applicationUrl && !adminUrl) {
       ),
       "person-activity-rankings": release("person-activity-rankings", "new"),
       "person-medal-rankings": release("person-medal-rankings", "new"),
-      "person-pr-streak-rankings": release(
-        "person-pr-streak-rankings",
-        "new",
-      ),
+      "person-pr-streak-rankings": release("person-pr-streak-rankings", "new"),
       "city-rankings": release("city-rankings", "new"),
       "sum-of-ranks": release("sum-of-ranks", "new"),
       "yearly-person-rankings": release("yearly-person-rankings", "new"),

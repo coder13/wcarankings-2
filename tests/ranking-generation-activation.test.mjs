@@ -210,6 +210,7 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
     "export_metadata",
     "ranking_entries_single",
     "ranking_entries_average",
+    "ranking_counts",
     "competition_podium_members",
     "competition_event_stats",
     "competition_stats",

@@ -1,8 +1,8 @@
 import { createHash, type Hash } from "node:crypto";
 
-export const SOURCE_MANIFEST_VERSION = 1;
-export interface SourceCompetitionFingerprint { competitionId: string; competitionMetadataHash: string; resultCount: number; resultsHash: string; attemptCount: number; attemptsHash: string; year: number; }
-export interface SourceYearFingerprint { competitionCount: number; competitionIds: string[]; fingerprint: string; year: number; }
+const SOURCE_MANIFEST_VERSION = 1;
+interface SourceCompetitionFingerprint { competitionId: string; competitionMetadataHash: string; resultCount: number; resultsHash: string; attemptCount: number; attemptsHash: string; year: number; }
+interface SourceYearFingerprint { competitionCount: number; competitionIds: string[]; fingerprint: string; year: number; }
 export interface SourceManifest { exportId: string; generatedAt: string; version: number; competitions: Record<string, SourceCompetitionFingerprint>; years: Record<string, SourceYearFingerprint>; dimensions: { attemptsHash: string; attemptsChanged: boolean; personsHash: string; personsChanged: boolean; }; }
 export interface SourceManifestComparison { dirtyCompetitionIds: string[]; dirtyYears: number[]; missingPreviousManifest: boolean; attemptsChanged: boolean; personsChanged: boolean; reasons: string[]; }
 interface CompetitionState { competitionId: string; year: number; competitionMetadataHash: string; results: Hash; attempts: Hash; resultCount: number; attemptCount: number; lastResultId?: number; }

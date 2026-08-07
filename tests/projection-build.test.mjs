@@ -320,7 +320,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     (candidate) => candidate.name === "person-activity-rankings",
   );
   assert.ok(activity, "person-activity-rankings is registered");
-  assert.deepEqual(activity.dependencies, ["person-period-metrics"]);
+  assert.deepEqual(activity.dependencies, ["result-facts"]);
   assert.equal(activity.enabledByDefault, false);
   assert.equal(activity.estimatedDurationMs, 45_000);
   for (const name of [
@@ -366,7 +366,9 @@ test("person activity rankings keep only the three new activity metrics", async 
     ),
     "utf8",
   );
-  assert.match(sql, /FROM person_period_metrics/);
+  assert.match(sql, /COUNT\(DISTINCT NULLIF\(competition\.country_id, ''\)\)/);
+  assert.match(sql, /COUNT\(\*\) AS round_count/);
+  assert.match(sql, /WHEN value > 0 THEN 1/);
   assert.match(sql, /'countries' AS metric/);
   assert.match(sql, /country_count AS metric_value/);
   assert.match(sql, /CAST\('' AS CHAR\(16\)\) AS region_id/);
@@ -445,13 +447,13 @@ test("core ranking-table build contains only active ranking tables", () => {
     ({ name }) => name === "ranking-tables-entries-average-source",
   );
   assert.deepEqual(averageSource.dependencies, ["projection:result-facts"]);
-  assert.equal(CORE_RANKING_TABLE_TASK_COUNT, 2);
+  assert.equal(CORE_RANKING_TABLE_TASK_COUNT, 3);
   const progress = createTableProgress(CORE_RANKING_TABLE_TASK_COUNT);
   let lastProgress;
   for (const task of CORE_RANKING_TABLE_TASKS) {
     if (task.table) lastProgress = progress.start(task.table);
   }
-  assert.equal(lastProgress, "[2/2]");
+  assert.equal(lastProgress, "[3/3]");
 });
 
 test("core ranking-table source views wait for result facts", async () => {
