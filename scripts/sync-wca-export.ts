@@ -2,7 +2,7 @@ import { argumentPresent, argumentValue } from "./lib/arguments.ts";
 import { databaseOptions } from "./lib/database.ts";
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import mysql from "mysql2/promise";
@@ -240,6 +240,20 @@ async function publishSourceManifest(manifest: SourceManifest, previous?: Source
   process.stdout.write(`Source manifest: ${path} (${Object.keys(manifest.competitions).length} competitions; dirty years: ${comparison.dirtyYears.join(",") || "none"})\n`);
 }
 
+async function previousSourceManifest(exportId: string): Promise<SourceManifest | undefined> {
+  const explicit = process.env.WCA_SOURCE_MANIFEST_PREVIOUS_PATH;
+  if (explicit) {
+    try { return JSON.parse(await readFile(explicit, "utf8")) as SourceManifest; } catch { return undefined; }
+  }
+  const directory = process.env.WCA_EXPORT_CACHE_DIR || "/var/cache/wcarankings";
+  try {
+    const current = `wca-source-manifest-${String(exportId).slice(0, 10)}.json`;
+    const candidates = (await readdir(directory)).filter((file) => file.startsWith("wca-source-manifest-") && file.endsWith(".json") && file !== current).sort().reverse();
+    const candidate = candidates[0];
+    return candidate ? JSON.parse(await readFile(join(directory, candidate), "utf8")) as SourceManifest : undefined;
+  } catch { return undefined; }
+}
+
 function hasMariaDbCode(value: unknown): value is { code: string } {
   return isRecord(value) && typeof value.code === "string";
 }
@@ -363,12 +377,13 @@ async function main(): Promise<void> {
   }
 
   const zipPath = await getCachedExport(latest, options);
+  const previousManifest = await previousSourceManifest(latest.exportDate);
   await dropRankingViews();
   process.stdout.write("Importing WCA SQL tables into MariaDB…\n");
-  const sourceManifest = await importSqlExport(zipPath, latest.exportDate);
+  const sourceManifest = await importSqlExport(zipPath, latest.exportDate, previousManifest);
   if (options.rawOnly) {
     await refreshRawPersonLookupIndex();
-    await publishSourceManifest(sourceManifest);
+    await publishSourceManifest(sourceManifest, previousManifest);
     await writeExportMetadata(latest);
     process.stdout.write(
       `WCA raw tables are current through ${latest.exportDate}; projection publication skipped by --raw-only.\n`,
