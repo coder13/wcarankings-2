@@ -134,11 +134,12 @@ function makeMockResponse(url: URL, init?: RequestInit) {
   }
 
   const search = url.searchParams.get("search")?.trim().toLocaleLowerCase();
-  const fixtureEntries = url.pathname.startsWith("/api/countries/")
-    ? countryEntries
-    : url.pathname.endsWith("/people/pr-streak")
-      ? allPrStreakEntries
-      : allEntries;
+  let fixtureEntries = allEntries;
+  if (url.pathname.startsWith("/api/countries/")) {
+    fixtureEntries = countryEntries;
+  } else if (url.pathname.endsWith("/people/pr-streak")) {
+    fixtureEntries = allPrStreakEntries;
+  }
   if (search) {
     const searchLimit = Number(url.searchParams.get("searchLimit")) || 500;
     return Promise.resolve(
