@@ -1,8 +1,15 @@
 import { databaseOptions } from "./lib/database.ts";
 import { randomUUID } from "node:crypto";
 import mysql from "mysql2/promise";
-import type { Connection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import type { ClaimedRankingRebuildJob, CurrentListVersion } from "./list-ranking-worker-types.ts";
+import type {
+  Connection,
+  ResultSetHeader,
+  RowDataPacket,
+} from "mysql2/promise";
+import type {
+  ClaimedRankingRebuildJob,
+  CurrentListVersion,
+} from "./list-ranking-worker-types.ts";
 
 const POLL_MS = Math.max(
   250,
@@ -13,7 +20,9 @@ const LEASE_SECONDS = Math.max(
   Number(process.env.LIST_RANKING_WORKER_LEASE_SECONDS) || 600,
 );
 
-async function claimJob(connection: Connection): Promise<ClaimedRankingRebuildJob | null> {
+async function claimJob(
+  connection: Connection,
+): Promise<ClaimedRankingRebuildJob | null> {
   const token = randomUUID();
   await connection.beginTransaction();
   try {
@@ -48,7 +57,10 @@ async function claimJob(connection: Connection): Promise<ClaimedRankingRebuildJo
   }
 }
 
-async function buildJob(connection: Connection, job: ClaimedRankingRebuildJob): Promise<void> {
+async function buildJob(
+  connection: Connection,
+  job: ClaimedRankingRebuildJob,
+): Promise<void> {
   const token = randomUUID();
   await connection.beginTransaction();
   try {
@@ -128,7 +140,7 @@ async function buildJob(connection: Connection, job: ClaimedRankingRebuildJob): 
   }
 }
 
-async function main(): Promise<void> {
+export async function runListRankingWorker(): Promise<void> {
   const connection = await mysql.createConnection(databaseOptions());
   try {
     for (;;) {
@@ -149,7 +161,12 @@ async function main(): Promise<void> {
     await connection.end();
   }
 }
-main().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+
+if (import.meta.main) {
+  runListRankingWorker().catch((error: unknown) => {
+    process.stderr.write(
+      `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  });
+}

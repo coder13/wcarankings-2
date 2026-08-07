@@ -98,19 +98,29 @@ function rankingPageResponse(
 }
 
 function yearlyColumns(type: RankingType): string {
-  const recordColumn =
-    type === "average"
-      ? "facts.regional_average_record"
-      : "facts.regional_single_record";
+  const currentResultTable =
+    type === "average" ? "result_rankings_average" : "result_rankings_single";
   return `ranking.public_rank AS rank, ranking.position AS sub_rank, ranking.person_id,
     COALESCE(person.name, ranking.person_id) AS person_name,
     COALESCE(country.id, '') AS country_id, COALESCE(country.name, country.id, '') AS country_name,
     COALESCE(country.iso2, '') AS country_iso2, COALESCE(country.continent_id, '') AS continent_id,
     ranking.result_value AS best, COALESCE(facts.competition_id, '') AS competition_id,
     COALESCE(competition.name, '') AS competition_name,
-    ${recordColumn} = 'WR' AS is_world_record,
-    ${recordColumn} IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
-    ${recordColumn} = 'NR' AS is_country_record`;
+    EXISTS (
+      SELECT 1 FROM ${currentResultTable} current_record
+      WHERE current_record.result_id = ranking.result_id
+        AND current_record.world_rank = 1
+    ) AS is_world_record,
+    EXISTS (
+      SELECT 1 FROM ${currentResultTable} current_record
+      WHERE current_record.result_id = ranking.result_id
+        AND current_record.continent_rank = 1
+    ) AS is_continent_record,
+    EXISTS (
+      SELECT 1 FROM ${currentResultTable} current_record
+      WHERE current_record.result_id = ranking.result_id
+        AND current_record.country_rank = 1
+    ) AS is_country_record`;
 }
 
 function yearlyFilters(input: QueryInput) {
@@ -187,7 +197,13 @@ export async function queryRankingPage(
   const result = await query<RankingRow>(
     rankingPageQuery(
       rankingTable(input.type),
-      rankingColumns(rank, subRank),
+      rankingColumns(
+        rank,
+        subRank,
+        input.type === "average"
+          ? "result_rankings_average"
+          : "result_rankings_single",
+      ),
       conditions,
       subRank,
     ),
@@ -218,7 +234,13 @@ export async function queryPersonRanking(input: QueryInput) {
     : rankingTable(input.type);
   const selectColumns = yearly
     ? yearlyColumns(input.type)
-    : rankingColumns(rank, subRank);
+    : rankingColumns(
+        rank,
+        subRank,
+        input.type === "average"
+          ? "result_rankings_average"
+          : "result_rankings_single",
+      );
   let from = `FROM ${source} ranking`;
   if (yearly) {
     from = `FROM ${source} ranking LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1 LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id LEFT JOIN countries country ON country.id = facts.person_country_id LEFT JOIN competitions competition ON competition.id = facts.competition_id`;

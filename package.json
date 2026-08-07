@@ -18,6 +18,7 @@
     "db:refresh-system-lists": "bun --env-file-if-exists=.env.local scripts/refresh-system-lists.ts",
     "db:refresh-board-list": "bun --env-file-if-exists=.env.local scripts/refresh-board-list.ts",
     "db:refresh-delegates-list": "bun --env-file-if-exists=.env.local scripts/refresh-board-list.ts --delegates",
+    "cache:clear-redis": "bun --env-file-if-exists=.env.local scripts/clear-redis-cache.ts",
     "test": "pnpm run build && node --test tests/release-compatibility.test.mjs && bun test tests/person-lookup-index.integration.test.mjs tests/chunk-projection-dump.test.mjs tests/projection-build.test.mjs tests/projection-deployment-plan.test.mjs tests/projection-release-artifact.test.mjs tests/projection-release-plan.test.mjs tests/projection-table-usage.test.mjs tests/ranking-generation-activation.test.mjs tests/projection-transfer.test.mjs",
     "test:unit": "node --import ./tests/register-asset-loader.mjs --import tsx --test components/*.test.tsx components/*/*.test.tsx tests/*.test.ts",
     "test:integration": "bun test tests/ranking-generation-activation.integration.test.mjs",
@@ -35,7 +36,9 @@
     "benchmark:ranking-scroll:cities": "bun scripts/benchmark-ranking-cities.ts",
     "benchmark:ranking-scroll:medals": "bun scripts/benchmark-ranking-medals.ts",
     "benchmark:ranking-scroll:pr-streak": "bun scripts/benchmark-ranking-pr-streak.ts",
-    "benchmark:build:pr-streak": "bun --env-file-if-exists=.env.local scripts/benchmark-pr-streak-build.ts"
+    "benchmark:build:pr-streak": "bun --env-file-if-exists=.env.local scripts/benchmark-pr-streak-build.ts",
+    "benchmark:sor:as-of": "bun --env-file-if-exists=.env.local scripts/benchmark-sor-as-of.ts",
+    "feed:generate": "bun --env-file-if-exists=.env.local scripts/generate-feed.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
@@ -50,6 +53,7 @@
     "react-ga4": "^3.0.1",
     "react-i18next": "^17.0.11",
     "recharts": "^3.10.1",
+    "redis": "5.8.2",
     "sql-template-tag": "^5.2.1",
     "unzipper": "^0.12.5"
   },

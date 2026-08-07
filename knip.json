@@ -4,6 +4,7 @@
     "playwright.list-e2e.config.mjs",
     "playwright.visual-smoke.config.mjs",
     "public/sw.js",
+    "scripts/background-worker.ts",
     "scripts/list-ranking-worker.ts",
     "scripts/projections/generation/activate-ranking-generation.ts",
     "scripts/projections/planning/plan-projection-deployment.ts",

@@ -32,8 +32,30 @@ export function rankingShape(scope: RegionScope) {
   } as const;
 }
 
-export function rankingColumns(rank: string, subRank: string) {
-  return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record`;
+export function rankingColumns(
+  rank: string,
+  subRank: string,
+  currentResultTable?: string,
+) {
+  if (!currentResultTable) {
+    return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record`;
+  }
+  const currentRecord = (rankColumn: string) => {
+    let regionColumn: "continent_id" | "country_id" | null = null;
+    if (rankColumn === "continent_rank") regionColumn = "continent_id";
+    if (rankColumn === "country_rank") regionColumn = "country_id";
+    const regionCondition = regionColumn
+      ? `\n      AND current_record.${regionColumn} = ranking.${regionColumn}`
+      : "";
+    const positionColumn = rankColumn.replace("_rank", "_position");
+    return `EXISTS (
+    SELECT 1 FROM ${currentResultTable} current_record
+    WHERE current_record.event_id = ranking.event_id
+      AND current_record.result_value = ranking.best
+      AND current_record.${positionColumn} = 1${regionCondition}
+  )`;
+  };
+  return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, ${currentRecord("world_rank")} AS is_world_record, ${currentRecord("continent_rank")} AS is_continent_record, ${currentRecord("country_rank")} AS is_country_record`;
 }
 
 export function genderCondition(

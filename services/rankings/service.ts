@@ -1,6 +1,10 @@
 import { ApiInputError } from "@/lib/api/projection";
 import type { RankingEntry } from "@/lib/wca";
 import {
+  readRankingWindowPages,
+  writeRankingWindowPages,
+} from "@/services/cache/ranking-pages";
+import {
   rankingsWindowCache,
   RANKINGS_WINDOW_SIZE,
 } from "@/services/rankings/cache";
@@ -13,7 +17,6 @@ import {
 } from "@/services/rankings/person-rankings";
 import { isPersonMetric, parseRankingInput } from "@/services/rankings/request";
 import type { QueryInput, RankingsMetadata } from "@/services/rankings/types";
-
 interface RankingTimings {
   queueMs: number;
   statementMs: number;
@@ -100,8 +103,18 @@ function rankingWindowCacheValue(
 async function loadCachedRankingWindow(
   input: QueryInput,
   metadata: RankingsMetadata,
+  cacheKey: string,
 ): Promise<RankingWindowCacheValue> {
-  return rankingWindowCacheValue(await loadRankingWindow(input, metadata));
+  const cached = await readRankingWindowPages<RankingWindowCacheValue>(
+    cacheKey,
+    input.startRank,
+  );
+  if (cached && isRankingWindowCacheValue(cached)) return cached;
+  const value = rankingWindowCacheValue(
+    await loadRankingWindow(input, metadata),
+  );
+  void writeRankingWindowPages(cacheKey, input.startRank, value);
+  return value;
 }
 
 function isRankingWindowCacheValue(
@@ -190,7 +203,12 @@ export async function loadRankingsWithDiagnostics(
   };
   const cached = await rankingsWindowCache.getWithStatus(
     personWindowKey(input, windowStart, metadata.fetchedAt),
-    () => loadCachedRankingWindow(windowInput, metadata),
+    () =>
+      loadCachedRankingWindow(
+        windowInput,
+        metadata,
+        personWindowKey(input, windowStart, metadata.fetchedAt),
+      ),
     { pin: isPrimedPersonMetricWindow(input, windowStart) },
   );
   if (!isRankingWindowCacheValue(cached.value)) {
@@ -211,7 +229,11 @@ export async function loadRankingsWithDiagnostics(
             startRank: nextWindowStart,
             limit: RANKINGS_WINDOW_SIZE,
           };
-          return loadCachedRankingWindow(nextInput, metadata);
+          return loadCachedRankingWindow(
+            nextInput,
+            metadata,
+            personWindowKey(input, nextWindowStart, metadata.fetchedAt),
+          );
         },
       )
       .catch((error) => console.warn("Ranking window prefetch failed", error));
