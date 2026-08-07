@@ -27,6 +27,9 @@ export async function GET() {
   );
   return Response.json(
     {
+      // The worker does not currently persist a heartbeat. Keep this explicit
+      // so the admin UI cannot mistake recent source activity for liveness.
+      worker: { online: null, lastSeenAt: null },
       scheduler: {
         discoveryCron: "0 0 * * * UTC",
         pollerIntervalMs:

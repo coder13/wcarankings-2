@@ -18,6 +18,9 @@
 /.next/
 /.vinext/
 /out/
+**/.next/
+**/.vinext/
+**/out/
 
 # misc
 .DS_Store
@@ -42,6 +45,8 @@ next-env.d.ts
 *.tsbuildinfo
 /dist/
 /storybook-static/
+**/dist/
+**/storybook-static/
 /.playwright-mcp/
 /.wrangler/
 /outputs/

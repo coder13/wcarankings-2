@@ -8,12 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@tanstack/react-query':
-        specifier: ^5.101.4
-        version: 5.101.4(react@19.2.6)
-      '@tanstack/react-virtual':
-        specifier: ^3.14.5
-        version: 3.14.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@wcarankings/cli':
         specifier: workspace:*
         version: link:packages/cli
@@ -23,6 +17,61 @@ importers:
       '@wcarankings/live-results':
         specifier: workspace:*
         version: link:packages/live-results
+      mysql2:
+        specifier: ^3.23.2
+        version: 3.23.2(@types/node@22.19.19)
+      unzipper:
+        specifier: ^0.12.5
+        version: 0.12.5
+    devDependencies:
+      '@types/node':
+        specifier: 22.19.19
+        version: 22.19.19
+      '@types/unzipper':
+        specifier: ^0.10.11
+        version: 0.10.11
+      eslint:
+        specifier: 9.39.4
+        version: 9.39.4(jiti@2.7.0)(supports-color@8.1.1)
+      prettier:
+        specifier: 3.9.6
+        version: 3.9.6
+      prettier-plugin-sh:
+        specifier: 0.19.0
+        version: 0.19.0(prettier@3.9.6)
+      prettier-plugin-sql:
+        specifier: 0.20.0
+        version: 0.20.0(prettier@3.9.6)
+      turbo:
+        specifier: ^2.8.12
+        version: 2.10.8
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  apps/live-results-worker:
+    dependencies:
+      '@wcarankings/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@wcarankings/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@wcarankings/live-results':
+        specifier: workspace:*
+        version: link:../../packages/live-results
+      '@wcarankings/projection-jobs':
+        specifier: workspace:*
+        version: link:../../packages/projection-jobs
+
+  apps/web:
+    dependencies:
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.6)
+      '@tanstack/react-virtual':
+        specifier: ^3.14.5
+        version: 3.14.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       i18next:
         specifier: ^26.3.6
         version: 26.3.6(typescript@5.9.3)
@@ -56,9 +105,6 @@ importers:
       sql-template-tag:
         specifier: ^5.2.1
         version: 5.2.1
-      unzipper:
-        specifier: ^0.12.5
-        version: 0.12.5
     devDependencies:
       '@playwright/test':
         specifier: ^1.55.1
@@ -81,9 +127,6 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.14)
-      '@types/unzipper':
-        specifier: ^0.10.11
-        version: 0.10.11
       '@vitejs/plugin-react':
         specifier: 6.0.2
         version: 6.0.2(vite@8.0.13(@types/node@22.19.19)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.47.1)(tsx@4.22.1)(yaml@2.9.0))
@@ -105,12 +148,6 @@ importers:
       prettier:
         specifier: 3.9.6
         version: 3.9.6
-      prettier-plugin-sh:
-        specifier: 0.19.0
-        version: 0.19.0(prettier@3.9.6)
-      prettier-plugin-sql:
-        specifier: 0.20.0
-        version: 0.20.0(prettier@3.9.6)
       react-server-dom-webpack:
         specifier: 19.2.6
         version: 19.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(webpack@5.106.2(esbuild@0.28.0)(lightningcss@1.32.0)(postcss@8.5.14))
@@ -123,9 +160,6 @@ importers:
       tsx:
         specifier: ^4.22.1
         version: 4.22.1
-      turbo:
-        specifier: ^2.8.12
-        version: 2.10.8
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -138,23 +172,6 @@ importers:
       vite-plugin-svgr:
         specifier: ^5.2.0
         version: 5.2.0(supports-color@8.1.1)(typescript@5.9.3)(vite@8.0.13(@types/node@22.19.19)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.47.1)(tsx@4.22.1)(yaml@2.9.0))
-
-  apps/live-results-worker:
-    dependencies:
-      '@wcarankings/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@wcarankings/database':
-        specifier: workspace:*
-        version: link:../../packages/database
-      '@wcarankings/live-results':
-        specifier: workspace:*
-        version: link:../../packages/live-results
-      '@wcarankings/projection-jobs':
-        specifier: workspace:*
-        version: link:../../packages/projection-jobs
-
-  apps/web: {}
 
   packages/cli: {}
 

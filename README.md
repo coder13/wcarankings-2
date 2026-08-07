@@ -55,7 +55,8 @@ to check SQL files without changing them.
 
 Storybook runs the client-side rankings explorer with deterministic preview data
 at `http://localhost:6006`, so it does not require MariaDB or a WCA export.
-The main page lives in `app/page.tsx`. UI components live in `components/`;
+The main page lives in `apps/web/app/page.tsx`. UI components live in
+`apps/web/components/`;
 each component folder contains its source, Storybook stories, and colocated unit
 tests.
 
@@ -83,8 +84,8 @@ Run Flyway before enabling sign-in so the user and session tables exist.
 ## Repository layout
 
 ```text
-app/                         React UI and API routes
-db/                          MySQL connection pool
+apps/web/app/                React UI and API routes
+apps/web/db/                 MySQL connection pool
 migrations/mysql/            Flyway versioned MariaDB migrations
 sql/ranking-projections/     Readable SQL for daily derived ranking projections
 Dockerfile.flyway             Pinned Flyway migration image

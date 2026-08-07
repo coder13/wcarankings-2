@@ -39,6 +39,13 @@
   white-space: nowrap;
 }
 
+.statusGroup {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .healthy {
   background: color-mix(in srgb, var(--record-national) 16%, var(--surface));
   color: var(--record-national);
@@ -121,5 +128,9 @@
 
   .status {
     margin-top: 1rem;
+  }
+
+  .statusGroup {
+    justify-content: flex-start;
   }
 }

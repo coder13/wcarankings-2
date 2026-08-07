@@ -14,6 +14,7 @@ type Source = {
 };
 type Snapshot = {
   scheduler: { discoveryCron: string; pollerIntervalMs: number };
+  worker: { online: boolean | null; lastSeenAt: string | null };
   sources: Source[];
 };
 
@@ -72,9 +73,32 @@ export function LiveAdmin() {
           <h1>Live results</h1>
           <p>Tracked competitions active today and their import state.</p>
         </div>
-        <strong className={`${styles.status} ${styles.unknown}`}>
-          {data?.sources.length ?? "…"} tracked
-        </strong>
+        <div className={styles.statusGroup}>
+          <strong className={`${styles.status} ${styles.unknown}`}>
+            {data?.sources.length ?? "…"} tracked
+          </strong>
+          <strong
+            className={`${styles.status} ${
+              data?.worker.online === true
+                ? styles.healthy
+                : data?.worker.online === false
+                  ? styles.degraded
+                  : styles.unknown
+            }`}
+            title={
+              data?.worker.lastSeenAt
+                ? `Last seen ${new Date(data.worker.lastSeenAt).toLocaleString()}`
+                : "Worker heartbeat is not available"
+            }
+          >
+            Worker{" "}
+            {data?.worker.online === true
+              ? "online"
+              : data?.worker.online === false
+                ? "offline"
+                : "status unavailable"}
+          </strong>
+        </div>
       </header>
       {message && <p className={styles.alert}>{message}</p>}
       <section className={styles.card} aria-labelledby="schedule-heading">

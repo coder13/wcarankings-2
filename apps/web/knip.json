@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "playwright.list-e2e.config.mjs",
+    "playwright.visual-smoke.config.mjs",
+    "public/sw.js",
+    "scripts/server-component-fingerprints.ts",
+    "scripts/validate-pages.ts",
+    "scripts/benchmark-ranking-scroll.ts",
+    "scripts/benchmark-ranking-*.ts"
+  ],
+  "ignoreBinaries": ["mariadb"],
+  "ignoreDependencies": ["tailwindcss"]
+}
