@@ -38,10 +38,6 @@ export async function GET(request: Request) {
     {
       scheduler: {
         discoveryCron: "0 0 * * * UTC",
-        pollerIntervalMs: Math.max(
-          60_000,
-          Number(process.env.PROVISIONAL_RANKING_WORKER_POLL_MS) || 60_000,
-        ),
       },
       sources: rows,
     },

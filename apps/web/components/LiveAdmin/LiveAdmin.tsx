@@ -20,7 +20,7 @@ type Source = {
   last_error: string | null;
 };
 type Snapshot = {
-  scheduler: { discoveryCron: string; pollerIntervalMs: number };
+  scheduler: { discoveryCron: string };
   sources: Source[];
 };
 type AlertMessage = { text: string; tone: "success" | "error" };
@@ -131,7 +131,6 @@ export function LiveAdmin() {
   return (
     <AdminPage
       title="Live results"
-      description="Tracked competitions active today and their import state."
       aside={
         <div className={styles.statusGroup}>
           <strong className={`${styles.status} ${styles.unknown}`}>
@@ -154,14 +153,9 @@ export function LiveAdmin() {
       <section className={styles.card} aria-labelledby="schedule-heading">
         <h2 id="schedule-heading">Worker schedule</h2>
         <dl className={styles.grid}>
-          <Metric label="Find active competitions" value="Daily at 00:00 UTC" />
           <Metric
-            label="Check for due imports"
-            value={
-              data
-                ? `Every ${formatMinutes(data.scheduler.pollerIntervalMs / 1_000)}`
-                : "Loading…"
-            }
+            label="Daily discovery"
+            value={data?.scheduler.discoveryCron ?? "Loading…"}
           />
         </dl>
       </section>

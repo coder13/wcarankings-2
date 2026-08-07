@@ -10,7 +10,7 @@ export function AdminPage({
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
   aside?: ReactNode;
   children: ReactNode;
 }) {
