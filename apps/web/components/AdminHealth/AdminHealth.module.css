@@ -253,6 +253,52 @@
   font-size: 1rem;
 }
 
+.settingsForm {
+  display: grid;
+  max-width: 28rem;
+  gap: 1rem;
+}
+
+.settingsField {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.settingsField input {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: inherit;
+}
+
+.settingsForm p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.settingsForm button {
+  justify-self: start;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text-strong);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.settingsForm button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

@@ -25,6 +25,7 @@ const LEASE_SECONDS = Math.max(
 );
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const HEARTBEAT_TIMEOUT_SECONDS = 90;
+const SETTINGS_REFRESH_INTERVAL_MS = 60_000;
 const selectedCompetition = argumentValue("competition");
 const once = argumentPresent("once");
 
@@ -171,6 +172,22 @@ async function reconcileActiveSources(connection: Connection): Promise<void> {
     await connection.rollback();
     throw error;
   }
+}
+
+async function applyPollingSettings(connection: Connection): Promise<void> {
+  await connection.query(
+    `UPDATE provisional_live_result_sources source
+     JOIN live_results_settings settings ON settings.id = 1
+     SET source.next_poll_at = IF(
+           source.poll_seconds <> settings.poll_seconds,
+           DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL settings.poll_seconds SECOND),
+           source.next_poll_at
+         ),
+         source.poll_seconds = settings.poll_seconds
+     WHERE source.source_name = 'wca-live'
+       AND source.enabled = 1
+       AND source.provider_status = 'supported'`,
+  );
 }
 
 async function claimSource(
@@ -377,6 +394,7 @@ async function main(): Promise<void> {
   try {
     let reconciledDay = "";
     let lastHeartbeatAt = 0;
+    let lastSettingsRefreshAt = 0;
     async function heartbeat(force = false): Promise<void> {
       const now = Date.now();
       if (!force && now - lastHeartbeatAt < HEARTBEAT_INTERVAL_MS) return;
@@ -397,12 +415,20 @@ async function main(): Promise<void> {
       reconciledDay = day;
       await logActiveSources(connection);
     }
+    async function refreshPollingSettings(): Promise<void> {
+      const now = Date.now();
+      if (now - lastSettingsRefreshAt < SETTINGS_REFRESH_INTERVAL_MS) return;
+      await applyPollingSettings(connection);
+      lastSettingsRefreshAt = now;
+    }
 
     await reconcileForToday();
+    await refreshPollingSettings();
     await heartbeat(true);
     do {
       await heartbeat();
       await reconcileForToday();
+      await refreshPollingSettings();
       const source = await claimSource(connection);
       if (source) {
         try {

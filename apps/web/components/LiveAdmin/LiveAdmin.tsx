@@ -1,5 +1,6 @@
 "use client";
 import { type ReactNode, useEffect, useState } from "react";
+import Link from "next/link";
 import { AdminPage } from "@/components/AdminPage/AdminPage";
 import styles from "@/components/AdminHealth/AdminHealth.module.css";
 type Source = {
@@ -115,6 +116,9 @@ export function LiveAdmin() {
           <strong className={`${styles.status} ${styles.unknown}`}>
             {data?.sources.length ?? "…"} tracked
           </strong>
+          <Link href="/admin/live/settings" className={styles.status}>
+            Settings
+          </Link>
         </div>
       }
     >

@@ -15,7 +15,7 @@ const [
   source,
   competitionId,
   remoteCompetitionId = competitionId,
-  pollSeconds = "30",
+  pollSeconds = "3600",
 ] = process.argv.slice(2);
 if (
   !source ||
@@ -30,8 +30,8 @@ if (!competitionId.includes(String(year))) {
   );
 }
 const poll = Number(pollSeconds);
-if (!Number.isInteger(poll) || poll < 10 || poll > 300)
-  throw new Error("pollSeconds must be an integer from 10 through 300.");
+if (!Number.isInteger(poll) || poll < 60 || poll > 86_400)
+  throw new Error("pollSeconds must be an integer from 60 through 86400.");
 
 const connection = await mysql.createConnection(databaseOptions());
 try {
