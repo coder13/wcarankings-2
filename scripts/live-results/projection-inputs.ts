@@ -34,15 +34,15 @@ export async function prepareLiveProjectionInputs(connection: Connection): Promi
     LEFT JOIN persons person ON person.wca_id = live.person_id AND person.sub_id = 1
     WHERE source.enabled = 1`);
   await connection.query(`CREATE OR REPLACE VIEW result_attempts_with_live AS
-    SELECT result_id, attempt_number, result FROM result_attempts
+    SELECT result_id, attempt_number, value FROM result_attempts
     UNION ALL
-    SELECT -CAST(live.projection_result_id AS SIGNED), attempts.attempt_number, attempts.result
+    SELECT -CAST(live.projection_result_id AS SIGNED), attempts.attempt_number, attempts.value
     FROM provisional_live_results live
     JOIN provisional_live_result_sources source
       ON source.source_name = live.source_name AND source.competition_id = live.competition_id
     JOIN JSON_TABLE(live.attempts_json, '$[*]' COLUMNS (
       attempt_number FOR ORDINALITY,
-      result INT PATH '$'
+      value INT PATH '$'
     )) attempts
     WHERE source.enabled = 1`);
 }
