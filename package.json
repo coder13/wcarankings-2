@@ -36,7 +36,8 @@
     "benchmark:ranking-scroll:cities": "bun scripts/benchmark-ranking-cities.ts",
     "benchmark:ranking-scroll:medals": "bun scripts/benchmark-ranking-medals.ts",
     "benchmark:ranking-scroll:pr-streak": "bun scripts/benchmark-ranking-pr-streak.ts",
-    "benchmark:build:pr-streak": "bun --env-file-if-exists=.env.local scripts/benchmark-pr-streak-build.ts"
+    "benchmark:build:pr-streak": "bun --env-file-if-exists=.env.local scripts/benchmark-pr-streak-build.ts",
+    "feed:generate": "bun --env-file-if-exists=.env.local scripts/generate-feed.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",

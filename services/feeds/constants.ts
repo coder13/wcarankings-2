@@ -21,4 +21,13 @@ export const FEED_SORT_CONSTANTS = {
 
 export const FEED_PAGE_SIZE = 5;
 export const FEED_ITEM_PAGE_SIZE = 50;
-export const FEED_TOP_SCAN_SIZE = 10;
+
+function positiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export const FEED_TOP_SCAN_SIZE = positiveInteger(
+  process.env.FEED_TOP_SCAN_SIZE,
+  10,
+);

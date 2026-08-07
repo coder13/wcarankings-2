@@ -7,6 +7,7 @@ import {
 } from "./inventory";
 import type { RecentResultReference } from "./recent-changes";
 import type { FeedInterestingResult } from "./stat-previews";
+import { FEED_TOP_SCAN_SIZE } from "./constants";
 
 type FeedQuery = (
   text: string,
@@ -46,7 +47,7 @@ function isTopTen(row: CandidateRow) {
     row.world_sub_rank,
     row.continent_sub_rank,
     row.country_sub_rank,
-  ].some((value) => (number(value) ?? Infinity) <= 10);
+  ].some((value) => (number(value) ?? Infinity) <= FEED_TOP_SCAN_SIZE);
 }
 
 function rowGender(row: CandidateRow, reference: RecentResultReference) {
@@ -186,7 +187,7 @@ async function groupedResultRows(
        competition_id, world_position, continent_position, country_position
      FROM ${table}
      WHERE result_id IN (${placeholders(resultIds.length)})
-       AND (world_position <= 10 OR continent_position <= 10 OR country_position <= 10)`,
+       AND (world_position <= ${FEED_TOP_SCAN_SIZE} OR continent_position <= ${FEED_TOP_SCAN_SIZE} OR country_position <= ${FEED_TOP_SCAN_SIZE})`,
     resultIds,
   );
   return result.rows as unknown as CandidateRow[];
@@ -215,7 +216,7 @@ async function groupedPersonRows(
      LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
      WHERE ranking.person_id IN (${placeholders(people.length)})
        AND ranking.competition_id IN (${placeholders(competitions.length)})
-       AND (ranking.world_sub_rank <= 10 OR ranking.continent_sub_rank <= 10 OR ranking.country_sub_rank <= 10)`,
+       AND (ranking.world_sub_rank <= ${FEED_TOP_SCAN_SIZE} OR ranking.continent_sub_rank <= ${FEED_TOP_SCAN_SIZE} OR ranking.country_sub_rank <= ${FEED_TOP_SCAN_SIZE})`,
     [...people, ...competitions],
   );
   return result.rows as unknown as CandidateRow[];
@@ -244,7 +245,7 @@ async function groupedCurrentYearPersonRows(
          WHERE scope = 'world' AND region_id = ''
        )
        AND ranking.result_id IN (${placeholders(resultIds.length)})
-       AND ranking.position <= 10`,
+       AND ranking.position <= ${FEED_TOP_SCAN_SIZE}`,
     resultIds,
   );
   return result.rows as unknown as CandidateRow[];
