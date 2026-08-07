@@ -165,7 +165,27 @@ export async function loadResultRankingData(
             attempt.value AS result_value, facts.person_country_id AS country_id,
             facts.person_continent_id AS continent_id, facts.competition_id,
             facts.competition_start_date,
-            CASE WHEN attempt.value = facts.best THEN facts.regional_single_record ELSE '' END AS record_code`,
+            CASE
+              WHEN EXISTS (
+                SELECT 1 FROM result_rankings_single current_record
+                WHERE current_record.result_id = facts.result_id
+                  AND current_record.attempt_number = attempt.attempt_number
+                  AND current_record.country_rank = 1
+              ) THEN 'NR'
+              WHEN EXISTS (
+                SELECT 1 FROM result_rankings_single current_record
+                WHERE current_record.result_id = facts.result_id
+                  AND current_record.attempt_number = attempt.attempt_number
+                  AND current_record.continent_rank = 1
+              ) THEN 'CR'
+              WHEN EXISTS (
+                SELECT 1 FROM result_rankings_single current_record
+                WHERE current_record.result_id = facts.result_id
+                  AND current_record.attempt_number = attempt.attempt_number
+                  AND current_record.world_rank = 1
+              ) THEN 'WR'
+              ELSE ''
+            END AS record_code`,
       conditions: yearSingleConditions,
     });
     rankingValues = [...yearSingleValues, start, rowLimit];
@@ -178,7 +198,13 @@ export async function loadResultRankingData(
       joins: averageJoins.join(" "),
       candidateColumns: `result.result_id, NULL AS attempt_number, result.person_id,
               result.result_value, result.country_id, result.continent_id, result.competition_id,
-              average_facts.competition_start_date, result.record_code`,
+              average_facts.competition_start_date,
+              CASE
+                WHEN result.country_rank = 1 THEN 'NR'
+                WHEN result.continent_rank = 1 THEN 'CR'
+                WHEN result.world_rank = 1 THEN 'WR'
+                ELSE ''
+              END AS record_code`,
       conditions: averageConditions,
     });
     rankingValues = [...averageValues, start, rowLimit];

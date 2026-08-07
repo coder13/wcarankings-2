@@ -9,7 +9,12 @@ import { getTopRailScrollProgress } from "./useRailScrollProgress";
 import { competitionRankingPath } from "./useRankingsState";
 import { rankingPageRequestUrl } from "./rankingsQueries";
 import type { RankingsFilterState } from "./rankingsUrl";
-import { serializeRankingsUrl, type RankingsUrlState } from "./rankingsUrl";
+import {
+  personActivityRankingPath,
+  parseRankingsUrl,
+  serializeRankingsUrl,
+  type RankingsUrlState,
+} from "./rankingsUrl";
 import type { RankingEntry } from "./types";
 
 const rankingEntry: RankingEntry = {
@@ -37,6 +42,9 @@ function pathnameForFilters(filters: RankingsFilterState) {
   }
   if (filters.subject === "cities") return `/cities/${filters.cityRanking}`;
   if (filters.personCompetitionRanking) return "/persons/competitions";
+  if (filters.personActivityRanking) {
+    return personActivityRankingPath(filters.personActivityMetric);
+  }
   if (filters.personMedalRanking) return "/persons/medals";
   if (filters.personPrStreakRanking) return "/persons/pr-streak";
   if (filters.year) return `/persons/year/${filters.year}`;
@@ -52,6 +60,8 @@ function renderExplorerMarkup(
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
     personCompetitionRanking: false,
+    personActivityRanking: false,
+    personActivityMetric: "competitions",
     personMedalRanking: false,
     personPrStreakRanking: false,
     medalType: "overall",
@@ -203,16 +213,40 @@ test("renders a separate person ranking picker", () => {
   assert.match(markup, /aria-label="Person ranking"/);
   assert.match(
     markup,
-    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Medals<\/button><button[^>]*>Competitions<\/button><button[^>]*>PR Streak<\/button>/,
+    /personRankingDropdown[\s\S]*?>Rankings<\/button><button[^>]*>Competition count<\/button><button[^>]*>Countries<\/button><button[^>]*>Rounds<\/button><button[^>]*>Solves<\/button><button[^>]*>Medals<\/button><button[^>]*>PR Streak<\/button>/,
   );
 });
 
-test("keeps a competition-ranking year in its query string", () => {
+test("adds activity statistics to the person ranking selector", () => {
+  const markup = renderExplorerMarkup({ options: { showSubjectSwitch: true } });
+
+  assert.match(markup, />Countries</);
+  assert.match(markup, />Rounds</);
+  assert.match(markup, />Solves</);
+});
+
+test("keeps the activity metric in the person ranking selector", () => {
+  const markup = renderExplorerMarkup(
+    { options: { showSubjectSwitch: true } },
+    { personActivityRanking: true, personActivityMetric: "rounds" },
+  );
+  assert.match(markup, /aria-label="Person ranking"/);
+  assert.match(markup, />Competition count</);
+  assert.match(markup, />Countries</);
+  assert.match(markup, />Rounds</);
+  assert.match(markup, />Solves</);
+  assert.doesNotMatch(markup, /aria-label="Person ranking statistic"/);
+  assert.doesNotMatch(markup, /Find ranking/);
+});
+
+test("uses a unique canonical path for each person activity stat", () => {
   const filters: RankingsUrlState = {
     subject: "people",
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
-    personCompetitionRanking: true,
+    personCompetitionRanking: false,
+    personActivityRanking: true,
+    personActivityMetric: "countries",
     personMedalRanking: false,
     personPrStreakRanking: false,
     medalType: "overall",
@@ -229,16 +263,17 @@ test("keeps a competition-ranking year in its query string", () => {
     kinchOrder: "regional",
   };
   assert.equal(
-    serializeRankingsUrl("/persons/competitions", filters).toString(),
+    serializeRankingsUrl("/persons/countries", filters).toString(),
     "gender=f%2Co&year=2023",
   );
-  const markup = renderExplorerMarkup(
-    { options: { showSubjectSwitch: true } },
-    { personCompetitionRanking: true, year: 2023 },
+  const parsed = parseRankingsUrl(
+    "/persons/countries",
+    new URLSearchParams("year=2023&search=Avery"),
   );
-  assert.match(markup, /aria-label="Person ranking period"/);
-  assert.match(markup, />All time</);
-  assert.match(markup, />2023</);
+  assert.equal(parsed.personActivityRanking, true);
+  assert.equal(parsed.personActivityMetric, "countries");
+  assert.equal(parsed.year, 2023);
+  assert.equal(parsed.search, "Avery");
 });
 
 test("renders PR Streak without event or result controls", () => {
@@ -265,6 +300,7 @@ test("requests PR Streak with one-based positions and no event dimensions", () =
         gender: [],
         year: null,
         medalType: "overall",
+        personActivityMetric: "competitions",
       },
       1,
     ),

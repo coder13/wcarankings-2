@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import type { GenderFilter } from "@/lib/wca";
 import type { MedalRankingType } from "@/lib/medal-rankings";
+import type { PersonActivityMetric } from "./rankingsUrl";
 import { rankingStatSource } from "@/lib/ranking-stat-sources";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
@@ -34,6 +35,7 @@ export type RankingQueryFilters = {
   gender: readonly GenderFilter[];
   year: number | null;
   medalType: MedalRankingType;
+  personActivityMetric: PersonActivityMetric;
   membershipVersion?: number;
   rankingsDataVersion?: string | null;
 };
@@ -84,11 +86,13 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     filters.eventId,
     filters.rankingType,
     filters.medalType,
+    filters.personActivityMetric,
     filters.regionSelection.scope,
     filters.regionSelection.regionId,
     filters.gender.join(","),
     filters.resource === "people" ||
     filters.resource === "person-competition-count" ||
+    filters.resource === "person-activity-rankings" ||
     filters.resource === "person-pr-streak" ||
     filters.resource === "person-medal-rankings"
       ? (filters.year ?? "all")
@@ -128,6 +132,7 @@ function addRankingFilterParams(
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
+      filters.resource === "person-activity-rankings" ||
       filters.resource === "person-pr-streak" ||
       filters.resource === "person-medal-rankings") &&
     filters.year
@@ -137,6 +142,7 @@ function addRankingFilterParams(
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
+      filters.resource === "person-activity-rankings" ||
       filters.resource === "person-pr-streak" ||
       filters.resource === "person-medal-rankings" ||
       filters.resource === "results") &&
@@ -147,6 +153,9 @@ function addRankingFilterParams(
   if (filters.regionSelection.scope !== "world") {
     params.set("region", filters.regionSelection.regionId);
   }
+  if (filters.resource === "person-activity-rankings") {
+    params.set("metric", filters.personActivityMetric);
+  }
 }
 
 export function rankingPageRequestUrl(
@@ -156,7 +165,8 @@ export function rankingPageRequestUrl(
   const params = new URLSearchParams({
     start: String(
       filters.resource === "person-medal-rankings" ||
-        filters.resource === "person-pr-streak"
+        filters.resource === "person-pr-streak" ||
+        filters.resource === "person-activity-rankings"
         ? start
         : rankingPageStart(start),
     ),
@@ -167,8 +177,10 @@ export function rankingPageRequestUrl(
     params.set("result", filters.rankingType);
   }
   if (
+    (filters.resource !== "person-medal-rankings" || filters.eventId !== "all") &&
     filters.resource !== "person-pr-streak" &&
-    (filters.resource !== "person-medal-rankings" || filters.eventId !== "all")
+    (filters.resource !== "person-activity-rankings" ||
+      ["rounds", "solves"].includes(filters.personActivityMetric))
   ) {
     params.set("eventId", filters.eventId);
   }
@@ -199,11 +211,16 @@ export function rankingPageRequestUrl(
   if (filters.resource === "person-medal-rankings") {
     params.set("medal", filters.medalType);
   }
+  if (filters.resource === "person-activity-rankings") {
+    params.set("metric", filters.personActivityMetric);
+  }
 
   let endpoint = "/api/rankings";
   if (filters.resource === "results") endpoint = "/api/rankings/results";
   else if (filters.resource === "person-competition-count") {
     endpoint = "/api/rankings/people/competitions";
+  } else if (filters.resource === "person-activity-rankings") {
+    endpoint = "/api/rankings/people/activity";
   } else if (filters.resource === "person-medal-rankings") {
     endpoint = "/api/rankings/people/medals";
   } else if (filters.resource === "person-pr-streak") {
@@ -332,11 +349,16 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       signal: AbortSignal,
     ) => {
       const params = new URLSearchParams({
-        eventId: filters.eventId,
         result: filters.rankingType,
         search,
         searchLimit: "500",
       });
+      if (
+        filters.resource !== "person-activity-rankings" ||
+        ["rounds", "solves"].includes(filters.personActivityMetric)
+      ) {
+        params.set("eventId", filters.eventId);
+      }
       if (regexSearch) params.set("mode", "vim");
       addRankingFilterParams(params, filters);
       const endpoint = personSearchEndpoint(filters.resource);

@@ -11,6 +11,7 @@ import {
   loadListRankings,
 } from "@/services/lists/rankings";
 import { assertCanViewList, resolveList } from "@/services/lists/lists";
+import { collectGlobalRankingPopularity } from "@/services/ranking-popularity/global-rankings";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { ApiInputError } from "@/lib/api/projection";
 import {
@@ -234,10 +235,10 @@ export async function handleRankingsRequest(request: Request) {
         },
       });
     }
-    return buildGlobalRankingsResponse(
-      input,
-      await fetchGlobalRankings(input, startedAt),
-    );
+    const loaded = await fetchGlobalRankings(input, startedAt);
+    const response = buildGlobalRankingsResponse(input, loaded);
+    void collectGlobalRankingPopularity(input.searchParams);
+    return response;
   } catch (error) {
     return buildRankingsErrorResponse(input, startedAt, error);
   }

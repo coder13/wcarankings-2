@@ -12,8 +12,11 @@ import { useRankingsExplorer } from "./RankingsExplorerContext";
 
 const PERSON_RANKING_OPTIONS = [
   { value: "rankings", label: "Rankings" },
+  { value: "competitions", label: "Competition count" },
+  { value: "countries", label: "Countries" },
+  { value: "rounds", label: "Rounds" },
+  { value: "solves", label: "Solves" },
   { value: "medals", label: "Medals" },
-  { value: "competitions", label: "Competitions" },
   { value: "pr-streak", label: "PR Streak" },
 ] as const;
 
@@ -40,33 +43,39 @@ export function RankingsExplorerHeader() {
   if (!source && showSubjectSwitch && subject === "people") {
     const personRankingOptions = PERSON_RANKING_OPTIONS.filter((option) => {
       if (option.value === "medals") return featureSwitch.personMedalRankings;
-      if (option.value === "competitions")
-        return featureSwitch.personCompetitionRankings;
       if (option.value === "pr-streak")
         return featureSwitch.personPrStreakRankings;
+      if (option.value !== "rankings")
+        return featureSwitch.personActivityRankings;
       return true;
     });
     let personRankingValue = "rankings";
-    if (filters.personCompetitionRanking) personRankingValue = "competitions";
-    else if (filters.personMedalRanking) personRankingValue = "medals";
+    if (filters.personMedalRanking) personRankingValue = "medals";
+    else if (filters.personActivityRanking)
+      personRankingValue = filters.personActivityMetric;
     else if (filters.personPrStreakRanking) personRankingValue = "pr-streak";
     contextualControl = (
       <TextDropdown
         options={personRankingOptions}
         value={personRankingValue}
         onChange={(value) => {
-          if (value === "competitions") {
-            actions.changePersonCompetitionRanking(true);
-          } else if (value === "medals") {
+          if (value === "medals") {
             actions.changePersonMedalRanking(true);
           } else if (value === "pr-streak") {
             actions.changePersonPrStreakRanking(true);
-          } else if (filters.personCompetitionRanking) {
-            actions.changePersonCompetitionRanking(false);
-          } else if (filters.personPrStreakRanking) {
-            actions.changePersonPrStreakRanking(false);
+          } else if (value === "rankings") {
+            if (filters.personMedalRanking)
+              actions.changePersonMedalRanking(false);
+            else if (filters.personActivityRanking)
+              actions.changePersonActivityRanking(false);
+            else if (filters.personPrStreakRanking)
+              actions.changePersonPrStreakRanking(false);
+            else actions.changePersonCompetitionRanking(false);
           } else {
-            actions.changePersonMedalRanking(false);
+            actions.changePersonActivityRanking(
+              true,
+              value as typeof filters.personActivityMetric,
+            );
           }
         }}
         ariaLabel="Person ranking"

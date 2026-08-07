@@ -43,6 +43,7 @@ type CityPageEntry = Pick<
   RankingEntry,
   | "personName"
   | "identitySubtitle"
+  | "resultSubtitle"
   | "best"
   | "formattedValue"
   | "competitionId"
@@ -113,7 +114,7 @@ export async function loadCityRankings(params: URLSearchParams) {
   );
   return cityPage(rows, counts, limit, start, (row) => ({
     personName: row.city_name,
-    identitySubtitle: row.person_name,
+    identitySubtitle: row.competition_name,
     best: Number(row.result_value),
     formattedValue: formatWcaResult(
       eventId,
@@ -121,7 +122,8 @@ export async function loadCityRankings(params: URLSearchParams) {
       resultType,
     ),
     competitionId: row.competition_id,
-    competitionName: `${row.competition_name} · ${row.person_name}`,
+    competitionName: "",
+    resultSubtitle: row.person_name,
   }));
 }
 

@@ -97,3 +97,14 @@ test("includes the top three results in ranking descriptions", () => {
     "Teodor Zajder (2.76)\nXuanyi Geng (2.80)\nYiheng Wang (3.06).",
   );
 });
+
+test("formats person activity ranking titles", () => {
+  assert.equal(
+    formatRankingDocumentTitle({
+      ...defaults,
+      personActivityRanking: true,
+      personActivityMetric: "solves",
+    }),
+    "People by Official Solve Count | WCA Rankings",
+  );
+});

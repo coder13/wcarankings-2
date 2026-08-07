@@ -21,6 +21,11 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY --chown=data-tools:data-tools release-compatibility.json ./
 COPY --chown=data-tools:data-tools data-tools ./data-tools
 COPY --chown=data-tools:data-tools scripts ./scripts
+COPY --chown=data-tools:data-tools components ./components
+COPY --chown=data-tools:data-tools db ./db
+COPY --chown=data-tools:data-tools lib ./lib
+COPY --chown=data-tools:data-tools services ./services
+COPY --chown=data-tools:data-tools tsconfig.json ./tsconfig.json
 COPY --chown=data-tools:data-tools sql ./sql
 COPY --chown=data-tools:data-tools migrations/mysql ./migrations/mysql
 

@@ -105,7 +105,13 @@ export async function queryGenderRankingPage(input: QueryInput) {
       source,
       baseConditions,
       conditions,
-      selectColumns: rankingColumns("filtered_rank", "filtered_position"),
+      selectColumns: rankingColumns(
+        "filtered_rank",
+        "filtered_position",
+        input.type === "average"
+          ? "result_rankings_average"
+          : "result_rankings_single",
+      ),
     }),
     [...values, resultLimit],
   );
