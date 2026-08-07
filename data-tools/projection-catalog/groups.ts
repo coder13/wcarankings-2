@@ -91,11 +91,11 @@ export function projectionGroup(name: string): DeploymentProjectionGroup {
   return group;
 }
 
-export interface GroupDependencyClosureOptions {
+interface GroupDependencyClosureOptions {
   includeSelected?: boolean;
 }
 
-export function groupDependencyClosure(
+function groupDependencyClosure(
   names: readonly string[],
   options: GroupDependencyClosureOptions = {},
 ): DeploymentProjectionGroup[] {
