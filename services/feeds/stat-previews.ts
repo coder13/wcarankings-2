@@ -284,22 +284,61 @@ async function loadSourcePage<T extends FeedInventoryStat>(
   );
 }
 
+function countBy<T>(items: readonly T[], key: (item: T) => string) {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const value = key(item);
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return Object.fromEntries([...counts.entries()].sort());
+}
+
 async function generateFeedStatPreviews({ now }: { now?: Date } = {}) {
-  const [{ triggers }, { references }, continents, countries] =
+  const [triggerResult, referenceResult, continents, countries] =
     await Promise.all([
       discoverRecentCompetitionTriggers({ now }),
       discoverRecentResultReferences({ now }),
       getRegions("continent"),
       getRegions("country"),
     ]);
+  const { triggers } = triggerResult;
+  const { references } = referenceResult;
   const inventory = prioritizeFeedStatInventory(
     buildRecentFeedStatInventory({ references, continents, countries }),
     triggers,
   );
-  return generateBatchedFeedCandidates({
+  const candidates = await generateBatchedFeedCandidates({
     references,
     inventory,
   });
+  return {
+    candidates,
+    details: {
+      triggerQueryMs: Math.round(triggerResult.triggerQueryMs * 100) / 100,
+      resultQueryMs: Math.round(referenceResult.resultQueryMs * 100) / 100,
+      triggerCount: triggers.length,
+      referenceCount: references.length,
+      inventoryCount: inventory.length,
+      inventoryByKind: countBy(inventory, (item) => item.kind),
+      inventoryByEvent: countBy(
+        inventory,
+        (item) => `${item.eventId} (${item.eventName})`,
+      ),
+      candidateCount: candidates.length,
+      candidatesByKind: countBy(candidates, (item) => item.kind),
+      candidatesByEvent: countBy(
+        candidates,
+        (item) => `${item.eventId} (${item.eventName})`,
+      ),
+      competitions: triggers.map((trigger) => ({
+        id: trigger.competitionId,
+        name: trigger.competitionName,
+        endDate: trigger.endDate,
+        eventIds: trigger.eventIds,
+        countryRecordEventIds: trigger.countryRecordEventIds,
+      })),
+    },
+  };
 }
 
 async function loadInterestingResultPage(
@@ -346,15 +385,25 @@ let backgroundBuild: Promise<void> | null = null;
 
 export async function buildFeedItems({ now }: { now?: Date } = {}) {
   const exportVersion = await currentFeedExportVersion();
-  const candidates = await generateFeedStatPreviews({ now });
+  const { candidates, details } = await generateFeedStatPreviews({ now });
   if ((await currentFeedExportVersion()) !== exportVersion) {
-    return { exportVersion, candidateCount: candidates.length, written: false };
+    return {
+      exportVersion,
+      candidateCount: candidates.length,
+      written: false,
+      details,
+    };
   }
   const selected = dedupeInterestingResults(
     sortFeedCandidates(candidates, null),
   );
   await replaceFeedItems(selected, { exportVersion });
-  return { exportVersion, candidateCount: candidates.length, written: true };
+  return {
+    exportVersion,
+    candidateCount: candidates.length,
+    written: true,
+    details,
+  };
 }
 
 export async function ensureFeedItems({ now }: { now?: Date } = {}) {

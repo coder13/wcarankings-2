@@ -2,11 +2,29 @@
 
 export {};
 
+function hasArgument(name: string) {
+  return process.argv.includes(`--${name}`);
+}
+
 function argument(name: string) {
   const prefix = `--${name}=`;
   return process.argv
     .find((value) => value.startsWith(prefix))
     ?.slice(prefix.length);
+}
+
+if (hasArgument("help")) {
+  console.log(`Usage:
+  pnpm run feed:generate
+  pnpm run feed:generate -- --top-rank=25
+
+Options:
+  --top-rank=N  Include changed results through rank N. Minimum: 5.
+  --help        Show this help text.
+
+The command reads DATABASE_URL from .env.local, rebuilds feed_items, and
+prints the export version, candidate count, write status, and elapsed time.`);
+  process.exit(0);
 }
 
 const topRank = argument("top-rank");
@@ -19,18 +37,37 @@ if (topRank !== undefined) {
 }
 
 const { buildFeedItems } = await import("../services/feeds/stat-previews.ts");
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error(
+    "DATABASE_URL is required. Set it in .env.local or the environment.",
+  );
+}
+const database = new URL(databaseUrl);
 const startedAt = performance.now();
 const result = await buildFeedItems();
 const elapsedMs = Math.round((performance.now() - startedAt) * 100) / 100;
 
+console.log("Feed generation complete.");
 console.log(
-  JSON.stringify(
-    {
-      elapsedMs,
-      topRank: Number(process.env.FEED_TOP_SCAN_SIZE ?? 10),
-      ...result,
-    },
-    null,
-    2,
-  ),
+  `Database: ${database.hostname}:${database.port || "3306"}${database.pathname}`,
 );
+console.log(`Top-rank limit: ${Number(process.env.FEED_TOP_SCAN_SIZE ?? 10)}`);
+console.log(`Export version: ${result.exportVersion}`);
+console.log(`Candidates: ${result.candidateCount}`);
+console.log(`Rows written: ${result.written ? "yes" : "no"}`);
+console.log(`Elapsed time: ${elapsedMs.toFixed(2)} ms`);
+console.log(`Trigger query: ${result.details.triggerQueryMs.toFixed(2)} ms`);
+console.log(`Result query: ${result.details.resultQueryMs.toFixed(2)} ms`);
+console.log(`Recent competitions: ${result.details.triggerCount}`);
+for (const competition of result.details.competitions) {
+  console.log(
+    `  ${competition.endDate} ${competition.name} (${competition.id}) events=${competition.eventIds.join(",") || "none"}`,
+  );
+}
+console.log(`Recent result references: ${result.details.referenceCount}`);
+console.log(`Inventory entries: ${result.details.inventoryCount}`);
+console.log("Inventory by statistic:", result.details.inventoryByKind);
+console.log("Inventory by event:", result.details.inventoryByEvent);
+console.log("Candidates by statistic:", result.details.candidatesByKind);
+console.log("Candidates by event:", result.details.candidatesByEvent);

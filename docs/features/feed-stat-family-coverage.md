@@ -32,8 +32,24 @@ Include changed results through rank 25 with:
 pnpm run feed:generate -- --top-rank=25
 ```
 
+Show the command options with:
+
+```bash
+pnpm run feed:generate -- --help
+```
+
 The command replaces the stored feed rows. It prints the build time, candidate
-count, stored row count, and selected top-rank limit.
+count, stored row count, and selected top-rank limit. It also reports:
+
+- the database host and export version used;
+- trigger and result-reference query times;
+- each recent competition trigger and its available event descriptors;
+- the number of inventory entries by statistic and event; and
+- the number of generated candidates by statistic and event.
+
+This report shows which competitions and statistic families the build examined.
+It also helps identify a missing source adapter when a recent competition has no
+event descriptors or a statistic family has no candidates.
 
 To add a new statistic, add its inventory definition and source loader in
 `services/feeds`. Then run this command to rebuild the feed.
