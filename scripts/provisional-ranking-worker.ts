@@ -203,6 +203,7 @@ async function currentSourceVersion(connection: Connection): Promise<number> {
 async function main(): Promise<void> {
   const connection = await mysql.createConnection(databaseOptions());
   try {
+    await logActiveSources(connection);
     do {
       const source = await claimSource(connection);
       if (source) await saveSnapshot(connection, source);
@@ -212,6 +213,18 @@ async function main(): Promise<void> {
   } finally {
     await connection.end();
   }
+}
+
+async function logActiveSources(connection: Connection): Promise<void> {
+  const [sources] = await connection.query<RowDataPacket[]>(
+    `SELECT source_name, competition_id, next_poll_at
+     FROM provisional_live_result_sources
+     WHERE enabled = 1
+     ORDER BY competition_id`,
+  );
+  process.stdout.write(
+    `Live poller sources: ${sources.length === 0 ? "none" : sources.map((source) => `${source.source_name}:${source.competition_id} (next ${source.next_poll_at})`).join(", ")}\n`,
+  );
 }
 
 main().catch((error: unknown) => {
