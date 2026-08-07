@@ -17,20 +17,20 @@ async function main(): Promise<void> {
   const includeRankingTables =
     useDefaultBuild || includeRankingTablesValue === "true";
   const selectedProjectionNames = useDefaultBuild ? undefined : projectionNames;
-  const groupNames =
-    requestedGroups.length > 0
-      ? requestedGroups
-      : useDefaultBuild
-        ? PROJECTION_JOBS.filter(
-            (job) => job.kind === "core" || job.enabledByDefault,
-          ).map((job) => job.releaseGroup)
-        : DEPLOYMENT_PROJECTION_GROUPS.filter(
-            (group) =>
-              group.projectionNames.some((name) =>
-                projectionNames.includes(name),
-              ) ||
-              (group.name === "ranking-tables" && includeRankingTables),
-          ).map((group) => group.name);
+  let groupNames: string[];
+  if (requestedGroups.length > 0) {
+    groupNames = requestedGroups;
+  } else if (useDefaultBuild) {
+    groupNames = PROJECTION_JOBS.filter(
+      (job) => job.kind === "core" || job.enabledByDefault,
+    ).map((job) => job.releaseGroup);
+  } else {
+    groupNames = DEPLOYMENT_PROJECTION_GROUPS.filter(
+      (group) =>
+        group.projectionNames.some((name) => projectionNames.includes(name)) ||
+        (group.name === "ranking-tables" && includeRankingTables),
+    ).map((group) => group.name);
+  }
   const satisfiedGroups =
     requestedSatisfiedGroups.length > 0
       ? requestedSatisfiedGroups
