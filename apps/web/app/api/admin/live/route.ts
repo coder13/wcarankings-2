@@ -24,7 +24,7 @@ type SourceRow = {
 
 export async function GET() {
   const { rows } = await query<SourceRow>(
-    `SELECT source.source_name, source.competition_id, source.remote_competition_id, source.competition_year, source.enabled, source.poll_seconds, source.next_poll_at, source.last_success_at, source.last_error, source.snapshot_hash, competition.name, CONCAT(LPAD(competition.year, 4, '0'), '-', LPAD(competition.month, 2, '0'), '-', LPAD(competition.day, 2, '0')) AS start_date, CONCAT(LPAD(competition.end_year, 4, '0'), '-', LPAD(competition.end_month, 2, '0'), '-', LPAD(competition.end_day, 2, '0')) AS end_date FROM provisional_live_result_sources source JOIN competitions competition ON competition.id = source.competition_id WHERE source.enabled = 1 AND ${activeToday} ORDER BY source.competition_id`,
+    `SELECT source.source_name, source.competition_id, source.remote_competition_id, source.competition_year, source.enabled, source.poll_seconds, CONCAT(DATE_FORMAT(source.next_poll_at, '%Y-%m-%dT%H:%i:%s.%f'), 'Z') AS next_poll_at, IF(source.last_success_at IS NULL, NULL, CONCAT(DATE_FORMAT(source.last_success_at, '%Y-%m-%dT%H:%i:%s.%f'), 'Z')) AS last_success_at, source.last_error, source.snapshot_hash, competition.name, CONCAT(LPAD(competition.year, 4, '0'), '-', LPAD(competition.month, 2, '0'), '-', LPAD(competition.day, 2, '0')) AS start_date, CONCAT(LPAD(competition.end_year, 4, '0'), '-', LPAD(competition.end_month, 2, '0'), '-', LPAD(competition.end_day, 2, '0')) AS end_date FROM provisional_live_result_sources source JOIN competitions competition ON competition.id = source.competition_id WHERE source.enabled = 1 AND ${activeToday} ORDER BY source.competition_id`,
   );
   return Response.json(
     {
