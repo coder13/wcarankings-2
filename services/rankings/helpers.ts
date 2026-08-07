@@ -40,17 +40,19 @@ export function rankingColumns(
   if (!currentResultTable) {
     return `${rank} AS rank, ${subRank} AS sub_rank, person_id, person_name, country_id, country_name, country_iso2, continent_id, best, competition_id, competition_name, is_world_record, is_continent_record, is_country_record`;
   }
+  const unicodeIdentifier = (column: string) =>
+    `${column} COLLATE utf8mb4_unicode_ci`;
   const currentRecord = (rankColumn: string) => {
     let regionColumn: "continent_id" | "country_id" | null = null;
     if (rankColumn === "continent_rank") regionColumn = "continent_id";
     if (rankColumn === "country_rank") regionColumn = "country_id";
     const regionCondition = regionColumn
-      ? `\n      AND current_record.${regionColumn} = ranking.${regionColumn}`
+      ? `\n      AND current_record.${regionColumn} = ${unicodeIdentifier(`ranking.${regionColumn}`)}`
       : "";
     const positionColumn = rankColumn.replace("_rank", "_position");
     return `EXISTS (
     SELECT 1 FROM ${currentResultTable} current_record
-    WHERE current_record.event_id = ranking.event_id
+    WHERE current_record.event_id = ${unicodeIdentifier("ranking.event_id")}
       AND current_record.result_value = ranking.best
       AND current_record.${positionColumn} = 1${regionCondition}
   )`;
