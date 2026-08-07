@@ -1,0 +1,31 @@
+import mysql from "mysql2/promise";
+import { databaseOptions } from "./lib/database.ts";
+import { LIVE_RESULT_SOURCES, type LiveResultSource } from "./live-results/types.ts";
+
+function usage(): never {
+  throw new Error("Usage: register-live-results-source.ts <wca-live|cubing-china> <competitionId> [remoteCompetitionId] [pollSeconds]");
+}
+
+const [source, competitionId, remoteCompetitionId = competitionId, pollSeconds = "30"] = process.argv.slice(2);
+if (!source || !competitionId || !LIVE_RESULT_SOURCES.includes(source as LiveResultSource)) usage();
+const year = new Date().getUTCFullYear();
+if (!competitionId.includes(String(year))) {
+  throw new Error(`Only the current year (${year}) may use provisional live results.`);
+}
+const poll = Number(pollSeconds);
+if (!Number.isInteger(poll) || poll < 10 || poll > 300) throw new Error("pollSeconds must be an integer from 10 through 300.");
+
+const connection = await mysql.createConnection(databaseOptions());
+try {
+  await connection.query(
+    `INSERT INTO provisional_live_result_sources
+     (source_name, competition_id, remote_competition_id, competition_year, poll_seconds, next_poll_at)
+     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))
+     ON DUPLICATE KEY UPDATE remote_competition_id = VALUES(remote_competition_id), enabled = 1,
+       poll_seconds = VALUES(poll_seconds), next_poll_at = CURRENT_TIMESTAMP(6), last_error = NULL`,
+    [source, competitionId, remoteCompetitionId, year, poll],
+  );
+  process.stdout.write(`Registered ${source} live results for ${competitionId}.\n`);
+} finally {
+  await connection.end();
+}

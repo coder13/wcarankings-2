@@ -86,6 +86,19 @@ services:
       db:
         condition: service_healthy
 
+  provisional-ranking-worker:
+    image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
+    restart: unless-stopped
+    command: ["/app/scripts/provisional-ranking-worker.ts"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      PROVISIONAL_RANKING_WORKER_POLL_MS: ${PROVISIONAL_RANKING_WORKER_POLL_MS:-2000}
+      PROVISIONAL_RANKING_WORKER_LEASE_SECONDS: ${PROVISIONAL_RANKING_WORKER_LEASE_SECONDS:-120}
+    depends_on:
+      db:
+        condition: service_healthy
+
   proxy:
     image: caddy:2-alpine
     restart: unless-stopped

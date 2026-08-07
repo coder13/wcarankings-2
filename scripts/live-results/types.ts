@@ -1,0 +1,34 @@
+export const LIVE_RESULT_SOURCES = ["wca-live", "cubing-china"] as const;
+
+export type LiveResultSource = (typeof LIVE_RESULT_SOURCES)[number];
+
+export interface LiveResult {
+  sourceResultId: string;
+  eventId: string;
+  roundNumber: number;
+  formatId: string | null;
+  personId: string;
+  personName: string;
+  countryIso2: string | null;
+  best: number;
+  average: number;
+  attempts: number[];
+}
+
+export interface LiveResultsSnapshot {
+  results: LiveResult[];
+}
+
+export interface LiveResultsSourceRow {
+  source_name: LiveResultSource;
+  competition_id: string;
+  remote_competition_id: string;
+  competition_year: number;
+  lease_token: string | null;
+}
+
+export interface ClaimedProvisionalRankingJob {
+  competition_year: number;
+  event_id: string;
+  lease_token: string;
+}
