@@ -20,6 +20,3 @@ CREATE TABLE provisional_live_result_state (
 );
 
 INSERT INTO provisional_live_result_state (id) VALUES (1);
-
-DROP TABLE provisional_current_year_rankings,
-  provisional_current_year_ranking_rebuild_jobs;
