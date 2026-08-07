@@ -610,11 +610,6 @@ main {
   background: var(--surface-raised);
 }
 
-.feedCards .profilePreviewLabel {
-  min-height: 2.05rem;
-  margin-bottom: 0.125rem;
-}
-
 .feedLoadingCard {
   overflow: hidden;
   border: 1px solid var(--border);

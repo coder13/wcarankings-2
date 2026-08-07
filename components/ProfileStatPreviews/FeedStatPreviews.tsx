@@ -162,6 +162,7 @@ export function FeedStatPreviews({
               <StatPreviewTable
                 tableName={preview.title}
                 surfaceClassName="profileRankingHighlightPreviewTable"
+                labelClassName="profilePreviewLabel--feed"
                 action={
                   <Link
                     className="profilePreviewExplore"

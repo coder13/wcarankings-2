@@ -163,6 +163,11 @@
   margin-bottom: 0.45rem;
 }
 
+.profilePreviewLabel--feed {
+  min-height: 2.05rem;
+  margin-bottom: 0.125rem;
+}
+
 .profilePreviewViewToggle {
   display: inline-flex;
   padding: 0.15rem;
