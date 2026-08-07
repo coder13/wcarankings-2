@@ -38,6 +38,17 @@ Show the command options with:
 pnpm run feed:generate -- --help
 ```
 
+Benchmark the current SoR lookup for people and regions touched by recent
+results with:
+
+```bash
+pnpm run feed:generate -- --benchmark-sor
+```
+
+This benchmark reads the current `person_sum_of_ranks_scores` projection and
+does not write feed rows. The projection stores current scores only. It does
+not measure an exact seven-day or 2026 historical delta calculation.
+
 The command replaces the stored feed rows. It prints the build time, candidate
 count, stored row count, and selected top-rank limit. It also reports:
 

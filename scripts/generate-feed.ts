@@ -17,13 +17,27 @@ if (hasArgument("help")) {
   console.log(`Usage:
   pnpm run feed:generate
   pnpm run feed:generate -- --top-rank=25
+  pnpm run feed:generate -- --benchmark-sor
 
 Options:
   --top-rank=N  Include changed results through rank N. Minimum: 5.
+  --benchmark-sor  Measure the current affected SoR lookup without writing rows.
   --help        Show this help text.
 
 The command reads DATABASE_URL from .env.local, rebuilds feed_items, and
 prints the export version, candidate count, write status, and elapsed time.`);
+  process.exit(0);
+}
+
+if (hasArgument("benchmark-sor")) {
+  const { benchmarkAffectedSorLookup } =
+    await import("../services/feeds/sor-benchmark.ts");
+  const result = await benchmarkAffectedSorLookup();
+  console.log("Affected SoR lookup benchmark complete.");
+  console.log(JSON.stringify(result, null, 2));
+  console.log(
+    "This measures the current materialized SoR lookup only. The current SoR table has no as-of date or year column, so historical seven-day and 2026 deltas are not calculated by this benchmark.",
+  );
   process.exit(0);
 }
 
