@@ -447,13 +447,13 @@ test("core ranking-table build contains only active ranking tables", () => {
     ({ name }) => name === "ranking-tables-entries-average-source",
   );
   assert.deepEqual(averageSource.dependencies, ["projection:result-facts"]);
-  assert.equal(CORE_RANKING_TABLE_TASK_COUNT, 2);
+  assert.equal(CORE_RANKING_TABLE_TASK_COUNT, 3);
   const progress = createTableProgress(CORE_RANKING_TABLE_TASK_COUNT);
   let lastProgress;
   for (const task of CORE_RANKING_TABLE_TASKS) {
     if (task.table) lastProgress = progress.start(task.table);
   }
-  assert.equal(lastProgress, "[2/2]");
+  assert.equal(lastProgress, "[3/3]");
 });
 
 test("core ranking-table source views wait for result facts", async () => {

@@ -235,6 +235,7 @@ export async function buildProjectionTables(
     const managedNames = [
       entriesTables.single,
       entriesTables.average,
+      `ranking_counts${projectionSuffix}`,
       entriesSources.single,
       entriesSources.average,
       bestSingle,

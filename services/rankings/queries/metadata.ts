@@ -25,23 +25,8 @@ export function yearCountsQuery() {
 
 export function rankingCountsQuery() {
   return sqlFragment`
-    SELECT event_id, 'single' AS ranking_type, 'world' AS scope, '' AS region_id, COUNT(*) AS count
-    FROM ranking_entries_single GROUP BY event_id
-    UNION ALL
-    SELECT event_id, 'single', 'continent', continent_id, COUNT(*)
-    FROM ranking_entries_single WHERE continent_id <> '' GROUP BY event_id, continent_id
-    UNION ALL
-    SELECT event_id, 'single', 'country', country_id, COUNT(*)
-    FROM ranking_entries_single WHERE country_id <> '' GROUP BY event_id, country_id
-    UNION ALL
-    SELECT event_id, 'average', 'world', '', COUNT(*)
-    FROM ranking_entries_average GROUP BY event_id
-    UNION ALL
-    SELECT event_id, 'average', 'continent', continent_id, COUNT(*)
-    FROM ranking_entries_average WHERE continent_id <> '' GROUP BY event_id, continent_id
-    UNION ALL
-    SELECT event_id, 'average', 'country', country_id, COUNT(*)
-    FROM ranking_entries_average WHERE country_id <> '' GROUP BY event_id, country_id
+    SELECT event_id, ranking_type, scope, region_id, count
+    FROM ranking_counts
   `;
 }
 
