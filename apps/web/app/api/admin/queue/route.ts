@@ -20,6 +20,8 @@ const removableStates = [
   "failed",
 ] as const;
 type QueueState = (typeof states)[number];
+const PAGE_SIZE = 50;
+type QueueCursor = Record<QueueState, number>;
 
 type QueueItem = {
   id: string;
@@ -65,19 +67,68 @@ export async function GET(request: Request) {
   if (rejection) return rejection;
   try {
     const queue = projectionJobQueue();
+    const rawCursor = new URL(request.url).searchParams.get("cursor");
+    let cursor: QueueCursor = Object.fromEntries(
+      states.map((state) => [state, 0]),
+    ) as QueueCursor;
+    if (rawCursor) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(rawCursor)) as unknown;
+        if (
+          !parsed ||
+          typeof parsed !== "object" ||
+          states.some(
+            (state) =>
+              !Number.isInteger((parsed as Record<string, unknown>)[state]) ||
+              Number((parsed as Record<string, unknown>)[state]) < 0,
+          )
+        )
+          throw new Error("Invalid queue cursor.");
+        cursor = parsed as QueueCursor;
+      } catch {
+        return Response.json({ error: "Invalid queue cursor." }, { status: 400 });
+      }
+    }
+    const counts = await queue.getJobCounts(...states);
     const groups = await Promise.all(
       states.map(async (state) => ({
         state,
-        jobs: await queue.getJobs([state], 0, 199, true),
+        jobs: await queue.getJobs(
+          [state],
+          cursor[state],
+          cursor[state] + PAGE_SIZE - 1,
+          true,
+        ),
       })),
     );
-    const items = groups
-      .flatMap(({ state, jobs }) => jobs.map((job) => formatItem(state, job)))
-      .filter((item): item is QueueItem => item !== null)
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    const candidates = groups.flatMap(({ state, jobs }) =>
+      jobs
+        .map((job) => formatItem(state, job))
+        .filter((item): item is QueueItem => item !== null)
+        .map((item) => ({ item, state })),
+    );
+    candidates.sort((left, right) =>
+      right.item.createdAt.localeCompare(left.item.createdAt),
+    );
+    const page = candidates.slice(0, PAGE_SIZE);
+    const consumed = Object.fromEntries(
+      states.map((state) => [state, cursor[state]]),
+    ) as QueueCursor;
+    for (const candidate of page) consumed[candidate.state] += 1;
+    const total = states.reduce(
+      (sum, state) => sum + Number(counts[state] ?? 0),
+      0,
+    );
+    const hasMore = states.some(
+      (state) => consumed[state] < Number(counts[state] ?? 0),
+    );
 
     return Response.json(
-      { items, limited: items.length === 1_000 },
+      {
+        items: page.map(({ item }) => item),
+        total,
+        nextCursor: hasMore ? encodeURIComponent(JSON.stringify(consumed)) : null,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

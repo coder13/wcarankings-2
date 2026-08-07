@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminPage } from "@/components/AdminPage/AdminPage";
 import { ListDialog } from "@/components/ListOwnerControls/shared";
 import styles from "@/components/AdminHealth/AdminHealth.module.css";
@@ -17,7 +17,12 @@ type QueueItem = {
   attemptsMade: number;
 };
 
-type QueueResponse = { items: QueueItem[]; limited: boolean; error?: string };
+type QueueResponse = {
+  items: QueueItem[];
+  total: number;
+  nextCursor: string | null;
+  error?: string;
+};
 type AlertMessage = { text: string; tone: "success" | "error" };
 
 function DateTime({ value }: { value: string | null }) {
@@ -43,8 +48,8 @@ function payload(item: QueueItem) {
 
 function queueSummary(data: QueueResponse | null, activeCount: number) {
   if (!data) return "Loading…";
-  if (activeCount) return `${activeCount} processing`;
-  return `${data.items.length} items`;
+  if (activeCount) return `${activeCount} processing · ${data.total} items`;
+  return `${data.total} items`;
 }
 
 export function ProjectionQueueAdmin() {
@@ -53,13 +58,26 @@ export function ProjectionQueueAdmin() {
   const [removing, setRemoving] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async () => {
-    const response = await fetch("/api/admin/queue", { cache: "no-store" });
+  const load = useCallback(async (cursor?: string, append = false) => {
+    if (append) setLoadingMore(true);
+    const query = cursor ? `?cursor=${cursor}` : "";
+    const response = await fetch(`/api/admin/queue${query}`, {
+      cache: "no-store",
+    });
     const next = (await response.json()) as QueueResponse;
-    setData(
-      response.ok ? next : { items: [], limited: false, error: next.error },
-    );
+    if (response.ok) {
+      setData((current) =>
+        append && current
+          ? { ...next, items: [...current.items, ...next.items] }
+          : next,
+      );
+    } else {
+      setData({ items: [], total: 0, nextCursor: null, error: next.error });
+    }
+    if (append) setLoadingMore(false);
   }, []);
 
   useEffect(() => {
@@ -79,6 +97,22 @@ export function ProjectionQueueAdmin() {
       window.clearInterval(interval);
     };
   }, [load]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const cursor = data?.nextCursor;
+        if (entry.isIntersecting && cursor && !loadingMore) {
+          void load(cursor, true);
+        }
+      },
+      { rootMargin: "240px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [data?.nextCursor, load, loadingMore]);
 
   const activeCount =
     data?.items.filter((item) => item.state === "active").length ?? 0;
@@ -183,11 +217,6 @@ export function ProjectionQueueAdmin() {
             {clearing ? "Clearing…" : "Clear queue"}
           </button>
         </div>
-        {data?.limited && (
-          <p className={`${styles.alert} ${styles.alertInfo}`}>
-            Only the 1,000 most recent queue items are shown.
-          </p>
-        )}
         <div className={styles.tableWrap}>
           <table className={styles.sourcesTable}>
             <thead>
@@ -241,6 +270,9 @@ export function ProjectionQueueAdmin() {
               )}
             </tbody>
           </table>
+        </div>
+        <div ref={loadMoreRef} aria-live="polite">
+          {loadingMore && <p className={styles.tableEmpty}>Loading more…</p>}
         </div>
       </section>
       {confirmingClear && (
