@@ -2,6 +2,11 @@
 
 # dependencies
 /node_modules
+**/node_modules/
+
+# build caches
+/.vite/
+**/.vite/
 /.pnp
 .pnp.*
 .yarn/*

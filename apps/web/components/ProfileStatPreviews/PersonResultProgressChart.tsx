@@ -6,6 +6,7 @@ import {
   LineChart,
   ResponsiveContainer,
   Tooltip,
+  type TooltipContentProps,
   XAxis,
   YAxis,
 } from "recharts";
@@ -99,7 +100,7 @@ export function PersonResultProgressChart({
           />
           <Tooltip
             allowEscapeViewBox={{ x: true, y: true }}
-            content={(properties) => (
+            content={(properties: TooltipContentProps<number, string>) => (
               <ResultProgressTooltip
                 {...properties}
                 eventId={eventId}
