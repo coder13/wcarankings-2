@@ -5,7 +5,7 @@ import test from "node:test";
 test("the popularity migration creates the registry and daily totals tables", async () => {
   const migration = await readFile(
     new URL(
-      "../migrations/mysql/app/V20__ranking_list_popularity.sql",
+      "../migrations/mysql/app/V23__ranking_list_popularity.sql",
       import.meta.url,
     ),
     "utf8",
