@@ -1,4 +1,5 @@
 import { query } from "@/db";
+import { sqlFragment } from "@/lib/helpers/database/sql";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import { searchPersonIds } from "@/services/people/service";
 import {
@@ -103,17 +104,29 @@ function yearlyColumns(type: RankingType): string {
       ? "facts.regional_average_record"
       : "facts.regional_single_record";
   return `ranking.public_rank AS rank, ranking.position AS sub_rank, ranking.person_id,
-    COALESCE(person.name, ranking.person_id) AS person_name,
+    COALESCE(live.person_name, person.name, ranking.person_id) AS person_name,
     COALESCE(country.id, '') AS country_id, COALESCE(country.name, country.id, '') AS country_name,
     COALESCE(country.iso2, '') AS country_iso2, COALESCE(country.continent_id, '') AS continent_id,
-    ranking.result_value AS best, COALESCE(facts.competition_id, '') AS competition_id,
+    ranking.result_value AS best, COALESCE(facts.competition_id, live.competition_id, '') AS competition_id,
     COALESCE(competition.name, '') AS competition_name,
-    ${recordColumn} = 'WR' AS is_world_record,
-    ${recordColumn} IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
-    ${recordColumn} = 'NR' AS is_country_record`;
+    COALESCE(${recordColumn}, '') = 'WR' AS is_world_record,
+    COALESCE(${recordColumn}, '') IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
+    COALESCE(${recordColumn}, '') = 'NR' AS is_country_record`;
 }
 
-function yearlyFilters(input: QueryInput) {
+function provisionalYearlyCondition(table: string) {
+  return sqlFragment`
+    ranking.is_provisional = COALESCE((
+      SELECT MAX(provisional.is_provisional)
+      FROM ${table} provisional
+      WHERE provisional.year = ranking.year
+        AND provisional.event_id = ranking.event_id
+        AND provisional.cohort_id = ranking.cohort_id
+    ), 0)
+  `;
+}
+
+function yearlyFilters(input: QueryInput, table: string) {
   const values: unknown[] = [
     input.year,
     input.eventId,
@@ -127,6 +140,7 @@ function yearlyFilters(input: QueryInput) {
       "ranking.year = ?",
       "ranking.event_id = ?",
       "ranking.cohort_id = (SELECT cohort_id FROM person_year_ranking_cohorts WHERE scope = ? AND region_id = ?)",
+      provisionalYearlyCondition(table),
       ...(gender.sql ? [gender.sql] : []),
     ],
     values,
@@ -139,13 +153,11 @@ export async function queryRankingPage(
   pageSize = RESULTS_PAGE_SIZE,
 ) {
   if (input.year !== null) {
-    const { conditions, values } = yearlyFilters(input);
+    const source = yearlyRankingTable(input.type);
+    const { conditions, values } = yearlyFilters(input, source);
     if (input.gender.length) {
       const result = await query<FilteredRankingRow>(
-        filteredYearlyRankingPageQuery(
-          yearlyRankingTable(input.type),
-          conditions,
-        ),
+        filteredYearlyRankingPageQuery(source, conditions),
         [...values, input.startRank, input.startRank + pageSize],
       );
       return {
@@ -162,11 +174,7 @@ export async function queryRankingPage(
       };
     }
     const result = await query<RankingRow>(
-      yearlyRankingPageQuery(
-        yearlyRankingTable(input.type),
-        yearlyColumns(input.type),
-        conditions,
-      ),
+      yearlyRankingPageQuery(source, yearlyColumns(input.type), conditions),
       [...values, input.startRank, input.startRank + pageSize],
     );
     return {
@@ -209,19 +217,23 @@ export async function queryRankingPage(
 
 export async function queryPersonRanking(input: QueryInput) {
   const yearly = input.year !== null;
-  const queryParts = yearly
-    ? { rank: "public_rank", subRank: "position", ...yearlyFilters(input) }
-    : rankingFilters(input);
-  const { rank, subRank, conditions, values } = queryParts;
   const source = yearly
     ? yearlyRankingTable(input.type)
     : rankingTable(input.type);
+  const queryParts = yearly
+    ? {
+        rank: "public_rank",
+        subRank: "position",
+        ...yearlyFilters(input, source),
+      }
+    : rankingFilters(input);
+  const { rank, subRank, conditions, values } = queryParts;
   const selectColumns = yearly
     ? yearlyColumns(input.type)
     : rankingColumns(rank, subRank);
   let from = `FROM ${source} ranking`;
   if (yearly) {
-    from = `FROM ${source} ranking LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1 LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id LEFT JOIN countries country ON country.id = facts.person_country_id LEFT JOIN competitions competition ON competition.id = facts.competition_id`;
+    from = `FROM ${source} ranking LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1 LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id LEFT JOIN provisional_live_results live ON -CAST(live.projection_result_id AS SIGNED) = ranking.result_id LEFT JOIN countries live_country ON live_country.iso2 = live.country_iso2 LEFT JOIN countries country ON country.id = COALESCE(facts.person_country_id, live_country.id) LEFT JOIN competitions competition ON competition.id = COALESCE(facts.competition_id, live.competition_id)`;
   }
   const predicate = conditions.join(" AND ");
   const qualifiedSubRank = yearly ? `ranking.${subRank}` : subRank;

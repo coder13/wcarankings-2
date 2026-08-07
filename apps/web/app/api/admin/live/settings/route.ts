@@ -1,10 +1,13 @@
 import { query } from "@/db";
+import { rejectNonAdmin } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
 type SettingsRow = { poll_seconds: number };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const rejection = await rejectNonAdmin(request);
+  if (rejection) return rejection;
   const { rows } = await query<SettingsRow>(
     "SELECT poll_seconds FROM live_results_settings WHERE id = 1",
   );
@@ -12,6 +15,8 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const rejection = await rejectNonAdmin(request);
+  if (rejection) return rejection;
   const body = (await request.json()) as {
     pollSeconds?: unknown;
     confirmed?: unknown;

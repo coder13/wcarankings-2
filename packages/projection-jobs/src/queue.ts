@@ -9,10 +9,10 @@ export interface ProjectionJob {
   payload: Record<string, string>;
 }
 
-const QUEUE_NAME = "wcarankings-projection-jobs";
+export const PROJECTION_JOB_QUEUE_NAME = "wcarankings-projection-jobs";
 let queue: Queue<ProjectionJob> | undefined;
 
-function connection() {
+export function projectionJobConnection() {
   const value = process.env.REDIS_URL;
   if (!value) throw new Error("REDIS_URL is required for projection jobs.");
   const url = new URL(value);
@@ -27,7 +27,9 @@ function connection() {
 }
 
 export function projectionJobQueue(): Queue<ProjectionJob> {
-  queue ??= new Queue<ProjectionJob>(QUEUE_NAME, { connection: connection() });
+  queue ??= new Queue<ProjectionJob>(PROJECTION_JOB_QUEUE_NAME, {
+    connection: projectionJobConnection(),
+  });
   return queue;
 }
 

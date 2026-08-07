@@ -15,6 +15,7 @@ CREATE TABLE person_period_metrics AS
 SELECT
   period_year,
   person_id,
+  0 AS is_provisional,
   person_gender,
   country_id,
   continent_id,
@@ -62,7 +63,7 @@ DROP TEMPORARY TABLE person_period_attempt_counts;
 
 ALTER TABLE person_period_metrics
   MODIFY period_year SMALLINT UNSIGNED NOT NULL,
-  ADD PRIMARY KEY (period_year, person_id),
+  ADD PRIMARY KEY (period_year, person_id, is_provisional),
   ADD INDEX idx_person_period_metrics_competitions (period_year, competition_count, person_id),
   ADD INDEX idx_person_period_metrics_gender (period_year, person_gender, competition_count, person_id),
   ADD INDEX idx_person_period_metrics_country (period_year, country_id, person_id),

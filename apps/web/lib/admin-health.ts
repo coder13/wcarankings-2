@@ -1,32 +1,27 @@
 import { getDatabaseDiagnostics, query } from "@/db";
 import {
+  getAdminRuntimeSnapshot,
+  type AdminRuntimeSnapshot,
+} from "@/lib/admin-runtime";
+import {
   rankingsPageCache,
   type RankingsCacheSnapshot,
 } from "@/services/rankings/cache";
 
 export const capabilityTables = {
   core: ["ranking_entries_single", "ranking_entries_average"],
-  resultRankings: [
-    "result_rankings_single",
-    "result_rankings_average",
-  ],
+  resultRankings: ["result_rankings_single", "result_rankings_average"],
   competitionRankings: [
     "competition_podium_members",
     "competition_event_stats",
     "competition_stats",
   ],
-  personActivityRankings: [
-    "person_activity_rankings",
-    "person_period_metrics",
-  ],
+  personActivityRankings: ["person_activity_rankings", "person_period_metrics"],
   personCompetitionRankings: [
     "person_competition_rankings",
     "person_period_metrics",
   ],
-  personMedalRankings: [
-    "person_medal_scores",
-    "person_medal_rankings",
-  ],
+  personMedalRankings: ["person_medal_scores", "person_medal_rankings"],
   personPrStreakRankings: [
     "person_pr_streak_counts",
     "person_pr_streak_year_counts",
@@ -110,6 +105,8 @@ export type AdminHealthSnapshot = {
     available: boolean;
     error: string | null;
   };
+  workers: AdminRuntimeSnapshot["workers"];
+  queue: AdminRuntimeSnapshot["queue"];
   cache: RankingsCacheSnapshot;
   currentExport: { date: string | null; fetchedAt: string | null };
   generation: {
@@ -148,6 +145,7 @@ export async function getAdminHealthSnapshot(): Promise<AdminHealthSnapshot> {
   const databaseConfig = getDatabaseDiagnostics();
   const cache = emptyCache();
   const diagnostics: string[] = [];
+  const workerRuntime = await getAdminRuntimeSnapshot();
 
   try {
     const [metadataResult, generationResult, tableResult] = await Promise.all([
@@ -217,6 +215,8 @@ export async function getAdminHealthSnapshot(): Promise<AdminHealthSnapshot> {
       status,
       runtime,
       database: { ...databaseConfig, available: true, error: null },
+      workers: workerRuntime.workers,
+      queue: workerRuntime.queue,
       cache,
       currentExport: {
         date: metadata.export_date ?? null,
@@ -261,6 +261,8 @@ export async function getAdminHealthSnapshot(): Promise<AdminHealthSnapshot> {
         available: false,
         error: error instanceof Error ? error.name : "unknown",
       },
+      workers: workerRuntime.workers,
+      queue: workerRuntime.queue,
       cache,
       currentExport: { date: null, fetchedAt: null },
       generation: null,

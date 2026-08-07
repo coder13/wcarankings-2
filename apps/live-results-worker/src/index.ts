@@ -16,8 +16,8 @@ import type {
 } from "@wcarankings/live-results";
 
 const POLL_MS = Math.max(
-  250,
-  Number(process.env.PROVISIONAL_RANKING_WORKER_POLL_MS) || 2_000,
+  60_000,
+  Number(process.env.PROVISIONAL_RANKING_WORKER_POLL_MS) || 60_000,
 );
 const LEASE_SECONDS = Math.max(
   30,

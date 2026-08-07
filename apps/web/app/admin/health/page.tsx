@@ -1,5 +1,5 @@
-import { AdminHealth } from "@/components/AdminHealth/AdminHealth";
+import { AdminHealthRoute } from "@/components/AdminPage/AdminPageRoutes";
 
 export default function AdminHealthPage() {
-  return <AdminHealth />;
+  return <AdminHealthRoute />;
 }

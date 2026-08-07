@@ -18,8 +18,13 @@ export function yearlyRankingPageQuery(
       LEFT JOIN persons person ON person.wca_id = ranking.person_id
       AND person.sub_id = 1
       LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id
-      LEFT JOIN countries country ON country.id = facts.person_country_id
-      LEFT JOIN competitions competition ON competition.id = facts.competition_id
+      LEFT JOIN provisional_live_results live
+        ON -CAST(live.projection_result_id AS SIGNED) = ranking.result_id
+      LEFT JOIN countries live_country ON live_country.iso2 = live.country_iso2
+      LEFT JOIN countries country
+        ON country.id = COALESCE(facts.person_country_id, live_country.id)
+      LEFT JOIN competitions competition
+        ON competition.id = COALESCE(facts.competition_id, live.competition_id)
     WHERE
       ${conditions.join(" AND ")}
       AND ranking.position >= ?
@@ -40,12 +45,12 @@ export function filteredYearlyRankingPageQuery(
           ranking.person_id,
           ranking.result_id,
           ranking.result_value,
-          COALESCE(person.name, ranking.person_id) AS person_name,
+          COALESCE(live.person_name, person.name, ranking.person_id) AS person_name,
           COALESCE(country.id, '') AS country_id,
           COALESCE(country.name, country.id, '') AS country_name,
           COALESCE(country.iso2, '') AS country_iso2,
           COALESCE(country.continent_id, '') AS continent_id,
-          COALESCE(facts.competition_id, '') AS competition_id,
+          COALESCE(facts.competition_id, live.competition_id, '') AS competition_id,
           COALESCE(competition.name, '') AS competition_name,
           facts.competition_start_date,
           COALESCE(facts.round_type_id, '') AS round_type_id,
@@ -56,8 +61,13 @@ export function filteredYearlyRankingPageQuery(
           JOIN persons person ON person.wca_id = ranking.person_id
           AND person.sub_id = 1
           LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id
-          LEFT JOIN countries country ON country.id = facts.person_country_id
-          LEFT JOIN competitions competition ON competition.id = facts.competition_id
+          LEFT JOIN provisional_live_results live
+            ON -CAST(live.projection_result_id AS SIGNED) = ranking.result_id
+          LEFT JOIN countries live_country ON live_country.iso2 = live.country_iso2
+          LEFT JOIN countries country
+            ON country.id = COALESCE(facts.person_country_id, live_country.id)
+          LEFT JOIN competitions competition
+            ON competition.id = COALESCE(facts.competition_id, live.competition_id)
         WHERE
           ${conditions.join(" AND ")}
       ),

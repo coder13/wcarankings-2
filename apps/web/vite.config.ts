@@ -23,7 +23,7 @@ export default defineConfig({
         }
       : undefined,
   ssr: {
-    external: ["mysql2"],
+    external: ["bullmq", "mysql2"],
   },
   plugins: isStorybook ? [] : [svgr(), vinext()],
 });

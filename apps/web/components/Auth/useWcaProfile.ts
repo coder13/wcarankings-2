@@ -12,6 +12,7 @@ type WcaProfile = {
 type WcaProfileResponse = {
   profile: WcaProfile | null;
   configured: boolean;
+  admin: boolean;
 };
 
 async function fetchWcaProfile(signal?: AbortSignal) {

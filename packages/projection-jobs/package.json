@@ -3,10 +3,13 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "bullmq": "^6.0.8"
+    "bullmq": "^6.0.8",
+    "mysql2": "^3.23.2",
+    "sql-template-tag": "^5.2.1"
   },
   "exports": {
     ".": "./src/queue.ts",
+    "./processor": "./src/processor.ts",
     "./status": "./src/status.ts"
   }
 }

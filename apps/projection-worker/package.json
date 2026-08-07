@@ -1,0 +1,17 @@
+{
+  "name": "@wcarankings/projection-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "run": "bun src/index.ts",
+    "dev": "bun --watch src/index.ts",
+    "typecheck": "bunx tsc --project tsconfig.json"
+  },
+  "dependencies": {
+    "@wcarankings/database": "workspace:*",
+    "@wcarankings/projection-jobs": "workspace:*",
+    "bullmq": "^6.0.8",
+    "mysql2": "^3.23.2",
+    "sql-template-tag": "^5.2.1"
+  }
+}

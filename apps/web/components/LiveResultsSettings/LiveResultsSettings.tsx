@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { AdminPage } from "@/components/AdminPage/AdminPage";
+import { ListDialog } from "@/components/ListOwnerControls/shared";
 import styles from "@/components/AdminHealth/AdminHealth.module.css";
 
 async function loadSettings() {
@@ -17,6 +17,7 @@ export function LiveResultsSettings() {
   const [pollMinutes, setPollMinutes] = useState(60);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmingSave, setConfirmingSave] = useState(false);
 
   useEffect(() => {
     void loadSettings()
@@ -30,7 +31,7 @@ export function LiveResultsSettings() {
       );
   }, []);
 
-  async function save(event: FormEvent<HTMLFormElement>) {
+  function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const pollSeconds = pollMinutes * 60;
     if (
@@ -41,12 +42,11 @@ export function LiveResultsSettings() {
       setMessage("Enter a whole number of minutes from 1 through 1440.");
       return;
     }
-    if (
-      !window.confirm(
-        `Change the live-results poll interval to ${pollMinutes} minutes?`,
-      )
-    )
-      return;
+    setConfirmingSave(true);
+  }
+
+  async function confirmSave() {
+    const pollSeconds = pollMinutes * 60;
     setSaving(true);
     try {
       const response = await fetch("/api/admin/live/settings", {
@@ -68,6 +68,7 @@ export function LiveResultsSettings() {
       );
     } finally {
       setSaving(false);
+      setConfirmingSave(false);
     }
   }
 
@@ -75,11 +76,6 @@ export function LiveResultsSettings() {
     <AdminPage
       title="Live results settings"
       description="Configuration for active live-results polling."
-      aside={
-        <Link href="/admin/live" className={styles.status}>
-          Back to live results
-        </Link>
-      }
     >
       {message && <p className={styles.alert}>{message}</p>}
       <section className={styles.card} aria-labelledby="polling-heading">
@@ -106,6 +102,36 @@ export function LiveResultsSettings() {
           </button>
         </form>
       </section>
+      {confirmingSave && (
+        <ListDialog
+          title="Save poll interval"
+          onClose={() => {
+            if (!saving) setConfirmingSave(false);
+          }}
+        >
+          <div className="listModalForm">
+            <p>
+              Change the live-results poll interval to {pollMinutes} minutes?
+            </p>
+            <div className="listRemovalActions">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setConfirmingSave(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void confirmSave()}
+              >
+                {saving ? "Saving…" : "Save poll interval"}
+              </button>
+            </div>
+          </div>
+        </ListDialog>
+      )}
     </AdminPage>
   );
 }

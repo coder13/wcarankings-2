@@ -1,7 +1,11 @@
 export function argumentValue(name: string, values = process.argv): string {
   const prefix = `--${name}=`;
   const argument = values.find((value) => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length) : "";
+  if (argument) return argument.slice(prefix.length);
+  const separateValueIndex = values.indexOf(`--${name}`);
+  return separateValueIndex === -1
+    ? ""
+    : (values[separateValueIndex + 1] ?? "");
 }
 
 export function argumentList(name: string, values = process.argv): string[] {

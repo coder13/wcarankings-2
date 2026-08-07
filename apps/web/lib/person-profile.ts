@@ -56,7 +56,14 @@ export async function loadPersonProfileHeader(
      LEFT JOIN continents continent ON continent.id = country.continent_id
      LEFT JOIN app_users app_user ON app_user.wca_id = person.wca_id
      LEFT JOIN person_period_metrics metrics
-       ON metrics.person_id = person.wca_id AND metrics.period_year = 0
+       ON metrics.person_id = person.wca_id
+       AND metrics.period_year = 0
+       AND metrics.is_provisional = COALESCE((
+         SELECT MAX(provisional.is_provisional)
+         FROM person_period_metrics provisional
+         WHERE provisional.person_id = metrics.person_id
+           AND provisional.period_year = metrics.period_year
+       ), 0)
      LEFT JOIN person_sum_of_ranks_scores kinch
        ON kinch.metric_version = 1
        AND kinch.event_set_version = 1

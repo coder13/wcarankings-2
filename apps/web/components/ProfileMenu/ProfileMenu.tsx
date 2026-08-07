@@ -19,7 +19,9 @@ export function ProfileMenu() {
   const profileQuery = useWcaProfile();
   const state =
     profileQuery.data ??
-    (profileQuery.isError ? { profile: null, configured: true } : null);
+    (profileQuery.isError
+      ? { profile: null, configured: true, admin: false }
+      : null);
 
   useEffect(() => {
     if (!open) return;
@@ -69,6 +71,11 @@ export function ProfileMenu() {
         <Link role="menuitem" href="/lists/mine">
           My lists
         </Link>
+        {state.admin && (
+          <Link role="menuitem" href="/admin/queue">
+            Admin
+          </Link>
+        )}
         <form action="/api/auth/wca/logout" method="post">
           <button role="menuitem" type="submit">
             Sign out
@@ -78,13 +85,27 @@ export function ProfileMenu() {
     );
   } else if (state?.configured) {
     menuContent = (
-      <a role="menuitem" href="/api/auth/wca">
-        Sign in with WCA
-      </a>
+      <>
+        {state.admin && (
+          <Link role="menuitem" href="/admin/queue">
+            Admin
+          </Link>
+        )}
+        <a role="menuitem" href="/api/auth/wca">
+          Sign in with WCA
+        </a>
+      </>
     );
   } else if (state) {
     menuContent = (
-      <p className="profileStatus">WCA sign-in is not configured.</p>
+      <>
+        {state.admin && (
+          <Link role="menuitem" href="/admin/queue">
+            Admin
+          </Link>
+        )}
+        <p className="profileStatus">WCA sign-in is not configured.</p>
+      </>
     );
   }
 

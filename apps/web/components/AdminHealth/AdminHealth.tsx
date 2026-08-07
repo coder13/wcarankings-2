@@ -5,19 +5,6 @@ import { AdminPage } from "@/components/AdminPage/AdminPage";
 import type { AdminHealthSnapshot } from "@/lib/admin-health";
 import styles from "./AdminHealth.module.css";
 
-const capabilityLabels: Record<string, string> = {
-  core: "Core rankings",
-  resultRankings: "Result rankings",
-  competitionRankings: "Competition rankings",
-  personActivityRankings: "Person activity rankings",
-  personCompetitionRankings: "Person competition rankings",
-  personMedalRankings: "Person medal rankings",
-  personPrStreakRankings: "Person PR Streak rankings",
-  cityEventStats: "City/event statistics",
-  sumOfRanks: "Sum of Ranks",
-  yearlyPersonRankings: "Yearly person rankings",
-};
-
 async function loadHealth(): Promise<AdminHealthSnapshot> {
   const response = await fetch("/api/admin/health", { cache: "no-store" });
   const payload = (await response.json()) as AdminHealthSnapshot;
@@ -142,57 +129,6 @@ export function AdminHealth({
             }
           />
         </dl>
-      </section>
-      <section className={styles.card} aria-labelledby="generation-heading">
-        <h2 id="generation-heading">Active ranking generation</h2>
-        {data.generation ? (
-          <>
-            <dl className={styles.grid}>
-              <Metric label="Generation" value={data.generation.generationId} />
-              <Metric label="Export" value={data.generation.exportId} />
-              <Metric
-                label="Activated"
-                value={formatDate(data.generation.activatedAt)}
-              />
-              <Metric label="Source SHA" value={data.generation.sourceSha} />
-              <Metric
-                label="Artifact run"
-                value={
-                  <a
-                    href={data.generation.artifactRunUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {data.generation.artifactRunId}
-                  </a>
-                }
-              />
-              <Metric label="Artifact ID" value={data.generation.artifactId} />
-              <Metric
-                label="Artifact format"
-                value={data.generation.artifactFormatVersion}
-              />
-              <Metric
-                label="Dataset schema"
-                value={data.generation.datasetSchemaVersion}
-              />
-            </dl>
-            <h3>Capabilities</h3>
-            <dl className={styles.grid}>
-              {Object.entries(data.generation.capabilities).map(
-                ([name, capability]) => (
-                  <Metric
-                    key={name}
-                    label={capabilityLabels[name] ?? name}
-                    value={`${capability.status} (${capability.presentTables}/${capability.totalTables} tables)`}
-                  />
-                ),
-              )}
-            </dl>
-          </>
-        ) : (
-          <p>No active ranking generation state is available.</p>
-        )}
       </section>
       <section className={styles.card} aria-labelledby="cache-heading">
         <h2 id="cache-heading">Rankings response cache</h2>

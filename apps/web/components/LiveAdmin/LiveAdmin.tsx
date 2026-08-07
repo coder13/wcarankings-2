@@ -1,6 +1,5 @@
 "use client";
 import { type ReactNode, useEffect, useState } from "react";
-import Link from "next/link";
 import { AdminPage } from "@/components/AdminPage/AdminPage";
 import styles from "@/components/AdminHealth/AdminHealth.module.css";
 type Source = {
@@ -14,6 +13,8 @@ type Source = {
   start_date: string;
   end_date: string;
   poll_seconds: number;
+  result_count: number;
+  person_count: number;
   next_poll_at: string;
   last_success_at: string | null;
   last_error: string | null;
@@ -59,6 +60,10 @@ function competitionDates(source: Source) {
     : `${source.start_date} – ${source.end_date}`;
 }
 
+function formatMinutes(seconds: number) {
+  return `${seconds / 60}m`;
+}
+
 function resultsNotPublished(source: Source) {
   return (
     source.source_name === "wca-live" &&
@@ -69,6 +74,20 @@ function resultsNotPublished(source: Source) {
 
 function providerUnavailable(source: Source) {
   return source.provider_status !== "supported";
+}
+
+function SourceStatus({ source }: { source: Source }) {
+  if (providerUnavailable(source))
+    return (
+      <span className={styles.unsupported}>
+        {source.provider_message ?? "Live results provider is not supported."}
+      </span>
+    );
+  if (resultsNotPublished(source))
+    return <span className={styles.pending}>Results not published yet</span>;
+  if (source.last_error)
+    return <span className={styles.error}>{source.last_error}</span>;
+  return <span className={styles.success}>Ready</span>;
 }
 
 export function LiveAdmin() {
@@ -116,27 +135,28 @@ export function LiveAdmin() {
           <strong className={`${styles.status} ${styles.unknown}`}>
             {data?.sources.length ?? "…"} tracked
           </strong>
-          <Link href="/admin/live/settings" className={styles.status}>
-            Settings
-          </Link>
         </div>
       }
     >
       {message && <p className={styles.alert}>{message}</p>}
       <section className={styles.card} aria-labelledby="schedule-heading">
-        <h2 id="schedule-heading">Poller schedule</h2>
+        <h2 id="schedule-heading">Worker schedule</h2>
         <dl className={styles.grid}>
+          <Metric label="Find active competitions" value="Daily at 00:00 UTC" />
           <Metric
-            label="Daily discovery"
-            value={data?.scheduler.discoveryCron ?? "Loading…"}
-          />
-          <Metric
-            label="Poll loop"
-            value={`${data?.scheduler.pollerIntervalMs ?? "…"} ms`}
+            label="Check for due imports"
+            value={
+              data
+                ? `Every ${formatMinutes(data.scheduler.pollerIntervalMs / 1_000)}`
+                : "Loading…"
+            }
           />
         </dl>
       </section>
-      <section className={styles.card} aria-labelledby="sources-heading">
+      <section
+        className={styles.tableSection}
+        aria-labelledby="sources-heading"
+      >
         <div className={styles.cardHeader}>
           <div>
             <h2 id="sources-heading">Tracked competitions</h2>
@@ -158,8 +178,10 @@ export function LiveAdmin() {
                 </th>
                 <th scope="col">Competition</th>
                 <th scope="col">Provider</th>
-                <th scope="col">Poll</th>
-                <th scope="col">Next poll</th>
+                <th scope="col">Results</th>
+                <th scope="col">People</th>
+                <th scope="col">Import every</th>
+                <th scope="col">Next import</th>
                 <th scope="col">Last import</th>
                 <th scope="col">Status</th>
               </tr>
@@ -191,7 +213,11 @@ export function LiveAdmin() {
                       {source.source_name}
                     </span>
                   </td>
-                  <td className={styles.pollCell}>{source.poll_seconds}s</td>
+                  <td className={styles.pollCell}>{source.result_count}</td>
+                  <td className={styles.pollCell}>{source.person_count}</td>
+                  <td className={styles.pollCell}>
+                    {formatMinutes(source.poll_seconds)}
+                  </td>
                   <td>
                     <DateTime value={source.next_poll_at} />
                   </td>
@@ -199,20 +225,7 @@ export function LiveAdmin() {
                     <DateTime value={source.last_success_at} />
                   </td>
                   <td className={styles.statusCell}>
-                    {providerUnavailable(source) ? (
-                      <span className={styles.unsupported}>
-                        {source.provider_message ??
-                          "Live results provider is not supported."}
-                      </span>
-                    ) : resultsNotPublished(source) ? (
-                      <span className={styles.pending}>
-                        Results not published yet
-                      </span>
-                    ) : source.last_error ? (
-                      <span className={styles.error}>{source.last_error}</span>
-                    ) : (
-                      <span className={styles.success}>Ready</span>
-                    )}
+                    <SourceStatus source={source} />
                   </td>
                 </tr>
               ))}

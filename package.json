@@ -16,6 +16,7 @@
     "validate:pages": "pnpm --filter @wcarankings/web validate:pages",
     "db:migrate": "docker compose --env-file .env.local run --rm flyway migrate",
     "db:refresh-rankings": "bun --env-file-if-exists=.env.local scripts/refresh-rankings.ts",
+    "projection:process-job": "bun --env-file-if-exists=.env.local scripts/process-projection-job.ts",
     "db:refresh-system-lists": "bun --env-file-if-exists=.env.local scripts/refresh-system-lists.ts",
     "db:refresh-board-list": "bun --env-file-if-exists=.env.local scripts/refresh-board-list.ts",
     "db:refresh-delegates-list": "bun --env-file-if-exists=.env.local scripts/refresh-board-list.ts --delegates",
@@ -47,6 +48,7 @@
     "@wcarankings/cli": "workspace:*",
     "@wcarankings/database": "workspace:*",
     "@wcarankings/live-results": "workspace:*",
+    "@wcarankings/projection-jobs": "workspace:*",
     "mysql2": "^3.23.2",
     "unzipper": "^0.12.5"
   },

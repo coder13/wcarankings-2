@@ -12,11 +12,25 @@ export function yearCountsQuery() {
       counts.count
     FROM (
       SELECT year, event_id, 'single' AS ranking_type, cohort_id, COUNT(*) AS count
-      FROM person_year_rankings_single
+      FROM person_year_rankings_single ranking
+      WHERE ranking.is_provisional = COALESCE((
+        SELECT MAX(provisional.is_provisional)
+        FROM person_year_rankings_single provisional
+        WHERE provisional.year = ranking.year
+          AND provisional.event_id = ranking.event_id
+          AND provisional.cohort_id = ranking.cohort_id
+      ), 0)
       GROUP BY year, event_id, cohort_id
       UNION ALL
       SELECT year, event_id, 'average', cohort_id, COUNT(*)
-      FROM person_year_rankings_average
+      FROM person_year_rankings_average ranking
+      WHERE ranking.is_provisional = COALESCE((
+        SELECT MAX(provisional.is_provisional)
+        FROM person_year_rankings_average provisional
+        WHERE provisional.year = ranking.year
+          AND provisional.event_id = ranking.event_id
+          AND provisional.cohort_id = ranking.cohort_id
+      ), 0)
       GROUP BY year, event_id, cohort_id
     ) counts
     JOIN person_year_ranking_cohorts cohorts ON cohorts.cohort_id = counts.cohort_id
