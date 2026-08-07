@@ -6,7 +6,8 @@ type Source = {
   source_name: string;
   competition_id: string;
   name: string | null;
-  city_name: string | null;
+  start_date: string;
+  end_date: string;
   poll_seconds: number;
   next_poll_at: string;
   last_success_at: string | null;
@@ -45,6 +46,12 @@ function DateTime({ value }: { value: string | null }) {
       <span>{formatted.time}</span>
     </time>
   );
+}
+
+function competitionDates(source: Source) {
+  return source.start_date === source.end_date
+    ? source.start_date
+    : `${source.start_date} – ${source.end_date}`;
 }
 
 export function LiveAdmin() {
@@ -156,10 +163,7 @@ export function LiveAdmin() {
                   </td>
                   <td className={styles.competitionCell}>
                     <strong>{source.name ?? source.competition_id}</strong>
-                    <span>
-                      {source.competition_id}
-                      {source.city_name ? ` · ${source.city_name}` : ""}
-                    </span>
+                    <span>{competitionDates(source)}</span>
                   </td>
                   <td>
                     <span className={styles.provider}>
