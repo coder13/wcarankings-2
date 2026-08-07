@@ -31,14 +31,16 @@ async function main(): Promise<void> {
         (group.name === "ranking-tables" && includeRankingTables),
     ).map((group) => group.name);
   }
-  const satisfiedGroups =
-    requestedSatisfiedGroups.length > 0
-      ? requestedSatisfiedGroups
-      : DEPLOYMENT_PROJECTION_GROUPS.filter((group) =>
-          group.projectionNames.some((name) =>
-            satisfiedProjectionNames.includes(name),
-          ),
-        ).map((group) => group.name);
+  let satisfiedGroups: string[];
+  if (requestedSatisfiedGroups.length > 0) {
+    satisfiedGroups = requestedSatisfiedGroups;
+  } else {
+    satisfiedGroups = DEPLOYMENT_PROJECTION_GROUPS.filter((group) =>
+      group.projectionNames.some((name) =>
+        satisfiedProjectionNames.includes(name),
+      ),
+    ).map((group) => group.name);
+  }
 
   process.stdout.write(
     formatProjectionBuildSummary(groupNames, satisfiedGroups),
