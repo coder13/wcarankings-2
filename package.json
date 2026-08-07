@@ -49,6 +49,7 @@
     "@tanstack/react-virtual": "^3.14.5",
     "bullmq": "^6.0.8",
     "i18next": "^26.3.6",
+    "ioredis": "^6.0.0",
     "lru-cache": "^11.5.2",
     "motion": "^12.43.0",
     "mysql2": "^3.23.2",

@@ -5,6 +5,7 @@
   "scripts": {
     "run": "bun ../../scripts/provisional-ranking-worker.ts",
     "dev": "bun --watch ../../scripts/provisional-ranking-worker.ts",
+    "poll": "bun ../../scripts/provisional-ranking-worker.ts --once",
     "build": "bun ../../scripts/register-live-results-source.ts --help",
     "lint": "eslint ../../scripts/live-results ../../scripts/provisional-ranking-worker.ts",
     "typecheck": "bunx tsc --project ../../tsconfig.data-tools.json"
