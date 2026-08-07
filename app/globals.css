@@ -603,8 +603,8 @@ main {
 
 .feedLoadingLabel {
   width: 70%;
-  min-height: 2.05rem;
-  margin-bottom: 0.45rem;
+  min-height: 1.75rem;
+  margin-bottom: 0.125rem;
   border-radius: 0.35rem;
   animation: feedLoadingPulse 1.4s ease-in-out infinite;
   background: var(--surface-raised);
