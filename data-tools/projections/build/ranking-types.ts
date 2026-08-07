@@ -18,8 +18,7 @@ export type RankingTableTaskName =
   | "ranking-tables-entries-single-source"
   | "ranking-tables-entries-average-source"
   | "ranking-tables-entries-single"
-  | "ranking-tables-entries-average"
-  | "ranking-tables-counts";
+  | "ranking-tables-entries-average";
 
 export interface RankingTableTaskDefinition {
   dependencies: readonly string[];
@@ -35,7 +34,6 @@ export interface RankingTableTask extends RankingTableTaskDefinition {
 export interface RankingTableTaskOptions {
   bestAverage: string;
   bestSingle: string;
-  countsTable: string;
   entriesSources: RankingTablePair;
   entriesTables: RankingTablePair;
   resultFacts: string;

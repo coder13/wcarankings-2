@@ -4,37 +4,33 @@ Status: **Active support projections**
 
 ## What it provides
 
-These small tables provide page totals and list metadata for other statistics.
-They do not define a new ranking. They prevent a request from counting a large
-ranking table or raw fact set before returning a page.
+The API provides page totals and list metadata for other statistics. These
+values do not define a new ranking. The API caches totals by generation and
+filter.
 
-The support tables cover result rankings by event, result type, scope, and
-region. They also cover person lists, person-competition lists, and yearly
-rankings.
+The API counts completed serving tables by event, result type, scope, and
+region. It counts person, competition, medal, and yearly ranking tables with
+the same filter used by each request.
 
 ## Source data
 
 Each build reads its matching completed ranking table. It must not read raw
 `results` or `result_facts` for a normal count request.
 
-Relevant SQL files include [result ranking counts](../../data-tools/projection-catalog/people/result-rankings/result_ranking_counts.sql),
-and [ranking counts](../../data-tools/projection-catalog/core/ranking-tables/ranking_counts.sql).
+The projection catalog does not build metadata-only count tables.
 
 ## Indexes
 
-Each count table needs a primary or unique key matching its full filter definition.
-The source ranking must have a browse index matching the count grouping, or the
-count must be produced during the same build phase as the ranking.
-
-`result_ranking_counts` is produced from the canonical result-ranking tables.
+Each serving table needs an index that supports its page query and its count
+filter. The API must use the same generation-aware cache for rows and totals.
 
 ## Build evidence
 
-The measured `result_ranking_counts` build took `39.093 s` (`00:39.09`). Lazy
-gender result windows derive their bounded count in the generation-aware cached
-request path.
+The benchmark must record count query time with the serving-table build time.
+The shared-grain benchmark compares this cost with the removed count-table
+builds.
 
 ## Request policy
 
-Read counts by their exact key. Do not run `COUNT(*)` over a full ranking table
-inside a page request.
+Read totals from the generation-aware cache. Use a filtered `COUNT(*)` query
+when the cache does not contain the requested generation and filter.

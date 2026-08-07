@@ -16,7 +16,7 @@ function isMissingCompetitionCountsTable(error: unknown) {
   const databaseError = error as { code?: string; message?: string };
   return (
     databaseError.code === "ER_NO_SUCH_TABLE" &&
-    databaseError.message?.includes("person_competition_counts")
+    databaseError.message?.includes("person_period_metrics")
   );
 }
 

@@ -34,7 +34,6 @@ const ACTIVE_SEMANTIC_PROJECTION_TABLES =
 export const CORE_RANKING_TABLES = [
   "ranking_entries_single",
   "ranking_entries_average",
-  "ranking_counts",
 ] as const;
 
 export const PUBLISHED_PROJECTION_TABLES = [

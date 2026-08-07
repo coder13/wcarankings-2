@@ -221,7 +221,6 @@ export async function buildProjectionTables(
     single: `ranking_entries_single${projectionSuffix}`,
     average: `ranking_entries_average${projectionSuffix}`,
   };
-  const countsTable = `ranking_counts${projectionSuffix}`;
   const bestSingle = `wca_best_single${projectionSuffix}`;
   const bestAverage = `wca_best_average${projectionSuffix}`;
   const resultFacts = `result_facts${projectionSuffix}`;
@@ -234,7 +233,6 @@ export async function buildProjectionTables(
 
   if (includeRankingTables) {
     const managedNames = [
-      countsTable,
       entriesTables.single,
       entriesTables.average,
       entriesSources.single,
@@ -282,7 +280,6 @@ export async function buildProjectionTables(
     ? rankingTableTasks({
         entriesTables,
         entriesSources,
-        countsTable,
         bestSingle,
         bestAverage,
         resultFacts,

@@ -47,16 +47,16 @@ export async function loadPersonProfileHeader(
        COALESCE(country.iso2, '') AS country_iso2,
        COALESCE(continent.name, country.continent_id, '') AS continent_name,
        app_user.avatar_url,
-       COALESCE(competition_counts.competition_count, 0) AS competition_count,
-       COALESCE(profile_stats.country_count, 0) AS country_count,
-       COALESCE(solves.solve_count, 0) AS solve_count,
+       COALESCE(metrics.competition_count, 0) AS competition_count,
+       COALESCE(metrics.country_count, 0) AS country_count,
+       COALESCE(metrics.official_solve_count, 0) AS solve_count,
        kinch.kinch_score / 17.0 AS kinch_score
      FROM persons person
      LEFT JOIN countries country ON country.id = person.country_id
      LEFT JOIN continents continent ON continent.id = country.continent_id
      LEFT JOIN app_users app_user ON app_user.wca_id = person.wca_id
-     LEFT JOIN person_competition_counts competition_counts
-       ON competition_counts.person_id = person.wca_id
+     LEFT JOIN person_period_metrics metrics
+       ON metrics.person_id = person.wca_id AND metrics.period_year = 0
      LEFT JOIN person_sum_of_ranks_scores kinch
        ON kinch.metric_version = 1
        AND kinch.event_set_version = 1
@@ -64,25 +64,9 @@ export async function loadPersonProfileHeader(
        AND kinch.scope = 'world'
        AND kinch.region_id = ''
        AND kinch.person_id = person.wca_id
-     LEFT JOIN (
-       SELECT
-         facts.person_id,
-         COUNT(DISTINCT competition.country_id) AS country_count
-       FROM result_facts facts
-       LEFT JOIN competitions competition ON competition.id = facts.competition_id
-       WHERE facts.person_id = ?
-       GROUP BY facts.person_id
-     ) profile_stats ON profile_stats.person_id = person.wca_id
-     LEFT JOIN (
-       SELECT facts.person_id, COUNT(*) AS solve_count
-       FROM result_facts facts
-       STRAIGHT_JOIN result_attempts attempts ON attempts.result_id = facts.result_id
-       WHERE facts.person_id = ? AND attempts.value > 0
-       GROUP BY facts.person_id
-     ) solves ON solves.person_id = person.wca_id
      WHERE person.wca_id = ? AND person.sub_id = 1
      LIMIT 1`,
-    [normalized, normalized, normalized],
+    [normalized],
   );
   const person = result.rows[0];
   if (!person) return null;

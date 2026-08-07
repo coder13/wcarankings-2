@@ -7,10 +7,8 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
     [
       "ranking_entries_single",
       "ranking_entries_average",
-      "ranking_counts",
       "result_rankings_single",
       "result_rankings_average",
-      "result_ranking_counts",
       "competition_podium_members",
       "competition_event_stats",
       "competition_stats",
@@ -19,21 +17,16 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
       "person_year_ranking_cohorts",
       "person_year_rankings_single",
       "person_year_rankings_average",
-      "person_year_ranking_counts",
-      "person_competition_counts",
-      "person_competition_year_counts",
+      "person_event_bests",
+      "person_period_metrics",
       "person_competition_rankings",
-      "person_competition_ranking_counts",
       "person_medal_scores",
       "person_medal_rankings",
-      "person_medal_ranking_counts",
       "person_pr_streak_counts",
       "person_pr_streak_year_counts",
       "person_pr_streak_rankings",
       "person_pr_streak_ranking_counts",
-      "person_activity_counts",
       "person_activity_rankings",
-      "person_activity_ranking_counts",
     ],
     { generationId: "generation-123", exportId: "2026-07-30T00:00:30Z" },
   );
@@ -57,7 +50,6 @@ test("keeps core ranking tables available without semantic projections", () => {
   const featureSwitch = featureSwitchFromTables([
     "ranking_entries_single",
     "ranking_entries_average",
-    "ranking_counts",
   ]);
   assert.equal(featureSwitch.core, true);
   assert.equal(featureSwitch.resultRankings, false);

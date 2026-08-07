@@ -83,15 +83,9 @@ export function eagerMedalRowsQuery() {
 
 export function eagerMedalCountQuery() {
   return sqlFragment`
-    SELECT
-      count
-    FROM
-      person_medal_ranking_counts
-    WHERE
-      event_id = ?
-      AND medal_type = ?
-      AND scope = ?
-      AND region_id = ?
+    SELECT COUNT(*) AS count
+    FROM person_medal_rankings
+    WHERE event_id = ? AND medal_type = ? AND scope = ? AND region_id = ?
   `;
 }
 

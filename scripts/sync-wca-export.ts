@@ -163,7 +163,6 @@ async function dropRankingViews(): Promise<void> {
   );
   try {
     for (const name of [
-      "ranking_counts_source",
       "ranking_entries_source",
       "ranking_entries_single_source",
       "ranking_entries_average_source",

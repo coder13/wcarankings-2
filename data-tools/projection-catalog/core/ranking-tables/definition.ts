@@ -9,15 +9,13 @@ export const rankingTablesJob = {
     "core/ranking-tables/ranking_entries_single_source.sql",
     "core/ranking-tables/ranking_entries_average_source.sql",
     "core/ranking-tables/ranking_entries_indexes.sql",
-    "core/ranking-tables/ranking_counts.sql",
   ],
   tables: [
     "ranking_entries_single",
     "ranking_entries_average",
-    "ranking_counts",
   ],
   releaseGroup: "ranking-tables",
   releaseOrder: 0,
-  releaseSchemaVersion: 4,
+  releaseSchemaVersion: 5,
   kind: "core",
 } as const satisfies ProjectionJob;

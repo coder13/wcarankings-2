@@ -12,6 +12,7 @@ import { personPrStreakRankingsJob } from "./people/pr-streak-rankings/definitio
 import { resultRankingsJobs } from "./people/result-rankings/definition.ts";
 import { sumOfRanksJob } from "./people/sum-of-ranks/definition.ts";
 import { personYearRankingsJob } from "./people/year-rankings/definition.ts";
+import { personPeriodMetricsJob, personEventBestsJob } from "./people/shared/definition.ts";
 import type { ProjectionJob } from "./types.ts";
 
 export const MARIADB_COMPATIBILITY_VERSION = "11.8";
@@ -20,6 +21,8 @@ export const PROJECTION_ARTIFACT_FORMAT_VERSION = 4;
 export const PROJECTION_JOBS: readonly ProjectionJob[] = [
   rankingTablesJob,
   resultFactsJob,
+  personPeriodMetricsJob,
+  personEventBestsJob,
   sumOfRanksJob,
   competitionPodiumMembersJob,
   competitionEventStatsJob,

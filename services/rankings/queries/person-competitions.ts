@@ -10,10 +10,10 @@ interface PersonCompetitionQueryPlan {
 function lazyConditions(input: PersonCompetitionRankingInput) {
   const conditions = ["counts.competition_count > 0"];
   const values: unknown[] = [];
-  if (input.year !== null) {
-    conditions.push("counts.year = ?");
-    values.push(input.year);
-  }
+  conditions.push(
+    input.year === null ? "counts.period_year = 0" : "counts.period_year = ?",
+  );
+  if (input.year !== null) values.push(input.year);
   if (input.scope === "continent") {
     conditions.push("country.continent_id = ?");
     values.push(input.regionId);
@@ -45,9 +45,7 @@ function lazyDimensionJoins(input: PersonCompetitionRankingInput) {
 }
 
 function lazySource(input: PersonCompetitionRankingInput) {
-  return input.year === null
-    ? "person_competition_counts"
-    : "person_competition_year_counts";
+  return "person_period_metrics";
 }
 
 export function personCompetitionRankingRowsQuery() {
@@ -90,14 +88,9 @@ export function personCompetitionRankingRowsQuery() {
 
 export function personCompetitionRankingCountQuery() {
   return sqlFragment`
-    SELECT
-      count
-    FROM
-      person_competition_ranking_counts
-    WHERE
-      scope = ?
-      AND region_id = ?
-      AND gender = ?
+    SELECT COUNT(*) AS count
+    FROM person_competition_rankings
+    WHERE scope = ? AND region_id = ? AND gender = ?
   `;
 }
 
@@ -109,7 +102,7 @@ export function buildLazyPersonCompetitionQueryPlan(
   const joins = lazyDimensionJoins(input);
   const predicate = conditions.join(" AND ");
   const rowsQuery = sqlFragment`
-    WITH
+      WITH
       filtered AS (
         SELECT
           counts.person_id,

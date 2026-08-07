@@ -34,6 +34,11 @@ const manifest = {
       artifactFingerprint: "facts-new",
       artifactDigest: "sha256:facts",
     },
+    "person-shared-grains": {
+      semanticFingerprint: "shared-semantic",
+      artifactFingerprint: "shared-new",
+      artifactDigest: "sha256:shared",
+    },
     "result-rankings": {
       semanticFingerprint: "result-semantic",
       artifactFingerprint: "result-new",
@@ -170,7 +175,6 @@ test("bootstrap fails closed without complete, valid export metadata", async () 
     "export_metadata",
     "ranking_entries_single",
     "ranking_entries_average",
-    "ranking_counts",
   ];
   for (const exportRows of [
     [],
@@ -206,7 +210,6 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
     "export_metadata",
     "ranking_entries_single",
     "ranking_entries_average",
-    "ranking_counts",
     "competition_podium_members",
     "competition_event_stats",
     "competition_stats",

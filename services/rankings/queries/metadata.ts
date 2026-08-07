@@ -10,22 +10,38 @@ export function yearCountsQuery() {
       cohorts.scope,
       cohorts.region_id,
       counts.count
-    FROM
-      person_year_ranking_counts counts
-      JOIN person_year_ranking_cohorts cohorts ON cohorts.cohort_id = counts.cohort_id
+    FROM (
+      SELECT year, event_id, 'single' AS ranking_type, cohort_id, COUNT(*) AS count
+      FROM person_year_rankings_single
+      GROUP BY year, event_id, cohort_id
+      UNION ALL
+      SELECT year, event_id, 'average', cohort_id, COUNT(*)
+      FROM person_year_rankings_average
+      GROUP BY year, event_id, cohort_id
+    ) counts
+    JOIN person_year_ranking_cohorts cohorts ON cohorts.cohort_id = counts.cohort_id
   `;
 }
 
 export function rankingCountsQuery() {
   return sqlFragment`
-    SELECT
-      event_id,
-      ranking_type,
-      scope,
-      region_id,
-      count
-    FROM
-      ranking_counts
+    SELECT event_id, 'single' AS ranking_type, 'world' AS scope, '' AS region_id, COUNT(*) AS count
+    FROM ranking_entries_single GROUP BY event_id
+    UNION ALL
+    SELECT event_id, 'single', 'continent', continent_id, COUNT(*)
+    FROM ranking_entries_single WHERE continent_id <> '' GROUP BY event_id, continent_id
+    UNION ALL
+    SELECT event_id, 'single', 'country', country_id, COUNT(*)
+    FROM ranking_entries_single WHERE country_id <> '' GROUP BY event_id, country_id
+    UNION ALL
+    SELECT event_id, 'average', 'world', '', COUNT(*)
+    FROM ranking_entries_average GROUP BY event_id
+    UNION ALL
+    SELECT event_id, 'average', 'continent', continent_id, COUNT(*)
+    FROM ranking_entries_average WHERE continent_id <> '' GROUP BY event_id, continent_id
+    UNION ALL
+    SELECT event_id, 'average', 'country', country_id, COUNT(*)
+    FROM ranking_entries_average WHERE country_id <> '' GROUP BY event_id, country_id
   `;
 }
 

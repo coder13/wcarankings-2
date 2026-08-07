@@ -9,12 +9,10 @@ export type { ProjectionFeatureSwitch } from "@/lib/projection-feature-switch-ty
 const CORE_TABLES = [
   "ranking_entries_single",
   "ranking_entries_average",
-  "ranking_counts",
 ] as const;
 const RESULT_RANKINGS_TABLES = [
   "result_rankings_single",
   "result_rankings_average",
-  "result_ranking_counts",
 ] as const;
 const COMPETITION_RANKINGS_TABLES = [
   "competition_podium_members",
@@ -22,20 +20,16 @@ const COMPETITION_RANKINGS_TABLES = [
   "competition_stats",
 ] as const;
 const PERSON_ACTIVITY_RANKINGS_TABLES = [
-  "person_activity_counts",
   "person_activity_rankings",
-  "person_activity_ranking_counts",
+  "person_period_metrics",
 ] as const;
 const PERSON_COMPETITION_RANKINGS_TABLES = [
-  "person_competition_counts",
-  "person_competition_year_counts",
   "person_competition_rankings",
-  "person_competition_ranking_counts",
+  "person_period_metrics",
 ] as const;
 const PERSON_MEDAL_RANKINGS_TABLES = [
   "person_medal_scores",
   "person_medal_rankings",
-  "person_medal_ranking_counts",
 ] as const;
 const PERSON_PR_STREAK_RANKINGS_TABLES = [
   "person_pr_streak_counts",
@@ -49,7 +43,7 @@ const YEARLY_TABLES = [
   "person_year_ranking_cohorts",
   "person_year_rankings_single",
   "person_year_rankings_average",
-  "person_year_ranking_counts",
+  "person_event_bests",
 ] as const;
 
 let cached: { value: ProjectionFeatureSwitch; expiresAt: number } | null = null;

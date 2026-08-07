@@ -127,7 +127,10 @@ function toEntry(input: PersonActivityInput, row: PersonActivityRankingRow) {
 }
 
 function lazyConditions(input: PersonActivityInput) {
-  const conditions = [`counts.${metricColumn[input.metric]} > 0`];
+  const conditions = [
+    "counts.period_year = 0",
+    `counts.${metricColumn[input.metric]} > 0`,
+  ];
   const values: unknown[] = [];
   if (input.scope === "continent") {
     conditions.push("counts.continent_id = ?");
@@ -151,7 +154,7 @@ function lazyRowsQuery(input: PersonActivityInput) {
   const valueColumn = metricColumn[input.metric];
   return sqlFragment`WITH filtered AS (
       SELECT counts.person_id, counts.${valueColumn} AS metric_value
-      FROM person_activity_counts counts
+      FROM person_period_metrics counts
       WHERE ${conditions.join(" AND ")}
     ), ranked AS (
       SELECT filtered.*,
@@ -177,7 +180,7 @@ function lazyRowsQuery(input: PersonActivityInput) {
 function lazyCountQuery(input: PersonActivityInput) {
   const { conditions } = lazyConditions(input);
   return sqlFragment`SELECT COUNT(*) AS count
-    FROM person_activity_counts counts
+    FROM person_period_metrics counts
     WHERE ${conditions.join(" AND ")}`;
 }
 
@@ -298,7 +301,7 @@ export async function loadPersonActivityRankings(params: URLSearchParams) {
       [input.metric, input.start, input.limit + 1],
     ),
     query<{ count: number }>(
-      `SELECT count FROM person_activity_ranking_counts
+      `SELECT COUNT(*) AS count FROM person_activity_rankings
        WHERE metric = ? AND scope = 'world' AND region_id = '' AND gender = 'all'`,
       [input.metric],
     ),

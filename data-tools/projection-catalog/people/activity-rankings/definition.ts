@@ -2,16 +2,14 @@ import type { ProjectionJob } from "../../types.ts";
 
 export const personActivityRankingsJob = {
   id: "person-activity-rankings",
-  dependencies: ["result-facts"],
+  dependencies: ["person-period-metrics"],
   sqlFiles: ["people/activity-rankings/person_activity_rankings.sql"],
   tables: [
-    "person_activity_counts",
     "person_activity_rankings",
-    "person_activity_ranking_counts",
   ],
   releaseGroup: "person-activity-rankings",
   releaseOrder: 6,
-  releaseSchemaVersion: 1,
+  releaseSchemaVersion: 2,
   estimatedDurationMs: 180_000,
   enabledByDefault: false,
   subject: "people",
