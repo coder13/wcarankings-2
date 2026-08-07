@@ -43,3 +43,13 @@ test("rejects result input that is not ordered by stable result ID", () => {
   builder.addResult("TestOpen2020", 2, {});
   assert.throws(() => builder.addResult("TestOpen2020", 1, {}), /ordered/);
 });
+
+test("canonicalizes person rows independent of export order", () => {
+  const first = new SourceManifestBuilder("2026-08-06T00:00:00Z");
+  first.addPerson("B", { country: "USA" });
+  first.addPerson("A", { country: "Canada" });
+  const second = new SourceManifestBuilder("2026-08-06T00:00:00Z");
+  second.addPerson("A", { country: "Canada" });
+  second.addPerson("B", { country: "USA" });
+  assert.equal(first.build().dimensions.personsHash, second.build().dimensions.personsHash);
+});
