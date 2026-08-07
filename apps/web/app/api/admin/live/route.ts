@@ -23,7 +23,7 @@ type SourceRow = {
 
 export async function GET() {
   const { rows } = await query<SourceRow>(
-    `SELECT source.source_name, source.competition_id, source.remote_competition_id, source.competition_year, source.enabled, source.poll_seconds, source.next_poll_at, source.last_success_at, source.last_error, source.snapshot_hash, competition.name, competition.city_name FROM provisional_live_result_sources source JOIN competitions competition ON competition.id = source.competition_id WHERE source.enabled = 1 AND ${activeToday} ORDER BY source.next_poll_at, source.competition_id`,
+    `SELECT source.source_name, source.competition_id, source.remote_competition_id, source.competition_year, source.enabled, source.poll_seconds, source.next_poll_at, source.last_success_at, source.last_error, source.snapshot_hash, competition.name, competition.city_name FROM provisional_live_result_sources source JOIN competitions competition ON competition.id = source.competition_id WHERE source.enabled = 1 AND ${activeToday} ORDER BY source.competition_id`,
   );
   return Response.json(
     {
