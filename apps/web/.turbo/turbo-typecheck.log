@@ -1,0 +1,1 @@
+$ cd ../.. && tsc --project tsconfig.json --noEmit --incremental false

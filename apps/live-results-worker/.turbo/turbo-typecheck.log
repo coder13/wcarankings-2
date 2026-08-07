@@ -1,0 +1,1 @@
+$ bunx tsc --project ../../tsconfig.data-tools.json

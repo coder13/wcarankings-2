@@ -7,6 +7,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "turbo": "turbo",
     "dev": "NODE_ENV=development vinext dev",
     "build": "vinext build",
     "storybook": "STORYBOOK=true storybook dev -p 6006",
@@ -35,7 +36,13 @@
     "benchmark:ranking-scroll:cities": "bun scripts/benchmark-ranking-cities.ts",
     "benchmark:ranking-scroll:medals": "bun scripts/benchmark-ranking-medals.ts",
     "benchmark:ranking-scroll:pr-streak": "bun scripts/benchmark-ranking-pr-streak.ts",
-    "benchmark:build:pr-streak": "bun --env-file-if-exists=.env.local scripts/benchmark-pr-streak-build.ts"
+    "benchmark:build:pr-streak": "bun --env-file-if-exists=.env.local scripts/benchmark-pr-streak-build.ts",
+    "dev:web": "turbo dev --filter=@wcarankings/web",
+    "dev:projection-worker": "turbo dev --filter=@wcarankings/projection-worker",
+    "dev:live-results-worker": "turbo dev --filter=@wcarankings/live-results-worker",
+    "build:apps": "turbo build",
+    "lint:workspace": "turbo lint",
+    "typecheck:workspace": "turbo typecheck"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
@@ -77,6 +84,7 @@
     "tsx": "^4.22.1",
     "typescript": "5.9.3",
     "vinext": "0.0.50",
+    "turbo": "^2.8.12",
     "vite": "8.0.13",
     "vite-plugin-svgr": "^5.2.0"
   },

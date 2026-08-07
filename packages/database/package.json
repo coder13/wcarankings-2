@@ -1,0 +1,6 @@
+{
+  "name": "@wcarankings/database",
+  "private": true,
+  "type": "module",
+  "exports": { "./connection": "./src/connection.ts" }
+}

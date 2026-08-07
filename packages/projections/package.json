@@ -1,0 +1,6 @@
+{
+  "name": "@wcarankings/projections",
+  "private": true,
+  "type": "module",
+  "exports": { "./builder": "./src/builder.ts" }
+}

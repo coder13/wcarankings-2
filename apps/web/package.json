@@ -1,0 +1,12 @@
+{
+  "name": "@wcarankings/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cd ../.. && vinext dev",
+    "build": "cd ../.. && vinext build",
+    "start": "node ../../dist/standalone/server.js",
+    "lint": "cd ../.. && eslint app components controllers lib services",
+    "typecheck": "cd ../.. && tsc --project tsconfig.json --noEmit --incremental false"
+  }
+}

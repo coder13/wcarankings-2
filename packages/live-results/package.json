@@ -1,0 +1,9 @@
+{
+  "name": "@wcarankings/live-results",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./providers": "./src/providers.ts",
+    "./types": "./src/types.ts"
+  }
+}
