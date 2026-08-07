@@ -5,18 +5,31 @@ import { argumentPresent, argumentValue } from "./lib/arguments.ts";
 import { databaseOptions } from "./lib/database.ts";
 import { enqueueProjectionJob } from "../packages/projection-jobs/src/queue.ts";
 import { fetchLiveResults, snapshotHash } from "./live-results/providers.ts";
-import type { LiveResultsSnapshot, LiveResultsSourceRow } from "./live-results/types.ts";
+import type {
+  LiveResultsSnapshot,
+  LiveResultsSourceRow,
+} from "./live-results/types.ts";
 
-const POLL_MS = Math.max(250, Number(process.env.PROVISIONAL_RANKING_WORKER_POLL_MS) || 2_000);
-const LEASE_SECONDS = Math.max(30, Number(process.env.PROVISIONAL_RANKING_WORKER_LEASE_SECONDS) || 120);
+const POLL_MS = Math.max(
+  250,
+  Number(process.env.PROVISIONAL_RANKING_WORKER_POLL_MS) || 2_000,
+);
+const LEASE_SECONDS = Math.max(
+  30,
+  Number(process.env.PROVISIONAL_RANKING_WORKER_LEASE_SECONDS) || 120,
+);
 const selectedCompetition = argumentValue("competition");
 const once = argumentPresent("once");
 
-async function claimSource(connection: Connection): Promise<LiveResultsSourceRow | null> {
+async function claimSource(
+  connection: Connection,
+): Promise<LiveResultsSourceRow | null> {
   const token = randomUUID();
   await connection.beginTransaction();
   try {
-    const [rows] = await connection.query<(LiveResultsSourceRow & RowDataPacket)[]>(
+    const [rows] = await connection.query<
+      (LiveResultsSourceRow & RowDataPacket)[]
+    >(
       `SELECT source_name, competition_id, remote_competition_id, competition_year
        FROM provisional_live_result_sources
        WHERE enabled = 1 AND (? = '' OR competition_id = ?)
@@ -26,7 +39,10 @@ async function claimSource(connection: Connection): Promise<LiveResultsSourceRow
       [selectedCompetition, selectedCompetition, selectedCompetition],
     );
     const source = rows[0];
-    if (!source) { await connection.commit(); return null; }
+    if (!source) {
+      await connection.commit();
+      return null;
+    }
     await connection.query(
       `UPDATE provisional_live_result_sources SET lease_token = ?,
        leased_until = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL ? SECOND)
@@ -34,28 +50,64 @@ async function claimSource(connection: Connection): Promise<LiveResultsSourceRow
       [token, LEASE_SECONDS, source.source_name, source.competition_id],
     );
     await connection.commit();
-    return { ...source, competition_year: Number(source.competition_year), lease_token: token };
-  } catch (error) { await connection.rollback(); throw error; }
+    return {
+      ...source,
+      competition_year: Number(source.competition_year),
+      lease_token: token,
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  }
 }
 
-function partitionJobs(source: LiveResultsSourceRow, snapshot: LiveResultsSnapshot, version: number) {
+function partitionJobs(
+  source: LiveResultsSourceRow,
+  snapshot: LiveResultsSnapshot,
+  version: number,
+) {
   const jobs = new Map<string, Record<string, string>>();
-  const add = (key: string, payload: Record<string, string>) => jobs.set(key, payload);
-  add(`competition-stats:${source.competition_id}`, { competitionId: source.competition_id, year: String(source.competition_year) });
+  const add = (key: string, payload: Record<string, string>) =>
+    jobs.set(key, payload);
+  add(`competition-stats:${source.competition_id}`, {
+    competitionId: source.competition_id,
+    year: String(source.competition_year),
+  });
   for (const result of snapshot.results) {
-    add(`person-stats:${result.personId}:${source.competition_year}`, { personId: result.personId, year: String(source.competition_year) });
+    add(`person-stats:${result.personId}:${source.competition_year}`, {
+      personId: result.personId,
+      year: String(source.competition_year),
+    });
     const region = result.countryIso2 ?? "unknown";
     for (const resultType of ["single", "average"]) {
-      add(`rankings:${result.eventId}:${resultType}:country:${region}:${source.competition_year}`, {
-        eventId: result.eventId, resultType, region, year: String(source.competition_year), provisional: "true",
-      });
+      add(
+        `rankings:${result.eventId}:${resultType}:country:${region}:${source.competition_year}`,
+        {
+          eventId: result.eventId,
+          resultType,
+          region,
+          year: String(source.competition_year),
+          provisional: "true",
+        },
+      );
     }
   }
-  return [...jobs].map(([key, payload]) => ({ kind: "projection-rebuild" as const, key, version, payload }));
+  return [...jobs].map(([key, payload]) => ({
+    kind: "projection-rebuild" as const,
+    key,
+    version,
+    payload,
+  }));
 }
 
-async function saveSnapshot(connection: Connection, source: LiveResultsSourceRow): Promise<void> {
-  const snapshot = await fetchLiveResults(source.source_name, source.remote_competition_id);
+async function saveSnapshot(
+  connection: Connection,
+  source: LiveResultsSourceRow,
+): Promise<void> {
+  const snapshot = await fetchLiveResults(
+    source.source_name,
+    source.remote_competition_id,
+  );
   const hash = snapshotHash(snapshot);
   let version: number | null = null;
   let needsQueue: boolean;
@@ -69,15 +121,38 @@ async function saveSnapshot(connection: Connection, source: LiveResultsSourceRow
     if (!state[0]) throw new Error("Live result source lease was lost.");
     needsQueue = stateNeedsQueue(state[0], hash);
     if (state[0].snapshot_hash !== hash) {
-      await connection.query("DELETE FROM provisional_live_results WHERE source_name = ? AND competition_id = ?", [source.source_name, source.competition_id]);
-      for (const result of snapshot.results) await connection.query(
-        `INSERT INTO provisional_live_results
+      await connection.query(
+        "DELETE FROM provisional_live_results WHERE source_name = ? AND competition_id = ?",
+        [source.source_name, source.competition_id],
+      );
+      for (const result of snapshot.results)
+        await connection.query(
+          `INSERT INTO provisional_live_results
          (source_name, competition_id, source_result_id, event_id, round_number, round_type_id, format_id, person_id, person_name, country_iso2, best, average, position, attempts_json)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [source.source_name, source.competition_id, result.sourceResultId, result.eventId, result.roundNumber, result.roundTypeId, result.formatId, result.personId, result.personName, result.countryIso2, result.best, result.average, result.position, JSON.stringify(result.attempts)],
+          [
+            source.source_name,
+            source.competition_id,
+            result.sourceResultId,
+            result.eventId,
+            result.roundNumber,
+            result.roundTypeId,
+            result.formatId,
+            result.personId,
+            result.personName,
+            result.countryIso2,
+            result.best,
+            result.average,
+            result.position,
+            JSON.stringify(result.attempts),
+          ],
+        );
+      await connection.query(
+        "UPDATE provisional_live_result_state SET source_version = source_version + 1 WHERE id = 1",
       );
-      await connection.query("UPDATE provisional_live_result_state SET source_version = source_version + 1 WHERE id = 1");
-      const [versions] = await connection.query<RowDataPacket[]>("SELECT source_version FROM provisional_live_result_state WHERE id = 1");
+      const [versions] = await connection.query<RowDataPacket[]>(
+        "SELECT source_version FROM provisional_live_result_state WHERE id = 1",
+      );
       version = Number(versions[0]?.source_version);
     }
     await connection.query(
@@ -89,15 +164,23 @@ async function saveSnapshot(connection: Connection, source: LiveResultsSourceRow
     await connection.commit();
   } catch (error) {
     await connection.rollback();
-    await connection.query(`UPDATE provisional_live_result_sources SET lease_token = NULL, leased_until = NULL,
+    await connection.query(
+      `UPDATE provisional_live_result_sources SET lease_token = NULL, leased_until = NULL,
       next_poll_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 60 SECOND), last_error = ?
       WHERE source_name = ? AND competition_id = ? AND lease_token = ?`,
-      [String(error instanceof Error ? error.message : error).slice(0, 1000), source.source_name, source.competition_id, source.lease_token]);
+      [
+        String(error instanceof Error ? error.message : error).slice(0, 1000),
+        source.source_name,
+        source.competition_id,
+        source.lease_token,
+      ],
+    );
     throw error;
   }
   if (needsQueue) {
-    const queuedVersion = version ?? await currentSourceVersion(connection);
-    for (const job of partitionJobs(source, snapshot, queuedVersion)) await enqueueProjectionJob(job);
+    const queuedVersion = version ?? (await currentSourceVersion(connection));
+    for (const job of partitionJobs(source, snapshot, queuedVersion))
+      await enqueueProjectionJob(job);
     await connection.query(
       `UPDATE provisional_live_result_sources SET queued_snapshot_hash = ?
        WHERE source_name = ? AND competition_id = ? AND snapshot_hash = ?`,
@@ -126,7 +209,14 @@ async function main(): Promise<void> {
       if (once || selectedCompetition) return;
       if (!source) await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     } while (true);
-  } finally { await connection.end(); }
+  } finally {
+    await connection.end();
+  }
 }
 
-main().catch((error: unknown) => { process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`); process.exitCode = 1; });
+main().catch((error: unknown) => {
+  process.stderr.write(
+    `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+  );
+  process.exitCode = 1;
+});
