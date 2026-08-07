@@ -9,11 +9,34 @@ export type RankingStatSourceDefinition = {
     year: boolean;
     genders: boolean;
   };
-  feedEligibility: { home: boolean; person: boolean };
-  paths: { page: string; api: string };
+  feedEligibility: {
+    home: boolean;
+    person: boolean;
+  };
+  paths: {
+    page: string;
+    api: string;
+  };
 };
 
 export const RANKING_STAT_SOURCES = [
+  {
+    sourceId: "person-pr-streak",
+    entityType: "person",
+    metrics: ["pr-streak"],
+    supportedFilters: {
+      event: false,
+      resultType: false,
+      regionScopes: ["world", "continent", "country"],
+      year: true,
+      genders: true,
+    },
+    feedEligibility: { home: true, person: true },
+    paths: {
+      page: "/persons/pr-streak",
+      api: "/api/rankings/people/pr-streak",
+    },
+  },
   {
     sourceId: "country-event-stats",
     entityType: "country",
@@ -28,7 +51,7 @@ export const RANKING_STAT_SOURCES = [
     feedEligibility: { home: true, person: false },
     paths: {
       page: "/countries/fastest-single",
-      api: "/api/rankings/countries",
+      api: "/api/countries/fastest-single",
     },
   },
 ] as const satisfies readonly RankingStatSourceDefinition[];

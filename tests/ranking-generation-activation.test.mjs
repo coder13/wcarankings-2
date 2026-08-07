@@ -34,6 +34,11 @@ const manifest = {
       artifactFingerprint: "facts-new",
       artifactDigest: "sha256:facts",
     },
+    "person-shared-grains": {
+      semanticFingerprint: "shared-semantic",
+      artifactFingerprint: "shared-new",
+      artifactDigest: "sha256:shared",
+    },
     "result-rankings": {
       semanticFingerprint: "result-semantic",
       artifactFingerprint: "result-new",
@@ -63,6 +68,11 @@ const manifest = {
       semanticFingerprint: "person-medal-semantic",
       artifactFingerprint: "person-medal-new",
       artifactDigest: "sha256:person-medal",
+    },
+    "person-pr-streak-rankings": {
+      semanticFingerprint: "person-pr-streak-semantic",
+      artifactFingerprint: "person-pr-streak-new",
+      artifactDigest: "sha256:person-pr-streak",
     },
     "city-rankings": {
       semanticFingerprint: "city-semantic",
@@ -170,7 +180,6 @@ test("bootstrap fails closed without complete, valid export metadata", async () 
     "export_metadata",
     "ranking_entries_single",
     "ranking_entries_average",
-    "ranking_counts",
   ];
   for (const exportRows of [
     [],
@@ -229,6 +238,7 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
     personActivityRankings: false,
     personCompetitionRankings: false,
     personMedalRankings: false,
+    personPrStreakRankings: false,
     personEventRankings: false,
     cityEventStats: true,
     countryEventStats: false,

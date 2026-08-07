@@ -14,20 +14,6 @@ export interface ProjectionBuildPlan {
   tables: string[];
 }
 
-export interface ProjectionBuildMatrixInput {
-  selectedGroups: readonly string[];
-  wave: number;
-}
-
-interface ProjectionBuildMatrixEntry {
-  group: string;
-  hydrate_groups: string;
-}
-
-export interface ProjectionBuildMatrix {
-  include: ProjectionBuildMatrixEntry[];
-}
-
 export interface ProjectionTask {
   dependencies: readonly string[];
   estimatedDurationMs: number;

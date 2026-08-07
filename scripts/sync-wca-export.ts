@@ -2,7 +2,7 @@ import { argumentPresent, argumentValue } from "./lib/arguments.ts";
 import { databaseOptions } from "./lib/database.ts";
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { access, mkdir, rename, rm } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import mysql from "mysql2/promise";
@@ -17,6 +17,8 @@ import { enqueueAllListRankingRebuilds } from "./lib/list-ranking-jobs.ts";
 import { refreshBoardList, refreshDelegatesList } from "./lib/board-lists.ts";
 import { refreshSystemLists } from "./lib/system-lists.ts";
 import { resolveWcaExport } from "./lib/wca-export.ts";
+import { sourceManifestFromSql } from "../data-tools/projections/release/source-manifest-sql.ts";
+import { compareSourceManifests, type SourceManifest } from "../data-tools/projections/release/source-manifest.ts";
 import type {
   ExportMetadataRow,
   MariaDbImportResult,
@@ -163,7 +165,6 @@ async function dropRankingViews(): Promise<void> {
   );
   try {
     for (const name of [
-      "ranking_counts_source",
       "ranking_entries_source",
       "ranking_entries_single_source",
       "ranking_entries_average_source",
@@ -190,9 +191,10 @@ async function promoteRankings(): Promise<void> {
   }
 }
 
-async function importSqlExport(zipPath: string): Promise<void> {
+async function importSqlExport(zipPath: string, exportId: string, previous?: SourceManifest): Promise<SourceManifest> {
   const archive = await unzipper.Open.file(zipPath);
   const entry = sqlEntry(archive);
+  const manifestPromise = sourceManifestFromSql(entry.stream(), exportId, previous);
   const options = databaseOptions(undefined, {
     databaseName: process.env.DATABASE_NAME_OVERRIDE,
   });
@@ -226,6 +228,30 @@ async function importSqlExport(zipPath: string): Promise<void> {
     throw new Error(
       `MariaDB import failed with exit code ${result.code ?? result.signal}.`,
     );
+  return manifestPromise;
+}
+
+async function publishSourceManifest(manifest: SourceManifest, previous?: SourceManifest): Promise<void> {
+  const cacheDirectory = process.env.WCA_EXPORT_CACHE_DIR || "/var/cache/wcarankings";
+  const path = process.env.WCA_SOURCE_MANIFEST_PATH || join(cacheDirectory, `wca-source-manifest-${String(manifest.exportId).slice(0, 10)}.json`);
+  await mkdir(join(path, ".."), { recursive: true });
+  await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`);
+  const comparison = compareSourceManifests(manifest, previous, new Date(manifest.exportId).getUTCFullYear());
+  process.stdout.write(`Source manifest: ${path} (${Object.keys(manifest.competitions).length} competitions; dirty years: ${comparison.dirtyYears.join(",") || "none"})\n`);
+}
+
+async function previousSourceManifest(exportId: string): Promise<SourceManifest | undefined> {
+  const explicit = process.env.WCA_SOURCE_MANIFEST_PREVIOUS_PATH;
+  if (explicit) {
+    try { return JSON.parse(await readFile(explicit, "utf8")) as SourceManifest; } catch { return undefined; }
+  }
+  const directory = process.env.WCA_EXPORT_CACHE_DIR || "/var/cache/wcarankings";
+  try {
+    const current = `wca-source-manifest-${String(exportId).slice(0, 10)}.json`;
+    const candidates = (await readdir(directory)).filter((file) => file.startsWith("wca-source-manifest-") && file.endsWith(".json") && file !== current).sort().reverse();
+    const candidate = candidates[0];
+    return candidate ? JSON.parse(await readFile(join(directory, candidate), "utf8")) as SourceManifest : undefined;
+  } catch { return undefined; }
 }
 
 function hasMariaDbCode(value: unknown): value is { code: string } {
@@ -351,11 +377,13 @@ async function main(): Promise<void> {
   }
 
   const zipPath = await getCachedExport(latest, options);
+  const previousManifest = await previousSourceManifest(latest.exportDate);
   await dropRankingViews();
   process.stdout.write("Importing WCA SQL tables into MariaDB…\n");
-  await importSqlExport(zipPath);
+  const sourceManifest = await importSqlExport(zipPath, latest.exportDate, previousManifest);
   if (options.rawOnly) {
     await refreshRawPersonLookupIndex();
+    await publishSourceManifest(sourceManifest, previousManifest);
     await writeExportMetadata(latest);
     process.stdout.write(
       `WCA raw tables are current through ${latest.exportDate}; projection publication skipped by --raw-only.\n`,

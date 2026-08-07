@@ -21,6 +21,16 @@ services:
       timeout: 5s
       retries: 12
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   flyway:
     image: ${FLYWAY_IMAGE_REF:-wcarankings-flyway:latest}
     build:
@@ -57,8 +67,13 @@ services:
       WCA_CLIENT_ID: ${WCA_CLIENT_ID:-}
       WCA_CLIENT_SECRET: ${WCA_CLIENT_SECRET:-}
       WCA_REDIRECT_URI: ${WCA_REDIRECT_URI:-}
+      FEED_WORKER_URL: ${FEED_WORKER_URL:-http://background-worker:3010}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_CACHE_VERSION: ${REDIS_CACHE_VERSION:-1}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "127.0.0.1:3000:3000"
@@ -67,23 +82,33 @@ services:
     image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_CACHE_VERSION: ${REDIS_CACHE_VERSION:-1}
       WCA_EXPORT_CACHE_DIR: /var/cache/wcarankings
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - wca_export_cache:/var/cache/wcarankings
 
-  list-ranking-worker:
+  background-worker:
     image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
     restart: unless-stopped
-    command: ["/app/scripts/list-ranking-worker.ts"]
+    command: ["/app/scripts/background-worker.ts"]
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
       LIST_RANKING_WORKER_POLL_MS: ${LIST_RANKING_WORKER_POLL_MS:-2000}
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: 3010
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_CACHE_VERSION: ${REDIS_CACHE_VERSION:-1}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   proxy:

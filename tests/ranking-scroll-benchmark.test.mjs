@@ -10,11 +10,12 @@ import {
   COMPETITION_RANKING_SCENARIOS,
   COUNTRY_RANKING_SCENARIOS,
   PERSON_RANKING_SCENARIOS,
+  PR_STREAK_RANKING_SCENARIOS,
   RANKING_SCROLL_SUITES,
   RESULT_RANKING_SCENARIOS,
 } from "../scripts/lib/ranking-scroll-scenarios.ts";
 
-test("ranking scroll scenarios are divided by stat family", () => {
+test("ranking scroll scenarios are divided into the supported stat suites", () => {
   assert.deepEqual(Object.keys(RANKING_SCROLL_SUITES), [
     "persons",
     "results",
@@ -22,6 +23,7 @@ test("ranking scroll scenarios are divided by stat family", () => {
     "cities",
     "countries",
     "medals",
+    "prStreak",
   ]);
   for (const scenarios of Object.values(RANKING_SCROLL_SUITES))
     assert.ok(scenarios.length > 0);
@@ -70,6 +72,11 @@ test("each primary stat covers its distinct ranking modes", () => {
     PERSON_RANKING_SCENARIOS.some(({ params }) => params.eventId === "SOR"),
   );
   assert.ok(
+    PR_STREAK_RANKING_SCENARIOS.every(
+      ({ path }) => path === "/api/rankings/people/pr-streak",
+    ),
+  );
+  assert.ok(
     PERSON_RANKING_SCENARIOS.some(
       ({ params }) => params.eventId === "sor-kinch",
     ),
@@ -99,12 +106,14 @@ test("each primary stat covers its distinct ranking modes", () => {
     ),
   );
   assert.deepEqual(
-    new Set(
-      COUNTRY_RANKING_SCENARIOS.map(({ params }) => params.stat).filter(
-        Boolean,
-      ),
-    ),
-    new Set(["competitors", "competitions", "solves"]),
+    new Set(COUNTRY_RANKING_SCENARIOS.map(({ path }) => path)),
+    new Set([
+      "/api/countries/fastest-single",
+      "/api/countries/fastest-average",
+      "/api/countries/competitors",
+      "/api/countries/competitions",
+      "/api/countries/solves",
+    ]),
   );
   assert.ok(
     COUNTRY_RANKING_SCENARIOS.some(

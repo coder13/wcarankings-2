@@ -1,5 +1,5 @@
-import { useLayoutEffect, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import type { Decorator, Meta, StoryObj } from "@storybook/react";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
 import type { RecordBadgeCode } from "@/lib/wca";
@@ -114,22 +114,37 @@ const countryEntries: RankingEntry[] = FALLBACK_COUNTRIES.map(
     recordBadges: [],
   }),
 );
+const allPrStreakEntries = allEntries.map((entry, index) => {
+  const prStreak = Math.max(2, 28 - Math.floor(index / 4));
+  return {
+    ...entry,
+    rank: Math.floor(index / 4) * 4 + 1,
+    subRank: index + 1,
+    best: prStreak,
+    formattedValue: String(prStreak),
+    competitionId: "",
+    competitionName: "",
+    recordBadges: [],
+  };
+});
 
 function makeMockResponse(url: URL, init?: RequestInit) {
   if (init?.signal?.aborted) {
     return Promise.reject(new DOMException("Request aborted", "AbortError"));
   }
 
-  const rankingEntries =
-    url.pathname === "/api/rankings/countries" ? countryEntries : allEntries;
-
   const search = url.searchParams.get("search")?.trim().toLocaleLowerCase();
+  const fixtureEntries = url.pathname.startsWith("/api/countries/")
+    ? countryEntries
+    : url.pathname.endsWith("/people/pr-streak")
+      ? allPrStreakEntries
+      : allEntries;
   if (search) {
     const searchLimit = Number(url.searchParams.get("searchLimit")) || 500;
     return Promise.resolve(
       new Response(
         JSON.stringify({
-          entries: rankingEntries
+          entries: fixtureEntries
             .filter(
               (entry) =>
                 entry.personName.toLocaleLowerCase().includes(search) ||
@@ -149,28 +164,28 @@ function makeMockResponse(url: URL, init?: RequestInit) {
   const limit = Math.max(1, Number(url.searchParams.get("limit")) || 100);
   const focusPersonId = url.searchParams.get("focus");
   const focusIndex = focusPersonId
-    ? rankingEntries.findIndex((entry) => entry.personId === focusPersonId)
+    ? fixtureEntries.findIndex((entry) => entry.personId === focusPersonId)
     : -1;
   const focusBefore = Number(url.searchParams.get("focusBefore")) || 50;
   const start =
     focusIndex >= 0
       ? Math.max(1, focusIndex + 1 - focusBefore)
       : requestedStart;
-  const pageEntries = rankingEntries.slice(start - 1, start - 1 + limit);
+  const pageEntries = fixtureEntries.slice(start - 1, start - 1 + limit);
 
   return Promise.resolve(
     new Response(
       JSON.stringify({
         entries: pageEntries,
-        hasMore: start - 1 + pageEntries.length < rankingEntries.length,
+        hasMore: start - 1 + pageEntries.length < fixtureEntries.length,
         nextPageStart:
-          start - 1 + pageEntries.length < rankingEntries.length
+          start - 1 + pageEntries.length < fixtureEntries.length
             ? start + pageEntries.length
             : null,
         previousPageStart: start > 1 ? Math.max(1, start - limit) : null,
         startPosition: start - 1,
         lastRank: pageEntries.at(-1)?.rank ?? null,
-        total: rankingEntries.length,
+        total: fixtureEntries.length,
       }),
       { headers: { "Content-Type": "application/json" } },
     ),
@@ -188,7 +203,10 @@ function StorybookFetchMock({ children }: { children: ReactNode }) {
     const originalFetch = window.fetch.bind(window);
     window.fetch = ((input, init) => {
       const requestUrl = new URL(getRequestUrl(input), window.location.href);
-      if (requestUrl.pathname.startsWith("/api/rankings")) {
+      if (
+        requestUrl.pathname.startsWith("/api/rankings") ||
+        requestUrl.pathname.startsWith("/api/countries/")
+      ) {
         return makeMockResponse(requestUrl, init);
       }
       return originalFetch(input, init);
@@ -202,20 +220,25 @@ function StorybookFetchMock({ children }: { children: ReactNode }) {
   return children;
 }
 
+function StorybookQueryProvider({ children }: { children: ReactNode }) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      }),
+  );
+  useEffect(() => () => queryClient.clear(), [queryClient]);
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+}
+
 const mockFetchDecorator: Decorator = (Story) => (
-  <StorybookFetchMock>
-    <Story />
-  </StorybookFetchMock>
-);
-
-const storybookQueryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false, staleTime: Infinity } },
-});
-
-const queryClientDecorator: Decorator = (Story) => (
-  <QueryClientProvider client={storybookQueryClient}>
-    <Story />
-  </QueryClientProvider>
+  <StorybookQueryProvider>
+    <StorybookFetchMock>
+      <Story />
+    </StorybookFetchMock>
+  </StorybookQueryProvider>
 );
 
 const initialData = {
@@ -227,6 +250,13 @@ const initialData = {
   startPosition: 0,
   lastRank: entries.at(-1)?.rank ?? null,
   total: allEntries.length,
+};
+const prStreakInitialData = {
+  ...initialData,
+  entries: allPrStreakEntries.slice(0, 100),
+  total: allPrStreakEntries.length,
+  lastRank: allPrStreakEntries[99]?.rank ?? null,
+  availableYears: [2026, 2025, 2024, 2023],
 };
 
 const countryInitialData = {
@@ -248,7 +278,7 @@ const meta = {
       appDirectory: true,
     },
   },
-  decorators: [queryClientDecorator, mockFetchDecorator],
+  decorators: [mockFetchDecorator],
 } satisfies Meta<typeof RankingsExplorer>;
 
 export default meta;
@@ -270,6 +300,19 @@ const sharedArgs = {
 
 export const Persons: Story = {
   args: sharedArgs,
+};
+
+export const PRStreak: Story = {
+  args: {
+    ...sharedArgs,
+    initial: {
+      ...sharedArgs.initial,
+      data: prStreakInitialData,
+    },
+  },
+  parameters: {
+    nextjs: { navigation: { pathname: "/persons/pr-streak" } },
+  },
 };
 
 export const PersonsInfiniteScroll: Story = {

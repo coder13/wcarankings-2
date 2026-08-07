@@ -1,4 +1,4 @@
-name: Build Projection Group
+name: Build Projection Groups
 
 on:
   workflow_call:
@@ -12,7 +12,7 @@ on:
       export_value:
         required: true
         type: string
-      group:
+      groups:
         required: true
         type: string
       hydrate_groups:
@@ -25,6 +25,10 @@ on:
       available_artifacts:
         required: false
         default: "{}"
+        type: string
+      dirty_years:
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -41,8 +45,9 @@ jobs:
       MYSQL_ROOT_PASSWORD: projection-build-root
       DATABASE_URL: mysql://wcarankings:projection-build@127.0.0.1:13307/wcarankings
       WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
-      GROUP: ${{ inputs.group }}
+      GROUPS: ${{ inputs.groups }}
       HYDRATE_GROUPS: ${{ inputs.hydrate_groups }}
+      DIRTY_YEARS: ${{ inputs.dirty_years }}
 
     steps:
       - uses: actions/checkout@v4
@@ -83,7 +88,7 @@ jobs:
           key: wca-sql-export-${{ inputs.export_date }}
           fail-on-cache-miss: true
 
-      - name: Start isolated projection database
+      - name: Start shared projection database
         run: |
           set -euo pipefail
           docker compose up -d db
@@ -139,61 +144,76 @@ jobs:
               --expected-export-date="${{ inputs.export_value }}"
           done
 
-      - name: Build projection group
+      - name: Build projection groups
         env:
           FINGERPRINTS: ${{ inputs.fingerprints }}
           AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}
+          DIRTY_YEARS: ${{ inputs.dirty_years }}
         run: |
           set -euo pipefail
-          bun scripts/projections/planning/projection-build-plan.ts --groups="$GROUP" \
+          build_groups="$GROUPS"
+          if [ -n "$DIRTY_YEARS" ] && printf ',%s,' "$HYDRATE_GROUPS" | grep -q ',yearly-person-rankings,'; then
+            build_groups=$(printf '%s' "$build_groups" | tr ',' '\n' | grep -vx 'yearly-person-rankings' | paste -sd, - || true)
+          fi
+          if [ -n "$build_groups" ]; then
+          bun scripts/projections/planning/projection-build-plan.ts --groups="$build_groups" \
             --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
           WCA_PROJECTION_BUILD_CONCURRENCY=2 bun scripts/projections/build/build-projection-groups.ts \
+            --groups="$build_groups" \
+            --satisfied-groups="$HYDRATE_GROUPS" \
             --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
             --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
             --include-ranking-tables="$(jq -r '.includeRankingTables' /tmp/build-plan.json)"
-
-          directory="/tmp/built/${GROUP}"
-          mkdir -p "$directory"
-          prefix="$GROUP"
-          if [ "$GROUP" = yearly-person-rankings ]; then prefix=yearly; fi
-          metadata_file="${prefix}-projection-transfer.json"
-          archive_file="${prefix}-projection-transfer.tar.gz"
-          metadata="$directory/$metadata_file"
-          archive="$directory/$archive_file"
-          bun scripts/projections/transfer/prepare-projection-transfer.ts --group="$GROUP" > "$metadata"
-          bun scripts/projections/transfer/export-projection-transfer.ts --metadata="$metadata" --output="$archive"
+          fi
+          if [ -n "$DIRTY_YEARS" ] && printf ',%s,' "$HYDRATE_GROUPS" | grep -q ',yearly-person-rankings,'; then
+            DATABASE_NAME_OVERRIDE="$MYSQL_DATABASE" bun scripts/projections/build/merge-yearly-rankings.ts --years="$DIRTY_YEARS"
+          fi
 
           printf '{"groups":%s}\n' "$FINGERPRINTS" > /tmp/fingerprints.json
-          bun scripts/projections/release/projection-release-artifact.ts create --directory="$directory" \
-            --export-id="${{ inputs.export_value }}" --export-date="${{ inputs.export_date }}" \
-            --groups="$GROUP" --fingerprints-file=/tmp/fingerprints.json \
-            --compatibility-file=release-compatibility.json --source-sha="${{ inputs.ref }}"
-
           owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
-          fingerprint=$(jq -r --arg group "$GROUP" '.groups[$group].artifactFingerprint' /tmp/fingerprints.json)
-          corrupt=$(jq -r --arg group "$GROUP" '.[$group].valid == false' <<<"$AVAILABLE_ARTIFACTS")
-          tag="$fingerprint"
-          if [ "$corrupt" = true ]; then tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
-          ref="ghcr.io/${owner}/wcarankings-projection-${GROUP}:${tag}"
-          pushd "$directory" >/dev/null
-          push_result=$(oras push "$ref" --format json \
-            --artifact-type application/vnd.cuberanks.projection.group.v4 \
-            --annotation "io.wcarankings.group=$GROUP" \
-            --annotation "io.wcarankings.export-id=${{ inputs.export_value }}" \
-            --annotation "io.wcarankings.artifact-fingerprint=$fingerprint" \
-            --annotation "io.wcarankings.format-version=4" \
-            "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json" \
-            "$archive_file:application/vnd.cuberanks.projection.tables.v1+gzip" \
-            "$metadata_file:application/vnd.cuberanks.projection.transfer.v4+json")
-          popd >/dev/null
-          digest=$(jq -er '.digest' <<<"$push_result")
-          {
-            echo "### Projection group"
-            echo "- Group: $GROUP"
-            echo "- Digest: $digest"
-            echo "- Dependencies hydrated: ${HYDRATE_GROUPS:-none}"
-          } >> "$GITHUB_STEP_SUMMARY"
+          for group in $(printf '%s' "$GROUPS" | tr ',' ' '); do
+            directory="/tmp/built/${group}"
+            mkdir -p "$directory"
+            prefix="$group"
+            if [ "$group" = yearly-person-rankings ]; then prefix=yearly; fi
+            metadata_file="${prefix}-projection-transfer.json"
+            archive_file="${prefix}-projection-transfer.tar.gz"
+            metadata="$directory/$metadata_file"
+            archive="$directory/$archive_file"
+            bun scripts/projections/transfer/prepare-projection-transfer.ts --group="$group" > "$metadata"
+            bun scripts/projections/transfer/export-projection-transfer.ts --metadata="$metadata" --output="$archive"
 
-      - name: Clean isolated database
+            bun scripts/projections/release/projection-release-artifact.ts create --directory="$directory" \
+              --export-id="${{ inputs.export_value }}" --export-date="${{ inputs.export_value }}" \
+              --groups="$group" --fingerprints-file=/tmp/fingerprints.json \
+              --compatibility-file=release-compatibility.json --source-sha="${{ inputs.ref }}"
+
+            fingerprint=$(jq -r --arg group "$group" '.groups[$group].artifactFingerprint' /tmp/fingerprints.json)
+            corrupt=$(jq -r --arg group "$group" '.[$group].valid == false' <<<"$AVAILABLE_ARTIFACTS")
+            tag="$fingerprint"
+            if [ "$corrupt" = true ]; then tag="${fingerprint}-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
+            ref="ghcr.io/${owner}/wcarankings-projection-${group}:${tag}"
+            pushd "$directory" >/dev/null
+            push_result=$(oras push "$ref" --format json \
+              --artifact-type application/vnd.cuberanks.projection.group.v4 \
+              --annotation "io.wcarankings.group=$group" \
+              --annotation "io.wcarankings.export-id=${{ inputs.export_value }}" \
+              --annotation "io.wcarankings.artifact-fingerprint=$fingerprint" \
+              --annotation "io.wcarankings.format-version=4" \
+              "projection-release.json:application/vnd.cuberanks.projection.manifest.v4+json" \
+              "$archive_file:application/vnd.cuberanks.projection.tables.v1+gzip" \
+              "$metadata_file:application/vnd.cuberanks.projection.transfer.v4+json")
+            popd >/dev/null
+            digest=$(jq -er '.digest' <<<"$push_result")
+            {
+              echo "### Projection group"
+              echo "- Group: $group"
+              echo "- Digest: $digest"
+              echo "- Dependencies hydrated: ${HYDRATE_GROUPS:-none}"
+              echo "- Shared database: one database for this build batch"
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Clean shared database
         if: always()
         run: docker compose down --volumes --remove-orphans

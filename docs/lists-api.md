@@ -31,7 +31,11 @@ User-created lists use eight-character Crockford Base32 public IDs. System alias
 
 `pnpm run db:refresh-system-lists` rebuilds curated system memberships. The WCA importer also runs the rebuild transaction after publishing new ranking projections. A failed rebuild rolls back and leaves the prior memberships intact.
 
-The first rules match an exact, case-insensitive first token from the primary WCA display name. They do not match prefixes, so `Max` matches and `Maxwell` does not.
+The generator uses the WCA persons export dated 2026-08-06. It creates gendered first-name lists and surname lists from primary person rows. First names use the first token in `persons.name`. Surnames use the last token before a parenthesized local name.
+
+The first 25 male first-name lists, first 25 female first-name lists, and first 25 surname lists are public. Other generated lists have private visibility. Private visibility only removes a list from the public directory. A user can still open a private system list through its direct URL.
+
+Name matching is exact and case-insensitive. It does not match prefixes, so `Max` matches and `Maxwell` does not.
 
 ## Still intentionally separate
 

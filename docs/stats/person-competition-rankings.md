@@ -20,8 +20,8 @@ A list row represents a scope, region, gender, and person.
 The build reads `result_facts` and `persons`, then counts distinct
 `competition_id` values per person. Both count tables store the current
 normalized person gender. It stores all-time counts in
-`person_competition_counts` and yearly counts in
-`person_competition_year_counts`.
+`person_period_metrics`, with period `0` for all-time rows and the competition
+year for yearly rows.
 
 The all-time projection expands common World, continent, country, and
 single-gender cohorts. The yearly and multi-gender paths rank the compact count

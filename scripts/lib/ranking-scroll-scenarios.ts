@@ -12,6 +12,33 @@ function scenario(
   return { id, label, path, params };
 }
 
+export const PR_STREAK_RANKING_SCENARIOS = [
+  scenario(
+    "world",
+    "precomputed PR Streak world",
+    "/api/rankings/people/pr-streak",
+    {},
+  ),
+  scenario(
+    "canada-f",
+    "precomputed PR Streak Canada women",
+    "/api/rankings/people/pr-streak",
+    { region: "Canada", gender: ["f"] },
+  ),
+  scenario(
+    "world-fo",
+    "lazy PR Streak world female-other cohort",
+    "/api/rankings/people/pr-streak",
+    { gender: ["f", "o"] },
+  ),
+  scenario(
+    "canada-2023-fo",
+    "lazy PR Streak Canada female-other 2023 cohort",
+    "/api/rankings/people/pr-streak",
+    { region: "Canada", year: "2023", gender: ["f", "o"] },
+  ),
+].map((entry) => ({ ...entry, startBase: 1 }));
+
 export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "event-single-world",
@@ -425,58 +452,52 @@ export const COUNTRY_RANKING_SCENARIOS = [
   scenario(
     "fastest-single-world",
     "fastest country single world",
-    "/api/rankings/countries",
+    "/api/countries/fastest-single",
     {
       eventId: "333",
-      result: "single",
     },
   ),
   scenario(
     "fastest-average-world",
     "fastest country average world",
-    "/api/rankings/countries",
+    "/api/countries/fastest-average",
     {
       eventId: "333",
-      result: "average",
     },
   ),
   scenario(
     "fastest-single-north-america",
     "fastest country single North America",
-    "/api/rankings/countries",
+    "/api/countries/fastest-single",
     {
       eventId: "333",
-      result: "single",
       region: "_North America",
     },
   ),
   scenario(
     "fastest-single-world-2023",
     "fastest country single 2023",
-    "/api/rankings/countries",
+    "/api/countries/fastest-single",
     {
       eventId: "333",
-      result: "single",
       year: "2023",
     },
   ),
   scenario(
     "fastest-single-world-f",
     "fastest country single women",
-    "/api/rankings/countries",
+    "/api/countries/fastest-single",
     {
       eventId: "333",
-      result: "single",
       gender: ["f"],
     },
   ),
   scenario(
     "fastest-single-north-america-2023-fo",
     "fastest country single North America female-other 2023",
-    "/api/rankings/countries",
+    "/api/countries/fastest-single",
     {
       eventId: "333",
-      result: "single",
       region: "_North America",
       year: "2023",
       gender: ["f", "o"],
@@ -486,22 +507,18 @@ export const COUNTRY_RANKING_SCENARIOS = [
     scenario(
       `${stat}-world`,
       `country ${stat} world`,
-      "/api/rankings/countries",
+      `/api/countries/${stat}`,
       {
         eventId: "333",
-        result: "single",
-        stat,
       },
     ),
   ),
   scenario(
     "solves-europe-2023-mf",
     "country solves Europe male-female 2023",
-    "/api/rankings/countries",
+    "/api/countries/solves",
     {
       eventId: "333",
-      result: "single",
-      stat: "solves",
       region: "_Europe",
       year: "2023",
       gender: ["m", "f"],
@@ -556,6 +573,7 @@ export const RANKING_SCROLL_SUITES = {
   cities: CITY_RANKING_SCENARIOS,
   countries: COUNTRY_RANKING_SCENARIOS,
   medals: MEDAL_RANKING_SCENARIOS,
+  prStreak: PR_STREAK_RANKING_SCENARIOS,
 };
 
 export const ALL_RANKING_SCROLL_SCENARIOS = Object.entries(

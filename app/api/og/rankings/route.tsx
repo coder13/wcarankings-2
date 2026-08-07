@@ -105,6 +105,7 @@ function metadataInput(params: URLSearchParams): RankingDocumentTitleInput {
     year: Number.isInteger(requestedYear) ? requestedYear : null,
     personCompetitionRanking: booleanParam(params, "personCompetitionRanking"),
     personMedalRanking,
+    personPrStreakRanking: booleanParam(params, "personPrStreakRanking"),
     medalType: isMedalRankingType(medal) ? medal : "overall",
   };
 }

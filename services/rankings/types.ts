@@ -3,6 +3,7 @@ import type { LRUCache } from "lru-cache";
 import type { MedalRankingType } from "@/lib/medal-rankings";
 
 export type RankingRow = {
+  result_id: number;
   rank: number;
   sub_rank: number;
   total_count?: number;
@@ -74,6 +75,30 @@ export interface PersonCompetitionRankingInput {
   year: number | null;
   start: number;
   limit: number;
+}
+
+export type PersonPrStreakRankingRow = {
+  person_id: string;
+  person_name: string;
+  country_id: string;
+  country_name: string;
+  country_iso2: string;
+  pr_streak: number;
+  rank: number;
+  position: number;
+};
+
+export interface PersonPrStreakRankingInput {
+  scope: RegionScope;
+  regionId: string;
+  gender: readonly GenderFilter[];
+  year: number | null;
+  start: number;
+  limit: number;
+  locate: string;
+  search: string;
+  regexSearch: boolean;
+  searchLimit: number;
 }
 
 export interface MedalRankingInput {

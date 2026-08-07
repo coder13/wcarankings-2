@@ -21,7 +21,10 @@ export type RankingDocumentTitleInput = {
     | "solves";
   year?: number | null;
   personCompetitionRanking?: boolean;
+  personActivityRanking?: boolean;
+  personActivityMetric?: "competitions" | "countries" | "rounds" | "solves";
   personMedalRanking?: boolean;
+  personPrStreakRanking?: boolean;
   medalType?: MedalRankingType;
   listName?: string;
 };
@@ -80,7 +83,10 @@ export function formatRankingDocumentTitle({
   countryRanking = "fastest-single",
   year,
   personCompetitionRanking,
+  personActivityRanking,
+  personActivityMetric = "competitions",
   personMedalRanking,
+  personPrStreakRanking,
   medalType = "overall",
   listName,
 }: RankingDocumentTitleInput) {
@@ -143,6 +149,16 @@ export function formatRankingDocumentTitle({
     return titleWithSite("People by Competition Count");
   }
 
+  if (personActivityRanking) {
+    const titles = {
+      competitions: "People by Competition Count",
+      countries: "People by Country Count",
+      rounds: "People by Round Count",
+      solves: "People by Official Solve Count",
+    };
+    return titleWithSite(titles[personActivityMetric]);
+  }
+
   if (personMedalRanking) {
     const eventPrefix = eventId === "all" ? "" : `${event} `;
     const medalPrefix =
@@ -150,6 +166,11 @@ export function formatRankingDocumentTitle({
         ? ""
         : `${medalType[0].toUpperCase()}${medalType.slice(1)} `;
     return titleWithSite(`${eventPrefix}${medalPrefix}Medal Rankings`);
+  }
+
+  if (personPrStreakRanking) {
+    const yearSuffix = year ? ` ${year}` : "";
+    return titleWithSite(`PR Streak${yearSuffix}`);
   }
 
   const yearSuffix = year ? ` ${year}` : "";

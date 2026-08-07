@@ -1,4 +1,5 @@
 import type { ExportDateInput } from "../../shared/date.ts";
+import type { SourceManifest } from "./source-manifest.ts";
 
 interface SemanticFingerprintGroup {
   inputs: string[];
@@ -48,6 +49,12 @@ export interface ProjectionReleasePlan extends ArtifactFingerprintSet {
   requiredGroups: string[];
   requiredGroupsCsv: string;
   selectedGroups: string[];
+  sourceManifest?: SourceManifest;
+  previousSourceManifest?: SourceManifest;
+  dirtyYears: number[];
+  reusedYears: number[];
+  dirtyCompetitionIds: string[];
+  sourceManifestReasons: string[];
   semanticChangeRequired: boolean;
 }
 
@@ -73,4 +80,7 @@ export interface ProjectionReleasePlanOptions extends SemanticFingerprintOptions
   productionExportId?: ExportDateInput;
   productionState?: unknown;
   selectedGroups?: readonly string[];
+  sourceManifest?: SourceManifest;
+  previousSourceManifest?: SourceManifest;
+  currentYear?: number;
 }

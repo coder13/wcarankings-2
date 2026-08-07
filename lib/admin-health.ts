@@ -18,6 +18,8 @@ export const capabilityTables = {
   ],
   personActivityRankings: [
     "person_activity_counts",
+  "person_activity_year_counts",
+  "person_activity_event_counts",
     "person_activity_rankings",
     "person_activity_ranking_counts",
   ],
@@ -31,6 +33,12 @@ export const capabilityTables = {
     "person_medal_scores",
     "person_medal_rankings",
     "person_medal_ranking_counts",
+  ],
+  personPrStreakRankings: [
+    "person_pr_streak_counts",
+    "person_pr_streak_year_counts",
+    "person_pr_streak_rankings",
+    "person_pr_streak_ranking_counts",
   ],
   cityEventStats: ["city_event_stats"],
   countryEventStats: ["country_event_stats"],

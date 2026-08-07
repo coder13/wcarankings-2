@@ -108,9 +108,11 @@ test("a result-facts semantic change selects only its downstream closure", async
   assert.deepEqual(plan.changedGroups, [
     "result-facts",
     "ranking-tables",
+    "person-shared-grains",
     "result-rankings",
     "person-event-rankings",
     "person-competition-rankings",
+    "person-pr-streak-rankings",
     "person-activity-rankings",
     "city-rankings",
     "country-rankings",

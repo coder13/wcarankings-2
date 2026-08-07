@@ -7,11 +7,10 @@ export const personMedalRankingsJob = {
   tables: [
     "person_medal_scores",
     "person_medal_rankings",
-    "person_medal_ranking_counts",
   ],
   releaseGroup: "person-medal-rankings",
   releaseOrder: 10,
-  releaseSchemaVersion: 1,
+  releaseSchemaVersion: 2,
   estimatedDurationMs: 90_000,
   enabledByDefault: true,
   subject: "people",

@@ -5,6 +5,7 @@ import {
 import { normalizeExportDate } from "../../shared/date.ts";
 import { projectionFingerprints } from "./fingerprints.ts";
 import { projectionSemanticPlan } from "./semantic-plan.ts";
+import { sourceReusePlan } from "./source-reuse.ts";
 import {
   activeFingerprint,
   isRecord,
@@ -130,6 +131,13 @@ export async function projectionReleasePlan(
     (group) => hydrateGroups.has(group.name) && !builds.has(group.name),
   ).map((group) => group.name);
   const releaseGroups = selected.filter((name) => !activeGroups.includes(name));
+  const sourcePlan = options.sourceManifest
+    ? sourceReusePlan(
+        options.sourceManifest,
+        options.previousSourceManifest,
+        options.currentYear ?? new Date(normalizedExportId).getUTCFullYear(),
+      )
+    : null;
 
   return {
     ...fingerprints,
@@ -148,5 +156,11 @@ export async function projectionReleasePlan(
     requiredGroupsCsv: releaseGroups.join(","),
     buildGroupsCsv: orderedBuildGroups.join(","),
     hydrateGroupsCsv: orderedHydrateGroups.join(","),
+    sourceManifest: options.sourceManifest,
+    previousSourceManifest: options.previousSourceManifest,
+    dirtyYears: sourcePlan?.dirtyYears ?? [],
+    reusedYears: sourcePlan?.reusedYears ?? [],
+    dirtyCompetitionIds: sourcePlan?.dirtyCompetitionIds ?? [],
+    sourceManifestReasons: sourcePlan?.reasons ?? [],
   };
 }

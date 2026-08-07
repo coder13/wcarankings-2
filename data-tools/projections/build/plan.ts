@@ -1,4 +1,5 @@
 import { DEPLOYMENT_PROJECTION_GROUPS } from "../../projection-catalog/groups.ts";
+import { PROJECTION_JOBS } from "../../projection-catalog/registry.ts";
 import {
   DEFAULT_PROJECTION_NAMES,
   SEMANTIC_PROJECTION_DEFINITIONS,
@@ -132,4 +133,41 @@ export function projectionBuildPlan(
     ),
     tables: [...new Set(groups.flatMap((group) => group.tables))],
   };
+}
+
+export function formatProjectionBuildSummary(
+  groupNames: readonly string[],
+  satisfiedGroupNames: readonly string[] = [],
+): string {
+  const selected = new Set(groupNames);
+  const satisfied = new Set(satisfiedGroupNames);
+  const groups = DEPLOYMENT_PROJECTION_GROUPS.filter((group) =>
+    selected.has(group.name),
+  );
+  const lines = [
+    "[projection-build] Build plan",
+    `[projection-build] Groups to build: ${groups.length}`,
+  ];
+  if (satisfied.size > 0) {
+    lines.push(
+      `[projection-build] Hydrated groups: ${[...satisfied].join(", ")}`,
+    );
+  }
+
+  for (const group of groups) {
+    const jobs = PROJECTION_JOBS.filter(
+      (job) => job.releaseGroup === group.name,
+    );
+    const outputs = jobs.map((job) => {
+      if (job.kind === "core") return "core ranking tables";
+      return job.stat ? `${job.id} (${job.stat})` : job.id;
+    });
+    lines.push(`[projection-build] ${group.name}`);
+    lines.push(`[projection-build]   generates: ${outputs.join(", ")}`);
+    lines.push(`[projection-build]   tables: ${group.tables.join(", ")}`);
+  }
+
+  const tableCount = new Set(groups.flatMap((group) => group.tables)).size;
+  lines.push(`[projection-build] Total owned tables: ${tableCount}`);
+  return `${lines.join("\n")}\n`;
 }

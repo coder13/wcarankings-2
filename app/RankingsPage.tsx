@@ -60,7 +60,6 @@ export async function getRankingsPageMetadata({
     requestedYearNumber <= new Date().getFullYear()
       ? requestedYearNumber
       : options.year;
-
   const metadataInput = {
     ...options,
     eventId,
@@ -106,6 +105,10 @@ export async function getRankingsPageMetadata({
     "personMedalRanking",
     String(metadataInput.personMedalRanking === true),
   );
+  imageParams.set(
+    "personPrStreakRanking",
+    String(metadataInput.personPrStreakRanking === true),
+  );
   imageParams.set("medal", metadataInput.medalType);
   if (metadataInput.year) imageParams.set("year", String(metadataInput.year));
   if (metadataInput.eventId === "all") imageParams.delete("eventId");
@@ -135,7 +138,9 @@ export async function RankingsPage({
   requiresResultRankings = false,
   requiresCompetitionRankings = false,
   requiresPersonCompetitionRankings = false,
+  requiresPersonActivityRankings = false,
   requiresPersonMedalRankings = false,
+  requiresPersonPrStreakRankings = false,
   requiresCityRankings = false,
   requiresCountryRankings = false,
 }: {
@@ -144,7 +149,9 @@ export async function RankingsPage({
   requiresResultRankings?: boolean;
   requiresCompetitionRankings?: boolean;
   requiresPersonCompetitionRankings?: boolean;
+  requiresPersonActivityRankings?: boolean;
   requiresPersonMedalRankings?: boolean;
+  requiresPersonPrStreakRankings?: boolean;
   requiresCityRankings?: boolean;
   requiresCountryRankings?: boolean;
 } = {}) {
@@ -160,7 +167,9 @@ export async function RankingsPage({
     (requiresCompetitionRankings && !featureSwitch.competitionRankings) ||
     (requiresPersonCompetitionRankings &&
       !featureSwitch.personCompetitionRankings) ||
+    (requiresPersonActivityRankings && !featureSwitch.personActivityRankings) ||
     (requiresPersonMedalRankings && !featureSwitch.personMedalRankings) ||
+    (requiresPersonPrStreakRankings && !featureSwitch.personPrStreakRankings) ||
     (requiresCityRankings && !featureSwitch.cityEventStats) ||
     (requiresCountryRankings && !featureSwitch.countryEventStats) ||
     (["SOR", "sor-kinch"].includes(requestedEvent) && !featureSwitch.sumOfRanks)

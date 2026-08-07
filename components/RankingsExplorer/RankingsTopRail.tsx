@@ -125,7 +125,11 @@ export function RankingsTopRail() {
   let personRankingPeriod = "";
   if (filters.personCompetitionRanking)
     personRankingPeriod = filters.year ? String(filters.year) : "competitions";
+  else if (filters.personActivityRanking)
+    personRankingPeriod = filters.year ? String(filters.year) : "";
   else if (filters.personMedalRanking) personRankingPeriod = filters.medalType;
+  else if (filters.personPrStreakRanking)
+    personRankingPeriod = filters.year ? String(filters.year) : "pr-streak";
   else if (filters.year) personRankingPeriod = String(filters.year);
   let personRankingYears = rankings.availableYears;
   if (personRankingYears.length === 0) {
@@ -136,6 +140,7 @@ export function RankingsTopRail() {
     }
   }
   let personRankingPeriodOptions: readonly PersonRankingPeriodOption[];
+  let personRankingPeriodAriaLabel: string | undefined;
   if (filters.subject === "countries") {
     personRankingPeriodOptions = [
       { value: "", label: t("rankingsRail.period.allTime") },
@@ -146,6 +151,7 @@ export function RankingsTopRail() {
     ];
   } else if (filters.personMedalRanking) {
     personRankingPeriodOptions = MEDAL_RANKING_OPTIONS;
+    personRankingPeriodAriaLabel = "Medal statistic";
   } else if (filters.personCompetitionRanking) {
     personRankingPeriodOptions = [
       {
@@ -157,16 +163,27 @@ export function RankingsTopRail() {
         label: String(year),
       })),
     ];
+  } else if (filters.personActivityRanking) {
+    personRankingPeriodOptions = [
+      { value: "", label: t("rankingsRail.period.allTime") },
+      ...personRankingYears.map((year) => ({
+        value: String(year),
+        label: String(year),
+      })),
+    ];
+  } else if (filters.personPrStreakRanking) {
+    personRankingPeriodOptions = [
+      {
+        value: "pr-streak",
+        label: t("rankingsRail.period.allTime"),
+      },
+      ...personRankingYears.map((year) => ({
+        value: String(year),
+        label: String(year),
+      })),
+    ];
   } else {
     personRankingPeriodOptions = [
-      ...(featureSwitch.personCompetitionRankings
-        ? [
-            {
-              value: "competitions",
-              label: t("rankingsRail.period.competitionCount"),
-            },
-          ]
-        : []),
       ...(featureSwitch.personMedalRankings
         ? [{ value: "medals", label: "Medal rankings" }]
         : []),
@@ -182,13 +199,13 @@ export function RankingsTopRail() {
     options.showSubjectSwitch &&
     (filters.subject === "people" || filters.subject === "countries") &&
     personRankingPeriodOptions.length > 1;
-  let periodAriaLabel: string | undefined;
-  if (filters.personMedalRanking) periodAriaLabel = "Medal statistic";
-  else if (filters.subject === "countries")
-    periodAriaLabel = "Country ranking period";
+  if (filters.subject === "countries")
+    personRankingPeriodAriaLabel = "Country ranking period";
   const hidesResultType =
     filters.personCompetitionRanking ||
+    filters.personActivityRanking ||
     filters.personMedalRanking ||
+    filters.personPrStreakRanking ||
     (filters.subject === "competitions" &&
       ["podiums", "latitude", "competitor-count"].includes(
         filters.competitionRanking,
@@ -201,6 +218,9 @@ export function RankingsTopRail() {
     ["fastest-single", "fastest-average"].includes(filters.countryRanking);
   const hidesEventPicker =
     filters.personCompetitionRanking ||
+    (filters.personActivityRanking &&
+      !["rounds", "solves"].includes(filters.personActivityMetric)) ||
+    filters.personPrStreakRanking ||
     (filters.subject === "competitions" &&
       ["latitude", "competitor-count"].includes(filters.competitionRanking));
   return (
@@ -243,6 +263,8 @@ export function RankingsTopRail() {
             eventLeadingOptions,
             additionalEventOptions:
               !filters.personMedalRanking &&
+              !filters.personActivityRanking &&
+              !filters.personPrStreakRanking &&
               options.showAllEventRankingOptions &&
               featureSwitch.sumOfRanks
                 ? ALL_EVENT_RANKING_OPTIONS
@@ -259,7 +281,23 @@ export function RankingsTopRail() {
                     if (value === "competitions") {
                       if (filters.personCompetitionRanking)
                         actions.changeYear(null);
-                      else actions.changePersonCompetitionRanking(true);
+                      else
+                        actions.changePersonActivityRanking(
+                          true,
+                          "competitions",
+                        );
+                    } else if (filters.personActivityRanking) {
+                      actions.changeYear(value ? Number(value) : null);
+                    } else if (
+                      filters.subject === "people" &&
+                      ["countries", "rounds", "solves"].includes(value)
+                    ) {
+                      actions.changePersonActivityRanking(
+                        true,
+                        value as typeof filters.personActivityMetric,
+                      );
+                    } else if (value === "pr-streak") {
+                      actions.changeYear(null);
                     } else if (value === "medals")
                       actions.changePersonMedalRanking(true);
                     else if (filters.personMedalRanking)
@@ -268,7 +306,7 @@ export function RankingsTopRail() {
                       );
                     else actions.changeYear(value ? Number(value) : null);
                   },
-                  ariaLabel: periodAriaLabel,
+                  ariaLabel: personRankingPeriodAriaLabel,
                 }
               : undefined,
             gender: filters.gender,
@@ -282,6 +320,7 @@ export function RankingsTopRail() {
               filters.eventId !== "SOR" &&
               filters.eventId !== "sor-kinch" &&
               !filters.personMedalRanking &&
+              !filters.personActivityRanking &&
               !hidesResultType &&
               (filters.subject !== "cities" || cityUsesResultType) &&
               (filters.subject !== "countries" || countryUsesResultType),
@@ -302,19 +341,19 @@ export function RankingsTopRail() {
             regionDisabled: options.regionSelectionDisabled,
           }}
           search={{
-            searchInputRef: commands.registerSearchInput,
-            findOpen: search.state.open,
-            findQuery: search.state.query,
-            findError: search.state.error,
-            findLoading: search.state.loading,
-            findPending: search.state.pending,
-            findMatches: search.state.matches,
-            findIndex: search.state.index,
-            onSearchOpen: search.actions.activate,
-            onSearchClose: search.actions.close,
-            onSearchQueryChange: search.actions.changeQuery,
-            onSearchCycle: search.actions.cycle,
-          }}
+                  searchInputRef: commands.registerSearchInput,
+                  findOpen: search.state.open,
+                  findQuery: search.state.query,
+                  findError: search.state.error,
+                  findLoading: search.state.loading,
+                  findPending: search.state.pending,
+                  findMatches: search.state.matches,
+                  findIndex: search.state.index,
+                  onSearchOpen: search.actions.activate,
+                  onSearchClose: search.actions.close,
+                  onSearchQueryChange: search.actions.changeQuery,
+                  onSearchCycle: search.actions.cycle,
+                }}
         />
       )}
     </div>

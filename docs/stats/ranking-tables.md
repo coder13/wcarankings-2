@@ -20,9 +20,8 @@ The SQL files are in the same catalog directory.
 
 - `ranking_entries_single`
 - `ranking_entries_average`
-- `ranking_counts`
 
 ## Request policy
 
 Read each page from its matching ranking-entry table. Read each total from
-`ranking_counts`. Apply display joins after the query selects a bounded page.
+the serving ranking tables. Apply display joins after the query selects a bounded page.

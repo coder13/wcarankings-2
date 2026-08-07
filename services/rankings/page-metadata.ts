@@ -4,6 +4,7 @@ import { loadCountryRankings } from "@/services/rankings/country-rankings";
 import { loadCompetitionRankings } from "@/services/rankings/competition-rankings";
 import { loadPersonCompetitionRankings } from "@/services/rankings/person-competitions";
 import { loadPersonMedalRankings } from "@/services/rankings/medals";
+import { loadPersonPrStreakRankings } from "@/services/rankings/person-pr-streak";
 import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
 import type { RankingDocumentTitleInput } from "@/lib/ranking-document-title";
@@ -120,6 +121,13 @@ export async function loadTopRankingEntries(
       rankingParams(params, 1, input),
     );
     return result.data.entries.slice(0, 3) as RankingPageEntry[];
+  }
+
+  if (input.personPrStreakRanking) {
+    const result = await loadPersonPrStreakRankings(
+      rankingParams(params, 1, input),
+    );
+    return (result.data.entries ?? []).slice(0, 3) as RankingPageEntry[];
   }
 
   const personParams = rankingParams(params, 1, input);

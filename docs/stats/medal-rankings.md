@@ -34,7 +34,7 @@ The build has three tables:
 
 - `person_medal_scores` is the compact score source for all later queries.
 - `person_medal_rankings` stores all-time World, continent, and country rows.
-- `person_medal_ranking_counts` stores the matching all-time totals.
+- The API counts matching all-time rows from `person_medal_rankings`.
 
 The all-time table stores all events as `event_id = ''`. It also stores each
 individual event. It stores one row for each medal statistic.

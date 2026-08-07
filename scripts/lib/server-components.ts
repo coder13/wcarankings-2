@@ -31,6 +31,7 @@ const SERVER_COMPONENT_PATHS = {
   flyway: ["Dockerfile.flyway", "migrations/mysql"],
   dataTools: [
     "Dockerfile.data-tools",
+    "data-tools",
     "scripts",
     "sql",
     "migrations/mysql",

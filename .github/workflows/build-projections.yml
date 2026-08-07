@@ -34,6 +34,10 @@ on:
         required: false
         default: false
         type: boolean
+      dirty_years:
+        required: false
+        default: ""
+        type: string
     outputs:
       artifact_name:
         value: ${{ jobs.compose.outputs.artifact_name }}
@@ -104,62 +108,19 @@ jobs:
           path: /tmp/wca-export-cache
           key: wca-sql-export-${{ inputs.export_date }}
 
-  matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      wave_one: ${{ steps.plan.outputs.wave_one }}
-      wave_two: ${{ steps.plan.outputs.wave_two }}
-      wave_two_required: ${{ steps.plan.outputs.wave_two_required }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref }}
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.3
-      - name: Plan isolated build waves
-        id: plan
-        env:
-          BUILD_GROUPS: ${{ inputs.build_groups }}
-        run: |
-          wave_one=$(bun scripts/projections/planning/projection-build-matrix.ts --wave=1)
-          wave_two=$(bun scripts/projections/planning/projection-build-matrix.ts --wave=2)
-          echo "wave_one=$wave_one" >> "$GITHUB_OUTPUT"
-          echo "wave_two=$wave_two" >> "$GITHUB_OUTPUT"
-          echo "wave_two_required=$(jq -r '.include | length > 0' <<<"$wave_two")" >> "$GITHUB_OUTPUT"
-
-  wave-one:
+  build:
     if: inputs.build_groups != ''
-    needs: [raw-export, matrix]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix.outputs.wave_one) }}
+    needs: raw-export
     uses: ./.github/workflows/build-projection-group.yml
     with:
       ref: ${{ inputs.ref }}
       export_date: ${{ inputs.export_date }}
       export_value: ${{ inputs.export_value }}
-      group: ${{ matrix.group }}
-      hydrate_groups: ${{ matrix.hydrate_groups }}
+      groups: ${{ inputs.build_groups }}
+      hydrate_groups: ${{ inputs.hydrate_groups }}
       fingerprints: ${{ inputs.fingerprints }}
       available_artifacts: ${{ inputs.available_artifacts }}
-    secrets: inherit
-
-  wave-two:
-    if: needs.matrix.outputs.wave_two_required == 'true'
-    needs: [raw-export, matrix, wave-one]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix.outputs.wave_two) }}
-    uses: ./.github/workflows/build-projection-group.yml
-    with:
-      ref: ${{ inputs.ref }}
-      export_date: ${{ inputs.export_date }}
-      export_value: ${{ inputs.export_value }}
-      group: ${{ matrix.group }}
-      hydrate_groups: ${{ matrix.hydrate_groups }}
-      fingerprints: ${{ inputs.fingerprints }}
-      available_artifacts: ${{ inputs.available_artifacts }}
+      dirty_years: ${{ inputs.dirty_years }}
     secrets: inherit
 
   compose:
@@ -167,10 +128,8 @@ jobs:
     if: >-
       always()
       && needs.raw-export.result == 'success'
-      && needs.matrix.result == 'success'
-      && (needs.wave-one.result == 'success' || needs.wave-one.result == 'skipped')
-      && (needs.wave-two.result == 'success' || needs.wave-two.result == 'skipped')
-    needs: [raw-export, matrix, wave-one, wave-two]
+      && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    needs: [raw-export, build]
     runs-on: ubuntu-latest
     outputs:
       artifact_name: ${{ steps.release.outputs.name }}

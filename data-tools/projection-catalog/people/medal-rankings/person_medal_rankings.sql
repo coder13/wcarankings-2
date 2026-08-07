@@ -219,22 +219,3 @@ ADD INDEX idx_person_medal_rankings_page (
   position,
   person_id
 );
-
--- phase: count all-time medal leaderboard rows
-CREATE TABLE person_medal_ranking_counts AS
-SELECT
-  event_id,
-  medal_type,
-  scope,
-  region_id,
-  COUNT(*) AS count
-FROM
-  person_medal_rankings
-GROUP BY
-  event_id,
-  medal_type,
-  scope,
-  region_id;
-
-ALTER TABLE person_medal_ranking_counts
-ADD PRIMARY KEY (event_id, medal_type, scope, region_id);

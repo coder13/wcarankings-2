@@ -35,7 +35,6 @@ export interface RankingTableTask extends RankingTableTaskDefinition {
 export interface RankingTableTaskOptions {
   bestAverage: string;
   bestSingle: string;
-  countsTable: string;
   entriesSources: RankingTablePair;
   entriesTables: RankingTablePair;
   resultFacts: string;

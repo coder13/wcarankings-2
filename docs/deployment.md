@@ -98,7 +98,8 @@ The two deployment workflows together do the following:
    releases never build an unverified fallback.
 3. Detects projection semantic changes before resolving the latest WCA export.
 4. Restores exact checksummed group artifacts from GHCR, hydrates cached
-   dependencies, and builds only cache-miss tables in runner-local MariaDB.
+   dependencies, and builds only cache-miss tables in the shared runner-local
+   MariaDB database.
 5. Retains immutable per-group artifacts and a checksummed release manifest.
 6. Uses repository-configured SSH credentials and host verification to establish
    non-interactive access to the production host.

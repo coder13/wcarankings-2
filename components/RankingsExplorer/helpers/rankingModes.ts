@@ -31,7 +31,9 @@ export type CountryRanking = (typeof COUNTRY_RANKING_OPTIONS)[number]["value"];
 export type RankingResource =
   | "people"
   | "person-competition-count"
+  | "person-activity-rankings"
   | "person-medal-rankings"
+  | "person-pr-streak"
   | "results"
   | "competitions"
   | "podiums"

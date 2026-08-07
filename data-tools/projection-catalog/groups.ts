@@ -18,6 +18,7 @@ export interface ProjectionCapabilities {
   personActivityRankings: readonly string[];
   personCompetitionRankings: readonly string[];
   personMedalRankings: readonly string[];
+  personPrStreakRankings: readonly string[];
   personEventRankings: readonly string[];
   resultRankings: readonly string[];
   sumOfRanks: readonly string[];
@@ -74,6 +75,7 @@ export const PROJECTION_CAPABILITIES: ProjectionCapabilities = {
   personActivityRankings: ["person-activity-rankings"],
   personCompetitionRankings: ["person-competition-rankings"],
   personMedalRankings: ["person-medal-rankings"],
+  personPrStreakRankings: ["person-pr-streak-rankings"],
   personEventRankings: ["person-event-rankings"],
   cityEventStats: ["city-rankings"],
   countryEventStats: ["country-rankings"],
@@ -89,37 +91,6 @@ export function projectionGroup(name: string): DeploymentProjectionGroup {
     throw new Error(`Unknown deployment projection group: ${name}`);
   }
   return group;
-}
-
-export interface GroupDependencyClosureOptions {
-  includeSelected?: boolean;
-}
-
-export function groupDependencyClosure(
-  names: readonly string[],
-  options: GroupDependencyClosureOptions = {},
-): DeploymentProjectionGroup[] {
-  const { includeSelected = true } = options;
-  const selected = new Set(names);
-  const ordered: DeploymentProjectionGroup[] = [];
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-
-  function visit(name: string): void {
-    if (visited.has(name)) return;
-    if (visiting.has(name)) {
-      throw new Error(`Projection group dependency cycle at ${name}`);
-    }
-    const group = projectionGroup(name);
-    visiting.add(name);
-    for (const dependency of group.dependencies) visit(dependency);
-    visiting.delete(name);
-    visited.add(name);
-    if (includeSelected || !selected.has(name)) ordered.push(group);
-  }
-
-  for (const name of names) visit(name);
-  return ordered;
 }
 
 export function downstreamGroupClosure(

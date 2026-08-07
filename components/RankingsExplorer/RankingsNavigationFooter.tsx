@@ -7,11 +7,16 @@ import { useRankingsExplorer } from "./RankingsExplorerContext";
 import { formatFooterDate, formatRankingsFreshness } from "./types";
 
 function RankingsFooter({ standalone = false }: { standalone?: boolean }) {
-  const { config: { release }, rankings } = useRankingsExplorer();
+  const {
+    config: { release },
+    rankings,
+  } = useRankingsExplorer();
   const { offlineStale, exportDate } = rankings;
 
   return (
-    <footer className={`siteFooter${standalone ? " siteFooter--standalone" : ""}`}>
+    <footer
+      className={`siteFooter${standalone ? " siteFooter--standalone" : ""}`}
+    >
       <span>By Adam Walker and Cailyn Sinclair</span>
       {offlineStale && (
         <span role="status">Offline cached rankings may be stale</span>
@@ -61,9 +66,12 @@ export function RankingsNavigationFooter() {
           onJumpDown: navigation.down,
           onJumpToTop: navigation.toTop,
           onJumpToEnd: navigation.toEnd,
-          onFocusMe: filters.subject === "people" && options.showMyRank
-            ? focus.focusMyRanking
-            : undefined,
+          onFocusMe:
+            filters.subject === "people" &&
+            !filters.personActivityRanking &&
+            options.showMyRank
+              ? focus.focusMyRanking
+              : undefined,
         }}
         search={{
           active: search.state.open && search.state.matches.length > 0,

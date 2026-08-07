@@ -23,6 +23,8 @@ const COMPETITION_RANKINGS_TABLES = [
 ] as const;
 const PERSON_ACTIVITY_RANKINGS_TABLES = [
   "person_activity_counts",
+  "person_activity_year_counts",
+  "person_activity_event_counts",
   "person_activity_rankings",
   "person_activity_ranking_counts",
 ] as const;
@@ -36,6 +38,12 @@ const PERSON_MEDAL_RANKINGS_TABLES = [
   "person_medal_scores",
   "person_medal_rankings",
   "person_medal_ranking_counts",
+] as const;
+const PERSON_PR_STREAK_RANKINGS_TABLES = [
+  "person_pr_streak_counts",
+  "person_pr_streak_year_counts",
+  "person_pr_streak_rankings",
+  "person_pr_streak_ranking_counts",
 ] as const;
 const CITY_EVENT_STATS_TABLES = ["city_event_stats"] as const;
 const COUNTRY_EVENT_STATS_TABLES = ["country_event_stats"] as const;
@@ -77,6 +85,10 @@ export function featureSwitchFromTables(
       PERSON_COMPETITION_RANKINGS_TABLES,
     ),
     personMedalRankings: allPresent(present, PERSON_MEDAL_RANKINGS_TABLES),
+    personPrStreakRankings: allPresent(
+      present,
+      PERSON_PR_STREAK_RANKINGS_TABLES,
+    ),
     cityEventStats: allPresent(present, CITY_EVENT_STATS_TABLES),
     countryEventStats: allPresent(present, COUNTRY_EVENT_STATS_TABLES),
     sumOfRanks: allPresent(present, SUM_OF_RANKS_TABLES),
@@ -117,6 +129,9 @@ async function loadProjectionFeatureSwitch() {
       personMedalRankings:
         capabilities.personMedalRankings === true ||
         capabilities.personMedalRankings === 1,
+      personPrStreakRankings:
+        capabilities.personPrStreakRankings === true ||
+        capabilities.personPrStreakRankings === 1,
       cityEventStats:
         capabilities.cityEventStats === true ||
         capabilities.cityEventStats === 1,

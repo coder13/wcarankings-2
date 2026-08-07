@@ -1,7 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { elapsedMs, writeBuildLog } from "./progress.ts";
+import {
+  elapsedMs,
+  startBuildHeartbeat,
+  writeBuildLog,
+} from "./progress.ts";
 import type { ProjectionConnection } from "../shared/database-types.ts";
 import type { BuildPhase, TableProgress } from "./progress-types.ts";
 
@@ -49,9 +53,12 @@ export async function executeTableStatements(
   const { tableProgress } = options;
   let activeTable: string | undefined;
   let activeTableStartedAt: number | undefined;
+  let stopActiveTableHeartbeat: (() => void) | undefined;
 
   function finishActiveTable() {
     if (!activeTable) return;
+    stopActiveTableHeartbeat?.();
+    stopActiveTableHeartbeat = undefined;
     if (activeTableStartedAt !== undefined)
       writeBuildLog(
         `Finished table ${activeTable} in ${elapsedMs(activeTableStartedAt)}ms.`,
@@ -67,6 +74,10 @@ export async function executeTableStatements(
         finishActiveTable();
         activeTable = table;
         activeTableStartedAt = performance.now();
+        stopActiveTableHeartbeat = startBuildHeartbeat(
+          `table ${table}`,
+          activeTableStartedAt,
+        );
         const progress = tableProgress ? `${tableProgress.start(table)} ` : "";
         writeBuildLog(`${progress}Starting table ${table}…`);
       }
@@ -78,6 +89,8 @@ export async function executeTableStatements(
     }
     finishActiveTable();
   } catch (error) {
+    stopActiveTableHeartbeat?.();
+    stopActiveTableHeartbeat = undefined;
     if (activeTable && activeTableStartedAt !== undefined)
       writeBuildLog(
         `Failed table ${activeTable} after ${elapsedMs(activeTableStartedAt)}ms.`,

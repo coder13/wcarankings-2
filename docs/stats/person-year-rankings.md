@@ -14,12 +14,12 @@ result value. Position is a deterministic page key and is not user-facing.
 
 The build reads `result_facts` for historical result values, competition year,
 and represented region. `person_year_ranking_cohorts` maps geographic cohorts
-to compact IDs. `person_year_ranking_counts` stores available totals.
+to compact IDs. The API derives available totals from the yearly ranking tables.
 
 The SQL files are [Single](../../data-tools/projection-catalog/people/year-rankings/person_year_rankings_single.sql),
 [Average](../../data-tools/projection-catalog/people/year-rankings/person_year_rankings_average.sql),
 [cohorts](../../data-tools/projection-catalog/people/year-rankings/person_year_ranking_cohorts.sql), and
-[counts](../../data-tools/projection-catalog/people/year-rankings/person_year_ranking_counts.sql).
+the yearly ranking tables.
 
 ## Indexes
 

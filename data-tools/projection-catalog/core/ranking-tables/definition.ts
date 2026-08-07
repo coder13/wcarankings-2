@@ -18,6 +18,6 @@ export const rankingTablesJob = {
   ],
   releaseGroup: "ranking-tables",
   releaseOrder: 0,
-  releaseSchemaVersion: 4,
+  releaseSchemaVersion: 5,
   kind: "core",
 } as const satisfies ProjectionJob;

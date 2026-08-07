@@ -10,22 +10,23 @@ export function yearCountsQuery() {
       cohorts.scope,
       cohorts.region_id,
       counts.count
-    FROM
-      person_year_ranking_counts counts
-      JOIN person_year_ranking_cohorts cohorts ON cohorts.cohort_id = counts.cohort_id
+    FROM (
+      SELECT year, event_id, 'single' AS ranking_type, cohort_id, COUNT(*) AS count
+      FROM person_year_rankings_single
+      GROUP BY year, event_id, cohort_id
+      UNION ALL
+      SELECT year, event_id, 'average', cohort_id, COUNT(*)
+      FROM person_year_rankings_average
+      GROUP BY year, event_id, cohort_id
+    ) counts
+    JOIN person_year_ranking_cohorts cohorts ON cohorts.cohort_id = counts.cohort_id
   `;
 }
 
 export function rankingCountsQuery() {
   return sqlFragment`
-    SELECT
-      event_id,
-      ranking_type,
-      scope,
-      region_id,
-      count
-    FROM
-      ranking_counts
+    SELECT event_id, ranking_type, scope, region_id, count
+    FROM ranking_counts
   `;
 }
 

@@ -22,7 +22,12 @@ export function resultRankingsQuery(input: ResultRankingsQueryInput) {
           ranking.country_id,
           ranking.continent_id,
           ranking.competition_id,
-          ranking.record_code
+          CASE
+            WHEN ranking.country_rank = 1 THEN 'NR'
+            WHEN ranking.continent_rank = 1 THEN 'CR'
+            WHEN ranking.world_rank = 1 THEN 'WR'
+            ELSE ''
+          END AS record_code
         FROM
           ${input.source} ranking
         WHERE
@@ -49,17 +54,20 @@ export function resultRankingsQuery(input: ResultRankingsQueryInput) {
   `;
 }
 
-export function resultRankingCountsQuery() {
+export function resultRankingCountsQuery(resultType: "single" | "average") {
+  const table =
+    resultType === "single"
+      ? "result_rankings_single"
+      : "result_rankings_average";
   return sqlFragment`
-    SELECT
-      count
-    FROM
-      result_ranking_counts
-    WHERE
-      event_id = ?
-      AND result_type = ?
-      AND scope = ?
-      AND region_id = ?
+    SELECT COUNT(*) AS count
+    FROM ${table} ranking
+    WHERE ranking.event_id = ?
+      AND (
+        (? = 'world' AND ? = '')
+        OR (? = 'continent' AND ranking.continent_id = ?)
+        OR (? = 'country' AND ranking.country_id = ?)
+      )
   `;
 }
 

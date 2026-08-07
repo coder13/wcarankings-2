@@ -75,9 +75,43 @@ When the WCA export changes, all export-dependent groups are selected to keep
 one coherent generation, but any same-export group artifact may still be
 restored instead of regenerated.
 
+## Projection build database strategy
+
+The projection build uses one MariaDB database for each build batch. The batch
+restores the raw WCA export once, applies the Flyway schema once, and creates
+the shared raw-table indexes once.
+
+The batch then builds `result-facts` once. This table is the main dependency
+hub for the people, result, city, country, yearly, and sum-of-ranks statistics.
+The internal projection scheduler runs independent downstream tasks with
+bounded concurrency. It uses separate connections for concurrent tasks, while
+all tasks read the same shared tables.
+
+The competition statistics branch uses the same database. Its podium-members
+task runs before its competition event-statistics task. The build exports each
+projection group separately after all SQL work completes. Artifact boundaries
+remain independent even though the build database is shared.
+
+The workflow does not use a GitHub Actions matrix for projection builds. A
+matrix job gives each group a new runner and a new MariaDB database. Each job
+then repeats the raw export import, Flyway setup, common indexes, and every
+dependency that it needs. The Actions cache shares the export file, but it does
+not share database tables.
+
+The matrix also makes `result-facts` repeat for every downstream group. This
+cost grows when new groups are added. PR Streak uses `result-facts`, and the
+planned country rankings use it too. Each new group would increase this
+repeated work if each group used a separate database.
+
+Do not restore the matrix unless a group needs process isolation that the
+shared database cannot provide. First measure database contention, task
+duration, and runner time. Then change the batch boundary or the internal
+concurrency limit. Keep separate projection artifacts so a failed group can be
+repaired without rebuilding every artifact.
+
 ## Build, staging, and activation safety
 
-Projection SQL runs only in runner-local MariaDB. The planner checks task names,
+Projection SQL runs only in the shared runner-local MariaDB database. The planner checks task names,
 dependencies, and cycles. It then returns tasks in dependency order. The builder
 has a default `WCA_PROJECTION_BUILD_CONCURRENCY=2` and gives each worker a
 separate connection. It starts a dependent task only after its prerequisites

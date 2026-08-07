@@ -10,6 +10,7 @@ import type {
   CountryRanking,
   RankingResource,
 } from "./helpers/rankingModes";
+import type { PersonActivityMetric } from "./rankingsUrl";
 import {
   rankingWindowQueryKey,
   seedSavedListVersionWindow,
@@ -27,7 +28,10 @@ type RankingsApiFilters = {
   cityRanking: CityRanking;
   countryRanking: CountryRanking;
   personCompetitionRanking: boolean;
+  personActivityRanking: boolean;
+  personActivityMetric: PersonActivityMetric;
   personMedalRanking: boolean;
+  personPrStreakRanking: boolean;
   medalType: MedalRankingType;
   year: number | null;
   latitudeHemisphere: "north" | "south";
@@ -43,7 +47,9 @@ function rankingResource({
   cityRanking,
   countryRanking,
   personCompetitionRanking,
+  personActivityRanking,
   personMedalRanking,
+  personPrStreakRanking,
   latitudeHemisphere,
 }: RankingsApiFilters): RankingResource {
   if (subject === "results") return "results";
@@ -51,7 +57,9 @@ function rankingResource({
   if (subject === "cities") return `city-${cityRanking}`;
   if (subject !== "competitions") {
     if (personCompetitionRanking) return "person-competition-count";
+    if (personActivityRanking) return "person-activity-rankings";
     if (personMedalRanking) return "person-medal-rankings";
+    if (personPrStreakRanking) return "person-pr-streak";
     return "people";
   }
   if (competitionRanking === "latitude")
@@ -69,8 +77,15 @@ export function useRankingsApi({
   source?: RankingSource;
   initialData?: InitialRankingData;
 }) {
-  const { eventId, rankingType, regionSelection, gender, year, medalType } =
-    filters;
+  const {
+    eventId,
+    rankingType,
+    regionSelection,
+    gender,
+    year,
+    medalType,
+    personActivityMetric,
+  } = filters;
   const resource = rankingResource(filters);
   const queryFilters = useMemo(
     () => ({
@@ -82,11 +97,13 @@ export function useRankingsApi({
       gender,
       year,
       medalType,
+      personActivityMetric,
     }),
     [
       eventId,
       gender,
       medalType,
+      personActivityMetric,
       rankingType,
       regionSelection,
       resource,

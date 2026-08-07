@@ -10,6 +10,7 @@ export interface ListRow extends RowDataPacket {
   id: number | string;
   membership_version: number | string;
   system_definition_version: number | string;
+  visibility: "public" | "private";
 }
 
 export interface PersonIdRow extends RowDataPacket {

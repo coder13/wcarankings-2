@@ -6,6 +6,7 @@ import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import { rankingStatSource } from "@/lib/ranking-stat-sources";
 import type { GenderFilter } from "@/lib/wca";
 import type { MedalRankingType } from "@/lib/medal-rankings";
+import type { PersonActivityMetric } from "./rankingsUrl";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
   InitialRankingData,
@@ -17,7 +18,17 @@ import type {
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const PAGE_STALE_TIME_MS = 5 * 60 * 1000;
-const countryStats = rankingStatSource("country-event-stats");
+const PR_STREAK_API = rankingStatSource("person-pr-streak").paths.api;
+
+function personSearchEndpoint(resource: RankingResource) {
+  if (resource === "results") return "/api/rankings/results";
+  if (resource === "person-pr-streak") return PR_STREAK_API;
+  return "/api/rankings";
+}
+
+function countryEndpoint(resource: RankingResource) {
+  return `/api/countries/${resource.slice("country-".length)}`;
+}
 
 export type RankingQueryFilters = {
   eventId: string;
@@ -28,6 +39,7 @@ export type RankingQueryFilters = {
   gender: readonly GenderFilter[];
   year: number | null;
   medalType: MedalRankingType;
+  personActivityMetric: PersonActivityMetric;
   membershipVersion?: number;
   rankingsDataVersion?: string | null;
 };
@@ -78,11 +90,14 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     filters.eventId,
     filters.rankingType,
     filters.medalType,
+    filters.personActivityMetric,
     filters.regionSelection.scope,
     filters.regionSelection.regionId,
     filters.gender.join(","),
     filters.resource === "people" ||
     filters.resource === "person-competition-count" ||
+    filters.resource === "person-activity-rankings" ||
+    filters.resource === "person-pr-streak" ||
     filters.resource === "person-medal-rankings" ||
     filters.resource.startsWith("country-")
       ? (filters.year ?? "all")
@@ -122,6 +137,8 @@ function addRankingFilterParams(
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
+      filters.resource === "person-activity-rankings" ||
+      filters.resource === "person-pr-streak" ||
       filters.resource === "person-medal-rankings" ||
       filters.resource.startsWith("country-")) &&
     filters.year
@@ -131,6 +148,8 @@ function addRankingFilterParams(
   if (
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
+      filters.resource === "person-activity-rankings" ||
+      filters.resource === "person-pr-streak" ||
       filters.resource === "person-medal-rankings" ||
       filters.resource === "results" ||
       filters.resource.startsWith("country-")) &&
@@ -141,13 +160,20 @@ function addRankingFilterParams(
   if (filters.regionSelection.scope !== "world") {
     params.set("region", filters.regionSelection.regionId);
   }
+  if (filters.resource === "person-activity-rankings") {
+    params.set("metric", filters.personActivityMetric);
+  }
 }
 
-function pageRequest(filters: RankingQueryFilters, start: number) {
+export function rankingPageRequestUrl(
+  filters: RankingQueryFilters,
+  start: number,
+) {
   const params = new URLSearchParams({
-    result: filters.rankingType,
     start: String(
-      filters.resource === "person-medal-rankings"
+      filters.resource === "person-medal-rankings" ||
+        filters.resource === "person-pr-streak" ||
+        filters.resource === "person-activity-rankings"
         ? start
         : rankingPageStart(start),
     ),
@@ -155,8 +181,16 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
     paged: "1",
   });
   if (
-    filters.resource !== "person-medal-rankings" ||
-    filters.eventId !== "all"
+    filters.resource !== "person-pr-streak" &&
+    !filters.resource.startsWith("country-")
+  ) {
+    params.set("result", filters.rankingType);
+  }
+  if (
+    (filters.resource !== "person-medal-rankings" || filters.eventId !== "all") &&
+    filters.resource !== "person-pr-streak" &&
+    (filters.resource !== "person-activity-rankings" ||
+      ["rounds", "solves"].includes(filters.personActivityMetric))
   ) {
     params.set("eventId", filters.eventId);
   }
@@ -184,33 +218,25 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
       );
     }
   }
-  if (filters.resource.startsWith("country-")) {
-    const countryRanking = filters.resource.slice("country-".length);
-    if (
-      countryRanking === "competitors" ||
-      countryRanking === "competitions" ||
-      countryRanking === "solves"
-    ) {
-      params.set("stat", countryRanking);
-    } else {
-      params.set(
-        "result",
-        countryRanking === "fastest-average" ? "average" : "single",
-      );
-    }
-  }
   if (filters.resource === "person-medal-rankings") {
     params.set("medal", filters.medalType);
+  }
+  if (filters.resource === "person-activity-rankings") {
+    params.set("metric", filters.personActivityMetric);
   }
 
   let endpoint = "/api/rankings";
   if (filters.resource === "results") endpoint = "/api/rankings/results";
   else if (filters.resource === "person-competition-count") {
     endpoint = "/api/rankings/people/competitions";
+  } else if (filters.resource === "person-activity-rankings") {
+    endpoint = "/api/rankings/people/activity";
   } else if (filters.resource === "person-medal-rankings") {
     endpoint = "/api/rankings/people/medals";
   } else if (filters.resource.startsWith("country-")) {
-    endpoint = countryStats.paths.api;
+    endpoint = countryEndpoint(filters.resource);
+  } else if (filters.resource === "person-pr-streak") {
+    endpoint = PR_STREAK_API;
   } else if (filters.resource.startsWith("city-"))
     endpoint = "/api/rankings/cities";
   else if (filters.resource !== "people") {
@@ -224,7 +250,9 @@ async function requestRankingPage(
   start: number,
   signal?: AbortSignal,
 ) {
-  const response = await fetch(pageRequest(filters, start), { signal });
+  const response = await fetch(rankingPageRequestUrl(filters, start), {
+    signal,
+  });
   if (!response.ok) {
     const body = (await response.json()) as { error?: string };
     throw new Error(body.error ?? "Rankings are unavailable.");
@@ -333,21 +361,20 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       signal: AbortSignal,
     ) => {
       const params = new URLSearchParams({
-        eventId: filters.eventId,
         result: filters.rankingType,
         search,
         searchLimit: "500",
       });
+      if (
+        filters.resource !== "person-activity-rankings" ||
+        ["rounds", "solves"].includes(filters.personActivityMetric)
+      ) {
+        params.set("eventId", filters.eventId);
+      }
       if (regexSearch) params.set("mode", "vim");
       addRankingFilterParams(params, filters);
-      const response = await fetch(
-        `${
-          filters.resource === "results"
-            ? "/api/rankings/results"
-            : "/api/rankings"
-        }?${params}`,
-        { signal },
-      );
+      const endpoint = personSearchEndpoint(filters.resource);
+      const response = await fetch(`${endpoint}?${params}`, { signal });
       if (!response.ok) {
         const body = (await response.json()) as { error?: string };
         throw new Error(body.error ?? "Search is unavailable.");
@@ -370,7 +397,11 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
             locate: wcaId,
           });
           addRankingFilterParams(params, peopleFilters);
-          const response = await fetch(`/api/rankings?${params}`, { signal });
+          const endpoint =
+            filters.resource === "person-pr-streak"
+              ? PR_STREAK_API
+              : "/api/rankings";
+          const response = await fetch(`${endpoint}?${params}`, { signal });
           if (!response.ok) {
             const body = (await response.json()) as { error?: string };
             throw new Error(

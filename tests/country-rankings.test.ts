@@ -20,7 +20,7 @@ test("country gender cohorts map to the seven stored masks", () => {
 test("registers country rankings as a home-feed-ready source", () => {
   const definitions: readonly RankingStatSourceDefinition[] =
     RANKING_STAT_SOURCES;
-  assert.equal(definitions.length, 1);
+  assert.equal(definitions.length, 2);
   assert.deepEqual(rankingStatSource("country-event-stats"), {
     sourceId: "country-event-stats",
     entityType: "country",
@@ -35,7 +35,7 @@ test("registers country rankings as a home-feed-ready source", () => {
     feedEligibility: { home: true, person: false },
     paths: {
       page: "/countries/fastest-single",
-      api: "/api/rankings/countries",
+      api: "/api/countries/fastest-single",
     },
   });
   assert.throws(

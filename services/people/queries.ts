@@ -16,7 +16,8 @@ export function personSearchRowsQuery(
     : "0";
   const competitionCountJoin = includeCompetitionCounts
     ? sqlFragment`
-        LEFT JOIN person_competition_counts competition_counts ON competition_counts.person_id = person.wca_id
+        LEFT JOIN person_period_metrics competition_counts ON competition_counts.person_id = person.wca_id
+          AND competition_counts.period_year = 0
       `
     : sqlFragment``;
   return sqlFragment`

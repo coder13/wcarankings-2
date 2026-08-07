@@ -18,6 +18,11 @@ corresponding update here.
 - Keep names predictable as yearly, weekly, competition, city, cohort, and
   metric features are added.
 
+Projection groups are release and dependency boundaries. They are not separate
+databases and they do not define a build matrix. The build uses one MariaDB
+database for one export. Shared grains are built once and downstream groups
+reuse them.
+
 ## Naming convention
 
 Use plural snake-case table names:
@@ -71,8 +76,13 @@ raw results + dimensions
     ├── temporary solve_facts_stage
     │   ├── result_rankings_single
     │   └── result_rankings_average
-    ├── person_event_rankings
-    └── city, yearly, competition, and Sum-of-Ranks projections
+    ├── person_period_metrics
+    │   ├── person_competition_rankings
+    │   └── person_activity_rankings
+    ├── person_event_bests
+    │   ├── person_event_rankings
+    │   └── yearly person rankings
+    └── city, competition, and Sum-of-Ranks projections
 ```
 
 Registration alone does not activate a future projection. Only the explicit
@@ -81,36 +91,38 @@ through public route handlers.
 
 ## Person-competition rankings
 
-### `person_competition_counts` and `person_competition_year_counts`
+### `person_period_metrics`
 
-The all-time count table has one row per person. The yearly count table has one
-row per person and competition year. Both tables store normalized gender and
-count distinct competition IDs from `result_facts`.
+This shared grain has one row per person and period. Period `0` means all-time.
+Other values are competition years. Each row stores competition count, country
+count, round count, official solve count, gender, country, and continent.
 
 The all-time ranking table stores common scope and single-gender cohorts.
-Yearly and multi-gender requests rank the compact count tables in cached,
-bounded windows. The public rank uses `RANK()` by competition count. The stable
-position orders tied rows by `person_id`.
+Yearly and multi-gender requests rank this shared table in cached, bounded
+windows. The public rank uses `RANK()` by competition count. The stable position
+orders tied rows by `person_id`.
 
 ## Person activity rankings
 
-### `person_activity_counts`, `person_activity_rankings`, and `person_activity_ranking_counts`
+### `person_activity_rankings`
 
-The count table has one all-time row per person. It stores host-country count,
-competed-round count, and official-solve count. Competition totals remain in
-`person_competition_counts` and are not copied into this table.
-
-An official solve is a positive `result_attempts.value`. A competed round is
-one stored `result_facts` row. The count table carries current normalized
-gender, country, and continent values for lazy cohorts.
+The activity ranking reads all-time rows from `person_period_metrics`. An
+official solve is a positive `result_attempts.value`. A competed round is one
+stored `result_facts` row.
 
 The ranking table stores World, all-gender rows for each new activity metric.
 Its public rank uses `RANK()` by descending metric value. Its stable position
 orders tied rows by `person_id`.
 
-Region and gender combinations rank the compact count table in cached,
-bounded windows. The competition metric uses the existing person-competition
-ranking tables.
+Region and gender combinations rank the shared metric table in cached, bounded
+windows. The competition metric uses the person-competition ranking tables.
+
+### `person_event_bests`
+
+This shared grain has one row for each period, event, result type, person, and
+historical country. It stores the result ID, result value, competition date,
+competition ID, country, continent, and gender. Person-event and yearly
+rankings reuse these rows and keep their existing tie-breaking rules.
 
 ## Core fact table
 
@@ -320,7 +332,7 @@ two exposed result views:
 No result-ranking query should apply `LIKE`, `REGEXP`, or another name search to
 projection display columns.
 
-### `result_ranking_counts`
+### Result ranking totals
 
 Stat row:
 
@@ -539,7 +551,7 @@ These physical projections represent each person's best valid result during a
 competition start year. Country bests are selected first using the country on
 the result, then continent and World bests are derived from those rows. The
 compact `person_year_ranking_cohorts` table maps World, continent, and country
-cohorts to numeric IDs; `person_year_ranking_counts` supplies available years
+cohorts to numeric IDs. The API derives available years from yearly serving rows
 and page totals without scanning raw results. Public rank uses `RANK()` and
 the deterministic internal position is never exposed in the UI.
 
@@ -749,7 +761,7 @@ Projection release order:
 1. Read the active generation and calculate the semantic plan
 2. Calculate the release plan for the selected WCA export
 3. Hydrate exact cached dependencies
-4. Build the missing groups in dependency waves
+4. Build the missing groups in one shared database, with bounded task concurrency
 5. Prepare transfer tables, export them, and create the release coordinate
 6. Validate the deployment plan and import the transfer tables
 7. Build deferred indexes and publish the candidate generation
@@ -792,7 +804,7 @@ Average tables to bound peak window-sort space:
 | ------------------------- | -----------: | --------: | ---------: | --------------------: |
 | `result_rankings_single`  |    6,564,373 | 911.0 MiB |  888.8 MiB | about 4m 15s observed |
 | `result_rankings_average` |    5,890,382 | 818.0 MiB |  797.8 MiB |              3m 40.4s |
-| `result_ranking_counts`   | scope counts |   0.3 MiB | negligible |                  8.2s |
+| Runtime filtered totals   | serving-table counts | measured with API query time | measured with API query time | measured in benchmark |
 
 The first Single timer wrapper exited after the SQL succeeded because it used a
 reserved zsh variable, so its duration is an observed approximation; subsequent

@@ -2,31 +2,33 @@ CREATE TABLE person_year_rankings_single AS
 WITH
   country_candidates AS (
     SELECT
-      competition_year AS ranking_year,
+      period_year AS ranking_year,
       event_id,
       person_id,
-      person_country_id AS country_id,
-      person_continent_id AS continent_id,
+      country_id,
+      continent_id,
       result_id,
       competition_start_date,
       competition_id,
-      best AS result_value,
+      result_value,
       ROW_NUMBER() OVER (
         PARTITION BY
-          competition_year,
+          period_year,
           event_id,
           person_id,
-          person_country_id
+          country_id
         ORDER BY
-          best,
+          result_value,
           competition_start_date,
           competition_id,
           result_id
       ) AS candidate_position
     FROM
-      result_facts
+      person_event_bests
     WHERE
-      best > 0
+      result_type = 'single'
+      AND period_year > 0
+      AND result_value > 0
       AND event_id IN (
         '333',
         '222',

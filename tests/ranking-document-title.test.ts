@@ -95,6 +95,14 @@ test("formats titles for non-person ranking views and saved lists", () => {
     }),
     "Gold Medal Rankings | WCA Rankings",
   );
+  assert.equal(
+    formatRankingDocumentTitle({
+      ...defaults,
+      personPrStreakRanking: true,
+      year: 2024,
+    }),
+    "PR Streak 2024 | WCA Rankings",
+  );
 });
 
 test("includes the top three results in ranking descriptions", () => {
@@ -105,5 +113,16 @@ test("includes the top three results in ranking descriptions", () => {
       "Yiheng Wang (3.06)",
     ]),
     "Teodor Zajder (2.76)\nXuanyi Geng (2.80)\nYiheng Wang (3.06).",
+  );
+});
+
+test("formats person activity ranking titles", () => {
+  assert.equal(
+    formatRankingDocumentTitle({
+      ...defaults,
+      personActivityRanking: true,
+      personActivityMetric: "solves",
+    }),
+    "People by Official Solve Count | WCA Rankings",
   );
 });

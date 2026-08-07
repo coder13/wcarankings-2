@@ -3,9 +3,11 @@ import {
   addTimings,
   ApiInputError,
   parseGender,
+  parseEvent,
   parseLimit,
   parseScope,
   parseStart,
+  parseYear,
 } from "@/lib/api/projection";
 import { sqlFragment } from "@/lib/helpers/database/sql";
 import type { QueryTimings } from "@/lib/api/projection";
@@ -16,6 +18,7 @@ import {
 } from "@/services/rankings/cache";
 import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 import { loadPersonCompetitionRankings } from "@/services/rankings/person-competitions";
+import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 
 const countFormatter = new Intl.NumberFormat("en-US");
 
@@ -35,6 +38,8 @@ type PersonActivityInput = {
   gender: readonly GenderFilter[];
   start: number;
   limit: number;
+  year: number | null;
+  eventId: string | null;
 };
 
 type PersonActivityRankingRow = {
@@ -73,13 +78,6 @@ const metricColumn: Record<PersonActivityMetric, string> = {
   solves: "official_solve_count",
 };
 
-const metricLabel: Record<PersonActivityMetric, string> = {
-  competitions: "competitions",
-  countries: "countries",
-  rounds: "rounds",
-  solves: "official solves",
-};
-
 export function parsePersonActivityMetric(
   params: URLSearchParams,
 ): PersonActivityMetric {
@@ -106,6 +104,8 @@ function parseInput(params: URLSearchParams): PersonActivityInput {
     gender: parseGender(params),
     start: parseStart(params),
     limit: parseLimit(params),
+    year: parseYear(params),
+    eventId: parseEvent(params, { required: false }),
   };
 }
 
@@ -119,7 +119,7 @@ function toEntry(input: PersonActivityInput, row: PersonActivityRankingRow) {
     countryName: row.country_name,
     countryIso2: row.country_iso2,
     best: value,
-    formattedValue: `${countFormatter.format(value)} ${metricLabel[input.metric]}`,
+    formattedValue: countFormatter.format(value),
     competitionId: "",
     competitionName: "",
     recordBadges: [],
@@ -129,6 +129,17 @@ function toEntry(input: PersonActivityInput, row: PersonActivityRankingRow) {
 function lazyConditions(input: PersonActivityInput) {
   const conditions = [`counts.${metricColumn[input.metric]} > 0`];
   const values: unknown[] = [];
+  if (input.year !== null) {
+    conditions.push("counts.year = ?");
+    values.push(input.year);
+  }
+  if (input.eventId) {
+    conditions.push("counts.event_id = ?");
+    values.push(input.eventId);
+    if (input.year === null) {
+      conditions.push("counts.year = 0");
+    }
+  }
   if (input.scope === "continent") {
     conditions.push("counts.continent_id = ?");
     values.push(input.regionId);
@@ -146,12 +157,18 @@ function lazyConditions(input: PersonActivityInput) {
   return { conditions, values };
 }
 
+function countsTable(input: PersonActivityInput) {
+  if (input.eventId) return "person_activity_event_counts";
+  if (input.year !== null) return "person_activity_year_counts";
+  return "person_activity_counts";
+}
+
 function lazyRowsQuery(input: PersonActivityInput) {
   const { conditions } = lazyConditions(input);
   const valueColumn = metricColumn[input.metric];
   return sqlFragment`WITH filtered AS (
       SELECT counts.person_id, counts.${valueColumn} AS metric_value
-      FROM person_activity_counts counts
+      FROM ${countsTable(input)} counts
       WHERE ${conditions.join(" AND ")}
     ), ranked AS (
       SELECT filtered.*,
@@ -177,7 +194,7 @@ function lazyRowsQuery(input: PersonActivityInput) {
 function lazyCountQuery(input: PersonActivityInput) {
   const { conditions } = lazyConditions(input);
   return sqlFragment`SELECT COUNT(*) AS count
-    FROM person_activity_counts counts
+    FROM ${countsTable(input)} counts
     WHERE ${conditions.join(" AND ")}`;
 }
 
@@ -223,13 +240,20 @@ function windowKey(
 export async function loadPersonActivityRankings(params: URLSearchParams) {
   const input = parseInput(params);
   if (input.metric === "competitions") {
+    if (input.eventId) {
+      throw new ApiInputError("eventId is only available for rounds and solves.");
+    }
     return loadPersonCompetitionRankings(params);
+  }
+  if (input.eventId && input.metric === "countries") {
+    throw new ApiInputError("eventId is only available for rounds and solves.");
   }
   const featureSwitch = await getProjectionFeatureSwitch();
   if (!featureSwitch.personActivityRankings || !featureSwitch.generationId) {
     throw new Error("Person activity rankings are unavailable.");
   }
-  if (input.scope !== "world" || input.gender.length) {
+  const metadata = await getCurrentRankingsMetadata();
+  if (input.year !== null || input.eventId || input.scope !== "world" || input.gender.length) {
     const windowStart =
       Math.floor((input.start - 1) / RANKINGS_WINDOW_SIZE) *
         RANKINGS_WINDOW_SIZE +
@@ -263,6 +287,7 @@ export async function loadPersonActivityRankings(params: URLSearchParams) {
         startPosition,
         lastRank: entries.at(-1)?.rank ?? null,
         total,
+        availableYears: metadata.availableYears,
       },
       diagnostics: {
         timings:
@@ -318,6 +343,7 @@ export async function loadPersonActivityRankings(params: URLSearchParams) {
       startPosition: Number(pageRows[0]?.position ?? input.start) - 1,
       lastRank: last ? Number(last.rank) : null,
       total: Number(counts.rows[0]?.count ?? 0),
+      availableYears: metadata.availableYears,
     },
     diagnostics: {
       timings: addTimings(rows.timings, counts.timings),

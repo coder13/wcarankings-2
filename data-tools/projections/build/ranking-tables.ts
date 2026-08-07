@@ -1,5 +1,5 @@
 import { runTimedBuildStep } from "./progress.ts";
-import { executeTableStatements, projectionSql, statements } from "./sql.ts";
+import { projectionSql, statements } from "./sql.ts";
 import type { ProjectionConnection } from "../shared/database-types.ts";
 import type { TableProgress } from "./progress-types.ts";
 import type {
@@ -106,7 +106,6 @@ export function rankingTableTasks(
   const {
     entriesTables,
     entriesSources,
-    countsTable,
     bestSingle,
     bestAverage,
     resultFacts,
@@ -151,16 +150,19 @@ export function rankingTableTasks(
         "core/ranking-tables/ranking_entries_indexes.sql",
         tableProgress,
       ),
-    "ranking-tables-counts": async (connection: ProjectionConnection) =>
-      executeTableStatements(
-        connection,
-        (await projectionSql("core/ranking-tables/ranking_counts.sql"))
-          .replaceAll("ranking_entries_single", entriesTables.single)
-          .replaceAll("ranking_entries_average", entriesTables.average)
-          .replaceAll("ranking_counts", countsTable),
-        [],
-        { tableProgress },
-      ),
+    "ranking-tables-counts": async (connection: ProjectionConnection) => {
+      await runTimedBuildStep(
+        "table ranking_counts",
+        async () => {
+          for (const statement of statements(
+            await projectionSql("core/ranking-tables/ranking_counts.sql"),
+          )) {
+            await connection.query(statement);
+          }
+        },
+        { tableProgress, tableName: "ranking_counts" },
+      );
+    },
   };
   return CORE_RANKING_TABLE_TASKS.map((task) => ({
     ...task,
