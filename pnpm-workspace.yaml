@@ -1,7 +1,9 @@
 allowBuilds:
   esbuild: true
+  msgpackr-extract: set this to true or false
   sharp: true
   unrs-resolver: true
+  msgpackr-extract: true
 
 packages:
   - apps/*
