@@ -59,6 +59,7 @@ function candidate(
   inventory: ReadonlyMap<string, FeedInventoryStat>,
   input: {
     kind: FeedStatKind;
+    eventId?: string;
     resultType: "single" | "average";
     year: 2026 | null;
     scope: "world" | "continent" | "country";
@@ -70,7 +71,8 @@ function candidate(
     countryRank: number | null;
   },
 ) {
-  const id = `${input.kind}-${input.reference.eventId}-${input.resultType}-${input.scope}-${input.regionId || "world"}-${input.gender ?? "all"}-${input.year ?? "all"}`;
+  const eventId = input.eventId ?? input.reference.eventId;
+  const id = `${input.kind}-${eventId}-${input.resultType}-${input.scope}-${input.regionId || "world"}-${input.gender ?? "all"}-${input.year ?? "all"}`;
   const source = inventory.get(id);
   if (!source) return null;
   let interestingEntityId = input.reference.personId;
@@ -120,21 +122,52 @@ function addRowCandidates(
     if (scope !== "world" && !regionId) continue;
     for (const selectedGender of [null, gender]) {
       for (const statKind of FEED_STAT_KINDS) {
-        const item = candidate(inventory, {
-          kind: statKind,
-          resultType,
-          year,
-          scope,
-          regionId,
-          gender: selectedGender,
-          reference,
-          worldRank: number(row.world_position ?? row.world_sub_rank),
-          continentRank: number(
-            row.continent_position ?? row.continent_sub_rank,
-          ),
-          countryRank: number(row.country_position ?? row.country_sub_rank),
-        });
-        if (item) output.set(`${item.id}:${item.interestingEntityId}`, item);
+        if (statKind.startsWith("person-activity-")) {
+          const activity = candidate(inventory, {
+            kind: statKind,
+            eventId: "activity",
+            resultType: "single",
+            year: null,
+            scope,
+            regionId,
+            gender: selectedGender,
+            reference,
+            worldRank: number(row.world_position ?? row.world_sub_rank),
+            continentRank: number(
+              row.continent_position ?? row.continent_sub_rank,
+            ),
+            countryRank: number(row.country_position ?? row.country_sub_rank),
+          });
+          if (activity)
+            output.set(
+              `${activity.id}:${activity.interestingEntityId}`,
+              activity,
+            );
+          continue;
+        }
+        const eventIds =
+          statKind === "person"
+            ? [reference.eventId, "SOR", "sor-kinch", "pr-streak"]
+            : [reference.eventId];
+        for (const eventId of eventIds) {
+          if (eventId === "sor-kinch" && resultType !== "single") continue;
+          const item = candidate(inventory, {
+            kind: statKind,
+            eventId,
+            resultType,
+            year,
+            scope,
+            regionId,
+            gender: selectedGender,
+            reference,
+            worldRank: number(row.world_position ?? row.world_sub_rank),
+            continentRank: number(
+              row.continent_position ?? row.continent_sub_rank,
+            ),
+            countryRank: number(row.country_position ?? row.country_sub_rank),
+          });
+          if (item) output.set(`${item.id}:${item.interestingEntityId}`, item);
+        }
       }
     }
   }

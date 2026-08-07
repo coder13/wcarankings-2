@@ -5,6 +5,8 @@ import { loadRankingsWithDiagnostics } from "@/services/rankings/service";
 import { loadResultRankings } from "@/services/rankings/result";
 import { loadPersonCompetitionRankings } from "@/services/rankings/person-competitions";
 import { loadPersonMedalRankings } from "@/services/rankings/medals";
+import { loadPersonActivityRankings } from "@/services/rankings/person-activity";
+import { loadPersonPrStreakRankings } from "@/services/rankings/person-pr-streak";
 import { loadCompetitionRankings } from "@/services/rankings/competition-rankings";
 import { loadCityRankings } from "@/services/rankings/city-rankings";
 import { generateBatchedFeedCandidates } from "./batched-candidates";
@@ -121,7 +123,8 @@ function sourceParams(source: FeedInventoryStat) {
     start:
       source.kind === "person" ||
       source.kind === "person-competition" ||
-      source.kind === "person-medals"
+      source.kind === "person-medals" ||
+      source.kind.startsWith("person-activity-")
         ? "1"
         : "0",
     limit: "50",
@@ -132,6 +135,9 @@ function sourceParams(source: FeedInventoryStat) {
   if (source.gender !== null) params.set("gender", source.gender);
   if (source.year !== null) params.set("year", String(source.year));
   if (source.kind === "person-medals") params.set("medal", "overall");
+  if (source.kind.startsWith("person-activity-")) {
+    params.set("metric", source.kind.replace("person-activity-", ""));
+  }
   if (source.kind === "competition" || source.kind === "city") {
     params.set("ranking", "fastest");
   }
@@ -142,6 +148,12 @@ async function loadSourceEntries(source: FeedInventoryStat) {
   try {
     const params = sourceParams(source);
     if (source.kind === "person") {
+      if (source.eventId === "pr-streak") {
+        const result = await loadPersonPrStreakRankings(params);
+        return normalizeSourceEntries(
+          (result.data.entries ?? []) as unknown as Record<string, unknown>[],
+        );
+      }
       const result = await loadRankingsWithDiagnostics(params);
       return normalizeSourceEntries(
         (result.data.entries ?? []) as unknown as Record<string, unknown>[],
@@ -161,6 +173,12 @@ async function loadSourceEntries(source: FeedInventoryStat) {
     }
     if (source.kind === "person-medals") {
       const result = await loadPersonMedalRankings(params);
+      return normalizeSourceEntries(
+        (result.data.entries ?? []) as unknown as Record<string, unknown>[],
+      );
+    }
+    if (source.kind.startsWith("person-activity-")) {
+      const result = await loadPersonActivityRankings(params);
       return normalizeSourceEntries(
         (result.data.entries ?? []) as unknown as Record<string, unknown>[],
       );
@@ -326,7 +344,7 @@ async function loadInterestingResultPage(
 
 let backgroundBuild: Promise<void> | null = null;
 
-async function buildFeedItems({ now }: { now?: Date } = {}) {
+export async function buildFeedItems({ now }: { now?: Date } = {}) {
   const exportVersion = await currentFeedExportVersion();
   const candidates = await generateFeedStatPreviews({ now });
   if ((await currentFeedExportVersion()) !== exportVersion) {

@@ -12,6 +12,9 @@ export type FeedStatKind =
   | "result"
   | "person-competition"
   | "person-medals"
+  | "person-activity-countries"
+  | "person-activity-rounds"
+  | "person-activity-solves"
   | "competition"
   | "city";
 
@@ -20,9 +23,28 @@ export const FEED_STAT_KINDS: readonly FeedStatKind[] = [
   "result",
   "person-competition",
   "person-medals",
+  "person-activity-countries",
+  "person-activity-rounds",
+  "person-activity-solves",
   "competition",
   "city",
 ];
+
+const ACTIVITY_KINDS = new Set<FeedStatKind>([
+  "person-activity-countries",
+  "person-activity-rounds",
+  "person-activity-solves",
+]);
+
+const FEED_METRIC_EVENTS = [
+  { id: "SOR", name: "Sum of Ranks", resultTypes: ["single", "average"] },
+  { id: "sor-kinch", name: "Kinch", resultTypes: ["single"] },
+  { id: "pr-streak", name: "PR Streak", resultTypes: ["single"] },
+] as const;
+
+const FEED_METRIC_EVENT_IDS = new Set<string>(
+  FEED_METRIC_EVENTS.map((event) => event.id),
+);
 
 export type FeedInventoryStat = {
   id: string;
@@ -74,8 +96,17 @@ export function feedStatKindName(kind: FeedStatKind) {
   if (kind === "result") return "Person result rankings";
   if (kind === "person-competition") return "Person competition rankings";
   if (kind === "person-medals") return "Person medal rankings";
+  if (kind === "person-activity-countries")
+    return "Person activity · Countries";
+  if (kind === "person-activity-rounds") return "Person activity · Rounds";
+  if (kind === "person-activity-solves")
+    return "Person activity · Official solves";
   if (kind === "competition") return "Competition rankings";
   return "City rankings";
+}
+
+function isActivityKind(kind: FeedStatKind) {
+  return ACTIVITY_KINDS.has(kind);
 }
 
 function exploreUrl({
@@ -97,10 +128,17 @@ function exploreUrl({
   if (region.scope !== "world") params.set("region", region.regionId);
   if (gender !== null) params.set("gender", gender);
   if (year !== null) params.set("year", String(year));
+  if (kind === "person" && eventId === "pr-streak") {
+    return `/persons/pr-streak?${params.toString()}`;
+  }
   if (kind === "person") return `/?${params.toString()}`;
   if (kind === "result") return `/results?${params.toString()}`;
   if (kind === "person-competition") return "/persons/competitions";
   if (kind === "person-medals") return "/persons/medals?medal=overall";
+  if (isActivityKind(kind)) {
+    params.set("metric", kind.replace("person-activity-", ""));
+    return `/api/rankings/people/activity?${params.toString()}`;
+  }
   if (kind === "competition") {
     params.set("ranking", "fastest");
     return `/competitions?${params.toString()}`;
@@ -116,8 +154,20 @@ export function buildFeedStatInventory({
   countries: readonly RegionRecord[];
 }) {
   const inventory: FeedInventoryStat[] = [];
-  for (const event of WCA_EVENTS) {
+  const events: readonly {
+    id: string;
+    name: string;
+    resultTypes: readonly RankingType[];
+  }[] = [
+    ...WCA_EVENTS.map((event) => ({
+      ...event,
+      resultTypes: ["single", "average"] as const,
+    })),
+    ...FEED_METRIC_EVENTS,
+  ];
+  for (const event of events) {
     for (const resultType of ["single", "average"] as const) {
+      if (!event.resultTypes.includes(resultType)) continue;
       const eventId = event.id;
       for (const region of regions(continents, countries)) {
         for (const gender of GENDERS) {
@@ -128,6 +178,10 @@ export function buildFeedStatInventory({
               year === null ? "All time" : String(year),
             ].join(" · ");
             for (const kind of FEED_STAT_KINDS) {
+              if (isActivityKind(kind)) continue;
+              if (FEED_METRIC_EVENT_IDS.has(eventId) && kind !== "person")
+                continue;
+              if (eventId === "sor-kinch" && resultType !== "single") continue;
               const family = kind;
               const title = `${event.name} · ${feedStatKindName(kind)} · ${resultName(resultType)} · ${suffix}`;
               inventory.push({
@@ -152,6 +206,32 @@ export function buildFeedStatInventory({
             }
           }
         }
+      }
+    }
+  }
+  for (const kind of ACTIVITY_KINDS) {
+    for (const region of regions(continents, countries)) {
+      for (const gender of GENDERS) {
+        const title = `Person activity · ${feedStatKindName(kind)} · ${region.name} · ${genderName(gender)} · All time`;
+        inventory.push({
+          id: `${kind}-activity-single-${region.scope}-${region.regionId || "world"}-${gender ?? "all"}-all`,
+          eventId: "activity",
+          eventName: "Person activity",
+          resultType: "single",
+          kind,
+          region,
+          gender,
+          year: null,
+          title,
+          exploreUrl: exploreUrl({
+            kind,
+            eventId: "activity",
+            resultType: "single",
+            region,
+            gender,
+            year: null,
+          }),
+        });
       }
     }
   }
@@ -211,6 +291,7 @@ export function buildRecentFeedStatInventory({
         for (const gender of genders) {
           for (const year of [null, 2026] as const) {
             for (const kind of FEED_STAT_KINDS) {
+              if (isActivityKind(kind)) continue;
               const suffix = [
                 region.name,
                 genderName(gender),
@@ -230,6 +311,58 @@ export function buildRecentFeedStatInventory({
                 exploreUrl: exploreUrl({
                   kind,
                   eventId: event.id,
+                  resultType,
+                  region,
+                  gender,
+                  year,
+                }),
+              });
+            }
+          }
+        }
+      }
+    }
+    for (const region of affectedRegions) {
+      for (const gender of genders) {
+        for (const kind of ACTIVITY_KINDS) {
+          const id = `${kind}-activity-single-${region.scope}-${region.regionId || "world"}-${gender ?? "all"}-all`;
+          inventory.set(id, {
+            id,
+            eventId: "activity",
+            eventName: "Person activity",
+            resultType: "single",
+            kind,
+            region,
+            gender,
+            year: null,
+            title: `Person activity · ${feedStatKindName(kind)} · ${region.name} · ${genderName(gender)} · All time`,
+            exploreUrl: exploreUrl({
+              kind,
+              eventId: "activity",
+              resultType: "single",
+              region,
+              gender,
+              year: null,
+            }),
+          });
+        }
+        for (const metricEvent of FEED_METRIC_EVENTS) {
+          for (const resultType of metricEvent.resultTypes) {
+            for (const year of [null, 2026] as const) {
+              const id = `person-${metricEvent.id}-${resultType}-${region.scope}-${region.regionId || "world"}-${gender ?? "all"}-${year ?? "all"}`;
+              inventory.set(id, {
+                id,
+                eventId: metricEvent.id,
+                eventName: metricEvent.name,
+                resultType,
+                kind: "person",
+                region,
+                gender,
+                year,
+                title: `${metricEvent.name} · Person rankings · ${resultName(resultType)} · ${region.name} · ${genderName(gender)} · ${year === null ? "All time" : year}`,
+                exploreUrl: exploreUrl({
+                  kind: "person",
+                  eventId: metricEvent.id,
                   resultType,
                   region,
                   gender,

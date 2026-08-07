@@ -38,4 +38,8 @@ The page returns five qualifying stats per request. A scroll sentinel fetches th
 
 The inventory contains person and result variants for the selected events and result types. It expands each variant across world, all continents, all countries, all three gender filters, and all-time plus 2026 rankings. It does not include prior-year lazy variants.
 
+The inventory also contains Sum of Ranks, Kinch, PR Streak, and person activity
+by countries, rounds, and official solves. Competition podium, competitor-count,
+latitude, and medal-metal variants remain planned.
+
 The inventory is lazy. Each request scans five inventory entries and returns at most five previews. A later change can replace the recent-result signal with the completed previous-generation comparator.

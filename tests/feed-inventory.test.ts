@@ -22,8 +22,21 @@ test("builds the full bounded feed stat inventory", () => {
       { id: "Japan", name: "Japan" },
     ],
   });
-  assert.equal(inventory.length, 17 * 2 * 5 * 3 * 6 * 2);
-  assert.equal(new Set(inventory.map((stat) => stat.eventId)).size, 17);
+  assert.equal(inventory.length, 6285);
+  assert.equal(new Set(inventory.map((stat) => stat.eventId)).size, 21);
+  assert.equal(inventory.filter((stat) => stat.eventId === "SOR").length, 60);
+  assert.equal(
+    inventory.filter((stat) => stat.eventId === "sor-kinch").length,
+    30,
+  );
+  assert.equal(
+    inventory.filter((stat) => stat.eventId === "pr-streak").length,
+    30,
+  );
+  assert.equal(
+    inventory.filter((stat) => stat.eventId === "activity").length,
+    45,
+  );
   assert.equal(
     new Set(inventory.map((stat) => stat.id)).size,
     inventory.length,

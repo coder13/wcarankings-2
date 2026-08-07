@@ -36,6 +36,17 @@ function feedDescriptor(source: FeedInventoryStat): RankingListDescriptor {
       genders,
     };
   }
+  if (source.kind.startsWith("person-activity-")) {
+    const metric = source.kind.replace("person-activity-", "") as
+      "countries" | "rounds" | "solves";
+    return {
+      version: 1,
+      family: "person-activity",
+      metric,
+      region,
+      genders,
+    };
+  }
   if (source.kind === "competition") {
     return {
       version: 1,
@@ -157,7 +168,8 @@ function feedStatFamilyWeight(candidate: FeedInterestingResult) {
   if (
     candidate.kind === "person" ||
     candidate.kind === "person-competition" ||
-    candidate.kind === "person-medals"
+    candidate.kind === "person-medals" ||
+    candidate.kind.startsWith("person-activity-")
   ) {
     return FEED_SORT_CONSTANTS.personRankingWeight;
   }
