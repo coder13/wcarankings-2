@@ -11,7 +11,7 @@ directory.
 projection catalog
     |
     v
-semantic plan -> release plan -> build matrix -> build plan -> database build
+semantic plan -> release plan -> shared build batch -> build plan -> database build
                                                             |
                                                             v
 release coordinate <- release manifest <- export <- prepare transfer tables
@@ -50,8 +50,8 @@ import these domain functions directly.
 | --------------- | ----------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | Semantic plan   | `projectionSemanticPlan`      | Active generation state, selected groups, force flag, repository root              | `ProjectionSemanticPlan` with current semantic fingerprints, changed roots, downstream changed groups, and `required` | Formatted JSON on stdout |
 | Release plan    | `projectionReleasePlan`       | Export identity, active generation state, selected groups, and available artifacts | `ProjectionReleasePlan` with active, cached, hydrate, build, and release groups                                       | Formatted JSON on stdout |
-| Build matrix    | `createProjectionBuildMatrix` | Selected groups and wave number                                                    | `ProjectionBuildMatrix` for the GitHub Actions matrix                                                                 | JSON on stdout           |
-| Build plan      | `projectionBuildPlan`         | One build group and groups that are already hydrated                               | `ProjectionBuildPlan` with projection names, satisfied dependencies, table ownership, and the ranking-table flag      | Formatted JSON on stdout |
+| Shared build batch | `Build Projection Groups` workflow | All groups that need SQL execution and groups already restored                 | One MariaDB database build with separate group artifacts                                                                  | GitHub Actions summary   |
+| Build plan      | `projectionBuildPlan`         | Groups to build and groups that are already restored                              | `ProjectionBuildPlan` with projection names, satisfied dependencies, table ownership, and the ranking-table flag      | Formatted JSON on stdout |
 | Task plan       | `createProjectionTaskPlan`    | Projection tasks and task names that are already satisfied                         | `ProjectionTaskPlan` with dependency-ordered tasks after it validates task names, dependencies, and cycles            | None                     |
 | Deployment plan | `planProjectionDeployment`    | Immutable environment values and the downloaded release directory                  | `ProjectionDeploymentPlan` with `hasRaw`, `normalizedBuildExport`, and `normalizedProductionExport`                   | JSON on stdout           |
 
