@@ -12,6 +12,33 @@ function scenario(
   return { id, label, path, params };
 }
 
+export const PR_STREAK_RANKING_SCENARIOS = [
+  scenario(
+    "world",
+    "precomputed PR Streak world",
+    "/api/rankings/people/pr-streak",
+    {},
+  ),
+  scenario(
+    "canada-f",
+    "precomputed PR Streak Canada women",
+    "/api/rankings/people/pr-streak",
+    { region: "Canada", gender: ["f"] },
+  ),
+  scenario(
+    "world-fo",
+    "lazy PR Streak world female-other cohort",
+    "/api/rankings/people/pr-streak",
+    { gender: ["f", "o"] },
+  ),
+  scenario(
+    "canada-2023-fo",
+    "lazy PR Streak Canada female-other 2023 cohort",
+    "/api/rankings/people/pr-streak",
+    { region: "Canada", year: "2023", gender: ["f", "o"] },
+  ),
+].map((entry) => ({ ...entry, startBase: 1 }));
+
 export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "event-single-world",
@@ -467,6 +494,7 @@ export const RANKING_SCROLL_SUITES = {
   competitions: COMPETITION_RANKING_SCENARIOS,
   cities: CITY_RANKING_SCENARIOS,
   medals: MEDAL_RANKING_SCENARIOS,
+  prStreak: PR_STREAK_RANKING_SCENARIOS,
 };
 
 export const ALL_RANKING_SCROLL_SCENARIOS = Object.entries(

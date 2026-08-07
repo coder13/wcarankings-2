@@ -29,6 +29,7 @@ type RankingsApiFilters = {
   personActivityRanking: boolean;
   personActivityMetric: PersonActivityMetric;
   personMedalRanking: boolean;
+  personPrStreakRanking: boolean;
   medalType: MedalRankingType;
   year: number | null;
   latitudeHemisphere: "north" | "south";
@@ -45,6 +46,7 @@ function rankingResource({
   personCompetitionRanking,
   personActivityRanking,
   personMedalRanking,
+  personPrStreakRanking,
   latitudeHemisphere,
 }: RankingsApiFilters): RankingResource {
   if (subject === "results") return "results";
@@ -53,6 +55,7 @@ function rankingResource({
     if (personCompetitionRanking) return "person-competition-count";
     if (personActivityRanking) return "person-activity-rankings";
     if (personMedalRanking) return "person-medal-rankings";
+    if (personPrStreakRanking) return "person-pr-streak";
     return "people";
   }
   if (competitionRanking === "latitude")

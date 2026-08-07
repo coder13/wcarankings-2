@@ -76,6 +76,30 @@ export interface PersonCompetitionRankingInput {
   limit: number;
 }
 
+export type PersonPrStreakRankingRow = {
+  person_id: string;
+  person_name: string;
+  country_id: string;
+  country_name: string;
+  country_iso2: string;
+  pr_streak: number;
+  rank: number;
+  position: number;
+};
+
+export interface PersonPrStreakRankingInput {
+  scope: RegionScope;
+  regionId: string;
+  gender: readonly GenderFilter[];
+  year: number | null;
+  start: number;
+  limit: number;
+  locate: string;
+  search: string;
+  regexSearch: boolean;
+  searchLimit: number;
+}
+
 export interface MedalRankingInput {
   eventId: string | null;
   medalType: MedalRankingType;

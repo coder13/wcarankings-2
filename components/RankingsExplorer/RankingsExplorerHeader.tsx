@@ -17,6 +17,7 @@ const PERSON_RANKING_OPTIONS = [
   { value: "rounds", label: "Rounds" },
   { value: "solves", label: "Solves" },
   { value: "medals", label: "Medals" },
+  { value: "pr-streak", label: "PR Streak" },
 ] as const;
 
 export function RankingsExplorerHeader() {
@@ -42,6 +43,8 @@ export function RankingsExplorerHeader() {
   if (!source && showSubjectSwitch && subject === "people") {
     const personRankingOptions = PERSON_RANKING_OPTIONS.filter((option) => {
       if (option.value === "medals") return featureSwitch.personMedalRankings;
+      if (option.value === "pr-streak")
+        return featureSwitch.personPrStreakRankings;
       if (option.value !== "rankings")
         return featureSwitch.personActivityRankings;
       return true;
@@ -50,6 +53,7 @@ export function RankingsExplorerHeader() {
     if (filters.personMedalRanking) personRankingValue = "medals";
     else if (filters.personActivityRanking)
       personRankingValue = filters.personActivityMetric;
+    else if (filters.personPrStreakRanking) personRankingValue = "pr-streak";
     contextualControl = (
       <TextDropdown
         options={personRankingOptions}
@@ -57,11 +61,15 @@ export function RankingsExplorerHeader() {
         onChange={(value) => {
           if (value === "medals") {
             actions.changePersonMedalRanking(true);
+          } else if (value === "pr-streak") {
+            actions.changePersonPrStreakRanking(true);
           } else if (value === "rankings") {
             if (filters.personMedalRanking)
               actions.changePersonMedalRanking(false);
             else if (filters.personActivityRanking)
               actions.changePersonActivityRanking(false);
+            else if (filters.personPrStreakRanking)
+              actions.changePersonPrStreakRanking(false);
             else actions.changePersonCompetitionRanking(false);
           } else {
             actions.changePersonActivityRanking(

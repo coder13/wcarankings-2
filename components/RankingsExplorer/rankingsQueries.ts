@@ -6,6 +6,7 @@ import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
 import type { GenderFilter } from "@/lib/wca";
 import type { MedalRankingType } from "@/lib/medal-rankings";
 import type { PersonActivityMetric } from "./rankingsUrl";
+import { rankingStatSource } from "@/lib/ranking-stat-sources";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
   InitialRankingData,
@@ -17,6 +18,13 @@ import type {
 
 const PAGE_SIZE = RESULTS_PAGE_SIZE;
 const PAGE_STALE_TIME_MS = 5 * 60 * 1000;
+const PR_STREAK_API = rankingStatSource("person-pr-streak").paths.api;
+
+function personSearchEndpoint(resource: RankingResource) {
+  if (resource === "results") return "/api/rankings/results";
+  if (resource === "person-pr-streak") return PR_STREAK_API;
+  return "/api/rankings";
+}
 
 export type RankingQueryFilters = {
   eventId: string;
@@ -85,6 +93,7 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     filters.resource === "people" ||
     filters.resource === "person-competition-count" ||
     filters.resource === "person-activity-rankings" ||
+    filters.resource === "person-pr-streak" ||
     filters.resource === "person-medal-rankings"
       ? (filters.year ?? "all")
       : "all",
@@ -124,6 +133,7 @@ function addRankingFilterParams(
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
       filters.resource === "person-activity-rankings" ||
+      filters.resource === "person-pr-streak" ||
       filters.resource === "person-medal-rankings") &&
     filters.year
   ) {
@@ -133,6 +143,7 @@ function addRankingFilterParams(
     (filters.resource === "people" ||
       filters.resource === "person-competition-count" ||
       filters.resource === "person-activity-rankings" ||
+      filters.resource === "person-pr-streak" ||
       filters.resource === "person-medal-rankings" ||
       filters.resource === "results") &&
     filters.gender.length
@@ -147,11 +158,14 @@ function addRankingFilterParams(
   }
 }
 
-function pageRequest(filters: RankingQueryFilters, start: number) {
+export function rankingPageRequestUrl(
+  filters: RankingQueryFilters,
+  start: number,
+) {
   const params = new URLSearchParams({
-    result: filters.rankingType,
     start: String(
       filters.resource === "person-medal-rankings" ||
+        filters.resource === "person-pr-streak" ||
         filters.resource === "person-activity-rankings"
         ? start
         : rankingPageStart(start),
@@ -159,12 +173,14 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
     limit: String(PAGE_SIZE),
     paged: "1",
   });
-  const activityUsesEvent =
-    filters.resource === "person-activity-rankings" &&
-    ["rounds", "solves"].includes(filters.personActivityMetric);
+  if (filters.resource !== "person-pr-streak") {
+    params.set("result", filters.rankingType);
+  }
   if (
     (filters.resource !== "person-medal-rankings" || filters.eventId !== "all") &&
-    (filters.resource !== "person-activity-rankings" || activityUsesEvent)
+    filters.resource !== "person-pr-streak" &&
+    (filters.resource !== "person-activity-rankings" ||
+      ["rounds", "solves"].includes(filters.personActivityMetric))
   ) {
     params.set("eventId", filters.eventId);
   }
@@ -207,6 +223,8 @@ function pageRequest(filters: RankingQueryFilters, start: number) {
     endpoint = "/api/rankings/people/activity";
   } else if (filters.resource === "person-medal-rankings") {
     endpoint = "/api/rankings/people/medals";
+  } else if (filters.resource === "person-pr-streak") {
+    endpoint = PR_STREAK_API;
   } else if (filters.resource.startsWith("city-"))
     endpoint = "/api/rankings/cities";
   else if (filters.resource !== "people") {
@@ -220,7 +238,9 @@ async function requestRankingPage(
   start: number,
   signal?: AbortSignal,
 ) {
-  const response = await fetch(pageRequest(filters, start), { signal });
+  const response = await fetch(rankingPageRequestUrl(filters, start), {
+    signal,
+  });
   if (!response.ok) {
     const body = (await response.json()) as { error?: string };
     throw new Error(body.error ?? "Rankings are unavailable.");
@@ -341,14 +361,8 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
       }
       if (regexSearch) params.set("mode", "vim");
       addRankingFilterParams(params, filters);
-      const response = await fetch(
-        `${
-          filters.resource === "results"
-            ? "/api/rankings/results"
-            : "/api/rankings"
-        }?${params}`,
-        { signal },
-      );
+      const endpoint = personSearchEndpoint(filters.resource);
+      const response = await fetch(`${endpoint}?${params}`, { signal });
       if (!response.ok) {
         const body = (await response.json()) as { error?: string };
         throw new Error(body.error ?? "Search is unavailable.");
@@ -371,7 +385,11 @@ export function useRankingsQueryApi(filters: RankingQueryFilters) {
             locate: wcaId,
           });
           addRankingFilterParams(params, peopleFilters);
-          const response = await fetch(`/api/rankings?${params}`, { signal });
+          const endpoint =
+            filters.resource === "person-pr-streak"
+              ? PR_STREAK_API
+              : "/api/rankings";
+          const response = await fetch(`${endpoint}?${params}`, { signal });
           if (!response.ok) {
             const body = (await response.json()) as { error?: string };
             throw new Error(

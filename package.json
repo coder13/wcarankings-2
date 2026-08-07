@@ -12,6 +12,7 @@
     "storybook": "STORYBOOK=true storybook dev -p 6006",
     "build-storybook": "STORYBOOK=true storybook build",
     "start": "node dist/standalone/server.js",
+    "validate:pages": "bun scripts/validate-pages.ts",
     "db:migrate": "docker compose --env-file .env.local run --rm flyway migrate",
     "db:refresh-rankings": "bun --env-file-if-exists=.env.local scripts/refresh-rankings.ts",
     "db:refresh-system-lists": "bun --env-file-if-exists=.env.local scripts/refresh-system-lists.ts",
@@ -32,7 +33,9 @@
     "benchmark:ranking-scroll:results": "bun scripts/benchmark-ranking-results.ts",
     "benchmark:ranking-scroll:competitions": "bun scripts/benchmark-ranking-competitions.ts",
     "benchmark:ranking-scroll:cities": "bun scripts/benchmark-ranking-cities.ts",
-    "benchmark:ranking-scroll:medals": "bun scripts/benchmark-ranking-medals.ts"
+    "benchmark:ranking-scroll:medals": "bun scripts/benchmark-ranking-medals.ts",
+    "benchmark:ranking-scroll:pr-streak": "bun scripts/benchmark-ranking-pr-streak.ts",
+    "benchmark:build:pr-streak": "bun --env-file-if-exists=.env.local scripts/benchmark-pr-streak-build.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",

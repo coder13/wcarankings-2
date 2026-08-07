@@ -13,6 +13,7 @@ import {
 } from "@/services/auth/wca";
 import { getLogoutDestination } from "@/app/api/auth/wca/logout/route";
 import { GET as startWcaAuth } from "@/app/api/auth/wca/route";
+import { assertSameOrigin } from "@/lib/api";
 
 type MutableEnvironment = Record<string, string | undefined>;
 
@@ -112,6 +113,38 @@ test("uses the forwarded HTTPS protocol for callback URLs and cookies", () => {
   });
   assert.equal(getRequestOrigin(request), "https://wcarankings.com");
   assert.match(makeCookie("state", "value", request), /; Secure$/);
+});
+
+test("uses the forwarded host and protocol for the public request origin", () => {
+  const request = new Request("http://app:3000/api/lists", {
+    headers: {
+      "x-forwarded-host": "wcarankings.com",
+      "x-forwarded-proto": "https",
+    },
+  });
+  assert.equal(getRequestOrigin(request), "https://wcarankings.com");
+});
+
+test("allows same-origin mutations through the reverse proxy", () => {
+  const request = new Request("http://app:3000/api/lists", {
+    headers: {
+      origin: "https://wcarankings.com",
+      "x-forwarded-host": "wcarankings.com",
+      "x-forwarded-proto": "https",
+    },
+  });
+  assert.doesNotThrow(() => assertSameOrigin(request));
+});
+
+test("rejects cross-origin mutations through the reverse proxy", () => {
+  const request = new Request("http://app:3000/api/lists", {
+    headers: {
+      origin: "https://example.com",
+      "x-forwarded-host": "wcarankings.com",
+      "x-forwarded-proto": "https",
+    },
+  });
+  assert.throws(() => assertSameOrigin(request), /Cross-origin mutations are not allowed/);
 });
 
 test("returns to the current same-origin page after sign-out", () => {

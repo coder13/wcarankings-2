@@ -64,6 +64,11 @@ const manifest = {
       artifactFingerprint: "person-medal-new",
       artifactDigest: "sha256:person-medal",
     },
+    "person-pr-streak-rankings": {
+      semanticFingerprint: "person-pr-streak-semantic",
+      artifactFingerprint: "person-pr-streak-new",
+      artifactDigest: "sha256:person-pr-streak",
+    },
     "city-rankings": {
       semanticFingerprint: "city-semantic",
       artifactFingerprint: "city-new",
@@ -224,6 +229,7 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
     personActivityRankings: false,
     personCompetitionRankings: false,
     personMedalRankings: false,
+    personPrStreakRankings: false,
     personEventRankings: false,
     cityEventStats: true,
     sumOfRanks: false,

@@ -23,6 +23,7 @@ export type RankingResource =
   | "person-competition-count"
   | "person-activity-rankings"
   | "person-medal-rankings"
+  | "person-pr-streak"
   | "results"
   | "competitions"
   | "podiums"

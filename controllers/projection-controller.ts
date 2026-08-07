@@ -94,12 +94,19 @@ export async function handleProjectionRequest(
   request: Request,
   operation: string,
   fetchData: (params: URLSearchParams) => Promise<ProjectionResult>,
+  afterSuccess?: (params: URLSearchParams) => void,
 ) {
   const startedAt = performance.now();
   try {
     const params = parseProjectionRequest(request);
     const loaded = await fetchData(params);
-    return buildProjectionResponse(operation, startedAt, loaded);
+    const response = await buildProjectionResponse(
+      operation,
+      startedAt,
+      loaded,
+    );
+    afterSuccess?.(params);
+    return response;
   } catch (error) {
     return buildProjectionErrorResponse(operation, startedAt, error);
   }

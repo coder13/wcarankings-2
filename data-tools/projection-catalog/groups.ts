@@ -17,6 +17,7 @@ export interface ProjectionCapabilities {
   personActivityRankings: readonly string[];
   personCompetitionRankings: readonly string[];
   personMedalRankings: readonly string[];
+  personPrStreakRankings: readonly string[];
   personEventRankings: readonly string[];
   resultRankings: readonly string[];
   sumOfRanks: readonly string[];
@@ -73,6 +74,7 @@ export const PROJECTION_CAPABILITIES: ProjectionCapabilities = {
   personActivityRankings: ["person-activity-rankings"],
   personCompetitionRankings: ["person-competition-rankings"],
   personMedalRankings: ["person-medal-rankings"],
+  personPrStreakRankings: ["person-pr-streak-rankings"],
   personEventRankings: ["person-event-rankings"],
   cityEventStats: ["city-rankings"],
   sumOfRanks: ["sum-of-ranks"],

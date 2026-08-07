@@ -1,6 +1,7 @@
 import { handleProjectionRequest } from "@/controllers/projection-controller";
 import { buildApiErrorResponse } from "@/lib/api";
 import { loadResultRankings } from "@/services/rankings/result";
+import { collectResultRankingPopularity } from "@/services/ranking-popularity/result-rankings";
 import { getAuthUser } from "@/services/auth/auth";
 import {
   DynamicListInputError,
@@ -67,5 +68,8 @@ export async function GET(request: Request) {
     request,
     "result-rankings",
     loadResultRankings,
+    (params) => {
+      void collectResultRankingPopularity(params);
+    },
   );
 }

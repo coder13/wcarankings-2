@@ -1,4 +1,5 @@
-import { useLayoutEffect, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import type { Decorator, Meta, StoryObj } from "@storybook/react";
 import { FALLBACK_CONTINENTS, FALLBACK_COUNTRIES } from "@/lib/wca";
 import type { RecordBadgeCode } from "@/lib/wca";
@@ -44,9 +45,10 @@ function makeMockRankings(): RankingEntry[] {
     personName: `${firstNames[index % firstNames.length]} ${
       lastNames[Math.floor(index / firstNames.length) % lastNames.length]
     }`,
-    personId: `${2000 + (index % 25)}${String(
-      Math.floor(index / 100)
-    ).padStart(4, "0")}${String(index % 100).padStart(2, "0")}`,
+    personId: `${2000 + (index % 25)}${String(Math.floor(index / 100)).padStart(
+      4,
+      "0",
+    )}${String(index % 100).padStart(2, "0")}`,
     best: Math.round((5 + random() * 395) * 100),
     competitionName: `Storybook Open ${2020 + (index % 7)}`,
   }))
@@ -78,6 +80,19 @@ function makeMockRankings(): RankingEntry[] {
 
 const allEntries = makeMockRankings();
 const entries = allEntries.slice(0, 100);
+const allPrStreakEntries = allEntries.map((entry, index) => {
+  const prStreak = Math.max(2, 28 - Math.floor(index / 4));
+  return {
+    ...entry,
+    rank: Math.floor(index / 4) * 4 + 1,
+    subRank: index + 1,
+    best: prStreak,
+    formattedValue: String(prStreak),
+    competitionId: "",
+    competitionName: "",
+    recordBadges: [],
+  };
+});
 
 function makeMockResponse(url: URL, init?: RequestInit) {
   if (init?.signal?.aborted) {
@@ -85,53 +100,59 @@ function makeMockResponse(url: URL, init?: RequestInit) {
   }
 
   const search = url.searchParams.get("search")?.trim().toLocaleLowerCase();
+  const fixtureEntries = url.pathname.endsWith("/people/pr-streak")
+    ? allPrStreakEntries
+    : allEntries;
   if (search) {
     const searchLimit = Number(url.searchParams.get("searchLimit")) || 500;
     return Promise.resolve(
       new Response(
         JSON.stringify({
-          entries: allEntries
+          entries: fixtureEntries
             .filter(
               (entry) =>
                 entry.personName.toLocaleLowerCase().includes(search) ||
-                entry.personId.toLocaleLowerCase().includes(search)
+                entry.personId.toLocaleLowerCase().includes(search),
             )
             .slice(0, searchLimit),
         }),
-        { headers: { "Content-Type": "application/json" } }
-      )
+        { headers: { "Content-Type": "application/json" } },
+      ),
     );
   }
 
   const requestedStart = Math.max(
     1,
-    Number(url.searchParams.get("start")) || 1
+    Number(url.searchParams.get("start")) || 1,
   );
   const limit = Math.max(1, Number(url.searchParams.get("limit")) || 100);
   const focusPersonId = url.searchParams.get("focus");
   const focusIndex = focusPersonId
-    ? allEntries.findIndex((entry) => entry.personId === focusPersonId)
+    ? fixtureEntries.findIndex((entry) => entry.personId === focusPersonId)
     : -1;
   const focusBefore = Number(url.searchParams.get("focusBefore")) || 50;
-  const start = focusIndex >= 0 ? Math.max(1, focusIndex + 1 - focusBefore) : requestedStart;
-  const pageEntries = allEntries.slice(start - 1, start - 1 + limit);
+  const start =
+    focusIndex >= 0
+      ? Math.max(1, focusIndex + 1 - focusBefore)
+      : requestedStart;
+  const pageEntries = fixtureEntries.slice(start - 1, start - 1 + limit);
 
   return Promise.resolve(
     new Response(
       JSON.stringify({
         entries: pageEntries,
-        hasMore: start - 1 + pageEntries.length < allEntries.length,
+        hasMore: start - 1 + pageEntries.length < fixtureEntries.length,
         nextPageStart:
-          start - 1 + pageEntries.length < allEntries.length
+          start - 1 + pageEntries.length < fixtureEntries.length
             ? start + pageEntries.length
             : null,
         previousPageStart: start > 1 ? Math.max(1, start - limit) : null,
         startPosition: start - 1,
         lastRank: pageEntries.at(-1)?.rank ?? null,
-        total: allEntries.length,
+        total: fixtureEntries.length,
       }),
-      { headers: { "Content-Type": "application/json" } }
-    )
+      { headers: { "Content-Type": "application/json" } },
+    ),
   );
 }
 
@@ -160,10 +181,25 @@ function StorybookFetchMock({ children }: { children: ReactNode }) {
   return children;
 }
 
+function StorybookQueryProvider({ children }: { children: ReactNode }) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      }),
+  );
+  useEffect(() => () => queryClient.clear(), [queryClient]);
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+}
+
 const mockFetchDecorator: Decorator = (Story) => (
-  <StorybookFetchMock>
-    <Story />
-  </StorybookFetchMock>
+  <StorybookQueryProvider>
+    <StorybookFetchMock>
+      <Story />
+    </StorybookFetchMock>
+  </StorybookQueryProvider>
 );
 
 const initialData = {
@@ -175,6 +211,13 @@ const initialData = {
   startPosition: 0,
   lastRank: entries.at(-1)?.rank ?? null,
   total: allEntries.length,
+};
+const prStreakInitialData = {
+  ...initialData,
+  entries: allPrStreakEntries.slice(0, 100),
+  total: allPrStreakEntries.length,
+  lastRank: allPrStreakEntries[99]?.rank ?? null,
+  availableYears: [2026, 2025, 2024, 2023],
 };
 
 const meta = {
@@ -209,12 +252,26 @@ export const Persons: Story = {
   args: sharedArgs,
 };
 
+export const PRStreak: Story = {
+  args: {
+    ...sharedArgs,
+    initial: {
+      ...sharedArgs.initial,
+      data: prStreakInitialData,
+    },
+  },
+  parameters: {
+    nextjs: { navigation: { pathname: "/persons/pr-streak" } },
+  },
+};
+
 export const PersonsInfiniteScroll: Story = {
   args: sharedArgs,
   parameters: {
     docs: {
       description: {
-        story: "Scroll through this 10,000-person fixture to exercise virtual rendering, page prefetching, and infinite loading.",
+        story:
+          "Scroll through this 10,000-person fixture to exercise virtual rendering, page prefetching, and infinite loading.",
       },
     },
   },

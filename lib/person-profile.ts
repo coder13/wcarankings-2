@@ -76,7 +76,7 @@ export async function loadPersonProfileHeader(
      LEFT JOIN (
        SELECT facts.person_id, COUNT(*) AS solve_count
        FROM result_facts facts
-       INNER JOIN result_attempts attempts ON attempts.result_id = facts.result_id
+       STRAIGHT_JOIN result_attempts attempts ON attempts.result_id = facts.result_id
        WHERE facts.person_id = ? AND attempts.value > 0
        GROUP BY facts.person_id
      ) solves ON solves.person_id = person.wca_id
