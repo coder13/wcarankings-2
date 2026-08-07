@@ -564,7 +564,7 @@ main {
 .feedCards {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 1.25rem;
+  gap: 1rem;
   max-width: 42rem;
   margin: 0 auto;
   padding: 0;
