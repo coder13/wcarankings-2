@@ -320,7 +320,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     (candidate) => candidate.name === "person-activity-rankings",
   );
   assert.ok(activity, "person-activity-rankings is registered");
-  assert.deepEqual(activity.dependencies, ["person-period-metrics"]);
+  assert.deepEqual(activity.dependencies, ["result-facts"]);
   assert.equal(activity.enabledByDefault, false);
   assert.equal(activity.estimatedDurationMs, 45_000);
   for (const name of [
@@ -366,7 +366,9 @@ test("person activity rankings keep only the three new activity metrics", async 
     ),
     "utf8",
   );
-  assert.match(sql, /FROM person_period_metrics/);
+  assert.match(sql, /COUNT\(DISTINCT NULLIF\(competition\.country_id, ''\)\)/);
+  assert.match(sql, /COUNT\(\*\) AS round_count/);
+  assert.match(sql, /WHEN value > 0 THEN 1/);
   assert.match(sql, /'countries' AS metric/);
   assert.match(sql, /country_count AS metric_value/);
   assert.match(sql, /CAST\('' AS CHAR\(16\)\) AS region_id/);
