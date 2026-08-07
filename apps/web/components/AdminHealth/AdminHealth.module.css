@@ -1,4 +1,6 @@
 .page {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   max-width: 960px;
   margin: 0 auto;
@@ -335,7 +337,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 2rem;
+  margin-top: auto;
+  padding-top: 2rem;
   padding: 0.85rem 0;
   border-top: 1px solid var(--border-subtle);
   color: var(--text-secondary);
