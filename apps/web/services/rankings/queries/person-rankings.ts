@@ -38,6 +38,9 @@ export function filteredYearlyRankingPageQuery(
   table: string,
   conditions: string[],
 ) {
+  const currentResultTable = table.endsWith("_average")
+    ? "result_rankings_average"
+    : "result_rankings_single";
   return sqlFragment`
     WITH
       candidates AS (
@@ -100,12 +103,24 @@ export function filteredYearlyRankingPageQuery(
       result_value AS best,
       competition_id,
       competition_name,
-      regional_single_record = 'WR'
-      OR regional_average_record = 'WR' AS is_world_record,
-      regional_single_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR')
-      OR regional_average_record IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
-      regional_single_record = 'NR'
-      OR regional_average_record = 'NR' AS is_country_record
+      EXISTS (
+        SELECT 1
+        FROM ${currentResultTable} current_record
+        WHERE current_record.result_id = candidates.result_id
+          AND current_record.world_rank = 1
+      ) AS is_world_record,
+      EXISTS (
+        SELECT 1
+        FROM ${currentResultTable} current_record
+        WHERE current_record.result_id = candidates.result_id
+          AND current_record.continent_rank = 1
+      ) AS is_continent_record,
+      EXISTS (
+        SELECT 1
+        FROM ${currentResultTable} current_record
+        WHERE current_record.result_id = candidates.result_id
+          AND current_record.country_rank = 1
+      ) AS is_country_record
     FROM
       ranked
     WHERE
@@ -126,7 +141,7 @@ export function rankingPageQuery(
     SELECT
       ${columns}
     FROM
-      ${table}
+      ${table} ranking
     WHERE
       ${conditions.join(" AND ")}
       AND ${subRank} >= ?

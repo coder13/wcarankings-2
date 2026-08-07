@@ -54,6 +54,26 @@ test("renders a result row without exposing internal ordering", () => {
   assert.doesNotMatch(markup, /sub-rank/);
 });
 
+test("supports a tinted highlight without replacing the zebra row color", () => {
+  const markup = renderToStaticMarkup(
+    <RankingRow
+      entry={entry}
+      display={{
+        eventId: "333",
+        rankingType: "single",
+        animationIndex: 0,
+        alternate: true,
+        highlighted: true,
+        highlightedStyle: "tint",
+      }}
+    />,
+  );
+
+  assert.match(markup, /row--alternate/);
+  assert.match(markup, /row--feedHighlight/);
+  assert.doesNotMatch(markup, /row--searchMatch/);
+});
+
 test("shows the competition name beneath a person result when a subtitle is also available", () => {
   const markup = renderToStaticMarkup(
     <RankingRow

@@ -22,9 +22,9 @@
     "benchmark:ranking-scroll:pr-streak": "bun scripts/benchmark-ranking-pr-streak.ts"
   },
   "dependencies": {
-    "@wcarankings/projection-jobs": "workspace:*",
     "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-virtual": "^3.14.5",
+    "@wcarankings/projection-jobs": "workspace:*",
     "i18next": "^26.3.6",
     "lru-cache": "^11.5.2",
     "motion": "^12.43.0",
@@ -35,6 +35,7 @@
     "react-ga4": "^3.0.1",
     "react-i18next": "^17.0.11",
     "recharts": "^3.10.1",
+    "redis": "5.8.2",
     "sql-template-tag": "^5.2.1"
   },
   "devDependencies": {

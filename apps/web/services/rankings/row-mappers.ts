@@ -3,6 +3,7 @@ import type { PersonMetricRow, RankingRow } from "@/services/rankings/types";
 
 export function toRankingEntry(row: RankingRow): RankingEntry {
   return {
+    resultId: Number(row.result_id),
     rank: Number(row.rank),
     subRank: Number(row.sub_rank),
     personId: row.person_id,

@@ -16,10 +16,12 @@ import {
   parseRankingsUrl,
   rankingsFilterStateFromUrl,
   serializeRankingsUrl,
+  personActivityRankingPath,
   type RankingsFilterState,
   type RankingsUrlNavigation,
   type RankingsUrlUpdate,
 } from "./rankingsUrl";
+import type { PersonActivityMetric } from "./rankingsUrl";
 import type { RegionOption } from "./types";
 
 const PR_STREAK_PATH = rankingStatSource("person-pr-streak").paths.page;
@@ -151,6 +153,8 @@ export function useRankingsState() {
         if (nextSubject === "people") {
           if (filters.personCompetitionRanking)
             nextPath = "/persons/competitions";
+          else if (filters.personActivityRanking)
+            nextPath = "/persons/activity";
           else if (filters.personMedalRanking) nextPath = "/persons/medals";
           else if (filters.personPrStreakRanking) nextPath = PR_STREAK_PATH;
           else if (filters.year) nextPath = `/persons/year/${filters.year}`;
@@ -181,10 +185,24 @@ export function useRankingsState() {
           );
           return;
         }
+        if (filters.personActivityRanking) {
+          patchFilters(
+            { year: nextYear },
+            {
+              history: "push",
+              pathname: personActivityRankingPath(
+                filters.personActivityMetric,
+              ),
+            },
+            { search: "", wcaId: "", focusMe: false },
+          );
+          return;
+        }
         patchFilters(
           {
             year: nextYear,
             personCompetitionRanking: false,
+            personActivityRanking: false,
             personMedalRanking: false,
             personPrStreakRanking: false,
           },
@@ -200,6 +218,7 @@ export function useRankingsState() {
         patchFilters(
           {
             personCompetitionRanking: enabled,
+            personActivityRanking: false,
             personMedalRanking: false,
             personPrStreakRanking: false,
             year: null,
@@ -211,11 +230,40 @@ export function useRankingsState() {
           { search: "", wcaId: "", focusMe: false },
         );
       },
+      changePersonActivityRanking(
+        enabled: boolean,
+        metric: PersonActivityMetric = filters.personActivityMetric,
+      ) {
+        if (
+          enabled === filters.personActivityRanking &&
+          (!enabled || metric === filters.personActivityMetric)
+        )
+          return;
+        patchFilters(
+          {
+            personCompetitionRanking: false,
+            personActivityRanking: enabled,
+            personMedalRanking: false,
+            personActivityMetric: metric,
+            year: null,
+          },
+          {
+            history: "push",
+            pathname: enabled ? personActivityRankingPath(metric) : "/",
+          },
+          { search: "", wcaId: "", focusMe: false },
+        );
+      },
+      changePersonActivityMetric(metric: PersonActivityMetric) {
+        if (metric === filters.personActivityMetric) return;
+        patchFilters({ personActivityMetric: metric });
+      },
       changePersonMedalRanking(enabled: boolean) {
         if (enabled === filters.personMedalRanking) return;
         patchFilters(
           {
             personCompetitionRanking: false,
+            personActivityRanking: false,
             personMedalRanking: enabled,
             personPrStreakRanking: false,
             year: null,

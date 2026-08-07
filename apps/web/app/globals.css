@@ -556,6 +556,135 @@ main {
   view-transition-name: rankings-content;
 }
 
+.feedPage {
+  width: min(100%, 1000px);
+  margin: 0 auto;
+}
+
+.feedCards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2rem;
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.feedEmpty {
+  margin: 2rem 0;
+  color: var(--text-subtle);
+  text-align: center;
+}
+
+.feedLoading {
+  display: grid;
+  gap: 1rem;
+}
+
+.feedLoading > p {
+  margin: 0;
+  color: var(--text-subtle);
+}
+
+.feedLoadingSkeletons {
+  display: grid;
+  gap: 1rem;
+}
+
+.feedLoadingSkeleton {
+  --profile-preview-table-height: 370px;
+  --profile-preview-results-height: calc(
+    var(--profile-preview-table-height) - 3rem - 2px
+  );
+
+  min-width: 0;
+}
+
+.feedLoadingLabel {
+  width: 70%;
+  min-height: 1.75rem;
+  margin-bottom: 0.125rem;
+  border-radius: 0.35rem;
+  animation: feedLoadingPulse 1.4s ease-in-out infinite;
+  background: var(--surface-raised);
+}
+
+.feedLoadingCard {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-sizing: border-box;
+  height: var(--profile-preview-table-height);
+}
+
+.feedLoadingRow {
+  animation: feedLoadingPulse 1.4s ease-in-out infinite;
+  background: var(--surface-raised);
+}
+
+.feedLoadingHeading {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
+.feedLoadingAction {
+  width: 3.5rem;
+  height: 1rem;
+  border-radius: 0.35rem;
+  animation: feedLoadingPulse 1.4s ease-in-out infinite;
+  background: var(--surface-raised);
+}
+
+.feedLoadingRows {
+  height: var(--profile-preview-results-height);
+}
+
+.feedLoadingRow {
+  height: 64px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--border);
+}
+
+.feedLoadingRow:last-child {
+  border-bottom: 0;
+}
+
+.feedLoadingMore {
+  padding: 1rem;
+  color: var(--text-subtle);
+  text-align: center;
+}
+
+@keyframes feedLoadingPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feedLoadingLabel,
+  .feedLoadingAction,
+  .feedLoadingRow {
+    animation: none;
+  }
+}
+
+.feedRankingRows .competitionName {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-old(*),

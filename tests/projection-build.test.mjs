@@ -322,6 +322,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
   assert.ok(activity, "person-activity-rankings is registered");
   assert.deepEqual(activity.dependencies, ["person-period-metrics"]);
   assert.equal(activity.enabledByDefault, false);
+  assert.equal(activity.estimatedDurationMs, 45_000);
   for (const name of [
     "ranking-tables-entries-single-source",
     "ranking-tables-entries-average-source",
