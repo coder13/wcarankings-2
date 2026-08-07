@@ -18,6 +18,7 @@ if (hasArgument("help")) {
   pnpm run feed:generate
   pnpm run feed:generate -- --top-rank=25
   pnpm run feed:generate -- --benchmark-sor
+  pnpm run benchmark:sor:as-of -- --cutoff=2026-07-30
 
 Options:
   --top-rank=N  Include changed results through rank N. Minimum: 5.
