@@ -22,6 +22,7 @@
     "benchmark:ranking-scroll:pr-streak": "bun scripts/benchmark-ranking-pr-streak.ts"
   },
   "dependencies": {
+    "@wcarankings/projection-jobs": "workspace:*",
     "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-virtual": "^3.14.5",
     "i18next": "^26.3.6",

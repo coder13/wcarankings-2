@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { AdminPage } from "@/components/AdminPage/AdminPage";
 import type { AdminHealthSnapshot } from "@/lib/admin-health";
 import styles from "./AdminHealth.module.css";
 
@@ -86,33 +86,33 @@ export function AdminHealth({
 
   if (!data && error)
     return (
-      <main className={styles.page}>
+      <AdminPage
+        title="Ranking service health"
+        description="Read-only diagnostics for ranking data freshness and publication."
+      >
         <p className={styles.alert}>{error}</p>
-      </main>
+      </AdminPage>
     );
   if (!data)
     return (
-      <main className={styles.page}>
+      <AdminPage
+        title="Ranking service health"
+        description="Read-only diagnostics for ranking data freshness and publication."
+      >
         <p>Loading health…</p>
-      </main>
+      </AdminPage>
     );
   const cache = data.cache.totals;
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <Link href="/" className={styles.back}>
-            ← WCA Rankings
-          </Link>
-          <h1>Ranking service health</h1>
-          <p>
-            Read-only diagnostics for ranking data freshness and publication.
-          </p>
-        </div>
+    <AdminPage
+      title="Ranking service health"
+      description="Read-only diagnostics for ranking data freshness and publication."
+      aside={
         <strong className={`${styles.status} ${styles[data.status]}`}>
           {data.status}
         </strong>
-      </header>
+      }
+    >
       {error && <p className={styles.alert}>Latest refresh failed: {error}</p>}
       <section className={styles.card} aria-labelledby="service-heading">
         <h2 id="service-heading">Service and database</h2>
@@ -235,6 +235,6 @@ export function AdminHealth({
           </ul>
         </section>
       )}
-    </main>
+    </AdminPage>
   );
 }

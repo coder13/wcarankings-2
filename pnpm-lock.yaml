@@ -72,6 +72,9 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.14.5
         version: 3.14.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@wcarankings/projection-jobs':
+        specifier: workspace:*
+        version: link:../../packages/projection-jobs
       i18next:
         specifier: ^26.3.6
         version: 26.3.6(typescript@5.9.3)

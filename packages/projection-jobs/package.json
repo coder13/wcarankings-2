@@ -5,5 +5,8 @@
   "dependencies": {
     "bullmq": "^6.0.8"
   },
-  "exports": "./src/queue.ts"
+  "exports": {
+    ".": "./src/queue.ts",
+    "./status": "./src/status.ts"
+  }
 }

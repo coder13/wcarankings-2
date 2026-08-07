@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import mysql from "mysql2/promise";
 import type { Connection, RowDataPacket } from "mysql2/promise";
 import { argumentPresent, argumentValue } from "@wcarankings/cli";
-import { databaseOptions } from "@wcarankings/database";
+import { databaseOptions, recordWorkerHeartbeat } from "@wcarankings/database";
 import { enqueueProjectionJob } from "@wcarankings/projection-jobs";
 import { fetchLiveResults, snapshotHash } from "@wcarankings/live-results";
 import type {
@@ -18,6 +18,8 @@ const LEASE_SECONDS = Math.max(
   30,
   Number(process.env.PROVISIONAL_RANKING_WORKER_LEASE_SECONDS) || 120,
 );
+const HEARTBEAT_INTERVAL_MS = 15_000;
+const HEARTBEAT_TIMEOUT_SECONDS = 90;
 const selectedCompetition = argumentValue("competition");
 const once = argumentPresent("once");
 
@@ -276,6 +278,20 @@ async function main(): Promise<void> {
   const connection = await mysql.createConnection(databaseOptions());
   try {
     let reconciledDay = "";
+    let lastHeartbeatAt = 0;
+    async function heartbeat(force = false): Promise<void> {
+      const now = Date.now();
+      if (!force && now - lastHeartbeatAt < HEARTBEAT_INTERVAL_MS) return;
+      await recordWorkerHeartbeat(connection, {
+        workerName: "live-results-poller",
+        timeoutSeconds: HEARTBEAT_TIMEOUT_SECONDS,
+        details: {
+          mode: selectedCompetition ? "manual" : once ? "once" : "scheduled",
+          pollIntervalMs: POLL_MS,
+        },
+      });
+      lastHeartbeatAt = now;
+    }
     async function reconcileForToday(): Promise<void> {
       const day = utcDay();
       if (day === reconciledDay) return;
@@ -285,7 +301,9 @@ async function main(): Promise<void> {
     }
 
     await reconcileForToday();
+    await heartbeat(true);
     do {
+      await heartbeat();
       await reconcileForToday();
       const source = await claimSource(connection);
       if (source) {

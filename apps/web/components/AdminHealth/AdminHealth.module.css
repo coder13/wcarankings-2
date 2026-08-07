@@ -268,6 +268,38 @@
   color: var(--error);
 }
 
+.adminFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 2rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.footerLabel {
+  font-weight: 600;
+}
+
+.footerStatus,
+.footerQueue {
+  padding: 0.25rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  white-space: nowrap;
+}
+
+.footerStatus.healthy {
+  background: color-mix(in srgb, var(--record-national) 16%, var(--surface));
+}
+
+.footerStatus.degraded {
+  background: color-mix(in srgb, var(--error) 16%, var(--surface));
+}
+
 .failures {
   margin: 0;
   padding-left: 1.25rem;
@@ -296,5 +328,10 @@
 
   .cardHeader button {
     margin-top: 0.85rem;
+  }
+
+  .adminFooter {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
