@@ -58,14 +58,16 @@ async function saveSnapshot(connection: Connection, source: LiveResultsSourceRow
   const snapshot = await fetchLiveResults(source.source_name, source.remote_competition_id);
   const hash = snapshotHash(snapshot);
   let version: number | null = null;
+  let needsQueue: boolean;
   await connection.beginTransaction();
   try {
     const [state] = await connection.query<RowDataPacket[]>(
-      `SELECT snapshot_hash FROM provisional_live_result_sources
+      `SELECT snapshot_hash, queued_snapshot_hash FROM provisional_live_result_sources
        WHERE source_name = ? AND competition_id = ? AND lease_token = ? FOR UPDATE`,
       [source.source_name, source.competition_id, source.lease_token],
     );
     if (!state[0]) throw new Error("Live result source lease was lost.");
+    needsQueue = stateNeedsQueue(state[0], hash);
     if (state[0].snapshot_hash !== hash) {
       await connection.query("DELETE FROM provisional_live_results WHERE source_name = ? AND competition_id = ?", [source.source_name, source.competition_id]);
       for (const result of snapshot.results) await connection.query(
@@ -93,7 +95,26 @@ async function saveSnapshot(connection: Connection, source: LiveResultsSourceRow
       [String(error instanceof Error ? error.message : error).slice(0, 1000), source.source_name, source.competition_id, source.lease_token]);
     throw error;
   }
-  if (version !== null) for (const job of partitionJobs(source, snapshot, version)) await enqueueProjectionJob(job);
+  if (needsQueue) {
+    const queuedVersion = version ?? await currentSourceVersion(connection);
+    for (const job of partitionJobs(source, snapshot, queuedVersion)) await enqueueProjectionJob(job);
+    await connection.query(
+      `UPDATE provisional_live_result_sources SET queued_snapshot_hash = ?
+       WHERE source_name = ? AND competition_id = ? AND snapshot_hash = ?`,
+      [hash, source.source_name, source.competition_id, hash],
+    );
+  }
+}
+
+function stateNeedsQueue(state: RowDataPacket, hash: string): boolean {
+  return state.queued_snapshot_hash !== hash;
+}
+
+async function currentSourceVersion(connection: Connection): Promise<number> {
+  const [rows] = await connection.query<RowDataPacket[]>(
+    "SELECT source_version FROM provisional_live_result_state WHERE id = 1",
+  );
+  return Number(rows[0]?.source_version);
 }
 
 async function main(): Promise<void> {
