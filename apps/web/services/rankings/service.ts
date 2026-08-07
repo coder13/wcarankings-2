@@ -3,7 +3,7 @@ import type { RankingEntry } from "@/lib/wca";
 import {
   readRankingWindowPages,
   writeRankingWindowPages,
-} from "@/services/cache/ranking-pages";
+} from "../cache/ranking-pages";
 import {
   rankingsWindowCache,
   RANKINGS_WINDOW_SIZE,
