@@ -177,6 +177,7 @@
 
 .provider,
 .success,
+.pending,
 .empty {
   color: var(--text-secondary);
   font-size: 0.85rem;
@@ -211,6 +212,11 @@
 
 .success {
   color: var(--record-national);
+  font-weight: 600;
+}
+
+.pending {
+  color: var(--text-secondary);
   font-weight: 600;
 }
 

@@ -54,6 +54,14 @@ function competitionDates(source: Source) {
     : `${source.start_date} – ${source.end_date}`;
 }
 
+function resultsNotPublished(source: Source) {
+  return (
+    source.source_name === "wca-live" &&
+    (source.last_error === "Results not published yet." ||
+      source.last_error?.startsWith("404 Not Found:") === true)
+  );
+}
+
 export function LiveAdmin() {
   const [data, setData] = useState<Snapshot | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -178,7 +186,11 @@ export function LiveAdmin() {
                     <DateTime value={source.last_success_at} />
                   </td>
                   <td className={styles.statusCell}>
-                    {source.last_error ? (
+                    {resultsNotPublished(source) ? (
+                      <span className={styles.pending}>
+                        Results not published yet
+                      </span>
+                    ) : source.last_error ? (
                       <span className={styles.error}>{source.last_error}</span>
                     ) : (
                       <span className={styles.success}>Ready</span>

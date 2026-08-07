@@ -4,7 +4,11 @@ import type { Connection, RowDataPacket } from "mysql2/promise";
 import { argumentPresent, argumentValue } from "@wcarankings/cli";
 import { databaseOptions, recordWorkerHeartbeat } from "@wcarankings/database";
 import { enqueueProjectionJob } from "@wcarankings/projection-jobs";
-import { fetchLiveResults, snapshotHash } from "@wcarankings/live-results";
+import {
+  fetchLiveResults,
+  LiveResultsNotPublishedError,
+  snapshotHash,
+} from "@wcarankings/live-results";
 import type {
   LiveResultsSnapshot,
   LiveResultsSourceRow,
@@ -237,6 +241,20 @@ async function saveSnapshot(
     transactionOpen = false;
   } catch (error) {
     if (transactionOpen) await connection.rollback();
+    if (error instanceof LiveResultsNotPublishedError) {
+      await connection.query(
+        `UPDATE provisional_live_result_sources SET lease_token = NULL, leased_until = NULL,
+         next_poll_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL poll_seconds SECOND), last_error = ?
+         WHERE source_name = ? AND competition_id = ? AND lease_token = ?`,
+        [
+          error.message,
+          source.source_name,
+          source.competition_id,
+          source.lease_token,
+        ],
+      );
+      return;
+    }
     await connection.query(
       `UPDATE provisional_live_result_sources SET lease_token = NULL, leased_until = NULL,
       next_poll_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 60 SECOND), last_error = ?
