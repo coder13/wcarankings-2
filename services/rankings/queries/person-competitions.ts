@@ -44,7 +44,7 @@ function lazyDimensionJoins(input: PersonCompetitionRankingInput) {
   return "";
 }
 
-function lazySource(input: PersonCompetitionRankingInput) {
+function lazySource() {
   return "person_period_metrics";
 }
 
@@ -98,7 +98,7 @@ export function buildLazyPersonCompetitionQueryPlan(
   input: PersonCompetitionRankingInput,
 ): PersonCompetitionQueryPlan {
   const { conditions, values } = lazyConditions(input);
-  const source = lazySource(input);
+  const source = lazySource();
   const joins = lazyDimensionJoins(input);
   const predicate = conditions.join(" AND ");
   const rowsQuery = sqlFragment`

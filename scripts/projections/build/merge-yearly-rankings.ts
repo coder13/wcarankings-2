@@ -1,6 +1,5 @@
 import type { Connection } from "mysql2/promise";
 import { argumentList } from "../../lib/arguments.ts";
-import { databaseOptions } from "../../lib/database.ts";
 import { projectionSql, statements } from "../../../data-tools/projections/build/sql.ts";
 
 const TABLES = [

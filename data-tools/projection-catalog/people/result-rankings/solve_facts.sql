@@ -21,6 +21,6 @@ SELECT
   END AS record_code
 FROM
   result_facts facts
-  STRAIGHT_JOIN result_attempts attempt ON attempt.result_id = facts.result_id
+  STRAIGHT_JOIN result_attempts_with_live attempt ON attempt.result_id = facts.result_id
 WHERE
   attempt.value > 0;

@@ -35,7 +35,7 @@ WITH
         END
       ) AS fastest_average_key
     FROM
-      results result
+      results_with_live result
       INNER JOIN competitions competition ON competition.id = result.competition_id
     GROUP BY
       result.competition_id,

@@ -45,12 +45,14 @@ function resultFromWcaLive(eventId: string, roundNumber: number, row: JsonObject
     sourceResultId: `${eventId}:${roundNumber}:${personId}`,
     eventId,
     roundNumber,
+    roundTypeId: String(roundNumber),
     formatId: null,
     personId,
     personName: requiredString(row.name, "person name"),
     countryIso2: asString(row.country)?.toUpperCase() ?? null,
     best: asInteger(row.best) ?? 0,
     average: asInteger(row.average) ?? 0,
+    position: asInteger(row.ranking) ?? 0,
     attempts: Array.isArray(row.attempts) ? row.attempts.map((attempt) => asInteger(attempt) ?? 0) : [],
   };
 }
@@ -83,6 +85,11 @@ export function normalizeWcaLiveResults(payload: unknown): LiveResultsSnapshot {
       }
     }
   }
+  for (const eventId of new Set(results.map((result) => result.eventId))) {
+    const eventResults = results.filter((result) => result.eventId === eventId);
+    const finalRound = Math.max(...eventResults.map((result) => result.roundNumber));
+    for (const result of eventResults) result.roundTypeId = result.roundNumber === finalRound ? "f" : String(result.roundNumber);
+  }
   return { results };
 }
 
@@ -97,12 +104,14 @@ function normalizeCubingChinaResult(row: unknown): LiveResult | null {
     sourceResultId,
     eventId,
     roundNumber: Number(roundId.match(/(?:^|\D)r(\d+)$/i)?.[1]) || 1,
+    roundTypeId: roundId,
     formatId: asString(row.formatId),
     personId,
     personName: requiredString(row.name, "person name"),
     countryIso2: null,
     best: asInteger(row.best) ?? 0,
     average: asInteger(row.average) ?? 0,
+    position: asInteger(row.place) ?? 0,
     attempts: Array.isArray(row.attempts) ? row.attempts.map((attempt) => asInteger(attempt) ?? 0) : [],
   };
 }
@@ -110,7 +119,13 @@ function normalizeCubingChinaResult(row: unknown): LiveResult | null {
 export function normalizeCubingChinaResults(payload: unknown): LiveResultsSnapshot {
   const data = unwrap(payload);
   if (!isObject(data) || !Array.isArray(data.results)) throw new Error("Unexpected Cubing China live results response.");
-  return { results: data.results.map(normalizeCubingChinaResult).filter((row): row is LiveResult => row !== null) };
+  const results = data.results.map(normalizeCubingChinaResult).filter((row): row is LiveResult => row !== null);
+  for (const eventId of new Set(results.map((result) => result.eventId))) {
+    const eventResults = results.filter((result) => result.eventId === eventId);
+    const finalRound = Math.max(...eventResults.map((result) => result.roundNumber));
+    for (const result of eventResults) result.roundTypeId = result.roundNumber === finalRound ? "f" : String(result.roundNumber);
+  }
+  return { results };
 }
 
 export function canonicalSnapshot(snapshot: LiveResultsSnapshot): string {

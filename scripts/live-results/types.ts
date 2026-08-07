@@ -6,12 +6,14 @@ export interface LiveResult {
   sourceResultId: string;
   eventId: string;
   roundNumber: number;
+  roundTypeId: string;
   formatId: string | null;
   personId: string;
   personName: string;
   countryIso2: string | null;
   best: number;
   average: number;
+  position: number;
   attempts: number[];
 }
 
@@ -28,7 +30,6 @@ export interface LiveResultsSourceRow {
 }
 
 export interface ClaimedProvisionalRankingJob {
-  competition_year: number;
-  event_id: string;
+  source_version: number;
   lease_token: string;
 }

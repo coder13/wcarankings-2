@@ -25,7 +25,7 @@ SELECT
     1
   ) AS competition_id
 FROM
-  results
+  results_with_live
 WHERE
   average > 0
 GROUP BY

@@ -5,7 +5,7 @@ CREATE TEMPORARY TABLE person_period_attempt_counts ENGINE = InnoDB AS
 SELECT
   result_id,
   COUNT(CASE WHEN value > 0 THEN 1 END) AS official_solve_count
-FROM result_attempts
+FROM result_attempts_with_live
 GROUP BY result_id;
 
 ALTER TABLE person_period_attempt_counts ADD PRIMARY KEY (result_id);

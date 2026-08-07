@@ -58,6 +58,7 @@ if (!applicationUrl && !adminUrl) {
     groups: {
       "ranking-tables": release("ranking-tables", "new"),
       "result-facts": release("result-facts", "new"),
+      "person-shared-grains": release("person-shared-grains", "new"),
       "result-rankings": release("result-rankings", "new"),
       "person-event-rankings": release("person-event-rankings", "new"),
       "competition-rankings": release("competition-rankings", "new"),

@@ -6,6 +6,7 @@ import {
 } from "../shared/database.ts";
 import type { ProjectionConnection } from "../shared/database-types.ts";
 import { elapsedMs, createTableProgress, writeBuildLog } from "./progress.ts";
+import { prepareLiveProjectionInputs } from "../../../scripts/live-results/projection-inputs.ts";
 import type { TableProgress } from "./progress-types.ts";
 import {
   CORE_RANKING_TABLE_TASK_COUNT,
@@ -229,6 +230,7 @@ export async function buildProjectionTables(
     average: `ranking_entries_average_source${projectionSuffix}`,
   };
 
+  await prepareLiveProjectionInputs(connection);
   await ensureIndexes(connection, INDEXES);
 
   if (includeRankingTables) {

@@ -18,7 +18,7 @@ SELECT
     END
   ) AS official_solve_count
 FROM
-  result_attempts
+  result_attempts_with_live
 GROUP BY
   result_id;
 

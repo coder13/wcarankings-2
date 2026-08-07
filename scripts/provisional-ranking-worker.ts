@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import mysql from "mysql2/promise";
 import type { Connection, RowDataPacket } from "mysql2/promise";
 import { databaseOptions } from "./lib/database.ts";
+import { buildProjectionTables } from "../data-tools/projections/build/builder.ts";
 import { fetchLiveResults, snapshotHash } from "./live-results/providers.ts";
-import { provisionalCurrentYearRankingSql } from "./live-results/ranking-sql.ts";
 import type { ClaimedProvisionalRankingJob, LiveResultsSourceRow } from "./live-results/types.ts";
 
 const POLL_MS = Math.max(250, Number(process.env.PROVISIONAL_RANKING_WORKER_POLL_MS) || 2_000);
@@ -45,10 +45,6 @@ async function saveSnapshot(connection: Connection, source: LiveResultsSourceRow
     );
     if (!state[0]) throw new Error("Live result source lease was lost.");
     if (state[0].snapshot_hash !== hash) {
-      const [oldEvents] = await connection.query<RowDataPacket[]>(
-        `SELECT DISTINCT event_id FROM provisional_live_results WHERE source_name = ? AND competition_id = ?`,
-        [source.source_name, source.competition_id],
-      );
       await connection.query(
         "DELETE FROM provisional_live_results WHERE source_name = ? AND competition_id = ?",
         [source.source_name, source.competition_id],
@@ -56,22 +52,21 @@ async function saveSnapshot(connection: Connection, source: LiveResultsSourceRow
       for (const result of snapshot.results) {
         await connection.query(
           `INSERT INTO provisional_live_results
-           (source_name, competition_id, source_result_id, event_id, round_number, format_id, person_id, person_name, country_iso2, best, average, attempts_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [source.source_name, source.competition_id, result.sourceResultId, result.eventId, result.roundNumber,
-            result.formatId, result.personId, result.personName, result.countryIso2, result.best, result.average,
+           (source_name, competition_id, source_result_id, event_id, round_number, round_type_id, format_id, person_id, person_name, country_iso2, best, average, position, attempts_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [source.source_name, source.competition_id, result.sourceResultId, result.eventId, result.roundNumber, result.roundTypeId,
+            result.formatId, result.personId, result.personName, result.countryIso2, result.best, result.average, result.position,
             JSON.stringify(result.attempts)],
         );
       }
-      const eventIds = new Set([...oldEvents.map((row) => String(row.event_id)), ...snapshot.results.map((result) => result.eventId)]);
-      for (const eventId of eventIds) {
-        await connection.query(
-          `INSERT INTO provisional_current_year_ranking_rebuild_jobs (competition_year, event_id)
-           VALUES (?, ?) ON DUPLICATE KEY UPDATE priority = GREATEST(priority, VALUES(priority)),
-             available_at = LEAST(available_at, VALUES(available_at)), last_error = NULL`,
-          [source.competition_year, eventId],
-        );
-      }
+      await connection.query("UPDATE provisional_live_result_state SET source_version = source_version + 1 WHERE id = 1");
+      const [versions] = await connection.query<RowDataPacket[]>("SELECT source_version FROM provisional_live_result_state WHERE id = 1");
+      await connection.query(
+        `INSERT INTO provisional_projection_rebuild_jobs (id, source_version)
+         VALUES (1, ?) ON DUPLICATE KEY UPDATE source_version = VALUES(source_version),
+           available_at = CURRENT_TIMESTAMP(6), lease_token = NULL, leased_until = NULL, last_error = NULL`,
+        [versions[0]?.source_version],
+      );
     }
     await connection.query(
       `UPDATE provisional_live_result_sources
@@ -99,45 +94,38 @@ async function claimJob(connection: Connection): Promise<ClaimedProvisionalRanki
   await connection.beginTransaction();
   try {
     const [rows] = await connection.query<(ClaimedProvisionalRankingJob & RowDataPacket)[]>(
-      `SELECT competition_year, event_id FROM provisional_current_year_ranking_rebuild_jobs
+      `SELECT source_version FROM provisional_projection_rebuild_jobs
        WHERE available_at <= CURRENT_TIMESTAMP(6) AND (leased_until IS NULL OR leased_until < CURRENT_TIMESTAMP(6))
-       ORDER BY priority DESC, available_at, event_id LIMIT 1 FOR UPDATE SKIP LOCKED`,
+       ORDER BY available_at LIMIT 1 FOR UPDATE SKIP LOCKED`,
     );
     const job = rows[0];
     if (!job) { await connection.commit(); return null; }
     await connection.query(
-      `UPDATE provisional_current_year_ranking_rebuild_jobs
+      `UPDATE provisional_projection_rebuild_jobs
        SET lease_token = ?, leased_until = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL ? SECOND), attempts = attempts + 1
-       WHERE competition_year = ? AND event_id = ?`,
-      [token, LEASE_SECONDS, job.competition_year, job.event_id],
+       WHERE id = 1`,
+      [token, LEASE_SECONDS],
     );
     await connection.commit();
-    return { competition_year: Number(job.competition_year), event_id: job.event_id, lease_token: token };
+    return { source_version: Number(job.source_version), lease_token: token };
   } catch (error) { await connection.rollback(); throw error; }
 }
 
 async function buildJob(connection: Connection, job: ClaimedProvisionalRankingJob): Promise<void> {
-  await connection.beginTransaction();
   try {
+    await buildProjectionTables(connection, { createConnection: () => mysql.createConnection(databaseOptions()) });
     await connection.query(
-      "DELETE FROM provisional_current_year_rankings WHERE year = ? AND event_id = ?",
-      [job.competition_year, job.event_id],
+      `DELETE FROM provisional_projection_rebuild_jobs
+       WHERE id = 1 AND source_version = ? AND lease_token = ?`,
+      [job.source_version, job.lease_token],
     );
-    await connection.query(provisionalCurrentYearRankingSql, [job.competition_year, job.event_id, job.competition_year, job.event_id]);
-    await connection.query(
-      `DELETE FROM provisional_current_year_ranking_rebuild_jobs
-       WHERE competition_year = ? AND event_id = ? AND lease_token = ?`,
-      [job.competition_year, job.event_id, job.lease_token],
-    );
-    await connection.commit();
   } catch (error) {
-    await connection.rollback();
     await connection.query(
-      `UPDATE provisional_current_year_ranking_rebuild_jobs
+      `UPDATE provisional_projection_rebuild_jobs
        SET lease_token = NULL, leased_until = NULL,
          available_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL LEAST(300, POW(2, attempts) * 5) SECOND), last_error = ?
-       WHERE competition_year = ? AND event_id = ? AND lease_token = ?`,
-      [String(error instanceof Error ? error.message : error).slice(0, 1000), job.competition_year, job.event_id, job.lease_token],
+       WHERE id = 1 AND lease_token = ?`,
+      [String(error instanceof Error ? error.message : error).slice(0, 1000), job.lease_token],
     );
     throw error;
   }
