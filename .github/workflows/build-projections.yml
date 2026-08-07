@@ -34,6 +34,10 @@ on:
         required: false
         default: false
         type: boolean
+      dirty_years:
+        required: false
+        default: ""
+        type: string
     outputs:
       artifact_name:
         value: ${{ jobs.compose.outputs.artifact_name }}
@@ -116,6 +120,7 @@ jobs:
       hydrate_groups: ${{ inputs.hydrate_groups }}
       fingerprints: ${{ inputs.fingerprints }}
       available_artifacts: ${{ inputs.available_artifacts }}
+      dirty_years: ${{ inputs.dirty_years }}
     secrets: inherit
 
   compose:

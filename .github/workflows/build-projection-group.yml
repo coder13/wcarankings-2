@@ -26,6 +26,10 @@ on:
         required: false
         default: "{}"
         type: string
+      dirty_years:
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -43,6 +47,7 @@ jobs:
       WCA_EXPORT_CACHE_DIR: /tmp/wca-export-cache
       GROUPS: ${{ inputs.groups }}
       HYDRATE_GROUPS: ${{ inputs.hydrate_groups }}
+      DIRTY_YEARS: ${{ inputs.dirty_years }}
 
     steps:
       - uses: actions/checkout@v4
@@ -143,16 +148,26 @@ jobs:
         env:
           FINGERPRINTS: ${{ inputs.fingerprints }}
           AVAILABLE_ARTIFACTS: ${{ inputs.available_artifacts }}
+          DIRTY_YEARS: ${{ inputs.dirty_years }}
         run: |
           set -euo pipefail
-          bun scripts/projections/planning/projection-build-plan.ts --groups="$GROUPS" \
+          build_groups="$GROUPS"
+          if [ -n "$DIRTY_YEARS" ] && printf ',%s,' "$HYDRATE_GROUPS" | grep -q ',yearly-person-rankings,'; then
+            build_groups=$(printf '%s' "$build_groups" | tr ',' '\n' | grep -vx 'yearly-person-rankings' | paste -sd, - || true)
+          fi
+          if [ -n "$build_groups" ]; then
+          bun scripts/projections/planning/projection-build-plan.ts --groups="$build_groups" \
             --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
           WCA_PROJECTION_BUILD_CONCURRENCY=2 bun scripts/projections/build/build-projection-groups.ts \
-            --groups="$GROUPS" \
+            --groups="$build_groups" \
             --satisfied-groups="$HYDRATE_GROUPS" \
             --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
             --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
             --include-ranking-tables="$(jq -r '.includeRankingTables' /tmp/build-plan.json)"
+          fi
+          if [ -n "$DIRTY_YEARS" ] && printf ',%s,' "$HYDRATE_GROUPS" | grep -q ',yearly-person-rankings,'; then
+            DATABASE_NAME_OVERRIDE="$MYSQL_DATABASE" bun scripts/projections/build/merge-yearly-rankings.ts --years="$DIRTY_YEARS"
+          fi
 
           printf '{"groups":%s}\n' "$FINGERPRINTS" > /tmp/fingerprints.json
           owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
