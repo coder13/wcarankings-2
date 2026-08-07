@@ -749,7 +749,7 @@ Projection release order:
 1. Read the active generation and calculate the semantic plan
 2. Calculate the release plan for the selected WCA export
 3. Hydrate exact cached dependencies
-4. Build the missing groups in dependency waves
+4. Build the missing groups in one shared database, with bounded task concurrency
 5. Prepare transfer tables, export them, and create the release coordinate
 6. Validate the deployment plan and import the transfer tables
 7. Build deferred indexes and publish the candidate generation

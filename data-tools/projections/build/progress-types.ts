@@ -2,6 +2,8 @@ export type BuildStartTime = number;
 
 export type BuildStep = () => Promise<unknown>;
 
+export type StopBuildHeartbeat = () => void;
+
 export interface TableProgress {
   start(tableName?: string): string;
 }

@@ -111,7 +111,7 @@ repaired without rebuilding every artifact.
 
 ## Build, staging, and activation safety
 
-Projection SQL runs only in runner-local MariaDB. The planner checks task names,
+Projection SQL runs only in the shared runner-local MariaDB database. The planner checks task names,
 dependencies, and cycles. It then returns tasks in dependency order. The builder
 has a default `WCA_PROJECTION_BUILD_CONCURRENCY=2` and gives each worker a
 separate connection. It starts a dependent task only after its prerequisites

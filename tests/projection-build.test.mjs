@@ -9,9 +9,13 @@ import {
 } from "../data-tools/projections/build/ranking-tables.ts";
 import { DEFAULT_PROJECTION_NAMES } from "../data-tools/projection-catalog/tables.ts";
 import { PROJECTION_REGISTRY } from "../data-tools/projections/build/registry.ts";
-import { createTableProgress } from "../data-tools/projections/build/progress.ts";
+import {
+  createTableProgress,
+  startBuildHeartbeat,
+} from "../data-tools/projections/build/progress.ts";
 import {
   createProjectionTaskPlan,
+  formatProjectionBuildSummary,
   projectionBuildPlan,
   projectionNamesForRefresh,
 } from "../data-tools/projections/build/plan.ts";
@@ -28,6 +32,42 @@ function fakeConnection(id, closed) {
     },
   };
 }
+
+test("build heartbeat reports long-running work and stops cleanly", async () => {
+  const messages = [];
+  const stop = startBuildHeartbeat(
+    "table result_facts",
+    performance.now(),
+    5,
+    (message) => messages.push(message),
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  assert.ok(
+    messages.some((message) =>
+      message.includes("Still building table result_facts"),
+    ),
+  );
+
+  stop();
+  const messageCount = messages.length;
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  assert.equal(messages.length, messageCount);
+});
+
+test("projection build summary explains groups, outputs, and tables", () => {
+  const summary = formatProjectionBuildSummary([
+    "result-facts",
+    "person-pr-streak-rankings",
+  ]);
+
+  assert.match(summary, /Groups to build: 2/);
+  assert.match(summary, /result-facts/);
+  assert.match(summary, /generates: result-facts/);
+  assert.match(summary, /person-pr-streak-rankings \(pr-streak\)/);
+  assert.match(summary, /person_pr_streak_counts/);
+  assert.match(summary, /Total owned tables: 5/);
+});
 
 test("projection builder bounds and overlaps independent tasks", async () => {
   const events = [];

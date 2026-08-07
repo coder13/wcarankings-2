@@ -148,6 +148,8 @@ jobs:
           bun scripts/projections/planning/projection-build-plan.ts --groups="$GROUPS" \
             --satisfied-groups="$HYDRATE_GROUPS" > /tmp/build-plan.json
           WCA_PROJECTION_BUILD_CONCURRENCY=2 bun scripts/projections/build/build-projection-groups.ts \
+            --groups="$GROUPS" \
+            --satisfied-groups="$HYDRATE_GROUPS" \
             --projection-names="$(jq -r '.projectionNames | join(",")' /tmp/build-plan.json)" \
             --satisfied-projection-names="$(jq -r '.satisfiedProjectionNames | join(",")' /tmp/build-plan.json)" \
             --include-ranking-tables="$(jq -r '.includeRankingTables' /tmp/build-plan.json)"

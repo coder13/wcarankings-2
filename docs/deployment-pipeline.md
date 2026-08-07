@@ -114,6 +114,6 @@ newer generation.
 ## Incrementality claim
 
 Planning, artifact reuse, and table execution are fingerprint-selective. Cached
-dependency groups are hydrated into runner-local MariaDB, and only tables owned by
-cache-miss groups execute. Independent ready tables run with two workers while
-production imports remain sequential.
+dependency groups are hydrated into the shared runner-local MariaDB database,
+and only tables owned by cache-miss groups execute. Independent ready tables run
+with two workers while production imports remain sequential.
