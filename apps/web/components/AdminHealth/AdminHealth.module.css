@@ -160,7 +160,8 @@
 
 .competitionCell strong,
 .competitionCell span,
-.dateTime {
+.dateTime,
+.dateTime span {
   display: block;
 }
 
