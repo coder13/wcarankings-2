@@ -20,6 +20,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 
 COPY --chown=data-tools:data-tools release-compatibility.json ./
 COPY --chown=data-tools:data-tools data-tools ./data-tools
+COPY --chown=data-tools:data-tools packages ./packages
 COPY --chown=data-tools:data-tools scripts ./scripts
 COPY --chown=data-tools:data-tools sql ./sql
 COPY --chown=data-tools:data-tools migrations/mysql ./migrations/mysql
