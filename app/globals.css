@@ -564,7 +564,7 @@ main {
 .feedCards {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 1rem;
+  gap: 1.25rem;
   max-width: 42rem;
   margin: 0 auto;
   padding: 0;
@@ -612,6 +612,7 @@ main {
 
 .feedCards .profilePreviewLabel {
   min-height: 2.05rem;
+  margin-bottom: 0.25rem;
 }
 
 .feedLoadingCard {
