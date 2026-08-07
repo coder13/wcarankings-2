@@ -1,12 +1,21 @@
-import { createClient } from "redis";
+import { createRequire } from "node:module";
+
+type RedisModule = typeof import("redis");
+type RedisClient = ReturnType<RedisModule["createClient"]>;
+
+const require = createRequire(import.meta.url);
+const REDIS_PACKAGE_NAME = "redis";
+
+function loadCommonJsModule(loader: NodeJS.Require, name: string) {
+  return loader(name);
+}
 
 const REDIS_KEY_VERSION = process.env.REDIS_CACHE_VERSION ?? "1";
 const DEFAULT_TTL_SECONDS = 24 * 60 * 60;
 
-type RedisClient = ReturnType<typeof createClient>;
-
 let clientPromise: Promise<RedisClient | null> | null = null;
 let reportedFailure = false;
+let redisModule: RedisModule | null = null;
 
 function cacheKey(key: string) {
   return `wca-rankings:v${REDIS_KEY_VERSION}:${key}`;
@@ -25,7 +34,11 @@ async function getClient() {
   const url = process.env.REDIS_URL;
   if (!url) return null;
   if (!clientPromise) {
-    const client = createClient({ url });
+    redisModule = loadCommonJsModule(
+      require,
+      REDIS_PACKAGE_NAME,
+    ) as RedisModule;
+    const client = redisModule.createClient({ url });
     client.on("error", reportFailure);
     clientPromise = client
       .connect()
