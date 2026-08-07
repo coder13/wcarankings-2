@@ -123,11 +123,10 @@
 
 .row--feedHighlight {
   background-color: var(--search-match);
-  box-shadow: inset 4px 0 0 var(--secondary);
 }
 
 .row--alternate.row--feedHighlight {
-  background-image: linear-gradient(rgb(0 0 0 / 8%), rgb(0 0 0 / 8%));
+  background-image: linear-gradient(rgb(0 0 0 / 4%), rgb(0 0 0 / 4%));
 }
 
 :root[data-theme="dark"] .virtualRow:hover {
