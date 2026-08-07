@@ -2,6 +2,10 @@ import { query } from "@/db";
 
 export const dynamic = "force-dynamic";
 
+const activeToday = `CURRENT_DATE() BETWEEN
+  STR_TO_DATE(CONCAT(competition.year, '-', competition.month, '-', competition.day), '%Y-%c-%e')
+  AND STR_TO_DATE(CONCAT(competition.end_year, '-', competition.end_month, '-', competition.end_day), '%Y-%c-%e')`;
+
 type SourceRow = {
   source_name: string;
   competition_id: string;
@@ -19,7 +23,7 @@ type SourceRow = {
 
 export async function GET() {
   const { rows } = await query<SourceRow>(
-    `SELECT source.source_name, source.competition_id, source.remote_competition_id, source.competition_year, source.enabled, source.poll_seconds, source.next_poll_at, source.last_success_at, source.last_error, source.snapshot_hash, competition.name, competition.city_name FROM provisional_live_result_sources source LEFT JOIN competitions competition ON competition.id = source.competition_id ORDER BY source.enabled DESC, source.next_poll_at, source.competition_id`,
+    `SELECT source.source_name, source.competition_id, source.remote_competition_id, source.competition_year, source.enabled, source.poll_seconds, source.next_poll_at, source.last_success_at, source.last_error, source.snapshot_hash, competition.name, competition.city_name FROM provisional_live_result_sources source JOIN competitions competition ON competition.id = source.competition_id WHERE source.enabled = 1 AND ${activeToday} ORDER BY source.next_poll_at, source.competition_id`,
   );
   return Response.json(
     {
@@ -51,22 +55,22 @@ export async function POST(request: Request) {
       { error: "Select from 1 through 100 competition IDs." },
       { status: 400 },
     );
-  const { rows } = await query<{ id: string; year: number }>(
-    `SELECT id, year FROM competitions WHERE id IN (${ids.map(() => "?").join(",")})`,
+  const { rows } = await query<{ competition_id: string }>(
+    `SELECT source.competition_id FROM provisional_live_result_sources source JOIN competitions competition ON competition.id = source.competition_id WHERE source.enabled = 1 AND ${activeToday} AND source.competition_id IN (${ids.map(() => "?").join(",")})`,
     ids,
   );
   if (rows.length !== ids.length)
     return Response.json(
-      { error: "One or more competition IDs are unknown." },
+      { error: "Select only tracked competitions that are active today." },
       { status: 400 },
     );
   for (const competition of rows)
     await query(
-      `INSERT INTO provisional_live_result_sources (source_name, competition_id, remote_competition_id, competition_year, enabled, next_poll_at) VALUES ('wca-live', ?, ?, ?, 1, CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE enabled = 1, next_poll_at = CURRENT_TIMESTAMP(6), last_error = NULL`,
-      [competition.id, competition.id, competition.year],
+      `UPDATE provisional_live_result_sources SET next_poll_at = CURRENT_TIMESTAMP(6), last_error = NULL WHERE competition_id = ?`,
+      [competition.competition_id],
     );
   return Response.json(
-    { scheduled: rows.map((row) => row.id) },
+    { scheduled: rows.map((row) => row.competition_id) },
     { status: 202 },
   );
 }
