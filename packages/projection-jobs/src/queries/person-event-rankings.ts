@@ -12,9 +12,9 @@ export const deleteProvisionalPersonEventRankingRowsQuery = ({
   resultType: PersonEventResultType;
 }) => SQL`
   DELETE FROM person_event_rankings
-  WHERE event_id = ${eventId}
-    AND result_type = ${resultType}
-    AND continent_id = ${continentId}
+  WHERE event_id = CONVERT(${eventId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
+    AND result_type = CONVERT(${resultType} USING utf8mb4) COLLATE utf8mb4_unicode_ci
+    AND continent_id = CONVERT(${continentId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
     AND is_provisional = 1
 `;
 
@@ -52,8 +52,8 @@ export const upsertProvisionalPersonEventRankingSliceQuery = ({
       ) AS candidate_position
     FROM person_event_bests best
     WHERE best.period_year = 0
-      AND best.event_id = ${eventId}
-      AND best.result_type = ${resultType}
+      AND best.event_id = CONVERT(${eventId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
+      AND best.result_type = CONVERT(${resultType} USING utf8mb4) COLLATE utf8mb4_unicode_ci
   ), regional_bests AS (
     SELECT *
     FROM world_candidates
