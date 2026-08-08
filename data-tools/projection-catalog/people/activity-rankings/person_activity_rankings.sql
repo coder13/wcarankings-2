@@ -1,170 +1,167 @@
--- phase: count valid official solves once
-DROP TEMPORARY TABLE IF EXISTS person_activity_attempt_counts;
-
-CREATE TEMPORARY TABLE person_activity_attempt_counts ENGINE = InnoDB AS
-SELECT
-  result_id,
-  COUNT(
-    CASE
-      WHEN value > 0 THEN 1
-    END
-  ) AS official_solve_count
-FROM
-  result_attempts
-GROUP BY
-  result_id;
-
-ALTER TABLE person_activity_attempt_counts
-ADD PRIMARY KEY (result_id);
-
--- phase: aggregate all person activity values from shared result facts
-CREATE TABLE person_activity_counts AS
-SELECT
-  facts.person_id,
-  CASE
-    WHEN person.gender IN ('m', 'f') THEN person.gender
-    ELSE 'o'
-  END AS person_gender,
-  COALESCE(person.country_id, '') AS country_id,
-  COALESCE(person_country.continent_id, '') AS continent_id,
-  COUNT(DISTINCT NULLIF(competition.country_id, '')) AS country_count,
-  COUNT(*) AS round_count,
-  COALESCE(SUM(attempts.official_solve_count), 0) AS official_solve_count
-FROM
-  result_facts facts
-  INNER JOIN persons person ON person.wca_id = facts.person_id
-  AND person.sub_id = 1
-  LEFT JOIN countries person_country ON person_country.id = person.country_id
-  LEFT JOIN competitions competition ON competition.id = facts.competition_id
-  LEFT JOIN person_activity_attempt_counts attempts ON attempts.result_id = facts.result_id
-GROUP BY
-  facts.person_id,
-  person_gender,
-  country_id,
-  continent_id;
-
-ALTER TABLE person_activity_counts
-ADD PRIMARY KEY (person_id);
-
--- phase: aggregate activity values by competition year
-CREATE TABLE person_activity_year_counts AS
-SELECT
-  facts.competition_year AS year,
-  facts.person_id,
-  CASE
-    WHEN person.gender IN ('m', 'f') THEN person.gender
-    ELSE 'o'
-  END AS person_gender,
-  COALESCE(person.country_id, '') AS country_id,
-  COALESCE(person_country.continent_id, '') AS continent_id,
-  COUNT(DISTINCT NULLIF(competition.country_id, '')) AS country_count,
-  COUNT(*) AS round_count,
-  COALESCE(SUM(attempts.official_solve_count), 0) AS official_solve_count
-FROM result_facts facts
-INNER JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1
-LEFT JOIN countries person_country ON person_country.id = person.country_id
-LEFT JOIN competitions competition ON competition.id = facts.competition_id
-LEFT JOIN person_activity_attempt_counts attempts ON attempts.result_id = facts.result_id
-GROUP BY facts.competition_year, facts.person_id, person_gender, country_id, continent_id;
-
-ALTER TABLE person_activity_year_counts
-ADD PRIMARY KEY (year, person_id),
-ADD INDEX idx_person_activity_year_gender (year, person_gender, person_id);
-
--- phase: aggregate round and solve values by event and year
-CREATE TABLE person_activity_event_counts AS
-SELECT
-  facts.competition_year AS year,
-  facts.event_id,
-  facts.person_id,
-  CASE
-    WHEN person.gender IN ('m', 'f') THEN person.gender
-    ELSE 'o'
-  END AS person_gender,
-  COALESCE(person.country_id, '') AS country_id,
-  COALESCE(person_country.continent_id, '') AS continent_id,
-  COUNT(*) AS round_count,
-  COALESCE(SUM(attempts.official_solve_count), 0) AS official_solve_count
-FROM result_facts facts
-INNER JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1
-LEFT JOIN countries person_country ON person_country.id = person.country_id
-LEFT JOIN person_activity_attempt_counts attempts ON attempts.result_id = facts.result_id
-GROUP BY facts.competition_year, facts.event_id, facts.person_id, person_gender, country_id, continent_id
-UNION ALL
-SELECT
-  0 AS year,
-  facts.event_id,
-  facts.person_id,
-  CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END,
-  COALESCE(person.country_id, ''),
-  COALESCE(person_country.continent_id, ''),
-  COUNT(*),
-  COALESCE(SUM(attempts.official_solve_count), 0)
-FROM result_facts facts
-INNER JOIN persons person ON person.wca_id = facts.person_id AND person.sub_id = 1
-LEFT JOIN countries person_country ON person_country.id = person.country_id
-LEFT JOIN person_activity_attempt_counts attempts ON attempts.result_id = facts.result_id
-GROUP BY facts.event_id, facts.person_id, person.gender, person.country_id, person_country.continent_id;
-
-ALTER TABLE person_activity_event_counts
-ADD PRIMARY KEY (year, event_id, person_id),
-ADD INDEX idx_person_activity_event_filter (year, event_id, person_gender, person_id);
-
-DROP TEMPORARY TABLE person_activity_attempt_counts;
-
--- phase: rank the common World all-gender activity lists
+-- phase: rank all-time and current-year person statistics
 CREATE TABLE person_activity_rankings AS
 WITH
   metrics AS (
     SELECT
+      period_year,
       person_id,
+      person_gender,
+      country_id,
+      continent_id,
       'countries' AS metric,
       country_count AS metric_value
     FROM
-      person_activity_counts
+      person_period_metrics
+    WHERE
+      period_year IN (0, YEAR(CURRENT_DATE))
     UNION ALL
     SELECT
+      period_year,
       person_id,
+      person_gender,
+      country_id,
+      continent_id,
       'rounds' AS metric,
       round_count AS metric_value
     FROM
-      person_activity_counts
+      person_period_metrics
+    WHERE
+      period_year IN (0, YEAR(CURRENT_DATE))
     UNION ALL
     SELECT
+      period_year,
       person_id,
+      person_gender,
+      country_id,
+      continent_id,
       'solves' AS metric,
       official_solve_count AS metric_value
     FROM
-      person_activity_counts
+      person_period_metrics
+    WHERE
+      period_year IN (0, YEAR(CURRENT_DATE))
+  ),
+  cohorts AS (
+    SELECT
+      period_year,
+      person_id,
+      metric,
+      metric_value,
+      'world' AS scope,
+      CAST('' AS CHAR(16)) AS region_id,
+      'all' AS gender
+    FROM
+      metrics
+    UNION ALL
+    SELECT
+      period_year,
+      person_id,
+      metric,
+      metric_value,
+      'world',
+      '',
+      person_gender
+    FROM
+      metrics
+    UNION ALL
+    SELECT
+      period_year,
+      person_id,
+      metric,
+      metric_value,
+      'continent',
+      continent_id,
+      'all'
+    FROM
+      metrics
+    WHERE
+      continent_id <> ''
+    UNION ALL
+    SELECT
+      period_year,
+      person_id,
+      metric,
+      metric_value,
+      'continent',
+      continent_id,
+      person_gender
+    FROM
+      metrics
+    WHERE
+      continent_id <> ''
+    UNION ALL
+    SELECT
+      period_year,
+      person_id,
+      metric,
+      metric_value,
+      'country',
+      country_id,
+      'all'
+    FROM
+      metrics
+    WHERE
+      country_id <> ''
+    UNION ALL
+    SELECT
+      period_year,
+      person_id,
+      metric,
+      metric_value,
+      'country',
+      country_id,
+      person_gender
+    FROM
+      metrics
+    WHERE
+      country_id <> ''
   )
 SELECT
+  period_year,
   person_id,
   metric,
-  'world' AS scope,
-  CAST('' AS CHAR(16)) AS region_id,
-  'all' AS gender,
+  scope,
+  region_id,
+  gender,
+  0 AS is_provisional,
   metric_value,
   RANK() OVER (
     PARTITION BY
-      metric
+      period_year,
+      metric,
+      scope,
+      region_id,
+      gender
     ORDER BY
       metric_value DESC
   ) AS rank,
   ROW_NUMBER() OVER (
     PARTITION BY
-      metric
+      period_year,
+      metric,
+      scope,
+      region_id,
+      gender
     ORDER BY
       metric_value DESC,
       person_id
   ) AS position
 FROM
-  metrics
+  cohorts
 WHERE
   metric_value > 0;
 
 ALTER TABLE person_activity_rankings
-ADD PRIMARY KEY (metric, scope, region_id, gender, person_id),
+ADD PRIMARY KEY (
+  period_year,
+  metric,
+  scope,
+  region_id,
+  gender,
+  person_id
+),
 ADD INDEX idx_person_activity_rankings_page (
+  period_year,
   metric,
   scope,
   region_id,
@@ -173,21 +170,4 @@ ADD INDEX idx_person_activity_rankings_page (
   person_id
 );
 
--- phase: count common activity leaderboard rows
-CREATE TABLE person_activity_ranking_counts AS
-SELECT
-  metric,
-  scope,
-  region_id,
-  gender,
-  COUNT(*) AS count
-FROM
-  person_activity_rankings
-GROUP BY
-  metric,
-  scope,
-  region_id,
-  gender;
-
-ALTER TABLE person_activity_ranking_counts
-ADD PRIMARY KEY (metric, scope, region_id, gender);
+-- phase: count common person-statistic leaderboard rows

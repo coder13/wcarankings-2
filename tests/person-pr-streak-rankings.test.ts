@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { DEFAULT_PROJECTION_NAMES } from "@/data-tools/projection-catalog/tables";
-import { PROJECTION_REGISTRY } from "@/data-tools/projections/build/registry";
+import { DEFAULT_PROJECTION_NAMES } from "../data-tools/projection-catalog/tables";
+import { PROJECTION_REGISTRY } from "../data-tools/projections/build/registry";
 import {
   formatPrStreak,
   parsePersonPrStreakInput,
-} from "@/services/rankings/person-pr-streak";
-import { buildLazyPersonPrStreakQueryPlan } from "@/services/rankings/queries/person-pr-streak";
+} from "../apps/web/services/rankings/person-pr-streak";
+import { buildLazyPersonPrStreakQueryPlan } from "../apps/web/services/rankings/queries/person-pr-streak";
 
 type CompetitionOutcome = {
   competitionId: string;

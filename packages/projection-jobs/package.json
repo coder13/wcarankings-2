@@ -1,0 +1,18 @@
+{
+  "name": "@wcarankings/projection-jobs",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "bullmq": "^6.0.8",
+    "ioredis": "^6.0.0",
+    "mysql2": "^3.23.2",
+    "sql-template-tag": "^5.2.1"
+  },
+  "exports": {
+    ".": "./src/queue.ts",
+    "./metrics": "./src/metrics.ts",
+    "./processor": "./src/processor.ts",
+    "./supported": "./src/supported.ts",
+    "./status": "./src/status.ts"
+  }
+}

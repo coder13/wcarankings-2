@@ -1,4 +1,4 @@
-import { argumentList } from "../../lib/arguments.ts";
+import { argumentList } from "@wcarankings/cli";
 import { projectionBuildPlan } from "../../../data-tools/projections/build/plan.ts";
 
 async function main(): Promise<void> {

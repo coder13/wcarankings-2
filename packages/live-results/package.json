@@ -1,0 +1,6 @@
+{
+  "name": "@wcarankings/live-results",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts"
+}

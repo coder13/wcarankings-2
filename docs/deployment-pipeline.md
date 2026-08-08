@@ -42,7 +42,7 @@ The server deployment checks the active dataset schema version. It does not requ
 the active export or group fingerprints to equal those used by the new server.
 
 The immutable server release identity contains the app, Flyway, and data-tools
-digests plus checksums for `docker-compose.yml` and `ops/Caddyfile`. Caddy is only
+digests plus checksums for `docker/docker-compose.yml` and `ops/Caddyfile`. Caddy is only
 recreated when either Compose or Caddy configuration changed.
 
 ## Ranking-generation activation

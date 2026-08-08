@@ -1,4 +1,4 @@
-import { argumentPresent, argumentValue } from "../../lib/arguments.ts";
+import { argumentPresent, argumentValue } from "@wcarankings/cli";
 import { chunkProjectionDump } from "../../../data-tools/projections/transfer/chunk.ts";
 
 async function main(): Promise<void> {

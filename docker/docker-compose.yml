@@ -1,0 +1,175 @@
+services:
+  db:
+    image: mariadb:11.8
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE must be set}
+      MARIADB_USER: ${MYSQL_USER:?MYSQL_USER must be set}
+      MARIADB_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set}
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:13307:3306"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mariadb-admin ping -h 127.0.0.1 -u$$MARIADB_USER -p$$MARIADB_PASSWORD --silent",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  flyway:
+    image: ${FLYWAY_IMAGE_REF:-wcarankings-flyway:latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.flyway
+    environment:
+      FLYWAY_URL: jdbc:mariadb://db:3306/${MYSQL_DATABASE:?MYSQL_DATABASE must be set}
+      FLYWAY_USER: ${MYSQL_USER:?MYSQL_USER must be set}
+      FLYWAY_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set}
+      # Server deployment runs the app lane. Projection deployment explicitly
+      # selects the result lane after creating its candidate database.
+      FLYWAY_LOCATIONS: filesystem:/flyway/migrations/app
+      FLYWAY_TABLE: flyway_schema_history_app
+      # Production predates Flyway; baseline its existing V1 metadata table once.
+      FLYWAY_BASELINE_ON_MIGRATE: "true"
+      FLYWAY_CONNECT_RETRIES: 60
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    image: wcarankings-app:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      APP_COMMIT_SHA: ${DEPLOYED_MAIN_SHA:-unknown}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-5}
+      DATABASE_QUEUE_LIMIT: ${DATABASE_QUEUE_LIMIT:-20}
+      DATABASE_STATEMENT_TIMEOUT_MS: ${DATABASE_STATEMENT_TIMEOUT_MS:-10000}
+      WCA_CLIENT_ID: ${WCA_CLIENT_ID:-}
+      WCA_CLIENT_SECRET: ${WCA_CLIENT_SECRET:-}
+      WCA_REDIRECT_URI: ${WCA_REDIRECT_URI:-}
+      FEED_WORKER_URL: ${FEED_WORKER_URL:-http://background-worker:3010}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_CACHE_VERSION: ${REDIS_CACHE_VERSION:-1}
+      LIVE_RESULTS_POLLER_HEALTH_URL: ${LIVE_RESULTS_POLLER_HEALTH_URL:-http://live-results-worker:3011/health}
+      PROJECTION_WORKER_HEALTH_URL: ${PROJECTION_WORKER_HEALTH_URL:-http://projection-worker:3012/health}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  data-tools:
+    image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_CACHE_VERSION: ${REDIS_CACHE_VERSION:-1}
+      WCA_EXPORT_CACHE_DIR: /var/cache/wcarankings
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - wca_export_cache:/var/cache/wcarankings
+
+  background-worker:
+    image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
+    restart: unless-stopped
+    command: ["/app/scripts/background-worker.ts"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      LIST_RANKING_WORKER_POLL_MS: ${LIST_RANKING_WORKER_POLL_MS:-2000}
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: 3010
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_CACHE_VERSION: ${REDIS_CACHE_VERSION:-1}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  live-results-worker:
+    image: ${WORKERS_IMAGE_REF:-wcarankings-workers:latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.workers
+    restart: unless-stopped
+    command: ["/app/apps/live-results-worker/src/index.ts"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PROVISIONAL_RANKING_WORKER_POLL_MS: ${PROVISIONAL_RANKING_WORKER_POLL_MS:-2000}
+      PROVISIONAL_RANKING_WORKER_LEASE_SECONDS: ${PROVISIONAL_RANKING_WORKER_LEASE_SECONDS:-120}
+      LIVE_RESULTS_POLLER_HEALTH_PORT: 3011
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  projection-worker:
+    image: ${WORKERS_IMAGE_REF:-wcarankings-workers:latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.workers
+    restart: unless-stopped
+    command: ["/app/apps/projection-worker/src/index.ts"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PROJECTION_WORKER_HEALTH_PORT: 3012
+      PROJECTION_WORKER_CONCURRENCY: ${PROJECTION_WORKER_CONCURRENCY:-3}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  mariadb_data:
+  wca_export_cache:
+  caddy_data:
+  caddy_config:

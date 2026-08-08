@@ -16,7 +16,7 @@ This slice does not add source SQL, a home-feed change log, or a new ranking pro
 
 ## Recent home candidates
 
-The `/feed` endpoint reads competitions that ended during the last seven days. The query returns at most 50 trigger rows. It joins recent results to find event IDs.
+The `/api/feed` endpoint reads competitions that ended during the last seven days. The query returns at most 50 trigger rows. It joins recent results to find event IDs.
 
 The precomputation function accepts injected candidates. It keeps candidates that contain semantic change metadata. It does not scan ranking filters or generate source-specific variants.
 

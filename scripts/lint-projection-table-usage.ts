@@ -20,19 +20,21 @@ const SOURCE_DIRECTORIES: readonly SourceDirectory[] = [
     kind: "projection-sql",
   },
   {
-    directory: "services/lists",
+    directory: "apps/web/services/lists",
     extension: ".ts",
     kind: "runtime-reference",
   },
   {
-    directory: "services/rankings",
+    directory: "apps/web/services/rankings",
     extension: ".ts",
     kind: "runtime-reference",
   },
-  { directory: "lib", extension: ".ts", kind: "runtime-sql" },
+  { directory: "apps/web/lib", extension: ".ts", kind: "runtime-sql" },
 ];
 
-const IGNORED_RUNTIME_FILES = new Set(["services/rankings/metadata.ts"]);
+const IGNORED_RUNTIME_FILES = new Set([
+  "apps/web/services/rankings/metadata.ts",
+]);
 
 async function filesBelow(
   rootDirectory: string,

@@ -1,0 +1,48 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { ApiInputError } from "@/lib/api/projection";
+import { parseListRankingInput } from "@/services/lists/input";
+
+test("normalizes list ranking query parameters", () => {
+  const input = parseListRankingInput(
+    new URLSearchParams({
+      eventId: "444",
+      result: "average",
+      start: "25",
+      limit: "5000",
+      search: " Max ",
+    }),
+  );
+  assert.deepEqual(input, {
+    eventId: "444",
+    type: "average",
+    start: 25,
+    limit: 50,
+    search: "Max",
+    locate: "",
+    region: { scope: "world", regionId: "" },
+    gender: [],
+    membershipVersion: null,
+    rankingsDataVersion: null,
+  });
+});
+
+test("forces Multi-Blind to single rankings", () => {
+  const input = parseListRankingInput(
+    new URLSearchParams({
+      eventId: "333mbf",
+      result: "average",
+    }),
+  );
+  assert.equal(input.type, "single");
+});
+
+test("rejects legacy ranking parameter names", () => {
+  assert.throws(
+    () =>
+      parseListRankingInput(
+        new URLSearchParams({ event: "444", type: "average" }),
+      ),
+    ApiInputError,
+  );
+});

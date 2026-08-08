@@ -82,6 +82,7 @@ WITH
   )
 SELECT
   values_by_competition.*,
+  0 AS is_provisional,
   CASE
     WHEN fastest_single IS NOT NULL THEN RANK() OVER (
       PARTITION BY

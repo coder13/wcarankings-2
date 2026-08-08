@@ -1,4 +1,4 @@
-import { databaseOptions } from "./lib/database.ts";
+import { databaseOptions } from "@wcarankings/database";
 import mysql from "mysql2/promise";
 import { buildProjectionTables } from "../data-tools/projections/build/builder.ts";
 

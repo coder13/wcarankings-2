@@ -295,7 +295,7 @@ esac
 
 probe_core() {
   curl --fail --silent --show-error --max-time 2 \
-    "http://127.0.0.1:3000/api/rankings?eventId=333&result=single&start=0&limit=1" \
+    "http://127.0.0.1:3000/api/persons/rankings?eventId=333&result=single&start=0&limit=1" \
     > /dev/null
 }
 for probe in 1 2 3; do
@@ -458,21 +458,21 @@ retry_endpoint() {
   done
   return 1
 }
-retry_endpoint "/api/rankings?eventId=333&result=single&start=0&limit=1"
+retry_endpoint "/api/persons/rankings?eventId=333&result=single&start=0&limit=1"
 case ",$PROJECTION_GROUPS," in
-  *,result-rankings,*) retry_endpoint "/api/rankings/results?eventId=333&result=single&start=0&limit=1" ;;
+  *,result-rankings,*) retry_endpoint "/api/persons/results?eventId=333&result=single&start=0&limit=1" ;;
 esac
 case ",$PROJECTION_GROUPS," in
-  *,yearly-person-rankings,*) retry_endpoint "/api/rankings?eventId=333&result=single&year=2024&start=0&limit=1&paged=1" ;;
+  *,yearly-person-rankings,*) retry_endpoint "/api/persons/rankings?eventId=333&result=single&year=2024&start=0&limit=1&paged=1" ;;
 esac
 case ",$PROJECTION_GROUPS," in
-  *,sum-of-ranks,*) retry_endpoint "/api/rankings?eventId=SOR&result=single&start=0&limit=10" ;;
+  *,sum-of-ranks,*) retry_endpoint "/api/persons/rankings?eventId=SOR&result=single&start=0&limit=10" ;;
 esac
 case ",$PROJECTION_GROUPS," in
-  *,competition-rankings,*) retry_endpoint "/api/rankings/competitions?ranking=competitor-count&start=0&limit=10" ;;
+  *,competition-rankings,*) retry_endpoint "/api/competitions/competitor-count?start=0&limit=10" ;;
 esac
 case ",$PROJECTION_GROUPS," in
-  *,person-competition-rankings,*) retry_endpoint "/api/rankings/people/competitions?start=0&limit=1" ;;
+  *,person-competition-rankings,*) retry_endpoint "/api/persons/competitions?start=0&limit=1" ;;
 esac
 
 dc exec -T \

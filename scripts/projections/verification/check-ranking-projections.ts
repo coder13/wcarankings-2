@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import { databaseOptions } from "../../lib/database.ts";
+import { databaseOptions } from "@wcarankings/database";
 import { inspectRankingProjections } from "../../../data-tools/projections/verification/check.ts";
 
 async function main(): Promise<void> {

@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import mysql, { type RowDataPacket } from "mysql2/promise";
 import { statements } from "../data-tools/projections/build/sql.ts";
-import { databaseOptions } from "./lib/database.ts";
+import { databaseOptions } from "@wcarankings/database";
 
 const BUILD_TARGET_MS = 10 * 60 * 1_000;
 const SCROLL_TARGET_MS = 2_500;

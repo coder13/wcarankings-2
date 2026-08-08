@@ -1,0 +1,782 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 80%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 2rem 1rem 5.5rem;
+  color: var(--text-strong);
+  font-family: Arial, sans-serif;
+}
+
+.appHeader {
+  width: 100%;
+  padding-bottom: 0.5rem;
+}
+
+.navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+}
+
+.navigation a {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.4rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.navigation a:hover,
+.navigation a:focus-visible {
+  background: var(--surface-muted);
+  color: var(--text-strong);
+  outline: none;
+}
+
+.navigation a[aria-current="page"] {
+  background: var(--surface-muted);
+  color: var(--text-strong);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+}
+
+.header h1 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 2rem;
+  font-weight: 500;
+}
+
+.header p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.status {
+  display: inline-block;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.4rem;
+  background: var(--surface-muted);
+  white-space: nowrap;
+}
+
+.statusGroup {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.healthy {
+  background: color-mix(in srgb, var(--record-national) 16%, var(--surface));
+  color: var(--record-national);
+}
+
+.degraded {
+  background: color-mix(in srgb, var(--error) 16%, var(--surface));
+  color: var(--error);
+}
+
+.unknown {
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.card {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  box-shadow: 0 2px 8px var(--shadow-soft);
+}
+
+.card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cardHeader h2 {
+  margin-bottom: 0.25rem;
+}
+
+.cardHeader p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.cardHeader button {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text-strong);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cardHeader button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.sourcesTable {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.sourcesTable th,
+.sourcesTable td {
+  padding: 0.75rem;
+  vertical-align: middle;
+}
+
+.sourcesTable th {
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sourcesTable thead,
+.sourcesTable tbody tr:not(:last-child) {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sourcesTable tbody tr {
+  background: var(--surface);
+}
+
+.sourcesTable tbody tr:hover {
+  background: var(--surface-muted);
+}
+
+.jobStatsTable {
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.82rem;
+}
+
+.jobStatsTable th,
+.jobStatsTable td {
+  padding: 0.5rem 0.35rem;
+  white-space: nowrap;
+}
+
+.jobStatsTable th:first-child,
+.jobStatsTable td:first-child {
+  width: 35%;
+  text-align: left;
+}
+
+.jobStatsTable th:nth-child(2),
+.jobStatsTable th:nth-child(3),
+.jobStatsTable th:nth-child(4),
+.jobStatsTable th:nth-child(5),
+.jobStatsTable td:nth-child(2),
+.jobStatsTable td:nth-child(3),
+.jobStatsTable td:nth-child(4),
+.jobStatsTable td:nth-child(5) {
+  width: 4em;
+}
+
+.jobStatsTable th:nth-child(6),
+.jobStatsTable th:nth-child(7),
+.jobStatsTable th:nth-child(8),
+.jobStatsTable td:nth-child(6),
+.jobStatsTable td:nth-child(7),
+.jobStatsTable td:nth-child(8) {
+  width: 5em;
+}
+
+.jobStatsTable th:not(:first-child),
+.jobStatsTable td:not(:first-child) {
+  text-align: center;
+}
+
+.jobStatsTable td:nth-child(7) {
+  text-align: right;
+}
+
+.jobStatGroup + .jobStatGroup {
+  margin-top: 1.5rem;
+}
+
+.jobStatGroup h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.jobStatsTable tbody tr.jobStatClear,
+.jobStatsTable tbody tr.jobStatClear:hover {
+  background: color-mix(in srgb, var(--record-national) 8%, var(--surface));
+}
+
+.jobStatsTable tbody tr.jobStatActive,
+.jobStatsTable tbody tr.jobStatActive:hover {
+  background: color-mix(in srgb, var(--secondary) 10%, var(--surface));
+}
+
+.jobStatsTable tbody tr.jobStatWaiting,
+.jobStatsTable tbody tr.jobStatWaiting:hover {
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.jobStatsTable tbody tr.jobStatFailed,
+.jobStatsTable tbody tr.jobStatFailed:hover {
+  background: color-mix(in srgb, var(--error) 9%, var(--surface));
+}
+
+.queueTable {
+  min-width: 620px;
+  table-layout: fixed;
+}
+
+.queueTable td {
+  vertical-align: top;
+}
+
+.queueTable th:nth-child(1) {
+  width: 5.75rem;
+}
+
+.queueTable th:nth-child(3) {
+  width: calc(5.75rem + 1em);
+}
+
+.queueTable th:nth-child(4) {
+  width: 6rem;
+}
+
+.queueTable th:nth-child(5) {
+  width: 4.5rem;
+}
+
+.queueTable th:nth-child(4),
+.queueTable td:nth-child(4),
+.queueTable th:nth-child(5),
+.queueTable td:nth-child(5) {
+  text-align: center;
+}
+
+.queueTable th:nth-child(6) {
+  width: 7rem;
+}
+
+.queueTable th:last-child,
+.queueTable td:last-child {
+  padding-right: 1rem;
+}
+
+.queueTable .tableAction {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.queueActions {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.tableSection {
+  margin-top: 1.5rem;
+}
+
+.tableSection .cardHeader {
+  margin-bottom: 0.75rem;
+}
+
+.tableEmpty {
+  padding: 1.5rem 0.75rem;
+  color: var(--text-secondary);
+}
+
+.tableAction {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text-strong);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.tableAction:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.tableAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.dangerButton {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--error);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--error);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--error) 12%, var(--surface));
+}
+
+.dangerButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.selectionCell {
+  width: 1%;
+}
+
+.selectionCell input {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+
+.competitionCell {
+  min-width: 15rem;
+}
+
+.competitionCell strong,
+.competitionCell span,
+.dateTime,
+.dateTime span {
+  display: block;
+}
+
+.competitionCell span,
+.dateTime span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.competitionCell strong {
+  margin-bottom: 0.15rem;
+}
+
+.competitionIdentity {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.competitionCell .competitionFlag {
+  flex: 0 0 auto;
+  color: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.jobCell {
+  overflow-wrap: anywhere;
+}
+
+.jobCell strong,
+.jobCell span {
+  display: block;
+}
+
+.jobCell strong {
+  margin-bottom: 0.15rem;
+}
+
+.jobCell span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.provider,
+.success,
+.pending,
+.empty {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.provider {
+  display: inline-block;
+  padding: 0.2rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  white-space: nowrap;
+}
+
+.queueState {
+  display: inline-block;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.queueStateWaiting {
+  background: color-mix(in srgb, var(--secondary) 18%, var(--surface));
+  color: var(--secondary);
+}
+
+.queueStatePrioritized {
+  background: color-mix(in srgb, var(--record-continent) 16%, var(--surface));
+  color: var(--record-continent);
+}
+
+.queueStateDelayed {
+  background: color-mix(in srgb, var(--secondary) 18%, var(--surface));
+  color: var(--secondary);
+}
+
+.queueStateActive {
+  background: color-mix(in srgb, var(--record-national) 16%, var(--surface));
+  color: var(--record-national);
+}
+
+.queueStateFailed {
+  background: color-mix(in srgb, var(--error) 16%, var(--surface));
+  color: var(--error);
+}
+
+.pollCell {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dateTime {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.queueElapsed {
+  display: table-cell;
+  text-align: center;
+  color: var(--record-national);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dateTime span:first-child {
+  color: var(--text-strong);
+}
+
+.statusCell {
+  min-width: 14rem;
+}
+
+.success {
+  color: var(--record-national);
+  font-weight: 600;
+}
+
+.pending {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.error {
+  display: block;
+  color: var(--error);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.unsupported {
+  display: block;
+  color: var(--error);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.inlineAction {
+  display: inline-block;
+  min-height: 1.8rem;
+  margin: 0.35rem 0 0;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.inlineAction:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.card h3 {
+  margin: 1.25rem 0 0.75rem;
+  font-size: 1rem;
+}
+
+.settingsForm {
+  display: grid;
+  max-width: 28rem;
+  gap: 1rem;
+}
+
+.settingsField {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.settingsField input {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: inherit;
+}
+
+.settingsForm p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.settingsForm button {
+  justify-self: start;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text-strong);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.settingsForm button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.85rem;
+  margin: 0;
+}
+
+.metric {
+  padding: 0.7rem;
+  background: var(--surface-muted);
+  border-radius: 0.35rem;
+}
+
+.metric dt {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.metric dd {
+  margin: 0.35rem 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.alert {
+  padding: 0.9rem;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--error) 16%, var(--surface));
+  color: var(--error);
+}
+
+.alertSuccess {
+  background: color-mix(in srgb, var(--record-national) 16%, var(--surface));
+  color: var(--record-national);
+}
+
+.alertInfo {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  color: var(--primary);
+}
+
+.alertError {
+  background: color-mix(in srgb, var(--error) 16%, var(--surface));
+  color: var(--error);
+}
+
+.adminFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  min-height: 3.5rem;
+  padding: 0.65rem 1rem;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface);
+  box-shadow: 0 -2px 8px var(--shadow-soft);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.footerWorkers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.footerStatus,
+.footerQueue {
+  padding: 0.25rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  white-space: nowrap;
+}
+
+.footerStatus.healthy {
+  background: color-mix(in srgb, var(--record-national) 16%, var(--surface));
+}
+
+.footerStatus.degraded {
+  background: color-mix(in srgb, var(--error) 16%, var(--surface));
+}
+
+.failures {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.failures li {
+  margin: 0.5rem 0;
+}
+
+@media (max-width: 1023px) {
+  .page {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .header {
+    display: block;
+  }
+
+  .status {
+    margin-top: 1rem;
+  }
+
+  .statusGroup {
+    justify-content: flex-start;
+  }
+
+  .cardHeader {
+    display: block;
+  }
+
+  .cardHeader button {
+    margin-top: 0.85rem;
+  }
+
+  .jobStatsTable {
+    font-size: 0.68rem;
+  }
+
+  .jobStatsTable th,
+  .jobStatsTable td {
+    padding: 0.35rem 0.18rem;
+  }
+
+  .jobStatsTable th {
+    letter-spacing: 0;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .jobStatsTable th:first-child,
+  .jobStatsTable td:first-child {
+    width: 25%;
+  }
+
+  .jobStatsTable td:first-child {
+    white-space: normal;
+  }
+
+  .jobStatsTable th:last-child,
+  .jobStatsTable td:last-child {
+    display: none;
+  }
+
+  .adminFooter {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 0.65rem 1rem;
+  }
+
+  .footerWorkers {
+    flex-direction: column;
+  }
+
+  .page {
+    padding-bottom: 10rem;
+  }
+}

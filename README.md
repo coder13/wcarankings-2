@@ -10,13 +10,17 @@ Install dependencies and create a local environment:
 
 ```bash
 pnpm install
-cp .env.example .env.local
+bun scripts/ensure-local-env.ts
 ```
+
+Every local app process and worker loads the repository-root `.env.local` file.
+If this worktree has no file, the setup command copies it from
+`~/projects/wcarankings-2/.env.local`. Keep the main worktree file current.
 
 For a local Node process, change `DATABASE_URL` in `.env.local` from the Compose hostname `db` to `127.0.0.1:13307`, then start MariaDB:
 
 ```bash
-docker compose up -d db
+docker compose -f docker/docker-compose.yml up -d db
 pnpm run dev
 ```
 
@@ -55,7 +59,8 @@ to check SQL files without changing them.
 
 Storybook runs the client-side rankings explorer with deterministic preview data
 at `http://localhost:6006`, so it does not require MariaDB or a WCA export.
-The main page lives in `app/page.tsx`. UI components live in `components/`;
+The main page lives in `apps/web/app/page.tsx`. UI components live in
+`apps/web/components/`;
 each component folder contains its source, Storybook stories, and colocated unit
 tests.
 
@@ -83,14 +88,14 @@ Run Flyway before enabling sign-in so the user and session tables exist.
 ## Repository layout
 
 ```text
-app/                         React UI and API routes
-db/                          MySQL connection pool
+apps/web/app/                React UI and API routes
+apps/web/db/                 MySQL connection pool
 migrations/mysql/            Flyway versioned MariaDB migrations
 sql/ranking-projections/     Readable SQL for daily derived ranking projections
-Dockerfile.flyway             Pinned Flyway migration image
+docker/Dockerfile.flyway      Pinned Flyway migration image
 scripts/sync-wca-export.ts  WCA SQL export downloader and importer
-Dockerfile                   Multi-stage production image
-docker-compose.yml           MariaDB + app services
+docker/Dockerfile             Multi-stage production image
+docker/docker-compose.yml     MariaDB + app services
 ```
 
 See [docs/projection-architecture.md](docs/projection-architecture.md) for the

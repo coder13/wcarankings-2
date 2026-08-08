@@ -34,6 +34,15 @@ export const CORE_RANKING_TABLE_TASKS: readonly RankingTableTaskDefinition[] = [
     table: "ranking_entries_average",
     estimatedDurationMs: 120_000,
   },
+  {
+    name: "ranking-tables-counts",
+    dependencies: [
+      "ranking-tables-entries-single",
+      "ranking-tables-entries-average",
+    ],
+    table: "ranking_counts",
+    estimatedDurationMs: 15_000,
+  },
 ];
 
 // Source-view tasks coordinate dependencies but do not create a published
@@ -141,6 +150,19 @@ export function rankingTableTasks(
         "core/ranking-tables/ranking_entries_indexes.sql",
         tableProgress,
       ),
+    "ranking-tables-counts": async (connection: ProjectionConnection) => {
+      await runTimedBuildStep(
+        "table ranking_counts",
+        async () => {
+          for (const statement of statements(
+            await projectionSql("core/ranking-tables/ranking_counts.sql"),
+          )) {
+            await connection.query(statement);
+          }
+        },
+        { tableProgress, tableName: "ranking_counts" },
+      );
+    },
   };
   return CORE_RANKING_TABLE_TASKS.map((task) => ({
     ...task,

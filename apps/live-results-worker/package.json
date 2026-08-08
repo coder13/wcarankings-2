@@ -1,0 +1,21 @@
+{
+  "name": "@wcarankings/live-results-worker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@wcarankings/cli": "workspace:*",
+    "@wcarankings/database": "workspace:*",
+    "@wcarankings/live-results": "workspace:*",
+    "@wcarankings/projection-jobs": "workspace:*",
+    "@wcarankings/worker-health": "workspace:*",
+    "@wcarankings/worker-logging": "workspace:*"
+  },
+  "scripts": {
+    "run": "bun ../../scripts/ensure-local-env.ts && bun --cwd=../.. --env-file=.env.local apps/live-results-worker/src/index.ts",
+    "dev": "bun ../../scripts/ensure-local-env.ts && bun --cwd=../.. --env-file=.env.local --watch apps/live-results-worker/src/index.ts",
+    "poll": "bun ../../scripts/ensure-local-env.ts && bun --cwd=../.. --env-file=.env.local apps/live-results-worker/src/index.ts --once",
+    "register": "bun ../../scripts/ensure-local-env.ts && bun --cwd=../.. --env-file=.env.local apps/live-results-worker/src/register-source.ts",
+    "lint": "eslint src",
+    "typecheck": "bunx tsc --project ../../tsconfig.data-tools.json"
+  }
+}

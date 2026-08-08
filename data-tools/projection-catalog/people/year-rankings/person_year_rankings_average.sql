@@ -138,6 +138,7 @@ SELECT
   candidate.person_id,
   candidate.result_id,
   candidate.result_value,
+  0 AS is_provisional,
   RANK() OVER (
     PARTITION BY
       candidate.ranking_year,
@@ -161,7 +162,12 @@ FROM
   AND cohort.region_id = candidate.region_id;
 
 ALTER TABLE person_year_rankings_average
-ADD PRIMARY KEY (year, event_id, cohort_id, person_id),
+ADD PRIMARY KEY (
+  year,
+  event_id,
+  cohort_id,
+  person_id
+),
 ADD INDEX idx_person_year_average_browse (year, event_id, cohort_id, position, person_id),
 ADD INDEX idx_person_year_average_value (
   year,

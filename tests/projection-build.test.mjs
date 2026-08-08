@@ -295,11 +295,7 @@ test("a full schema refresh keeps the default semantic projections when selectio
 });
 
 test("result-fact consumers never start from raw WCA tables alone", () => {
-  for (const name of [
-    "sum-of-ranks",
-    "person-medal-rankings",
-    "person-pr-streak-rankings",
-  ]) {
+  for (const name of ["person-medal-rankings", "person-pr-streak-rankings"]) {
     const projection = PROJECTION_REGISTRY.find(
       (candidate) => candidate.name === name,
     );
@@ -322,7 +318,7 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
   assert.ok(activity, "person-activity-rankings is registered");
   assert.deepEqual(activity.dependencies, ["person-period-metrics"]);
   assert.equal(activity.enabledByDefault, false);
-  assert.equal(activity.estimatedDurationMs, 45_000);
+  assert.equal(activity.estimatedDurationMs, 180_000);
   for (const name of [
     "ranking-tables-entries-single-source",
     "ranking-tables-entries-average-source",
@@ -356,6 +352,86 @@ test("shared person grains build once and feed their downstream rankings", () =>
     ).dependencies,
     ["person-event-bests"],
   );
+  assert.deepEqual(
+    PROJECTION_REGISTRY.find((candidate) => candidate.name === "sum-of-ranks")
+      .dependencies,
+    ["person-event-bests"],
+  );
+});
+
+test("Sum of Ranks reuses historical person event bests", async () => {
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/people/sum-of-ranks/person_sum_of_ranks_scores.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(sql, /FROM\s+person_event_bests/);
+  assert.match(sql, /period_year\s*=\s*0/);
+  assert.doesNotMatch(sql, /result_facts/);
+  assert.doesNotMatch(sql, /ranks_single/);
+  assert.doesNotMatch(sql, /ranks_average/);
+  assert.doesNotMatch(sql, /sum_of_ranks_historical_results/);
+});
+
+test("all-time person event bests preserve historical countries", async () => {
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/people/shared/person_event_bests.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(
+    sql,
+    /PARTITION BY\s+facts\.person_id,\s+facts\.event_id,\s+facts\.person_country_id/,
+  );
+});
+
+test("person event rankings map provisional values to their declared column", async () => {
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/people/event-rankings/person_event_rankings.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const insertColumns = sql.match(
+    /INSERT INTO\s+person_event_rankings\s*\((?<columns>[\s\S]*?)\)\s*WITH/,
+  )?.groups?.columns;
+  const tableColumns = sql.match(
+    /CREATE TABLE person_event_rankings\s*\((?<columns>[\s\S]*?)\n\);/,
+  )?.groups?.columns;
+
+  assert.ok(insertColumns);
+  assert.ok(tableColumns);
+  const declaredColumns = tableColumns
+    .match(/^\s*(\w+)\s+/gm)
+    ?.map((column) => column.trim().split(/\s+/, 1)[0]);
+  const selectedColumns = insertColumns
+    .match(/^\s*(\w+),?\s*$/gm)
+    ?.map((column) => column.trim().replace(/,$/, ""));
+
+  assert.deepEqual(selectedColumns, declaredColumns);
+  assert.deepEqual(selectedColumns, [
+    "person_id",
+    "event_id",
+    "result_type",
+    "result_id",
+    "result_value",
+    "country_id",
+    "continent_id",
+    "gender",
+    "world_rank",
+    "world_position",
+    "continent_rank",
+    "continent_position",
+    "country_rank",
+    "country_position",
+    "is_provisional",
+  ]);
+  assert.match(sql, /\) AS country_position,\s+0 AS is_provisional\s+FROM/);
 });
 
 test("person activity rankings keep only the three new activity metrics", async () => {
@@ -366,9 +442,11 @@ test("person activity rankings keep only the three new activity metrics", async 
     ),
     "utf8",
   );
-  assert.match(sql, /FROM person_period_metrics/);
   assert.match(sql, /'countries' AS metric/);
   assert.match(sql, /country_count AS metric_value/);
+  assert.match(sql, /round_count AS metric_value/);
+  assert.match(sql, /official_solve_count AS metric_value/);
+  assert.match(sql, /FROM\s+person_period_metrics/);
   assert.match(sql, /CAST\('' AS CHAR\(16\)\) AS region_id/);
   assert.doesNotMatch(sql, /competition_count/);
 });
@@ -445,13 +523,13 @@ test("core ranking-table build contains only active ranking tables", () => {
     ({ name }) => name === "ranking-tables-entries-average-source",
   );
   assert.deepEqual(averageSource.dependencies, ["projection:result-facts"]);
-  assert.equal(CORE_RANKING_TABLE_TASK_COUNT, 2);
+  assert.equal(CORE_RANKING_TABLE_TASK_COUNT, 3);
   const progress = createTableProgress(CORE_RANKING_TABLE_TASK_COUNT);
   let lastProgress;
   for (const task of CORE_RANKING_TABLE_TASKS) {
     if (task.table) lastProgress = progress.start(task.table);
   }
-  assert.equal(lastProgress, "[2/2]");
+  assert.equal(lastProgress, "[3/3]");
 });
 
 test("core ranking-table source views wait for result facts", async () => {

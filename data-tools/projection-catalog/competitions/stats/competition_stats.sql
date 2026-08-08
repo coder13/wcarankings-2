@@ -31,6 +31,7 @@ WITH
   )
 SELECT
   competition_values.*,
+  0 AS is_provisional,
   CASE
     WHEN competitor_count > 0 THEN DENSE_RANK() OVER (
       PARTITION BY

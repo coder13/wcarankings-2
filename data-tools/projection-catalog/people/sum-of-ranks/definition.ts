@@ -2,7 +2,7 @@ import type { ProjectionJob } from "../../types.ts";
 
 export const sumOfRanksJob = {
   id: "sum-of-ranks",
-  dependencies: ["result-facts"],
+  dependencies: ["person-event-bests"],
   sqlFiles: ["people/sum-of-ranks/person_sum_of_ranks_scores.sql"],
   tables: ["person_sum_of_ranks_scores"],
   releaseGroup: "sum-of-ranks",

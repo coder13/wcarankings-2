@@ -82,7 +82,8 @@ raw results + dimensions
     ├── person_event_bests
     │   ├── person_event_rankings
     │   └── yearly person rankings
-    └── city, competition, and Sum-of-Ranks projections
+    │   └── Sum-of-Ranks and Kinch projections
+    └── city and competition projections
 ```
 
 Registration alone does not activate a future projection. Only the explicit
@@ -737,8 +738,8 @@ materialized cohort rankings after measurement.
 The active semantic surface is exposed through:
 
 ```text
-GET /api/people/search
-GET /api/rankings
+GET /api/persons/search
+GET /api/persons/rankings
 ```
 
 Sum of Ranks is represented as the synthetic event `eventId=SOR` on the same
@@ -800,10 +801,10 @@ The first targeted all-results backfill ran on 2026-07-29 against 6,750,045 raw
 `results` rows. The logical projection was split into physical Single and
 Average tables to bound peak window-sort space:
 
-| Table                     |         Rows |      Data |    Indexes |            Build time |
-| ------------------------- | -----------: | --------: | ---------: | --------------------: |
-| `result_rankings_single`  |    6,564,373 | 911.0 MiB |  888.8 MiB | about 4m 15s observed |
-| `result_rankings_average` |    5,890,382 | 818.0 MiB |  797.8 MiB |              3m 40.4s |
+| Table                     |                 Rows |                         Data |                      Indexes |            Build time |
+| ------------------------- | -------------------: | ---------------------------: | ---------------------------: | --------------------: |
+| `result_rankings_single`  |            6,564,373 |                    911.0 MiB |                    888.8 MiB | about 4m 15s observed |
+| `result_rankings_average` |            5,890,382 |                    818.0 MiB |                    797.8 MiB |              3m 40.4s |
 | Runtime filtered totals   | serving-table counts | measured with API query time | measured with API query time | measured in benchmark |
 
 The first Single timer wrapper exited after the SQL succeeded because it used a

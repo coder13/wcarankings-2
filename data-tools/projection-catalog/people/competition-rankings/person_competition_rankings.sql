@@ -15,7 +15,8 @@ WITH
       INNER JOIN persons person ON person.wca_id = counts.person_id
       AND person.sub_id = 1
       LEFT JOIN countries country ON country.id = person.country_id
-    WHERE counts.period_year = 0
+    WHERE
+      counts.period_year = 0
   ),
   cohorts AS (
     SELECT
@@ -86,6 +87,7 @@ SELECT
   scope,
   region_id,
   gender,
+  0 AS is_provisional,
   RANK() OVER (
     PARTITION BY
       scope,

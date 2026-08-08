@@ -1,0 +1,24 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "playwright.list-e2e.config.mjs",
+    "playwright.visual-smoke.config.mjs",
+    "public/sw.js",
+    "scripts/server-component-fingerprints.ts",
+    "scripts/validate-pages.ts",
+    "scripts/benchmark-ranking-scroll.ts",
+    "scripts/benchmark-ranking-*.ts",
+    "../../scripts/clear-redis-cache.ts",
+    "../../scripts/generate-feed.ts",
+    "tests/database-timeout.integration.ts",
+    "../../tests/person-pr-streak-rankings.test.ts"
+  ],
+  "ignoreBinaries": ["mariadb"],
+  "ignoreDependencies": ["ioredis", "redis", "tailwindcss"],
+  "ignoreFiles": ["services/feeds/sor-benchmark.ts"],
+  "ignoreIssues": {
+    "services/cache/redis.ts": ["exports"],
+    "services/feeds/stat-previews.ts": ["exports"],
+    "services/rankings/person-pr-streak.ts": ["exports"]
+  }
+}

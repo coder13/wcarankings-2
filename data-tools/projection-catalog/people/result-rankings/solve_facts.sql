@@ -9,7 +9,10 @@ SELECT
   attempt.attempt_number,
   facts.event_id,
   facts.person_id,
-  facts.gender,
+  CASE
+    WHEN person.gender IN ('m', 'f') THEN person.gender
+    ELSE 'o'
+  END AS gender,
   facts.competition_id,
   facts.competition_start_date,
   facts.person_country_id AS country_id,
@@ -21,6 +24,8 @@ SELECT
   END AS record_code
 FROM
   result_facts facts
+  LEFT JOIN persons person ON person.wca_id = facts.person_id
+  AND person.sub_id = 1
   STRAIGHT_JOIN result_attempts attempt ON attempt.result_id = facts.result_id
 WHERE
   attempt.value > 0;

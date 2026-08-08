@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import mysql from "mysql2/promise";
-import { argumentValue } from "../../lib/arguments.ts";
-import { databaseOptions } from "../../lib/database.ts";
+import { argumentValue } from "@wcarankings/cli";
+import { databaseOptions } from "@wcarankings/database";
 import {
   activateGeneration,
   bootstrapGenerationState,

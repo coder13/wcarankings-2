@@ -7,7 +7,7 @@ import type {
   TimedBuildStepResult,
 } from "./progress-types.ts";
 
-export const BUILD_HEARTBEAT_INTERVAL_MS = 60_000;
+const BUILD_HEARTBEAT_INTERVAL_MS = 60_000;
 
 export function elapsedMs(startedAt: BuildStartTime): number {
   return Math.round(performance.now() - startedAt);

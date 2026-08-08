@@ -4,23 +4,32 @@ SELECT
   facts.competition_year AS year,
   facts.event_id,
   facts.person_id,
-  facts.gender AS person_gender,
+  CASE
+    WHEN person.gender IN ('m', 'f') THEN person.gender
+    ELSE 'o'
+  END AS person_gender,
   facts.person_country_id AS country_id,
   facts.person_continent_id AS continent_id,
+  0 AS is_provisional,
   SUM(facts.position = 1) AS gold_count,
   SUM(facts.position = 2) AS silver_count,
   SUM(facts.position = 3) AS bronze_count
 FROM
   result_facts facts
+  LEFT JOIN persons person ON person.wca_id = facts.person_id
+  AND person.sub_id = 1
 WHERE
   facts.is_final_round = 1
   AND facts.position BETWEEN 1 AND 3
-  AND (facts.best > 0 OR facts.average > 0)
+  AND (
+    facts.best > 0
+    OR facts.average > 0
+  )
 GROUP BY
   facts.competition_year,
   facts.event_id,
   facts.person_id,
-  facts.gender,
+  person.gender,
   facts.person_country_id,
   facts.person_continent_id;
 
@@ -33,12 +42,7 @@ ADD INDEX idx_person_medal_scores_continent (
   person_gender,
   person_id
 ),
-ADD INDEX idx_person_medal_scores_gender (
-  person_gender,
-  year,
-  event_id,
-  person_id
-);
+ADD INDEX idx_person_medal_scores_gender (person_gender, year, event_id, person_id);
 
 -- phase: build all-time medal leaderboard rows
 CREATE TABLE person_medal_rankings AS
@@ -185,6 +189,7 @@ SELECT
   region_id,
   medal_type,
   medal_count,
+  0 AS is_provisional,
   RANK() OVER (
     PARTITION BY
       medal_type,

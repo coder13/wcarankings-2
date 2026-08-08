@@ -64,6 +64,43 @@ The new temporary solve stage completed in `130.44 s` (`02:10.44`) in the
 local profile. The complete post-change result-ranking build remains pending
 until the current branch finishes focused validation.
 
+## Live overlay policy
+
+Live polling does not rewrite this materialized table. Active provisional
+competition snapshots are a small read-time overlay. The request reads a
+bounded base window, merges the relevant live attempts, and returns the final
+page order.
+
+A public rank is `1 + the number of better results`. For an official base row,
+the stored rank is adjusted by the count of live attempts with a lower value.
+The code never adds two rank numbers. A live row uses the first official base
+row at or after its value as an anchor, then applies the same small adjustment.
+
+The overlay contains only active, un-reconciled competition snapshots. The
+official incremental worker in issue 247 must remove a snapshot only after it
+has replaced the authoritative competition data and compacted the affected
+ranking partition.
+
+## Retired provisional rebuild policy
+
+One changed live event creates one Single rebuild for each supported period.
+Each rebuild calculates World, continent, country, and gender rank columns in
+one query. It replaces the former separate scope and gender jobs.
+
+The live poller compares the changed attempt array with the stored array. A
+name or placing change does not create this rebuild. An invalid attempt also
+does not create it. The worker repeats the valid-attempt check before it starts
+the rebuild.
+
+On 2026-08-08, the Bespin read-only benchmark processed the all-time 6x6
+Single candidate and window stage in `15.864 s`. This measurement excludes the
+upsert and serving-index updates.
+
+The same database has 1,358,662 all-time 5x5 Single rows. Its fastest live 5x5
+value was `4258`, which moves 1,354,164 rows. A read-only suffix count took
+`20.594 s`. An exact stored update must also update rank and position indexes.
+The current direct rebuild is not a seconds-scale operation for this case.
+
 ## Request policy
 
 World, continent, and country pages use stored positions. A request must select

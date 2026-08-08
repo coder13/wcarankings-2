@@ -7,6 +7,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  COMPOSE_FILE: docker/docker-compose.yml
+
 concurrency:
   group: pull-request-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -124,7 +127,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.flyway
+          file: docker/Dockerfile.flyway
           load: true
           push: false
           tags: |
@@ -155,9 +158,18 @@ jobs:
             --password="$MYSQL_PASSWORD" \
             "$MYSQL_DATABASE" \
             --execute="CREATE TABLE IF NOT EXISTS export_metadata (\`key\` VARCHAR(64) NOT NULL PRIMARY KEY, \`value\` TEXT NOT NULL); CREATE TABLE IF NOT EXISTS result_attempts (result_id BIGINT NOT NULL, attempt_number INT NOT NULL, value INT NOT NULL)"
+          docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$MYSQL_DATABASE" < tests/fixtures/pre-v37-result-rankings.sql
           docker compose run --rm \
             -e FLYWAY_TABLE=flyway_schema_history_app \
             flyway migrate
+          docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$MYSQL_DATABASE" \
+            --execute="DROP TABLE countries"
           docker compose run --rm \
             -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
             -e FLYWAY_TABLE=flyway_schema_history_results \
@@ -182,13 +194,14 @@ jobs:
           DATABASE_URL: mysql://wcarankings:local-development-password@127.0.0.1:13307/wcarankings
           DATABASE_POOL_MAX: 1
           DATABASE_STATEMENT_TIMEOUT_MS: 250
-        run: node --import tsx tests/database-timeout.integration.ts
+        run: node --import tsx apps/web/tests/database-timeout.integration.ts
 
       - name: Build production Docker image
         if: steps.existing.outputs.app != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: docker/Dockerfile
           load: true
           push: false
           tags: |
@@ -206,7 +219,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.data-tools
+          file: docker/Dockerfile.data-tools
           load: true
           push: false
           tags: |
@@ -227,7 +240,7 @@ jobs:
       - name: Verify production image contents
         run: |
           docker run --rm --entrypoint sh wcarankings-app:pull-request -c \
-            'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.ts'
+            'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.ts && node -e '\''require("module").createRequire("/app/dist/standalone/node_modules/bullmq/package.json")("ioredis")'\'''
 
       - name: Seed visual smoke-test database
         run: |
@@ -279,13 +292,13 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Chromium for visual smoke test
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --filter @wcarankings/web exec playwright install --with-deps chromium
 
       - name: Run visual smoke test
-        run: pnpm exec playwright test --config=playwright.visual-smoke.config.mjs
+        run: pnpm --filter @wcarankings/web exec playwright test --config=playwright.visual-smoke.config.mjs
 
       - name: Run List Browser Tests
-        run: pnpm exec playwright test --config=playwright.list-e2e.config.mjs
+        run: pnpm --filter @wcarankings/web exec playwright test --config=playwright.list-e2e.config.mjs
 
       - name: Show Database State After Browser Test Failure
         if: failure()
@@ -314,9 +327,9 @@ jobs:
         with:
           name: browser-tests-pr-${{ github.event.pull_request.number }}
           path: |
-            artifacts/visual-smoke.png
-            artifacts/visual-playwright-report
-            artifacts/list-playwright-report
+            apps/web/artifacts/visual-smoke.png
+            apps/web/artifacts/visual-playwright-report
+            apps/web/artifacts/list-playwright-report
           if-no-files-found: warn
           retention-days: 14
 

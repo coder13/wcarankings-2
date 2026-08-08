@@ -91,37 +91,6 @@ export function projectionGroup(name: string): DeploymentProjectionGroup {
   return group;
 }
 
-export interface GroupDependencyClosureOptions {
-  includeSelected?: boolean;
-}
-
-export function groupDependencyClosure(
-  names: readonly string[],
-  options: GroupDependencyClosureOptions = {},
-): DeploymentProjectionGroup[] {
-  const { includeSelected = true } = options;
-  const selected = new Set(names);
-  const ordered: DeploymentProjectionGroup[] = [];
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-
-  function visit(name: string): void {
-    if (visited.has(name)) return;
-    if (visiting.has(name)) {
-      throw new Error(`Projection group dependency cycle at ${name}`);
-    }
-    const group = projectionGroup(name);
-    visiting.add(name);
-    for (const dependency of group.dependencies) visit(dependency);
-    visiting.delete(name);
-    visited.add(name);
-    if (includeSelected || !selected.has(name)) ordered.push(group);
-  }
-
-  for (const name of names) visit(name);
-  return ordered;
-}
-
 export function downstreamGroupClosure(
   names: readonly string[],
 ): DeploymentProjectionGroup[] {

@@ -2,6 +2,11 @@
 
 # dependencies
 /node_modules
+**/node_modules/
+
+# build caches
+/.vite/
+**/.vite/
 /.pnp
 .pnp.*
 .yarn/*
@@ -18,6 +23,9 @@
 /.next/
 /.vinext/
 /out/
+**/.next/
+**/.vinext/
+**/out/
 
 # misc
 .DS_Store
@@ -29,6 +37,9 @@ debug-storybook.log
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+apps/projection-worker/logs/
+apps/live-results-worker/logs/
+/logs/
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -42,7 +53,10 @@ next-env.d.ts
 *.tsbuildinfo
 /dist/
 /storybook-static/
+**/dist/
+**/storybook-static/
 /.playwright-mcp/
 /.wrangler/
 /outputs/
 /work/
+**/.turbo/
