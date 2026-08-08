@@ -12,12 +12,7 @@ export function currentYearLiveResultRankingsQuery(
   const genderCondition = input.gender.length
     ? `AND candidates.gender IN (${input.gender.map(() => "?").join(", ")})`
     : "";
-  const scopeColumn =
-    input.scope === "world"
-      ? ""
-      : input.scope === "continent"
-        ? "AND candidates.continent_id = ?"
-        : "AND candidates.country_id = ?";
+  const scopeColumn = currentYearScopeCondition(input);
   const official =
     input.resultType === "single"
       ? `SELECT facts.result_id, attempt.attempt_number, facts.person_id,
@@ -93,6 +88,12 @@ export function currentYearLiveResultRankingsQuery(
       AND best.result_value = ranked.result_value
     WHERE ranked.position > ? ORDER BY ranked.position LIMIT ?
   `;
+}
+
+function currentYearScopeCondition(input: ResultRankingRequest) {
+  if (input.scope === "world") return "";
+  if (input.scope === "continent") return "AND candidates.continent_id = ?";
+  return "AND candidates.country_id = ?";
 }
 
 export function currentYearLiveResultRankingValues(
