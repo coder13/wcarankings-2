@@ -21,10 +21,10 @@ WORKDIR /app
 RUN useradd --system --uid 10001 --create-home app
 
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
-COPY --from=build --chown=app:app /app/dist/standalone ./dist/standalone
-COPY --from=build --chown=app:app /app/dist/client ./dist/client
+COPY --from=build --chown=app:app /app/apps/web/dist/standalone ./dist/standalone
+COPY --from=build --chown=app:app /app/apps/web/dist/client ./dist/client
 # Vinext's standalone SSR resolves client manifests relative to its server bundle.
-COPY --from=build --chown=app:app /app/dist/client ./dist/standalone/dist/client
+COPY --from=build --chown=app:app /app/apps/web/dist/client ./dist/standalone/dist/client
 COPY --from=build --chown=app:app /app/release-compatibility.json ./release-compatibility.json
 COPY --chown=app:app docker-entrypoint.sh ./docker-entrypoint.sh
 
