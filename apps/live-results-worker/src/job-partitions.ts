@@ -194,10 +194,6 @@ export function partitionJobs(
           `person-event-rankings:${year}:${eventId}:${resultType}:${continentId}`,
           payload,
         );
-        add(
-          `result-rankings:${year}:${eventId}:${resultType}:${continentId}`,
-          payload,
-        );
       }
     }
   }

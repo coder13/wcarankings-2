@@ -88,7 +88,9 @@ test("partitions changed live people into bounded, stable person-stat jobs", () 
   );
   assert.ok(
     jobs.some(
-      (job) => job.key === "result-rankings:2026:333:average:_North America",
+      (job) =>
+        job.key ===
+        "result-rankings:2026:333:average:continent:_North America:all",
     ),
   );
   assert.ok(
