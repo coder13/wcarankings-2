@@ -194,7 +194,7 @@ jobs:
           DATABASE_URL: mysql://wcarankings:local-development-password@127.0.0.1:13307/wcarankings
           DATABASE_POOL_MAX: 1
           DATABASE_STATEMENT_TIMEOUT_MS: 250
-        run: node --import tsx tests/database-timeout.integration.ts
+        run: node --import tsx apps/web/tests/database-timeout.integration.ts
 
       - name: Build production Docker image
         if: steps.existing.outputs.app != 'true'
