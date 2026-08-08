@@ -389,6 +389,51 @@ test("all-time person event bests preserve historical countries", async () => {
   );
 });
 
+test("person event rankings map provisional values to their declared column", async () => {
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/people/event-rankings/person_event_rankings.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const insertColumns = sql.match(
+    /INSERT INTO\s+person_event_rankings\s*\((?<columns>[\s\S]*?)\)\s*WITH/,
+  )?.groups?.columns;
+  const tableColumns = sql.match(
+    /CREATE TABLE person_event_rankings\s*\((?<columns>[\s\S]*?)\n\);/,
+  )?.groups?.columns;
+
+  assert.ok(insertColumns);
+  assert.ok(tableColumns);
+  const declaredColumns = tableColumns
+    .match(/^\s*(\w+)\s+/gm)
+    ?.map((column) => column.trim().split(/\s+/, 1)[0]);
+  const selectedColumns = insertColumns
+    .match(/^\s*(\w+),?\s*$/gm)
+    ?.map((column) => column.trim().replace(/,$/, ""));
+
+  assert.deepEqual(selectedColumns, declaredColumns);
+  assert.deepEqual(selectedColumns, [
+    "person_id",
+    "event_id",
+    "result_type",
+    "result_id",
+    "result_value",
+    "country_id",
+    "continent_id",
+    "gender",
+    "world_rank",
+    "world_position",
+    "continent_rank",
+    "continent_position",
+    "country_rank",
+    "country_position",
+    "is_provisional",
+  ]);
+  assert.match(sql, /\) AS country_position,\s+0 AS is_provisional\s+FROM/);
+});
+
 test("person activity rankings keep only the three new activity metrics", async () => {
   const sql = await readFile(
     new URL(

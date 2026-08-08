@@ -18,7 +18,23 @@ CREATE TABLE person_event_rankings (
 
 -- phase: rank person event bests
 INSERT INTO
-  person_event_rankings
+  person_event_rankings (
+    person_id,
+    event_id,
+    result_type,
+    result_id,
+    result_value,
+    country_id,
+    continent_id,
+    gender,
+    world_rank,
+    world_position,
+    continent_rank,
+    continent_position,
+    country_rank,
+    country_position,
+    is_provisional
+  )
 WITH
   world_candidates AS (
     SELECT
@@ -56,7 +72,6 @@ SELECT
   best.country_id,
   best.continent_id,
   best.gender,
-  0 AS is_provisional,
   DENSE_RANK() OVER (
     PARTITION BY
       best.event_id,
@@ -105,7 +120,8 @@ SELECT
     ORDER BY
       best.result_value,
       best.person_id
-  ) AS country_position
+  ) AS country_position,
+  0 AS is_provisional
 FROM
   world_bests best;
 
