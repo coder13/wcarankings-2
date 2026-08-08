@@ -14,7 +14,7 @@
     "../../tests/person-pr-streak-rankings.test.ts"
   ],
   "ignoreBinaries": ["mariadb"],
-  "ignoreDependencies": ["redis", "tailwindcss"],
+  "ignoreDependencies": ["ioredis", "redis", "tailwindcss"],
   "ignoreFiles": ["services/feeds/sor-benchmark.ts"],
   "ignoreIssues": {
     "services/cache/redis.ts": ["exports"],
