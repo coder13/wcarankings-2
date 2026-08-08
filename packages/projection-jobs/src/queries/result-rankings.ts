@@ -33,6 +33,15 @@ const positionColumnFor = ({
 }: Pick<ResultRankingInput, "gender" | "scope">) =>
   gender === "all" ? `${scope}_position` : `gender_${scope}_position`;
 
+const rankingColumns = [
+  "world_rank",
+  "world_position",
+  "continent_rank",
+  "continent_position",
+  "country_rank",
+  "country_position",
+] as const;
+
 const liveRowsFor = ({
   eventId,
   periodYear,
@@ -152,6 +161,19 @@ export const upsertProvisionalResultRankingSliceQuery = (
   const table = raw(tableFor(input.resultType));
   const rankColumn = raw(rankColumnFor(input));
   const positionColumn = raw(positionColumnFor(input));
+  const rankColumnName = rankColumnFor(input);
+  const positionColumnName = positionColumnFor(input);
+  const rankingValues = raw(
+    rankingColumns
+      .map((column) =>
+        column === rankColumnName || column === positionColumnName
+          ? column.endsWith("rank")
+            ? "ranked.ranking_rank"
+            : "ranked.ranking_position"
+          : "0",
+      )
+      .join(",\n      "),
+  );
   const scopeColumn = scopeColumnFor(input.scope);
   const scopeCondition = scopeColumn
     ? SQL`AND candidate.${raw(scopeColumn)} = ${input.regionId}`
@@ -169,7 +191,8 @@ export const upsertProvisionalResultRankingSliceQuery = (
         input.resultType === "single" ? raw("competition_start_date,") : raw("")
       }
       country_id, continent_id, result_value, record_code,
-      ${rankColumn}, ${positionColumn}, is_provisional
+      world_rank, world_position, continent_rank, continent_position,
+      country_rank, country_position, is_provisional
     )
     WITH candidates AS (
       SELECT
@@ -225,8 +248,7 @@ export const upsertProvisionalResultRankingSliceQuery = (
       ranked.continent_id,
       ranked.result_value,
       ranked.record_code,
-      ranked.ranking_rank,
-      ranked.ranking_position,
+      ${rankingValues},
       1
     FROM ranked
     ON DUPLICATE KEY UPDATE
