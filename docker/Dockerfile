@@ -7,6 +7,7 @@ RUN corepack enable && pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm run build \
+  && pnpm --filter @wcarankings/web deploy --legacy --prod /app/web-runtime \
   && pnpm prune --prod --config.confirmModulesPurge=false \
   && pnpm store prune
 
@@ -21,6 +22,10 @@ WORKDIR /app
 RUN useradd --system --uid 10001 --create-home app
 
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
+# BullMQ loads ioredis at runtime. Vinext includes BullMQ in its standalone
+# output, but does not trace this peer dependency. The deployed web dependency
+# tree supplies BullMQ and ioredis with their full production dependencies.
+COPY --from=build --chown=app:app /app/web-runtime/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/apps/web/dist/standalone ./dist/standalone
 COPY --from=build --chown=app:app /app/apps/web/dist/client ./dist/client
 # Vinext's standalone SSR resolves client manifests relative to its server bundle.

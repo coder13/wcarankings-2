@@ -240,7 +240,7 @@ jobs:
       - name: Verify production image contents
         run: |
           docker run --rm --entrypoint sh wcarankings-app:pull-request -c \
-            'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.ts'
+            'test -f /app/docker-entrypoint.sh && test -f /app/release-compatibility.json && test ! -d /app/sql && test ! -f /app/scripts/sync-wca-export.ts && node -e '\''require("module").createRequire("/app/dist/standalone/node_modules/bullmq/package.json")("ioredis")'\'''
 
       - name: Seed visual smoke-test database
         run: |
