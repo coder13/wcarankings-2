@@ -165,6 +165,11 @@ jobs:
           docker compose run --rm \
             -e FLYWAY_TABLE=flyway_schema_history_app \
             flyway migrate
+          docker compose exec -T db mariadb \
+            --user="$MYSQL_USER" \
+            --password="$MYSQL_PASSWORD" \
+            "$MYSQL_DATABASE" \
+            --execute="DROP TABLE countries"
           docker compose run --rm \
             -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations/results \
             -e FLYWAY_TABLE=flyway_schema_history_results \

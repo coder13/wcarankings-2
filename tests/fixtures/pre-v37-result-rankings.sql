@@ -1,5 +1,11 @@
 -- The V37 app migration updated projection tables that predated Flyway.
 -- This fixture is their exact pre-V37 schema from catalog commit 3144e7e.
+-- V39 also indexes this imported WCA export table.
+CREATE TABLE countries (
+  id VARCHAR(50) NOT NULL PRIMARY KEY,
+  iso2 CHAR(2) NOT NULL
+);
+
 CREATE TABLE result_rankings_single (
   result_id BIGINT NOT NULL,
   attempt_number TINYINT UNSIGNED NOT NULL,
