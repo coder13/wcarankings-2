@@ -45,6 +45,9 @@ importers:
       prettier-plugin-sql:
         specifier: 0.20.0
         version: 0.20.0(prettier@3.9.6)
+      tsx:
+        specifier: ^4.22.1
+        version: 4.22.1
       turbo:
         specifier: ^2.8.12
         version: 2.10.8
