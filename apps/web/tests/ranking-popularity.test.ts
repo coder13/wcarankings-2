@@ -69,7 +69,7 @@ test("rejects invalid descriptors and unverified public lists before registry wr
   await assert.rejects(
     service.register({
       family: "person-activity",
-      metric: "solves",
+      metric: "invalid",
       year: 2025,
     }),
   );

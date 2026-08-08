@@ -2,19 +2,22 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { personEventResultRankingsQuery } from "../services/rankings/queries/person-results";
 
-test("person event Single results use the stored attempt date for stable ties", () => {
+test("person event Single results rank target candidates with stored dates", () => {
   const query = personEventResultRankingsQuery({
     source: "result_rankings_single",
     hasStoredDate: true,
   });
-  assert.match(query, /ranking\.person_id = \?\s+AND ranking\.event_id = \?/);
   assert.match(
     query,
-    /ranking\.competition_start_date AS competition_start_date/,
+    /WITH\s+target AS \(\s+SELECT \? AS person_id, \? AS event_id\s+\)/,
   );
   assert.match(
     query,
-    /RANK\(\) OVER \(\s+ORDER BY\s+ranking\.result_value\s+\)/,
+    /INNER JOIN target\s+ON target\.person_id = ranking\.person_id\s+AND target\.event_id = ranking\.event_id/,
+  );
+  assert.match(
+    query,
+    /ranking\.competition_start_date AS competition_start_date/,
   );
   assert.match(query, /COUNT\(\*\) OVER \(\) AS total_count/);
   assert.match(query, /position >= \?\s+AND position < \?/);
@@ -32,35 +35,36 @@ test("person event results show only current record badges", () => {
   assert.doesNotMatch(query, /ranking\.record_code/);
 });
 
-test("person event Averages use result ID for stable ties", () => {
+test("person event Averages rank the target candidate set by result ID", () => {
   const query = personEventResultRankingsQuery({
     source: "result_rankings_average",
     hasStoredDate: false,
   });
+  assert.match(
+    query,
+    /WITH\s+target AS \(\s+SELECT \? AS person_id, \? AS event_id\s+\)/,
+  );
   assert.match(query, /NULL AS competition_start_date/);
-  assert.match(query, /ORDER BY\s+ranking\.result_value, ranking\.result_id/);
-  assert.doesNotMatch(query, /ranking\.competition_start_date/);
+  assert.match(
+    query,
+    /ROW_NUMBER\(\) OVER \(\s+ORDER BY\s+ranking\.result_value, ranking\.result_id\s+\)/,
+  );
 });
 
-test("person event results filter a selected year before ranking", () => {
+test("person event results select the requested projection period and live year", () => {
   const singleQuery = personEventResultRankingsQuery({
     source: "result_rankings_single",
     hasStoredDate: true,
     year: 2023,
   });
-  assert.match(
-    singleQuery,
-    /ranking\.person_id = \?\s+AND ranking\.event_id = \?\s+AND YEAR\(ranking\.competition_start_date\) = \?/,
-  );
+  assert.match(singleQuery, /WHERE ranking\.period_year = 2023/);
+  assert.match(singleQuery, /AND competition\.year = 2023/);
 
   const averageQuery = personEventResultRankingsQuery({
     source: "result_rankings_average",
     hasStoredDate: false,
     year: 2023,
   });
-  assert.match(
-    averageQuery,
-    /INNER JOIN result_facts year_facts ON year_facts\.result_id = ranking\.result_id/,
-  );
-  assert.match(averageQuery, /YEAR\(year_facts\.competition_start_date\) = \?/);
+  assert.match(averageQuery, /WHERE ranking\.period_year = 2023/);
+  assert.match(averageQuery, /AND competition\.year = 2023/);
 });
