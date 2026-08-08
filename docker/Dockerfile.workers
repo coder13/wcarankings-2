@@ -27,7 +27,8 @@ COPY --from=dependencies /app/apps ./apps
 COPY --from=dependencies /app/packages ./packages
 COPY --chown=wcarankings:wcarankings tsconfig.data-tools.json ./tsconfig.data-tools.json
 
-RUN chown -R wcarankings:wcarankings /app/apps /app/packages /app/node_modules
+RUN mkdir -p /app/logs \
+  && chown -R wcarankings:wcarankings /app/apps /app/packages /app/node_modules /app/logs
 
 USER wcarankings
 
