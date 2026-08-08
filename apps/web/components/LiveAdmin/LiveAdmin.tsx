@@ -16,7 +16,7 @@ type Source = {
   result_count: number;
   person_count: number;
   next_poll_at: string;
-  last_success_at: string | null;
+  last_imported_at: string | null;
   last_error: string | null;
 };
 type Snapshot = {
@@ -142,9 +142,7 @@ export function LiveAdmin() {
       {message && (
         <p
           className={`${styles.alert} ${
-            message.tone === "success"
-              ? styles.alertSuccess
-              : styles.alertError
+            message.tone === "success" ? styles.alertSuccess : styles.alertError
           }`}
         >
           {message.text}
@@ -228,7 +226,7 @@ export function LiveAdmin() {
                     <DateTime value={source.next_poll_at} />
                   </td>
                   <td>
-                    <DateTime value={source.last_success_at} />
+                    <DateTime value={source.last_imported_at} />
                   </td>
                   <td className={styles.statusCell}>
                     <SourceStatus source={source} />

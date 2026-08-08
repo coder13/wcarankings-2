@@ -40,6 +40,7 @@
     "benchmark:build:pr-streak": "bun --env-file-if-exists=.env.local scripts/benchmark-pr-streak-build.ts",
     "dev:web": "turbo dev --filter=@wcarankings/web",
     "dev:live-results-worker": "turbo dev --filter=@wcarankings/live-results-worker",
+    "dev:projection-worker": "turbo dev --filter=@wcarankings/projection-worker",
     "build:apps": "turbo build",
     "lint:workspace": "turbo lint",
     "typecheck:workspace": "turbo typecheck"

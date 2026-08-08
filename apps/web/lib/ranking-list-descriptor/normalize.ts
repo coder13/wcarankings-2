@@ -323,24 +323,8 @@ export function normalizeRankingListDescriptor(
     throw new RankingListDescriptorError("person-composite metric is invalid.");
   }
   if (input.family === "person-activity") {
-    if (input.metric === "competitions") {
-      onlyKeys(input, [
-        "version",
-        "family",
-        "metric",
-        "year",
-        "region",
-        "genders",
-      ]);
-      return {
-        version,
-        family: "person-activity",
-        metric: "competitions",
-        year: normalizeYear(input.year),
-        ...personFilters(input),
-      };
-    }
     if (
+      input.metric === "competitions" ||
       input.metric === "countries" ||
       input.metric === "rounds" ||
       input.metric === "solves"
@@ -353,15 +337,15 @@ export function normalizeRankingListDescriptor(
         "region",
         "genders",
       ]);
-      rejectUnsupportedYear(input.year);
       return {
         version,
         family: "person-activity",
         metric: input.metric,
+        year: normalizeYear(input.year),
         ...personFilters(input),
       };
     }
-    throw new RankingListDescriptorError("person-activity metric is invalid.");
+    throw new RankingListDescriptorError("person statistic metric is invalid.");
   }
   if (input.family === "person-medals") {
     onlyKeys(input, [

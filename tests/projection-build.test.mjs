@@ -295,11 +295,7 @@ test("a full schema refresh keeps the default semantic projections when selectio
 });
 
 test("result-fact consumers never start from raw WCA tables alone", () => {
-  for (const name of [
-    "sum-of-ranks",
-    "person-medal-rankings",
-    "person-pr-streak-rankings",
-  ]) {
+  for (const name of ["person-medal-rankings", "person-pr-streak-rankings"]) {
     const projection = PROJECTION_REGISTRY.find(
       (candidate) => candidate.name === name,
     );
@@ -320,9 +316,9 @@ test("result-fact consumers never start from raw WCA tables alone", () => {
     (candidate) => candidate.name === "person-activity-rankings",
   );
   assert.ok(activity, "person-activity-rankings is registered");
-  assert.deepEqual(activity.dependencies, ["result-facts"]);
+  assert.deepEqual(activity.dependencies, ["person-period-metrics"]);
   assert.equal(activity.enabledByDefault, false);
-  assert.equal(activity.estimatedDurationMs, 45_000);
+  assert.equal(activity.estimatedDurationMs, 180_000);
   for (const name of [
     "ranking-tables-entries-single-source",
     "ranking-tables-entries-average-source",
@@ -356,6 +352,41 @@ test("shared person grains build once and feed their downstream rankings", () =>
     ).dependencies,
     ["person-event-bests"],
   );
+  assert.deepEqual(
+    PROJECTION_REGISTRY.find((candidate) => candidate.name === "sum-of-ranks")
+      .dependencies,
+    ["person-event-bests"],
+  );
+});
+
+test("Sum of Ranks reuses historical person event bests", async () => {
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/people/sum-of-ranks/person_sum_of_ranks_scores.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(sql, /FROM\s+person_event_bests/);
+  assert.match(sql, /period_year\s*=\s*0/);
+  assert.doesNotMatch(sql, /result_facts/);
+  assert.doesNotMatch(sql, /ranks_single/);
+  assert.doesNotMatch(sql, /ranks_average/);
+  assert.doesNotMatch(sql, /sum_of_ranks_historical_results/);
+});
+
+test("all-time person event bests preserve historical countries", async () => {
+  const sql = await readFile(
+    new URL(
+      "../data-tools/projection-catalog/people/shared/person_event_bests.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(
+    sql,
+    /PARTITION BY\s+facts\.person_id,\s+facts\.event_id,\s+facts\.person_country_id/,
+  );
 });
 
 test("person activity rankings keep only the three new activity metrics", async () => {
@@ -366,11 +397,11 @@ test("person activity rankings keep only the three new activity metrics", async 
     ),
     "utf8",
   );
-  assert.match(sql, /COUNT\(DISTINCT NULLIF\(competition\.country_id, ''\)\)/);
-  assert.match(sql, /COUNT\(\*\) AS round_count/);
-  assert.match(sql, /WHEN value > 0 THEN 1/);
   assert.match(sql, /'countries' AS metric/);
   assert.match(sql, /country_count AS metric_value/);
+  assert.match(sql, /round_count AS metric_value/);
+  assert.match(sql, /official_solve_count AS metric_value/);
+  assert.match(sql, /FROM\s+person_period_metrics/);
   assert.match(sql, /CAST\('' AS CHAR\(16\)\) AS region_id/);
   assert.doesNotMatch(sql, /competition_count/);
 });

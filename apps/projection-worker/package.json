@@ -10,6 +10,7 @@
   "dependencies": {
     "@wcarankings/database": "workspace:*",
     "@wcarankings/projection-jobs": "workspace:*",
+    "@wcarankings/worker-logging": "workspace:*",
     "bullmq": "^6.0.8",
     "mysql2": "^3.23.2",
     "sql-template-tag": "^5.2.1"

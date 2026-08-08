@@ -8,7 +8,7 @@ SELECT
   result.id AS result_id,
   result.best AS result_value
 FROM
-  results_with_live result
+  results result
   INNER JOIN round_types round_type ON round_type.id = result.round_type_id
   AND round_type.final = 1
 WHERE
@@ -25,7 +25,7 @@ SELECT
   result.id,
   result.average
 FROM
-  results_with_live result
+  results result
   INNER JOIN round_types round_type ON round_type.id = result.round_type_id
   AND round_type.final = 1
 WHERE

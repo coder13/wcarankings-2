@@ -188,15 +188,46 @@ export function normalizeCubingChinaResults(
 }
 
 export function canonicalSnapshot(snapshot: LiveResultsSnapshot): string {
+  return canonicalResults(snapshot.results);
+}
+
+function canonicalResults(results: readonly LiveResult[]): string {
   return JSON.stringify(
-    [...snapshot.results].sort((left, right) =>
+    [...results].sort((left, right) =>
       left.sourceResultId.localeCompare(right.sourceResultId),
     ),
   );
 }
 
+export function liveResultRoundKey(
+  result: Pick<LiveResult, "eventId" | "roundNumber">,
+): string {
+  return `${result.eventId}:${result.roundNumber}`;
+}
+
+export function roundSnapshotHashes(
+  snapshot: LiveResultsSnapshot,
+): Map<string, string> {
+  const resultsByRound = new Map<string, LiveResult[]>();
+  for (const result of snapshot.results) {
+    const key = liveResultRoundKey(result);
+    const results = resultsByRound.get(key) ?? [];
+    results.push(result);
+    resultsByRound.set(key, results);
+  }
+  return new Map(
+    [...resultsByRound].map(([key, results]) => [
+      key,
+      createHash("sha256").update(canonicalResults(results)).digest("hex"),
+    ]),
+  );
+}
+
 export function snapshotHash(snapshot: LiveResultsSnapshot): string {
-  return createHash("sha256").update(canonicalSnapshot(snapshot)).digest("hex");
+  const rounds = [...roundSnapshotHashes(snapshot)].sort(([left], [right]) =>
+    left.localeCompare(right),
+  );
+  return createHash("sha256").update(JSON.stringify(rounds)).digest("hex");
 }
 
 async function fetchCubingChinaResults(

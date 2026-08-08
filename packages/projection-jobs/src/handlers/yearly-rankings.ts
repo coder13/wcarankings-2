@@ -1,46 +1,29 @@
-import type { Connection, RowDataPacket } from "mysql2/promise";
+import type { Connection } from "mysql2/promise";
 import {
-  countryByIsoQuery,
-  countryCohortQuery,
-  createYearlyRankingStageQuery,
-  deleteProvisionalYearlyScopeQuery,
+  createAllYearlyRankingStageQuery,
+  deleteYearlyRankingsQuery,
   dropYearlyRankingStageQuery,
   insertProvisionalYearlyScopeQuery,
   type YearlyResultType,
 } from "../queries/yearly-rankings.ts";
-import { queryOne, required } from "./shared.ts";
-
-type CountryRow = RowDataPacket & { id: string };
-type CohortRow = RowDataPacket & { cohort_id: number };
+import { required } from "./shared.ts";
 
 const isYearlyResultType = (value: string): value is YearlyResultType =>
   value === "single" || value === "average";
 
-export async function handleYearlyRankings(
+export async function handleAllYearlyRankings(
   connection: Connection,
   payload: Record<string, string>,
 ): Promise<void> {
   const eventId = required(payload.eventId, "eventId");
   const resultType = required(payload.resultType, "resultType");
-  const countryIso2 = required(payload.region, "region");
   const year = Number(required(payload.year, "year"));
   if (!isYearlyResultType(resultType))
     throw new Error(`Unsupported result type: ${resultType}.`);
   if (!Number.isSafeInteger(year))
     throw new Error("Projection year is invalid.");
-  const country = await queryOne<CountryRow>(connection, countryByIsoQuery, [
-    countryIso2,
-  ]);
-  if (!country) throw new Error(`Unknown country ISO code: ${countryIso2}.`);
-  const cohort = await queryOne<CohortRow>(connection, countryCohortQuery, [
-    country.id,
-  ]);
-  const cohortId = Number(cohort?.cohort_id);
-  if (!Number.isSafeInteger(cohortId))
-    throw new Error(`No yearly cohort exists for country: ${country.id}.`);
-  const build = createYearlyRankingStageQuery({
-    countryId: country.id,
-    cohortId,
+
+  const build = createAllYearlyRankingStageQuery({
     eventId,
     resultType,
     year,
@@ -52,12 +35,7 @@ export async function handleYearlyRankings(
   await connection.query(build.sql, build.values);
   await connection.beginTransaction();
   try {
-    const remove = deleteProvisionalYearlyScopeQuery({
-      cohortId,
-      eventId,
-      resultType,
-      year,
-    });
+    const remove = deleteYearlyRankingsQuery({ eventId, resultType, year });
     const insert = insertProvisionalYearlyScopeQuery(resultType);
     await connection.query(remove.sql, remove.values);
     await connection.query(insert.sql, insert.values);

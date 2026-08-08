@@ -43,6 +43,7 @@ function feedDescriptor(source: FeedInventoryStat): RankingListDescriptor {
       version: 1,
       family: "person-activity",
       metric,
+      year: source.year,
       region,
       genders,
     };

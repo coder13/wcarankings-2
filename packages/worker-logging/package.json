@@ -1,0 +1,9 @@
+{
+  "name": "@wcarankings/worker-logging",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "winston": "^3.19.0"
+  },
+  "exports": "./src/index.ts"
+}

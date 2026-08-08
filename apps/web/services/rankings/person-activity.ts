@@ -6,6 +6,7 @@ import {
   parseLimit,
   parseScope,
   parseStart,
+  parseYear,
 } from "@/lib/api/projection";
 import { sqlFragment } from "@/lib/helpers/database/sql";
 import type { QueryTimings } from "@/lib/api/projection";
@@ -16,6 +17,7 @@ import {
 } from "@/services/rankings/cache";
 import { getProjectionFeatureSwitch } from "@/lib/projection-feature-switch";
 import { loadPersonCompetitionRankings } from "@/services/rankings/person-competitions";
+import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 
 const countFormatter = new Intl.NumberFormat("en-US");
 
@@ -30,6 +32,7 @@ export type PersonActivityMetric = (typeof PERSON_ACTIVITY_METRICS)[number];
 
 type PersonActivityInput = {
   metric: PersonActivityMetric;
+  year: number | null;
   scope: RegionScope;
   regionId: string;
   gender: readonly GenderFilter[];
@@ -92,15 +95,18 @@ export function parsePersonActivityMetric(
   return value as PersonActivityMetric;
 }
 
-function parseInput(params: URLSearchParams): PersonActivityInput {
+export function parsePersonStatisticInput(
+  params: URLSearchParams,
+): PersonActivityInput {
   const { scope, regionId } = parseScope(params);
   if (scope !== "world" && !regionId) {
     throw new ApiInputError(
-      "Choose a region before loading activity rankings.",
+      "Choose a region before loading person statistic rankings.",
     );
   }
   return {
     metric: parsePersonActivityMetric(params),
+    year: parseYear(params),
     scope,
     regionId,
     gender: parseGender(params),
@@ -128,7 +134,7 @@ function toEntry(input: PersonActivityInput, row: PersonActivityRankingRow) {
 
 function lazyConditions(input: PersonActivityInput) {
   const conditions = [
-    "counts.period_year = 0",
+    "counts.period_year = ?",
     `counts.is_provisional = COALESCE((
       SELECT MAX(provisional.is_provisional)
       FROM person_period_metrics provisional
@@ -137,7 +143,7 @@ function lazyConditions(input: PersonActivityInput) {
     ), 0)`,
     `counts.${metricColumn[input.metric]} > 0`,
   ];
-  const values: unknown[] = [];
+  const values: unknown[] = [input.year ?? 0];
   if (input.scope === "continent") {
     conditions.push("counts.continent_id = ?");
     values.push(input.regionId);
@@ -225,20 +231,22 @@ function windowKey(
     scope: input.scope,
     regionId: input.regionId,
     gender: input.gender,
+    year: input.year,
     windowStart,
   });
 }
 
 export async function loadPersonActivityRankings(params: URLSearchParams) {
-  const input = parseInput(params);
+  const input = parsePersonStatisticInput(params);
   if (input.metric === "competitions") {
     return loadPersonCompetitionRankings(params);
   }
+  const metadata = await getCurrentRankingsMetadata();
   const featureSwitch = await getProjectionFeatureSwitch();
   if (!featureSwitch.personActivityRankings || !featureSwitch.generationId) {
-    throw new Error("Person activity rankings are unavailable.");
+    throw new Error("Person statistic rankings are unavailable.");
   }
-  if (input.scope !== "world" || input.gender.length) {
+  if (input.year !== null || input.scope !== "world" || input.gender.length) {
     const windowStart =
       Math.floor((input.start - 1) / RANKINGS_WINDOW_SIZE) *
         RANKINGS_WINDOW_SIZE +
@@ -249,7 +257,7 @@ export async function loadPersonActivityRankings(params: URLSearchParams) {
     );
     if (!isPersonActivityWindow(cached.value)) {
       throw new Error(
-        "The person activity window cache returned invalid data.",
+        "The person statistic window cache returned invalid data.",
       );
     }
     const offset = input.start - windowStart;
@@ -272,6 +280,7 @@ export async function loadPersonActivityRankings(params: URLSearchParams) {
         startPosition,
         lastRank: entries.at(-1)?.rank ?? null,
         total,
+        availableYears: metadata.availableYears,
       },
       diagnostics: {
         timings:
@@ -327,6 +336,7 @@ export async function loadPersonActivityRankings(params: URLSearchParams) {
       startPosition: Number(pageRows[0]?.position ?? input.start) - 1,
       lastRank: last ? Number(last.rank) : null,
       total: Number(counts.rows[0]?.count ?? 0),
+      availableYears: metadata.availableYears,
     },
     diagnostics: {
       timings: addTimings(rows.timings, counts.timings),

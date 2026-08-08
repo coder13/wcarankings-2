@@ -39,17 +39,58 @@ function DateTime({ value }: { value: string | null }) {
   );
 }
 
-function payload(item: QueueItem) {
-  const values = Object.entries(item.payload);
-  return values.length
-    ? values.map(([key, value]) => `${key}: ${value}`).join(", ")
-    : "—";
+const jobTitles: Record<string, string> = {
+  "competition-stats": "Competition stats",
+  "competition-event-stats": "Competition event stats",
+  "medal-rankings": "Medal rankings",
+  "person-event-bests": "Person event bests",
+  "person-event-rankings": "Person event rankings",
+  "person-stats": "Person stats",
+  "result-rankings": "Result rankings",
+  "yearly-rankings": "Yearly rankings",
+};
+
+const payloadLabels: Record<string, string> = {
+  competitionId: "Competition",
+  eventId: "Event",
+  gender: "Gender",
+  periodYear: "Period",
+  regionId: "Region",
+  resultType: "Result",
+  scope: "Scope",
+  year: "Year",
+};
+
+function jobTitle(key: string) {
+  return jobTitles[key.split(":", 1)[0]] ?? "Projection rebuild";
+}
+
+function jobDetails(item: QueueItem) {
+  const details = Object.entries(item.payload)
+    .filter(([, value]) => value)
+    .map(([key, value]) => {
+      if (key === "personIds")
+        return `People: ${value.split(",").filter(Boolean).length}`;
+      if (key === "periodYear" && value === "0") return "Period: all time";
+      return `${payloadLabels[key] ?? key}: ${value}`;
+    });
+  return details.length ? details.join(" · ") : "No job details";
 }
 
 function queueSummary(data: QueueResponse | null, activeCount: number) {
   if (!data) return "Loading…";
   if (activeCount) return `${activeCount} processing · ${data.total} items`;
   return `${data.total} items`;
+}
+
+function queueStateClass(state: QueueItem["state"]) {
+  return {
+    waiting: styles.queueStateWaiting,
+    prioritized: styles.queueStatePrioritized,
+    delayed: styles.queueStateDelayed,
+    active: styles.queueStateActive,
+    failed: styles.queueStateFailed,
+  }[state];
 }
 
 export function ProjectionQueueAdmin() {
@@ -135,7 +176,10 @@ export function ProjectionQueueAdmin() {
       });
       await load();
     } catch {
-      setMessage({ text: "The queue item could not be removed.", tone: "error" });
+      setMessage({
+        text: "The queue item could not be removed.",
+        tone: "error",
+      });
     } finally {
       setRemoving(null);
     }
@@ -187,9 +231,7 @@ export function ProjectionQueueAdmin() {
       {message && (
         <p
           className={`${styles.alert} ${
-            message.tone === "success"
-              ? styles.alertSuccess
-              : styles.alertError
+            message.tone === "success" ? styles.alertSuccess : styles.alertError
           }`}
         >
           {message.text}
@@ -218,14 +260,13 @@ export function ProjectionQueueAdmin() {
           </button>
         </div>
         <div className={styles.tableWrap}>
-          <table className={styles.sourcesTable}>
+          <table className={`${styles.sourcesTable} ${styles.queueTable}`}>
             <thead>
               <tr>
                 <th scope="col">State</th>
-                <th scope="col">Rebuild</th>
+                <th scope="col">Job</th>
                 <th scope="col">Queued at</th>
                 <th scope="col">Attempts</th>
-                <th scope="col">Details</th>
                 <th scope="col">Action</th>
               </tr>
             </thead>
@@ -233,23 +274,20 @@ export function ProjectionQueueAdmin() {
               {data?.items.map((item) => (
                 <tr key={item.id}>
                   <td>
-                    <span className={styles.provider}>{item.state}</span>
+                    <span
+                      className={`${styles.queueState} ${queueStateClass(item.state)}`}
+                    >
+                      {item.state}
+                    </span>
                   </td>
-                  <td className={styles.competitionCell}>
-                    <strong>{item.kind}</strong>
-                    <span>{item.key}</span>
+                  <td className={styles.jobCell}>
+                    <strong title={item.key}>{jobTitle(item.key)}</strong>
+                    <span>{jobDetails(item)}</span>
                   </td>
                   <td>
                     <DateTime value={item.createdAt} />
                   </td>
                   <td>{item.attemptsMade}</td>
-                  <td className={styles.statusCell}>
-                    {item.failedReason ? (
-                      <span className={styles.error}>{item.failedReason}</span>
-                    ) : (
-                      <span className={styles.empty}>{payload(item)}</span>
-                    )}
-                  </td>
                   <td>
                     <button
                       className={styles.tableAction}
@@ -263,7 +301,7 @@ export function ProjectionQueueAdmin() {
               ))}
               {data && data.items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className={styles.tableEmpty}>
+                  <td colSpan={5} className={styles.tableEmpty}>
                     No queue items.
                   </td>
                 </tr>

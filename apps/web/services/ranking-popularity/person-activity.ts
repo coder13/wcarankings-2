@@ -32,7 +32,7 @@ function descriptorForMetric(
   return normalizeRankingListDescriptor({
     family: "person-activity",
     metric,
-    ...(metric === "competitions" ? { year: parseYear(params) } : {}),
+    year: parseYear(params),
     region: { scope, regionId },
     genders: parseGender(params),
   });

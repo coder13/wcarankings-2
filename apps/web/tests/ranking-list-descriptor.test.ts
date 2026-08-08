@@ -85,15 +85,18 @@ test("normalizes system aliases and preserves collision-sensitive dimensions", (
   );
 });
 
-test("rejects unsupported combinations and excluded populations", () => {
-  assert.throws(
-    () =>
-      normalizeRankingListDescriptor({
-        family: "person-activity",
-        metric: "solves",
-        year: 2025,
-      }),
-    RankingListDescriptorError,
+test("accepts yearly person statistics and rejects excluded populations", () => {
+  assert.deepEqual(
+    normalizeRankingListDescriptor({
+      family: "person-activity",
+      metric: "solves",
+      year: 2025,
+    }),
+    normalizeRankingListDescriptor({
+      family: "person-activity",
+      metric: "solves",
+      year: 2025,
+    }),
   );
   assert.deepEqual(
     normalizeRankingListDescriptor({
@@ -106,9 +109,13 @@ test("rejects unsupported combinations and excluded populations", () => {
       metric: "solves",
     }),
   );
-  assert.throws(
-    () => parseRankingListDescriptorUrl("/api/persons/solves?year=2025"),
-    RankingListDescriptorError,
+  assert.deepEqual(
+    parseRankingListDescriptorUrl("/api/persons/solves?year=2025"),
+    normalizeRankingListDescriptor({
+      family: "person-activity",
+      metric: "solves",
+      year: 2025,
+    }),
   );
   assert.throws(
     () =>

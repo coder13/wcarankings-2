@@ -5,29 +5,19 @@ import type {
 } from "@wcarankings/live-results";
 
 const PERSON_STATS_SHARD_COUNT = 16;
-const ACTIVITY_METRICS = ["competitions", "countries", "rounds", "solves"];
-const RESULT_TYPES = ["single", "average"];
-const PERIODS = ["all-time", "year"] as const;
-
-type Gender = "m" | "f" | "o";
-type Period = (typeof PERIODS)[number];
-
 export type SnapshotResultIdentity = {
   countryIso2: string | null;
   eventId: string;
   personId: string;
 };
 
-export type AffectedResultScope = SnapshotResultIdentity & {
-  continentId: string | null;
-  countryId: string | null;
-  gender: Gender;
+export type CountryRegion = {
+  continentId: string;
+  countryId: string;
 };
 
-type Scope = {
-  gender: "all" | Gender;
-  regionId: string;
-  scope: "world" | "continent" | "country";
+export type PersonRegion = CountryRegion & {
+  gender: "m" | "f" | "o";
 };
 
 export function partitionJobs(
@@ -35,7 +25,8 @@ export function partitionJobs(
   snapshot: LiveResultsSnapshot,
   version: number,
   previousResults: SnapshotResultIdentity[],
-  affectedResults: AffectedResultScope[],
+  countryRegionsByIso2: ReadonlyMap<string, CountryRegion> = new Map(),
+  personRegionsById: ReadonlyMap<string, PersonRegion> = new Map(),
 ): ProjectionJob[] {
   const jobs = new Map<string, Record<string, string>>();
   const add = (key: string, payload: Record<string, string>) =>
@@ -50,12 +41,17 @@ export function partitionJobs(
     })),
   ];
   const peopleByShard = new Map<number, Set<string>>();
+  const eventIds = new Set<string>();
+  const countryIdsByContinent = new Map<string, Set<string>>();
+  const continentIds = new Set<string>();
+  const countryIds = new Set<string>();
 
   add(`competition-stats:${source.competition_id}`, {
     competitionId: source.competition_id,
     year,
   });
   for (const result of resultIdentities) {
+    eventIds.add(result.eventId);
     const shard = personStatsShard(result.personId);
     const people = peopleByShard.get(shard) ?? new Set<string>();
     people.add(result.personId);
@@ -65,106 +61,159 @@ export function partitionJobs(
       eventId: result.eventId,
       year,
     });
+    add(`city-stats:${source.competition_id}:${result.eventId}`, {
+      competitionId: source.competition_id,
+      eventId: result.eventId,
+    });
+    if (!result.countryIso2) continue;
+    const region = countryRegionsByIso2.get(result.countryIso2);
+    if (!region) continue;
+    const countryIdsForContinent =
+      countryIdsByContinent.get(region.continentId) ?? new Set();
+    continentIds.add(region.continentId);
+    countryIds.add(region.countryId);
+    countryIdsForContinent.add(region.countryId);
+    countryIdsByContinent.set(region.continentId, countryIdsForContinent);
   }
   for (const [shard, people] of peopleByShard) {
     const personIds = [...people].sort().join(",");
     add(`person-stats:${year}:${shard}`, { personIds, year });
     add(`person-event-bests:${year}:${shard}`, { personIds, year });
+    add(`medal-scores:${year}:${shard}`, { personIds, year });
   }
-
-  for (const result of affectedResults) {
-    for (const period of PERIODS) {
-      const periodYear = period === "all-time" ? "0" : year;
-      for (const scope of scopesForResult(result)) {
-        add(`result-rankings:${period}:${result.eventId}:${scopeKey(scope)}`, {
-          eventId: result.eventId,
-          periodYear,
-          ...scope,
-        });
+  for (const periodYear of ["0", year]) {
+    for (const metric of [
+      "country-count",
+      "round-count",
+      "solve-count",
+    ] as const) {
+      for (const gender of ["all", "m", "f", "o"] as const) {
         add(
-          `person-event-rankings:${period}:${result.eventId}:${scopeKey(scope)}`,
-          { eventId: result.eventId, periodYear, ...scope },
-        );
-        for (const metric of ACTIVITY_METRICS) {
-          add(`activity-rankings:${period}:${metric}:${scopeKey(scope)}`, {
+          `person-stat-rankings:${periodYear}:${metric}:world::${gender}`,
+          {
+            gender,
             metric,
             periodYear,
-            ...scope,
-          });
-        }
-        for (const resultType of RESULT_TYPES) {
+            regionId: "",
+            scope: "world",
+          },
+        );
+        for (const continentId of [...continentIds].sort()) {
           add(
-            `yearly-rankings:${period}:${result.eventId}:${resultType}:${scopeKey(scope)}`,
+            `person-stat-rankings:${periodYear}:${metric}:continent:${continentId}:${gender}`,
             {
-              eventId: result.eventId,
+              gender,
+              metric,
               periodYear,
-              resultType,
-              ...scope,
+              regionId: continentId,
+              scope: "continent",
             },
           );
         }
-        for (const eventId of ["", result.eventId]) {
+        for (const countryId of [...countryIds].sort()) {
           add(
-            `medal-rankings:${period}:${eventId || "all"}:${scopeKey(scope)}`,
+            `person-stat-rankings:${periodYear}:${metric}:country:${countryId}:${gender}`,
             {
-              eventId,
+              gender,
+              metric,
               periodYear,
-              ...scope,
+              regionId: countryId,
+              scope: "country",
             },
           );
         }
       }
     }
-    for (const gender of gendersForResult(result)) {
-      add(`city-stats:${source.competition_id}:${result.eventId}:${gender}`, {
-        competitionId: source.competition_id,
-        eventId: result.eventId,
+  }
+  for (const [personId, region] of [...personRegionsById].sort()) {
+    if (!resultIdentities.some((result) => result.personId === personId))
+      continue;
+    for (const gender of ["all", region.gender]) {
+      add(`competition-rankings:world::${gender}`, {
         gender,
-        year,
+        regionId: "",
+        scope: "world",
+      });
+      add(`competition-rankings:continent:${region.continentId}:${gender}`, {
+        gender,
+        regionId: region.continentId,
+        scope: "continent",
+      });
+      add(`competition-rankings:country:${region.countryId}:${gender}`, {
+        gender,
+        regionId: region.countryId,
+        scope: "country",
       });
     }
   }
-
+  for (const eventId of eventIds) {
+    add(`yearly-rankings:${year}:${eventId}:single`, {
+      eventId,
+      resultType: "single",
+      year,
+    });
+    add(`yearly-rankings:${year}:${eventId}:average`, {
+      eventId,
+      resultType: "average",
+      year,
+    });
+    const rankingRegions = [
+      { regionId: "", scope: "world" as const },
+      ...[...continentIds].sort().map((regionId) => ({
+        regionId,
+        scope: "continent" as const,
+      })),
+      ...[...countryIds].sort().map((regionId) => ({
+        regionId,
+        scope: "country" as const,
+      })),
+    ];
+    for (const periodYear of ["0", year]) {
+      for (const scope of rankingRegions) {
+        for (const gender of ["all", "m", "f", "o"] as const) {
+          for (const resultType of ["single", "average"] as const) {
+            add(
+              `result-rankings:${periodYear}:${eventId}:${resultType}:${scope.scope}:${scope.regionId || "world"}:${gender}`,
+              {
+                eventId,
+                gender,
+                periodYear,
+                regionId: scope.regionId,
+                resultType,
+                scope: scope.scope,
+              },
+            );
+          }
+        }
+      }
+    }
+    for (const continentId of [...countryIdsByContinent.keys()].sort()) {
+      for (const resultType of ["single", "average"] as const) {
+        const payload = { continentId, eventId, resultType, year };
+        add(
+          `person-event-rankings:${year}:${eventId}:${resultType}:${continentId}`,
+          payload,
+        );
+        add(
+          `result-rankings:${year}:${eventId}:${resultType}:${continentId}`,
+          payload,
+        );
+      }
+    }
+  }
+  for (const [continentId, countryIds] of [...countryIdsByContinent].sort()) {
+    add(`sum-of-ranks:continent:${continentId}`, {
+      countryIds: [...countryIds].sort().join(","),
+      regionId: continentId,
+      scope: "continent",
+    });
+  }
   return [...jobs].map(([key, payload]) => ({
     kind: "projection-rebuild" as const,
     key,
     version,
     payload,
   }));
-}
-
-function scopesForResult(result: AffectedResultScope): Scope[] {
-  const genders = gendersForResult(result);
-  const scopes: Scope[] = genders.map((gender) => ({
-    gender,
-    regionId: "",
-    scope: "world",
-  }));
-  if (result.continentId)
-    scopes.push(
-      ...genders.map((gender) => ({
-        gender,
-        regionId: result.continentId ?? "",
-        scope: "continent" as const,
-      })),
-    );
-  if (result.countryId)
-    scopes.push(
-      ...genders.map((gender) => ({
-        gender,
-        regionId: result.countryId ?? "",
-        scope: "country" as const,
-      })),
-    );
-  return scopes;
-}
-
-function gendersForResult(result: AffectedResultScope): ("all" | Gender)[] {
-  return ["all", result.gender];
-}
-
-function scopeKey(scope: Scope): string {
-  return `${scope.scope}:${scope.regionId || "world"}:${scope.gender}`;
 }
 
 function personStatsShard(personId: string): number {

@@ -59,17 +59,11 @@ type KinchDescriptor = PersonFilters & {
   order: "regional" | "continent";
 };
 
-type PersonActivityCompetitionsDescriptor = PersonFilters & {
+type PersonActivityDescriptor = PersonFilters & {
   version: typeof RANKING_LIST_DESCRIPTOR_VERSION;
   family: "person-activity";
-  metric: "competitions";
+  metric: "competitions" | "countries" | "rounds" | "solves";
   year: number | null;
-};
-
-type PersonActivityCountDescriptor = PersonFilters & {
-  version: typeof RANKING_LIST_DESCRIPTOR_VERSION;
-  family: "person-activity";
-  metric: "countries" | "rounds" | "solves";
 };
 
 type PersonMedalsDescriptor = PersonFilters & {
@@ -129,8 +123,7 @@ export type RankingListDescriptor =
   | PersonResultDescriptor
   | SumOfRanksDescriptor
   | KinchDescriptor
-  | PersonActivityCompetitionsDescriptor
-  | PersonActivityCountDescriptor
+  | PersonActivityDescriptor
   | PersonMedalsDescriptor
   | CompetitionFastestDescriptor
   | CompetitionPodiumDescriptor

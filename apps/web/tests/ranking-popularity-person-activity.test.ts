@@ -22,7 +22,7 @@ function collector(
   return { register, recordSuccessfulFirstPageView, flushIfThresholdReached };
 }
 
-test("maps competition and activity requests to person-activity descriptors", () => {
+test("maps competition and person statistic requests to their descriptors", () => {
   assert.deepEqual(
     personCompetitionPopularityDescriptor(
       new URLSearchParams({ year: "2025", region: "_Europe", gender: "f,m" }),
@@ -44,13 +44,14 @@ test("maps competition and activity requests to person-activity descriptors", ()
       version: 1,
       family: "person-activity",
       metric: "solves",
+      year: 2025,
       region: { scope: "world", regionId: "" },
       genders: [],
     },
   );
 });
 
-test("accepts only global activity first pages", () => {
+test("accepts only global person statistic first pages", () => {
   assert.notEqual(
     personActivityPopularityDescriptor(new URLSearchParams()),
     null,
@@ -70,7 +71,7 @@ test("accepts only global activity first pages", () => {
   );
 });
 
-test("records activity popularity and contains failures", async () => {
+test("records person statistic popularity and contains failures", async () => {
   const registered = { registered: true } as never;
   const calls: unknown[] = [];
   const didCollect = await collectPersonCompetitionPopularity(

@@ -2,7 +2,8 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  max-width: 960px;
+  width: 80%;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 2rem 1rem 5.5rem;
   color: var(--text-strong);
@@ -179,6 +180,27 @@
   background: var(--surface-muted);
 }
 
+.queueTable {
+  min-width: 620px;
+  table-layout: fixed;
+}
+
+.queueTable th:nth-child(1) {
+  width: 5.75rem;
+}
+
+.queueTable th:nth-child(3) {
+  width: 5.75rem;
+}
+
+.queueTable th:nth-child(4) {
+  width: 4.5rem;
+}
+
+.queueTable th:nth-child(5) {
+  width: 5.5rem;
+}
+
 .tableSection {
   margin-top: 1.5rem;
 }
@@ -267,6 +289,24 @@
   margin-bottom: 0.15rem;
 }
 
+.jobCell {
+  overflow-wrap: anywhere;
+}
+
+.jobCell strong,
+.jobCell span {
+  display: block;
+}
+
+.jobCell strong {
+  margin-bottom: 0.15rem;
+}
+
+.jobCell span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
 .provider,
 .success,
 .pending,
@@ -281,6 +321,40 @@
   border-radius: 999px;
   background: var(--surface-muted);
   white-space: nowrap;
+}
+
+.queueState {
+  display: inline-block;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.queueStateWaiting {
+  background: color-mix(in srgb, var(--secondary) 18%, var(--surface));
+  color: var(--secondary);
+}
+
+.queueStatePrioritized {
+  background: color-mix(in srgb, var(--record-continent) 16%, var(--surface));
+  color: var(--record-continent);
+}
+
+.queueStateDelayed {
+  background: color-mix(in srgb, var(--secondary) 18%, var(--surface));
+  color: var(--secondary);
+}
+
+.queueStateActive {
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  color: var(--primary);
+}
+
+.queueStateFailed {
+  background: color-mix(in srgb, var(--error) 16%, var(--surface));
+  color: var(--error);
 }
 
 .pollCell {
@@ -486,6 +560,12 @@
 
 .failures li {
   margin: 0.5rem 0;
+}
+
+@media (max-width: 1023px) {
+  .page {
+    width: 100%;
+  }
 }
 
 @media (max-width: 600px) {

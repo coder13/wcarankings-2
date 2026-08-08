@@ -98,7 +98,7 @@ test("includes the top three results in ranking descriptions", () => {
   );
 });
 
-test("formats person activity ranking titles", () => {
+test("formats person statistic ranking titles", () => {
   assert.equal(
     formatRankingDocumentTitle({
       ...defaults,

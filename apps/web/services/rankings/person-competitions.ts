@@ -125,8 +125,8 @@ function windowKey(
 
 export async function loadPersonCompetitionRankings(params: URLSearchParams) {
   const input = parseInput(params);
+  const metadata = await getCurrentRankingsMetadata();
   if (input.year !== null || input.gender.length > 1) {
-    const metadata = await getCurrentRankingsMetadata();
     const windowStart =
       Math.floor((input.start - 1) / RANKINGS_WINDOW_SIZE) *
         RANKINGS_WINDOW_SIZE +
@@ -160,6 +160,7 @@ export async function loadPersonCompetitionRankings(params: URLSearchParams) {
         startPosition,
         lastRank: entries.at(-1)?.rank ?? null,
         total,
+        availableYears: metadata.availableYears,
       },
       diagnostics: {
         timings:
@@ -204,6 +205,7 @@ export async function loadPersonCompetitionRankings(params: URLSearchParams) {
       startPosition: Number(pageRows[0]?.position ?? input.start) - 1,
       lastRank: last ? Number(last.rank) : null,
       total: Number(counts.rows[0]?.count ?? 0),
+      availableYears: metadata.availableYears,
     },
     diagnostics: {
       timings: addTimings(rows.timings, counts.timings),

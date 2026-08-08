@@ -37,6 +37,9 @@ debug-storybook.log
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+apps/projection-worker/logs/
+apps/live-results-worker/logs/
+/logs/
 
 # env files (can opt-in for committing if needed)
 .env*

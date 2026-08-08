@@ -1,4 +1,5 @@
 import { Queue, QueueEvents, type JobsOptions } from "bullmq";
+import { supportsProjectionJob } from "./supported.ts";
 
 export type ProjectionJobKind = "projection-rebuild" | "list-ranking-rebuild";
 
@@ -9,6 +10,8 @@ export interface ProjectionJob {
   payload: Record<string, string>;
 }
 
+export type ProjectionJobEnqueueOutcome = "added" | "unchanged" | "updated";
+
 export const PROJECTION_JOB_QUEUE_NAME = "wcarankings-projection-jobs";
 let queue: Queue<ProjectionJob> | undefined;
 
@@ -17,6 +20,7 @@ export function projectionJobConnection() {
   if (!value) throw new Error("REDIS_URL is required for projection jobs.");
   const url = new URL(value);
   return {
+    db: Number(url.pathname.slice(1) || 0),
     host: url.hostname,
     port: Number(url.port || 6379),
     username: url.username || undefined,
@@ -77,17 +81,24 @@ const jobOptions: JobsOptions = {
  * waiting job data. Workers reload the job before acknowledging it, so an
  * update during an active build produces one follow-up build, not many jobs.
  */
-export async function enqueueProjectionJob(job: ProjectionJob): Promise<void> {
+export async function enqueueProjectionJob(
+  job: ProjectionJob,
+): Promise<ProjectionJobEnqueueOutcome> {
+  if (!supportsProjectionJob(job))
+    throw new Error(`Unsupported projection job key: ${job.key}.`);
   const queue = projectionJobQueue();
   const id = jobId(job);
   const existing = await queue.getJob(id);
   if (existing) {
     const current = existing.data;
-    if (job.version > current.version)
+    if (job.version > current.version) {
       await existing.updateData(mergeJobData(current, job));
-    return;
+      return "updated";
+    }
+    return "unchanged";
   }
   await queue.add(job.kind, job, { ...jobOptions, jobId: id });
+  return "added";
 }
 
 export async function closeProjectionJobQueue(): Promise<void> {

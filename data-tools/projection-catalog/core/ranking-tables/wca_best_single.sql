@@ -25,7 +25,7 @@ SELECT
     1
   ) AS competition_id
 FROM
-  results_with_live
+  results
 WHERE
   best > 0
 GROUP BY

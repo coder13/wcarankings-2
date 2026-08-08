@@ -4,6 +4,7 @@ import {
   canonicalSnapshot,
   normalizeCubingChinaResults,
   normalizeWcaLiveResults,
+  roundSnapshotHashes,
   snapshotHash,
 } from "@wcarankings/live-results";
 
@@ -119,4 +120,48 @@ test("snapshot fingerprints are stable when providers reorder rows", () => {
   const second = { results: [...first.results].reverse() };
   assert.equal(canonicalSnapshot(first), canonicalSnapshot(second));
   assert.equal(snapshotHash(first), snapshotHash(second));
+});
+
+test("changes only the fingerprint for the changed result round", () => {
+  const first = {
+    results: [
+      {
+        sourceResultId: "333:1:2026TEST01",
+        eventId: "333",
+        roundNumber: 1,
+        roundTypeId: "1",
+        formatId: null,
+        personId: "2026TEST01",
+        personName: "First Person",
+        countryIso2: "US",
+        best: 1000,
+        average: 1200,
+        position: 1,
+        attempts: [1000],
+      },
+      {
+        sourceResultId: "333:2:2026TEST01",
+        eventId: "333",
+        roundNumber: 2,
+        roundTypeId: "f",
+        formatId: null,
+        personId: "2026TEST01",
+        personName: "First Person",
+        countryIso2: "US",
+        best: 900,
+        average: 1100,
+        position: 1,
+        attempts: [900],
+      },
+    ],
+  };
+  const second = {
+    results: [first.results[0]!, { ...first.results[1]!, attempts: [899] }],
+  };
+
+  const firstRounds = roundSnapshotHashes(first);
+  const secondRounds = roundSnapshotHashes(second);
+  assert.equal(firstRounds.get("333:1"), secondRounds.get("333:1"));
+  assert.notEqual(firstRounds.get("333:2"), secondRounds.get("333:2"));
+  assert.notEqual(snapshotHash(first), snapshotHash(second));
 });

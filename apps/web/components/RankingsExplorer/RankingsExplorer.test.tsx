@@ -216,7 +216,7 @@ test("renders a separate person ranking picker", () => {
   );
 });
 
-test("adds activity statistics to the person ranking selector", () => {
+test("adds person statistics to the person ranking selector", () => {
   const markup = renderExplorerMarkup({ options: { showSubjectSwitch: true } });
 
   assert.match(markup, />Countries</);
@@ -224,7 +224,7 @@ test("adds activity statistics to the person ranking selector", () => {
   assert.match(markup, />Solves</);
 });
 
-test("keeps the activity metric in the person ranking selector", () => {
+test("keeps the selected person statistic in the person ranking selector", () => {
   const markup = renderExplorerMarkup(
     { options: { showSubjectSwitch: true } },
     { personActivityRanking: true, personActivityMetric: "rounds" },
@@ -238,7 +238,7 @@ test("keeps the activity metric in the person ranking selector", () => {
   assert.doesNotMatch(markup, /Find ranking/);
 });
 
-test("uses a unique canonical path for each person activity stat", () => {
+test("uses a unique canonical path for each person statistic", () => {
   const filters: RankingsUrlState = {
     subject: "people",
     competitionRanking: "best-result",
@@ -309,4 +309,28 @@ test("requests PR Streak with one-based positions and no event dimensions", () =
   assert.equal(url.searchParams.get("start"), "1");
   assert.equal(url.searchParams.has("eventId"), false);
   assert.equal(url.searchParams.has("result"), false);
+});
+
+test("requests a person statistic with its selected year", () => {
+  const url = new URL(
+    rankingPageRequestUrl(
+      {
+        eventId: "333",
+        rankingType: "single",
+        regionSelection: { scope: "continent", regionId: "_Europe" },
+        resource: "person-activity-rankings",
+        gender: ["f"],
+        year: 2026,
+        medalType: "overall",
+        personActivityMetric: "solves",
+      },
+      1,
+    ),
+    "http://localhost",
+  );
+  assert.equal(url.pathname, "/api/persons/solves");
+  assert.equal(url.searchParams.get("metric"), null);
+  assert.equal(url.searchParams.get("year"), "2026");
+  assert.equal(url.searchParams.get("region"), "_Europe");
+  assert.equal(url.searchParams.get("gender"), "f");
 });

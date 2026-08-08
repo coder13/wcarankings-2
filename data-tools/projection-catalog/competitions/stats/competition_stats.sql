@@ -5,7 +5,7 @@ WITH
       competition_id,
       COUNT(DISTINCT person_id) AS competitor_count
     FROM
-      results_with_live
+      results
     GROUP BY
       competition_id
   ),

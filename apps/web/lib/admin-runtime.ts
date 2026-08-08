@@ -38,7 +38,7 @@ async function getQueueCounts() {
 
 function workerStatus(row: WorkerRow | undefined): "online" | "offline" {
   if (!row) return "offline";
-  const lastSeenAt = new Date(row.heartbeat_at).getTime();
+  const lastSeenAt = new Date(`${row.heartbeat_at}Z`).getTime();
   return Date.now() - lastSeenAt <= row.heartbeat_timeout_seconds * 1_000
     ? "online"
     : "offline";

@@ -12,12 +12,41 @@ CREATE TABLE person_event_rankings (
   continent_rank INT UNSIGNED NOT NULL,
   continent_position INT UNSIGNED NOT NULL,
   country_rank INT UNSIGNED NOT NULL,
-  country_position INT UNSIGNED NOT NULL
+  country_position INT UNSIGNED NOT NULL,
+  is_provisional TINYINT(1) NOT NULL DEFAULT 0
 );
 
 -- phase: rank person event bests
 INSERT INTO
   person_event_rankings
+WITH
+  world_candidates AS (
+    SELECT
+      best.*,
+      ROW_NUMBER() OVER (
+        PARTITION BY
+          best.person_id,
+          best.event_id,
+          best.result_type
+        ORDER BY
+          best.result_value,
+          best.competition_start_date,
+          best.competition_id,
+          best.result_id
+      ) AS world_candidate_position
+    FROM
+      person_event_bests best
+    WHERE
+      best.period_year = 0
+  ),
+  world_bests AS (
+    SELECT
+      *
+    FROM
+      world_candidates
+    WHERE
+      world_candidate_position = 1
+  )
 SELECT
   best.person_id,
   best.event_id,
@@ -78,9 +107,7 @@ SELECT
       best.person_id
   ) AS country_position
 FROM
-  person_event_bests best
-WHERE
-  best.period_year = 0;
+  world_bests best;
 
 -- Build the supported browse and lazy-filter indexes together so MariaDB only
 -- scans the completed table once during index publication.

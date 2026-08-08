@@ -31,7 +31,7 @@ SELECT
   COALESCE(r.regional_single_record, '') AS regional_single_record,
   COALESCE(r.regional_average_record, '') AS regional_average_record
 FROM
-  results_with_live r
+  results r
   INNER JOIN competitions comp ON comp.id = r.competition_id
   LEFT JOIN persons person ON person.wca_id = r.person_id
   AND person.sub_id = 1

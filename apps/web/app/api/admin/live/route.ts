@@ -20,7 +20,7 @@ type SourceRow = {
   result_count: number;
   person_count: number;
   next_poll_at: string;
-  last_success_at: string | null;
+  last_imported_at: string | null;
   last_error: string | null;
   snapshot_hash: string | null;
   name: string | null;
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   const rejection = await rejectNonAdmin(request);
   if (rejection) return rejection;
   const { rows } = await query<SourceRow>(
-    `SELECT source.source_name, source.competition_id, source.remote_competition_id, source.competition_year, source.enabled, source.scoretaking_software, source.provider_status, source.provider_message, source.poll_seconds, COALESCE(counts.result_count, 0) AS result_count, COALESCE(counts.person_count, 0) AS person_count, CONCAT(DATE_FORMAT(source.next_poll_at, '%Y-%m-%dT%H:%i:%s.%f'), 'Z') AS next_poll_at, IF(source.last_success_at IS NULL, NULL, CONCAT(DATE_FORMAT(source.last_success_at, '%Y-%m-%dT%H:%i:%s.%f'), 'Z')) AS last_success_at, source.last_error, source.snapshot_hash, competition.name, CONCAT(LPAD(competition.year, 4, '0'), '-', LPAD(competition.month, 2, '0'), '-', LPAD(competition.day, 2, '0')) AS start_date, CONCAT(LPAD(competition.end_year, 4, '0'), '-', LPAD(competition.end_month, 2, '0'), '-', LPAD(competition.end_day, 2, '0')) AS end_date FROM provisional_live_result_sources source JOIN competitions competition ON competition.id = source.competition_id LEFT JOIN (SELECT source_name, competition_id, COUNT(*) AS result_count, COUNT(DISTINCT person_id) AS person_count FROM provisional_live_results GROUP BY source_name, competition_id) counts ON counts.source_name = source.source_name AND counts.competition_id = source.competition_id WHERE ${activeToday} ORDER BY source.competition_id`,
+    `SELECT source.source_name, source.competition_id, source.remote_competition_id, source.competition_year, source.enabled, source.scoretaking_software, source.provider_status, source.provider_message, source.poll_seconds, COALESCE(counts.result_count, 0) AS result_count, COALESCE(counts.person_count, 0) AS person_count, CONCAT(DATE_FORMAT(source.next_poll_at, '%Y-%m-%dT%H:%i:%s.%f'), 'Z') AS next_poll_at, IF(source.last_imported_at IS NULL, NULL, CONCAT(DATE_FORMAT(source.last_imported_at, '%Y-%m-%dT%H:%i:%s.%f'), 'Z')) AS last_imported_at, source.last_error, source.snapshot_hash, competition.name, CONCAT(LPAD(competition.year, 4, '0'), '-', LPAD(competition.month, 2, '0'), '-', LPAD(competition.day, 2, '0')) AS start_date, CONCAT(LPAD(competition.end_year, 4, '0'), '-', LPAD(competition.end_month, 2, '0'), '-', LPAD(competition.end_day, 2, '0')) AS end_date FROM provisional_live_result_sources source JOIN competitions competition ON competition.id = source.competition_id LEFT JOIN (SELECT source_name, competition_id, COUNT(*) AS result_count, COUNT(DISTINCT person_id) AS person_count FROM provisional_live_results GROUP BY source_name, competition_id) counts ON counts.source_name = source.source_name AND counts.competition_id = source.competition_id WHERE ${activeToday} ORDER BY source.competition_id`,
   );
   return Response.json(
     {

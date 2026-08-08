@@ -6,7 +6,8 @@
     "@wcarankings/cli": "workspace:*",
     "@wcarankings/database": "workspace:*",
     "@wcarankings/live-results": "workspace:*",
-    "@wcarankings/projection-jobs": "workspace:*"
+    "@wcarankings/projection-jobs": "workspace:*",
+    "@wcarankings/worker-logging": "workspace:*"
   },
   "scripts": {
     "run": "bun src/index.ts",

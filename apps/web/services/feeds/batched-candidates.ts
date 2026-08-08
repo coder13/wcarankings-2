@@ -126,9 +126,9 @@ function addRowCandidates(
         if (statKind.startsWith("person-activity-")) {
           const activity = candidate(inventory, {
             kind: statKind,
-            eventId: "activity",
+            eventId: "person-statistic",
             resultType: "single",
-            year: null,
+            year,
             scope,
             regionId,
             gender: selectedGender,

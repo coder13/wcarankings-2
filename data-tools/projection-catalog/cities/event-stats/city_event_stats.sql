@@ -18,7 +18,7 @@ SELECT
     END
   ) AS official_solve_count
 FROM
-  result_attempts_with_live
+  result_attempts
 GROUP BY
   result_id;
 
@@ -37,11 +37,16 @@ SELECT
   facts.average,
   comp.city_name,
   comp.country_id,
-  facts.gender AS person_gender,
+  CASE
+    WHEN person.gender IN ('m', 'f') THEN person.gender
+    ELSE 'o'
+  END AS person_gender,
   COALESCE(attempts.official_solve_count, 0) AS official_solve_count
 FROM
   result_facts facts
   INNER JOIN competitions comp ON comp.id = facts.competition_id
+  LEFT JOIN persons person ON person.wca_id = facts.person_id
+  AND person.sub_id = 1
   LEFT JOIN city_event_attempt_counts attempts ON attempts.result_id = facts.result_id
 WHERE
   comp.city_name <> '';
@@ -228,6 +233,7 @@ SELECT
   aggregates.competitor_count,
   aggregates.competition_count,
   aggregates.official_solve_count,
+  0 AS is_provisional,
   CASE
     WHEN fastest_single IS NOT NULL THEN DENSE_RANK() OVER (
       PARTITION BY
