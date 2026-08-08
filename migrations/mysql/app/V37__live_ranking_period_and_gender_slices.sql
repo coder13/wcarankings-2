@@ -1,19 +1,4 @@
--- Add period and gender rank dimensions required by live ranking jobs.
-ALTER TABLE person_activity_rankings
-  ADD COLUMN period_year SMALLINT UNSIGNED NOT NULL DEFAULT 0 FIRST,
-  DROP PRIMARY KEY,
-  ADD PRIMARY KEY (period_year, metric, scope, region_id, gender, person_id),
-  DROP INDEX idx_person_activity_rankings_page,
-  ADD INDEX idx_person_activity_rankings_page (
-    period_year,
-    metric,
-    scope,
-    region_id,
-    gender,
-    position,
-    person_id
-  );
-
+-- Add period and gender rank dimensions required by live result-ranking jobs.
 ALTER TABLE result_rankings_single
   ADD COLUMN period_year SMALLINT UNSIGNED NOT NULL DEFAULT 0 FIRST,
   ADD COLUMN gender_world_rank INT UNSIGNED NOT NULL DEFAULT 0
