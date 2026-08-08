@@ -1,4 +1,9 @@
-export const LIVE_RESULT_SOURCES = ["wca-live", "cubing-china"] as const;
+export const LIVE_RESULT_SOURCES = [
+  "unknown",
+  "ilr",
+  "wca-live",
+  "cubing-china",
+] as const;
 
 export type LiveResultSource = (typeof LIVE_RESULT_SOURCES)[number];
 
@@ -19,6 +24,7 @@ export interface LiveResult {
 
 export interface LiveResultsSnapshot {
   results: LiveResult[];
+  skippedRoundIds?: string[];
 }
 
 export interface LiveResultsSourceRow {

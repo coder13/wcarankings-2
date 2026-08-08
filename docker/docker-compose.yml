@@ -66,13 +66,14 @@ services:
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-5}
       DATABASE_QUEUE_LIMIT: ${DATABASE_QUEUE_LIMIT:-20}
       DATABASE_STATEMENT_TIMEOUT_MS: ${DATABASE_STATEMENT_TIMEOUT_MS:-10000}
-      REDIS_URL: ${REDIS_URL:-}
       WCA_CLIENT_ID: ${WCA_CLIENT_ID:-}
       WCA_CLIENT_SECRET: ${WCA_CLIENT_SECRET:-}
       WCA_REDIRECT_URI: ${WCA_REDIRECT_URI:-}
       FEED_WORKER_URL: ${FEED_WORKER_URL:-http://background-worker:3010}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       REDIS_CACHE_VERSION: ${REDIS_CACHE_VERSION:-1}
+      LIVE_RESULTS_POLLER_HEALTH_URL: ${LIVE_RESULTS_POLLER_HEALTH_URL:-http://live-results-worker:3011/health}
+      PROJECTION_WORKER_HEALTH_URL: ${PROJECTION_WORKER_HEALTH_URL:-http://projection-worker:3012/health}
     depends_on:
       db:
         condition: service_healthy
@@ -115,7 +116,10 @@ services:
         condition: service_healthy
 
   live-results-worker:
-    image: ${DATA_TOOLS_IMAGE_REF:-wcarankings-data-tools:latest}
+    image: ${WORKERS_IMAGE_REF:-wcarankings-workers:latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.workers
     restart: unless-stopped
     command: ["/app/apps/live-results-worker/src/index.ts"]
     environment:
@@ -124,8 +128,30 @@ services:
       REDIS_URL: ${REDIS_URL:?REDIS_URL must be set}
       PROVISIONAL_RANKING_WORKER_POLL_MS: ${PROVISIONAL_RANKING_WORKER_POLL_MS:-2000}
       PROVISIONAL_RANKING_WORKER_LEASE_SECONDS: ${PROVISIONAL_RANKING_WORKER_LEASE_SECONDS:-120}
+      LIVE_RESULTS_POLLER_HEALTH_PORT: 3011
     depends_on:
       db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  projection-worker:
+    image: ${WORKERS_IMAGE_REF:-wcarankings-workers:latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.workers
+    restart: unless-stopped
+    command: ["/app/apps/projection-worker/src/index.ts"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL must be set}
+      PROJECTION_WORKER_HEALTH_PORT: 3012
+      PROJECTION_WORKER_CONCURRENCY: ${PROJECTION_WORKER_CONCURRENCY:-3}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   proxy:

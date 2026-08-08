@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { AppHeader } from "@/components/AppHeader/AppHeader";
-import { FeedStatPreviews } from "@/components/ProfileStatPreviews/FeedStatPreviews";
+import { FeedPage } from "@/components/FeedPage/FeedPage";
 
 export const dynamic = "force-dynamic";
 
@@ -20,15 +19,10 @@ export default async function Home() {
   const { page, unavailable } = await getFeedPageData();
 
   return (
-    <div className="app">
-      <AppHeader />
-      <main className="feedPage" aria-label="Recent ranking changes">
-        <FeedStatPreviews
-          initialPreviews={page.previews}
-          initialCursor={page.nextCursor}
-        />
-        {unavailable && <p className="feedEmpty">Feed unavailable.</p>}
-      </main>
-    </div>
+    <FeedPage
+      initialPreviews={page.previews}
+      initialCursor={page.nextCursor}
+      unavailable={unavailable}
+    />
   );
 }

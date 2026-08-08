@@ -73,9 +73,7 @@ export async function loadTopRankingEntries(
     else if (input.competitionRanking === "latitude") ranking = "latitude";
     const rankingParamsForCompetitions = rankingParams(params, 0, input);
     rankingParamsForCompetitions.set("ranking", ranking);
-    const result = await loadCompetitionRankings(
-      rankingParamsForCompetitions,
-    );
+    const result = await loadCompetitionRankings(rankingParamsForCompetitions);
     return result.data.entries.slice(0, 3) as RankingPageEntry[];
   }
 
@@ -102,7 +100,9 @@ export async function loadTopRankingEntries(
   }
 
   if (input.personMedalRanking) {
-    const result = await loadPersonMedalRankings(rankingParams(params, 1, input));
+    const result = await loadPersonMedalRankings(
+      rankingParams(params, 1, input),
+    );
     return result.data.entries.slice(0, 3) as RankingPageEntry[];
   }
 
@@ -116,7 +116,10 @@ export async function loadTopRankingEntries(
   const personParams = rankingParams(params, 1, input);
   personParams.set("paged", "1");
   const result = await loadRankingsWithDiagnostics(personParams);
-  return (result.data.entries ?? []).slice(0, 3) as RankingPageEntry[];
+  return ("entries" in result.data ? result.data.entries : []).slice(
+    0,
+    3,
+  ) as RankingPageEntry[];
 }
 
 export async function loadTopRankingResultLabels(

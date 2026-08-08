@@ -20,9 +20,7 @@ const adminPages = [
 ] as const;
 
 function formatLastSeen(value: string | null) {
-  return value
-    ? `Last seen ${new Date(value).toLocaleString()}`
-    : "No heartbeat";
+  return value ? `Last ping ${new Date(value).toLocaleString()}` : "No ping";
 }
 
 function AdminRuntimeFooter() {

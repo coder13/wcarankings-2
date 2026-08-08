@@ -1,4 +1,7 @@
-import type { ExplorerSubject } from "../../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
+import type {
+  ExplorerSubject,
+  NavigationSubject,
+} from "../../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 
 const SUBJECT_PATHS: Record<ExplorerSubject, string> = {
   people: "/persons/rankings",
@@ -9,4 +12,14 @@ const SUBJECT_PATHS: Record<ExplorerSubject, string> = {
 
 export function subjectPath(subject: ExplorerSubject) {
   return SUBJECT_PATHS[subject];
+}
+
+const NAVIGATION_PATHS: Record<NavigationSubject, string> = {
+  feed: "/",
+  ...SUBJECT_PATHS,
+  lists: "/lists",
+};
+
+export function navigationPath(subject: NavigationSubject) {
+  return NAVIGATION_PATHS[subject];
 }

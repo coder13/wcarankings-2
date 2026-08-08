@@ -3,15 +3,18 @@ import { rejectNonAdmin } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
-type SettingsRow = { poll_seconds: number };
+type SettingsRow = { poll_seconds: number; next_import_at: string };
 
 export async function GET(request: Request) {
   const rejection = await rejectNonAdmin(request);
   if (rejection) return rejection;
   const { rows } = await query<SettingsRow>(
-    "SELECT poll_seconds FROM live_results_settings WHERE id = 1",
+    "SELECT poll_seconds, next_import_at FROM live_results_settings WHERE id = 1",
   );
-  return Response.json({ pollSeconds: Number(rows[0]?.poll_seconds ?? 3600) });
+  return Response.json({
+    pollSeconds: Number(rows[0]?.poll_seconds ?? 3600),
+    nextImportAt: rows[0]?.next_import_at ?? null,
+  });
 }
 
 export async function PUT(request: Request) {
@@ -40,8 +43,11 @@ export async function PUT(request: Request) {
       { status: 409 },
     );
   await query(
-    "UPDATE live_results_settings SET poll_seconds = ? WHERE id = 1",
-    [pollSeconds],
+    `UPDATE live_results_settings
+     SET poll_seconds = ?,
+         next_import_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL ? SECOND)
+     WHERE id = 1`,
+    [pollSeconds, pollSeconds],
   );
   return Response.json({ pollSeconds });
 }

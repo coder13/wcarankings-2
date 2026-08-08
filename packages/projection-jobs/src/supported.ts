@@ -82,32 +82,15 @@ export function supportsProjectionJob(job: ProjectionJob): boolean {
       `competition-rankings:${payload.scope}:${payload.regionId}:${payload.gender}`
     );
   if (
-    /^person-event-rankings:\d+:[A-Za-z0-9]+:(single|average):[A-Za-z0-9_ -]+$/.test(
+    /^person-event-rankings:[A-Za-z0-9]+:(single|average)$/.test(
       job.key,
     ) &&
     Boolean(payload.eventId) &&
-    (payload.resultType === "single" || payload.resultType === "average") &&
-    Boolean(payload.continentId) &&
-    Boolean(payload.year)
+    (payload.resultType === "single" || payload.resultType === "average")
   )
     return (
       job.key ===
-      `person-event-rankings:${payload.year}:${payload.eventId}:${payload.resultType}:${payload.continentId}`
-    );
-  if (
-    /^result-rankings:\d+:[A-Za-z0-9]+:(single|average):(world|continent|country):[A-Za-z0-9_ -]+:(all|m|f|o)$/.test(
-      job.key,
-    ) &&
-    Boolean(payload.eventId) &&
-    (payload.resultType === "single" || payload.resultType === "average") &&
-    ["world", "continent", "country"].includes(payload.scope ?? "") &&
-    ["all", "m", "f", "o"].includes(payload.gender ?? "") &&
-    payload.periodYear !== undefined &&
-    payload.regionId !== undefined
-  )
-    return (
-      job.key ===
-      `result-rankings:${payload.periodYear}:${payload.eventId}:${payload.resultType}:${payload.scope}:${payload.regionId || "world"}:${payload.gender}`
+      `person-event-rankings:${payload.eventId}:${payload.resultType}`
     );
   if (
     /^sum-of-ranks:(continent|country):[A-Za-z0-9_ -]+$/.test(job.key) &&

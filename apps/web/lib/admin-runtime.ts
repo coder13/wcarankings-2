@@ -1,24 +1,36 @@
-import { query } from "@/db";
+import type {
+  WorkerHealthPayload,
+  WorkerHealthState,
+} from "@wcarankings/worker-health";
 
-const workerNames = ["live-results-poller", "projection-worker"] as const;
+const workerChecks = [
+  {
+    name: "live-results-poller",
+    url:
+      process.env.LIVE_RESULTS_POLLER_HEALTH_URL ??
+      "http://127.0.0.1:3011/health",
+  },
+  {
+    name: "projection-worker",
+    url:
+      process.env.PROJECTION_WORKER_HEALTH_URL ??
+      "http://127.0.0.1:3012/health",
+  },
+] as const;
 
-type WorkerName = (typeof workerNames)[number];
-type WorkerRow = {
-  worker_name: WorkerName;
-  process_id: number;
-  started_at: string;
-  heartbeat_at: string;
-  heartbeat_timeout_seconds: number;
-};
+export type WorkerName = (typeof workerChecks)[number]["name"];
 
 export type AdminRuntimeSnapshot = {
   generatedAt: string;
   workers: Array<{
     name: WorkerName;
     status: "online" | "offline";
+    state: WorkerHealthState | null;
     processId: number | null;
     startedAt: string | null;
     lastSeenAt: string | null;
+    latencyMs: number | null;
+    error: string | null;
   }>;
   queue: {
     available: boolean;
@@ -36,39 +48,82 @@ async function getQueueCounts() {
   return getProjectionJobQueueCounts();
 }
 
-function workerStatus(row: WorkerRow | undefined): "online" | "offline" {
-  if (!row) return "offline";
-  const lastSeenAt = new Date(`${row.heartbeat_at}Z`).getTime();
-  return Date.now() - lastSeenAt <= row.heartbeat_timeout_seconds * 1_000
-    ? "online"
-    : "offline";
+async function pingWorker(
+  check: (typeof workerChecks)[number],
+  generatedAt: string,
+) {
+  const startedAt = performance.now();
+  try {
+    const response = await fetch(check.url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(2_000),
+    });
+    if (!response.ok)
+      throw new Error(`Worker returned HTTP ${response.status}.`);
+    const payload = (await response.json()) as WorkerHealthPayload;
+    if (payload.status !== "ok" || payload.worker !== check.name)
+      throw new Error("Worker returned an invalid health response.");
+    return {
+      name: check.name,
+      status:
+        payload.state === "stopping"
+          ? ("offline" as const)
+          : ("online" as const),
+      state: payload.state,
+      processId: payload.processId,
+      startedAt: payload.startedAt,
+      lastSeenAt: generatedAt,
+      latencyMs: Math.round(performance.now() - startedAt),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      name: check.name,
+      status: "offline" as const,
+      state: null,
+      processId: null,
+      startedAt: null,
+      lastSeenAt: null,
+      latencyMs: Math.round(performance.now() - startedAt),
+      error:
+        error instanceof Error ? error.message : "Worker health check failed.",
+    };
+  }
+}
+
+export async function restartWorkerProcess(workerName: WorkerName) {
+  const check = workerChecks.find(({ name }) => name === workerName);
+  if (!check) throw new Error("Unknown worker.");
+  const restartUrl = new URL("/restart", check.url);
+  const response = await fetch(restartUrl, {
+    method: "POST",
+    cache: "no-store",
+    signal: AbortSignal.timeout(2_000),
+  });
+  if (!response.ok)
+    throw new Error(`Worker returned HTTP ${response.status}.`);
 }
 
 export async function getAdminRuntimeSnapshot(): Promise<AdminRuntimeSnapshot> {
-  const [workersResult, queueResult] = await Promise.allSettled([
-    query<WorkerRow>(
-      `SELECT worker_name, process_id, started_at, heartbeat_at,
-              heartbeat_timeout_seconds
-       FROM worker_runtime_status
-       WHERE worker_name IN (?, ?)`,
-      [...workerNames],
+  const generatedAt = new Date().toISOString();
+  const [workers, queueResult] = await Promise.all([
+    Promise.all(workerChecks.map((check) => pingWorker(check, generatedAt))),
+    getQueueCounts().then(
+      (counts) => ({ status: "fulfilled" as const, counts }),
+      (reason) => ({ status: "rejected" as const, reason }),
     ),
-    getQueueCounts(),
   ]);
-  const rows =
-    workersResult.status === "fulfilled" ? workersResult.value.rows : [];
-  const workersByName = new Map(rows.map((row) => [row.worker_name, row]));
   const queue =
     queueResult.status === "fulfilled"
       ? {
           available: true,
           waiting:
-            queueResult.value.waiting +
-            queueResult.value.delayed +
-            queueResult.value.prioritized,
-          active: queueResult.value.active,
-          delayed: queueResult.value.delayed,
-          failed: queueResult.value.failed,
+            queueResult.counts.waiting +
+            queueResult.counts.delayed +
+            queueResult.counts.prioritized,
+          active: queueResult.counts.active,
+          delayed: queueResult.counts.delayed,
+          failed: queueResult.counts.failed,
           error: null,
         }
       : {
@@ -83,18 +138,5 @@ export async function getAdminRuntimeSnapshot(): Promise<AdminRuntimeSnapshot> {
               : "The Redis queue is unavailable.",
         };
 
-  return {
-    generatedAt: new Date().toISOString(),
-    workers: workerNames.map((name) => {
-      const row = workersByName.get(name);
-      return {
-        name,
-        status: workerStatus(row),
-        processId: row?.process_id ?? null,
-        startedAt: row?.started_at ?? null,
-        lastSeenAt: row?.heartbeat_at ?? null,
-      };
-    }),
-    queue,
-  };
+  return { generatedAt, workers, queue };
 }

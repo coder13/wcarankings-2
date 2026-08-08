@@ -2,8 +2,10 @@ import {
   rankingsWindowCache,
   RANKINGS_WINDOW_SIZE,
 } from "@/services/rankings/cache";
+import { query } from "@/db";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import { loadResultRankingData } from "@/services/rankings/result-data";
+import { activeLiveResultOverlayQuery } from "@/services/rankings/queries/live-result-overlay";
 import {
   parseResultRankingRequest,
   withResultRankingWindow,
@@ -74,6 +76,14 @@ function isResultRankingLoadResult(
 export async function loadResultRankings(params: URLSearchParams) {
   const input = parseResultRankingRequest(params);
   if (input.search) return loadResultRankingData(input);
+
+  const activeLiveResults = await query<{ active: number }>(
+    activeLiveResultOverlayQuery(),
+    [input.eventId],
+  );
+  if (activeLiveResults.rows[0]?.active) {
+    return loadResultRankingData(input);
+  }
 
   const metadata = await getCurrentRankingsMetadata();
   const windowStart =

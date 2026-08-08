@@ -10,8 +10,12 @@ Install dependencies and create a local environment:
 
 ```bash
 pnpm install
-cp .env.example .env.local
+bun scripts/ensure-local-env.ts
 ```
+
+Every local app process and worker loads the repository-root `.env.local` file.
+If this worktree has no file, the setup command copies it from
+`~/projects/wcarankings-2/.env.local`. Keep the main worktree file current.
 
 For a local Node process, change `DATABASE_URL` in `.env.local` from the Compose hostname `db` to `127.0.0.1:13307`, then start MariaDB:
 

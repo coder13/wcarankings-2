@@ -1,8 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader/AppHeader";
+import type { NavigationSubject } from "@/components/ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { JumpControlsVisibility } from "@/components/JumpControlsVisibility/JumpControlsVisibility";
+import { navigationPath } from "@/components/RankingsExplorer/helpers/navigation";
 import { RankingsPagerRail } from "@/components/RankingsRail/RankingsRail";
 import { formatRankingsFreshness } from "@/components/RankingsExplorer/types";
 import { ViewportEdgeGradients } from "@/components/ViewportEdgeGradients/ViewportEdgeGradients";
@@ -45,6 +48,7 @@ export function StatPageLayout({
   navigation,
   staticFooter = false,
   showFreshness = true,
+  subject = "people",
 }: {
   className?: string;
   header?: ReactNode;
@@ -55,7 +59,9 @@ export function StatPageLayout({
   navigation?: StatPageNavigation;
   staticFooter?: boolean;
   showFreshness?: boolean;
+  subject?: NavigationSubject;
 }) {
+  const router = useRouter();
   const footer = (
     <StatPageFooter
       exportDate={exportDate}
@@ -87,7 +93,15 @@ export function StatPageLayout({
 
   return (
     <div className={`app${className ? ` ${className}` : ""}`}>
-      <AppHeader>{header}</AppHeader>
+      <AppHeader
+        subject={subject}
+        onSubjectChange={(nextSubject) =>
+          router.push(navigationPath(nextSubject))
+        }
+        showSelectedSubjectOption
+      >
+        {header}
+      </AppHeader>
       <ViewportEdgeGradients
         topVisible={hasScrolled}
         bottomVisible={hasScrolled}

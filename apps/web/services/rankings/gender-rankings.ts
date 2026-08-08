@@ -9,6 +9,7 @@ import {
 } from "@/services/rankings/helpers";
 import {
   genderPersonRankingCountQuery,
+  genderPersonRankingLocateQuery,
   genderPersonRankingPrefixCountQuery,
   genderPersonRankingRowsQuery,
   genderRankingPageQuery,
@@ -47,6 +48,14 @@ function genderPersonColumns(scope: QueryInput["scope"]): GenderPersonColumns {
 }
 
 export async function queryGenderRankingPage(input: QueryInput) {
+  if (
+    input.year === null &&
+    !input.search &&
+    input.locate &&
+    input.gender.length === 0
+  ) {
+    return queryMaterializedGenderLocate(input);
+  }
   if (input.year === null && !input.search && !input.locate) {
     return queryMaterializedGenderPage(input);
   }
@@ -111,6 +120,7 @@ export async function queryGenderRankingPage(input: QueryInput) {
         input.type === "average"
           ? "result_rankings_average"
           : "result_rankings_single",
+        "filtered",
       ),
     }),
     [...values, resultLimit],
@@ -146,12 +156,29 @@ export async function queryGenderRankingPage(input: QueryInput) {
   };
 }
 
+async function queryMaterializedGenderLocate(input: QueryInput) {
+  const { positionColumn, regionColumn } = genderPersonColumns(input.scope);
+  const rankColumn = positionColumn.replace("position", "rank");
+  const values = [input.eventId, input.type, input.locate];
+  if (regionColumn) values.push(input.regionId);
+  const result = await query<RankingRow>(
+    genderPersonRankingLocateQuery({
+      rankColumn,
+      positionColumn,
+      regionColumn,
+    }),
+    values,
+  );
+  return {
+    data: { located: result.rows[0] ? toRankingEntry(result.rows[0]) : null },
+    timings: result.timings,
+    queryCount: 1,
+    returnedRows: result.rows.length,
+  };
+}
+
 async function queryMaterializedGenderPage(input: QueryInput) {
   const { positionColumn, regionColumn } = genderPersonColumns(input.scope);
-  const recordColumn =
-    input.type === "average"
-      ? "facts.regional_average_record"
-      : "facts.regional_single_record";
   const filterValues: unknown[] = [input.eventId, input.type, ...input.gender];
   if (regionColumn) filterValues.push(input.regionId);
   const totalPromise = query<CountRow>(
@@ -162,7 +189,6 @@ async function queryMaterializedGenderPage(input: QueryInput) {
   const result = await query<GenderPersonRankingRow>(
     genderPersonRankingRowsQuery({
       genderCount: input.gender.length,
-      recordColumn,
       positionColumn,
       regionColumn,
     }),

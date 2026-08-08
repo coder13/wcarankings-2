@@ -3,7 +3,7 @@ import test from "node:test";
 import { renderWithProviders } from "@/tests/render-providers";
 import { EXPLORER_SUBJECTS } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { RankingsExplorer } from "./RankingsExplorer";
-import { subjectPath } from "./helpers/navigation";
+import { navigationPath, subjectPath } from "./helpers/navigation";
 import { orderSearchMatches } from "./helpers/search";
 import { getTopRailScrollProgress } from "./useRailScrollProgress";
 import { competitionRankingPath } from "./useRankingsState";
@@ -117,6 +117,7 @@ test("gives each non-default subject and competition ranking a page", () => {
   assert.equal(subjectPath("results"), "/persons/results");
   assert.equal(subjectPath("competitions"), "/competitions/best-result");
   assert.equal(subjectPath("cities"), "/cities/fastest-single");
+  assert.equal(navigationPath("feed"), "/");
   assert.equal(
     competitionRankingPath("best-result"),
     "/competitions/best-result",

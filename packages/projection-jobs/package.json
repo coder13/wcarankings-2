@@ -9,6 +9,7 @@
   },
   "exports": {
     ".": "./src/queue.ts",
+    "./metrics": "./src/metrics.ts",
     "./processor": "./src/processor.ts",
     "./supported": "./src/supported.ts",
     "./status": "./src/status.ts"

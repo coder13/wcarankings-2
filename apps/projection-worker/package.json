@@ -3,13 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "run": "bun src/index.ts",
-    "dev": "bun --watch src/index.ts",
+    "run": "bun ../../scripts/ensure-local-env.ts && bun --cwd=../.. --env-file=.env.local apps/projection-worker/src/index.ts",
+    "dev": "bun ../../scripts/ensure-local-env.ts && bun --cwd=../.. --env-file=.env.local --watch apps/projection-worker/src/index.ts",
     "typecheck": "bunx tsc --project tsconfig.json"
   },
   "dependencies": {
     "@wcarankings/database": "workspace:*",
     "@wcarankings/projection-jobs": "workspace:*",
+    "@wcarankings/worker-health": "workspace:*",
     "@wcarankings/worker-logging": "workspace:*",
     "bullmq": "^6.0.8",
     "mysql2": "^3.23.2",

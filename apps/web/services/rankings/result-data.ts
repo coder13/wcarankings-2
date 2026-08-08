@@ -3,6 +3,10 @@ import { addTimings } from "@/lib/api/projection";
 import { getRecordBadges } from "@/lib/wca";
 import { searchPersonIds } from "@/services/people/service";
 import {
+  loadAllTimeLiveResultOverlay,
+  loadCurrentYearLiveResultOverlay,
+} from "@/services/rankings/live-result-overlay";
+import {
   filteredResultRankingsQuery,
   lazySingleResultRankingsQuery,
   resultRankingCountsQuery,
@@ -34,6 +38,9 @@ export async function loadResultRankingData(
     gender,
     year,
   } = input;
+  if (year === new Date().getUTCFullYear() && !search)
+    return loadCurrentYearLiveResultOverlay(input);
+  if (year === null && !search) return loadAllTimeLiveResultOverlay(input);
   const yearSingle = resultType === "single" && year !== null;
   const lazySingle =
     resultType === "single" && year === null && gender.length > 0;
@@ -57,6 +64,11 @@ export async function loadResultRankingData(
   const averageJoins = [
     "JOIN result_facts average_facts ON average_facts.result_id = result.result_id",
   ];
+
+  if (year === null) {
+    conditions.push("ranking.period_year = ?");
+    values.push(0);
+  }
 
   if (gender.length) {
     lazyConditions.push(
@@ -98,7 +110,7 @@ export async function loadResultRankingData(
 
   let peopleTimings = { queueMs: 0, statementMs: 0 };
   let peopleReturnedRows = 0;
-  let queryCount = dynamicSingle || lazyAverage ? 1 : 2;
+  let queryCount = dynamicSingle || lazyAverage || search ? 1 : 2;
   let rowLimit = limit + 1;
   if (search) {
     const people = await searchPersonIds(
@@ -211,18 +223,17 @@ export async function loadResultRankingData(
   }
 
   const rows = await query<ResultRankingQueryRow>(rankingsSql, rankingValues);
+  const countConditions = conditions.filter(
+    (condition) => !condition.startsWith(`ranking.${positionColumn} > `),
+  );
+  const countValues = values.slice(0, values.length - (search ? 0 : 1));
   const counts =
-    dynamicSingle || lazyAverage
+    dynamicSingle || lazyAverage || search
       ? null
-      : await query<{ count: number }>(resultRankingCountsQuery(resultType), [
-          eventId,
-          scope,
-          regionId,
-          scope,
-          regionId,
-          scope,
-          regionId,
-        ]);
+      : await query<{ count: number }>(
+          resultRankingCountsQuery({ resultType, conditions: countConditions }),
+          countValues,
+        );
   const pageRows = search ? rows.rows : rows.rows.slice(0, limit);
   const last = pageRows.at(-1);
   const entries = pageRows.map((row) => ({

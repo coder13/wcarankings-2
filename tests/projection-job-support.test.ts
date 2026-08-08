@@ -27,12 +27,10 @@ test("only accepts projection rebuild keys with a registered handler", () => {
   assert.equal(
     supportsProjectionJob({
       ...supported,
-      key: "person-event-rankings:2026:333:single:_North America",
+      key: "person-event-rankings:333:single",
       payload: {
-        continentId: "_North America",
         eventId: "333",
         resultType: "single",
-        year: "2026",
       },
     }),
     true,
@@ -40,29 +38,24 @@ test("only accepts projection rebuild keys with a registered handler", () => {
   assert.equal(
     supportsProjectionJob({
       ...supported,
-      key: "result-rankings:2026:333:average:continent:_North America:all",
+      key: "result-rankings:2026:333:average",
       payload: {
         eventId: "333",
-        gender: "all",
         periodYear: "2026",
-        regionId: "_North America",
         resultType: "average",
-        scope: "continent",
       },
     }),
-    true,
+    false,
   );
   assert.equal(
     supportsProjectionJob({
       ...supported,
-      key: "result-rankings:2026:333:single:continent:_North America:all",
+      key: "result-rankings:2026:333:single",
       payload: {
         eventId: "333",
         gender: "world",
         periodYear: "2026",
-        regionId: "_North America",
         resultType: "world",
-        scope: "continent",
       },
     }),
     false,

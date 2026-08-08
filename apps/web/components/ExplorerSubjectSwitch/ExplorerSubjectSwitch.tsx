@@ -10,6 +10,7 @@ export const EXPLORER_SUBJECTS = [
   { id: "cities", label: "Cities" },
 ] as const;
 const NAVIGATION_SUBJECTS = [
+  { id: "feed", label: "Feed" },
   ...EXPLORER_SUBJECTS,
   { id: "lists", label: "Lists" },
 ] as const;
@@ -21,13 +22,16 @@ export function ExplorerSubjectSwitch({
   subject,
   onChange,
   variant = "segmented",
+  showSelectedOption = false,
 }: {
   subject: NavigationSubject;
   onChange: (subject: NavigationSubject) => void;
   variant?: "segmented" | "select" | "text" | "title";
+  showSelectedOption?: boolean;
 }) {
   const featureSwitch = useProjectionFeatureSwitch();
   const subjects = NAVIGATION_SUBJECTS.filter((option) => {
+    if (option.id === "feed") return true;
     if (option.id === "lists") return true;
     if (!featureSwitch.core) return false;
     if (option.id === "results") return featureSwitch.resultRankings;
@@ -48,7 +52,7 @@ export function ExplorerSubjectSwitch({
         ariaLabel="Browse WCA data"
         className="headerSubjectDropdown"
         triggerPrefix="WCA "
-        hideSelectedOption={subject !== "lists"}
+        hideSelectedOption={!showSelectedOption && subject !== "lists"}
       />
     );
   }
@@ -76,7 +80,9 @@ export function ExplorerSubjectSwitch({
           }
         >
           {subjects.map((option) => (
-            <option key={option.id} value={option.id}>{option.label}</option>
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
           ))}
         </select>
       </label>

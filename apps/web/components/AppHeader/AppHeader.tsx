@@ -15,12 +15,14 @@ export function AppHeader({
   className = "",
   subject,
   onSubjectChange,
+  showSelectedSubjectOption = false,
 }: {
   actions?: ReactNode;
   children?: ReactNode;
   className?: string;
   subject?: NavigationSubject;
   onSubjectChange?: (subject: NavigationSubject) => void;
+  showSelectedSubjectOption?: boolean;
 }) {
   return (
     <header
@@ -34,6 +36,7 @@ export function AppHeader({
                 subject={subject}
                 onChange={onSubjectChange}
                 variant="title"
+                showSelectedOption={showSelectedSubjectOption}
               />
             ) : (
               <Link href="/">WCA Rankings</Link>

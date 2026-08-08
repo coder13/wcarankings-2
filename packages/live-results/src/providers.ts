@@ -8,18 +8,48 @@ import type {
 const WCA_LIVE_BASE_URL = "https://live.worldcubeassociation.org";
 const CUBING_CHINA_BASE_URL = "https://cubing.com";
 const FETCH_TIMEOUT_MS = 30_000;
+const WCA_FETCH_ATTEMPTS = 3;
+const WCA_RETRY_DELAY_MS = 250;
 const WCA_COMPETITION_API_URL =
   "https://www.worldcubeassociation.org/api/v0/competitions";
+const WCA_ILR_API_URL =
+  "https://www.worldcubeassociation.org/api/v1/competitions";
 
 type JsonObject = Record<string, unknown>;
+
+export type WcaCompetitionMetadata = {
+  scoretakingSoftware: string | null;
+  website: string | null;
+};
+
+export async function fetchWcaCompetitionMetadata(
+  competitionId: string,
+): Promise<WcaCompetitionMetadata> {
+  const payload = await fetchJson(
+    `${WCA_COMPETITION_API_URL}/${encodeURIComponent(competitionId)}`,
+  );
+  if (!isObject(payload)) return { scoretakingSoftware: null, website: null };
+  return {
+    scoretakingSoftware: asString(payload.scoretaking_software),
+    website: asString(payload.website),
+  };
+}
+
+export async function fetchWcaCompetitionRegistrationCount(
+  competitionId: string,
+): Promise<number | null> {
+  const payload = unwrap(
+    await fetchJson(
+      `${WCA_COMPETITION_API_URL}/${encodeURIComponent(competitionId)}/registrations`,
+    ),
+  );
+  return Array.isArray(payload) ? payload.length : null;
+}
 
 export async function fetchWcaCompetitionScoretakingSoftware(
   competitionId: string,
 ): Promise<string | null> {
-  const payload = await fetchJson(
-    `${WCA_COMPETITION_API_URL}/${encodeURIComponent(competitionId)}`,
-  );
-  return isObject(payload) ? asString(payload.scoretaking_software) : null;
+  return (await fetchWcaCompetitionMetadata(competitionId)).scoretakingSoftware;
 }
 
 export class LiveResultsNotPublishedError extends Error {
@@ -42,6 +72,10 @@ function asInteger(value: unknown): number | null {
   return Number.isInteger(number) ? number : null;
 }
 
+function asIdentifier(value: unknown): string | null {
+  return asString(value) ?? asInteger(value)?.toString() ?? null;
+}
+
 function unwrap(value: unknown): unknown {
   return isObject(value) && "data" in value ? value.data : value;
 }
@@ -50,18 +84,48 @@ async function fetchJson(
   url: string,
   { resultsNotPublishedOn404 = false } = {},
 ): Promise<unknown> {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "wcarankings-live-results-worker/1.0",
-    },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (response.status === 404 && resultsNotPublishedOn404)
-    throw new LiveResultsNotPublishedError();
-  if (!response.ok)
-    throw new Error(`${response.status} ${response.statusText}: ${url}`);
-  return response.json();
+  const attempts = isWcaUrl(url) ? WCA_FETCH_ATTEMPTS : 1;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "wcarankings-live-results-worker/1.0",
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (response.status === 404 && resultsNotPublishedOn404)
+        throw new LiveResultsNotPublishedError();
+      if (!response.ok)
+        throw new Error(`${response.status} ${response.statusText}: ${url}`);
+      return response.json();
+    } catch (error) {
+      if (!canRetryWcaFetch(error, attempt, attempts)) throw error;
+      await new Promise((resolve) =>
+        setTimeout(resolve, WCA_RETRY_DELAY_MS * 2 ** (attempt - 1)),
+      );
+    }
+  }
+  throw new Error(`Unable to fetch ${url}.`);
+}
+
+function isWcaUrl(url: string): boolean {
+  return (
+    url.startsWith(`${WCA_COMPETITION_API_URL}/`) ||
+    url.startsWith(`${WCA_ILR_API_URL}/`) ||
+    url.startsWith(`${WCA_LIVE_BASE_URL}/`)
+  );
+}
+
+function canRetryWcaFetch(
+  error: unknown,
+  attempt: number,
+  attempts: number,
+): boolean {
+  if (attempt >= attempts || error instanceof LiveResultsNotPublishedError)
+    return false;
+  const status = error instanceof Error ? Number(error.message.slice(0, 3)) : 0;
+  return !Number.isInteger(status) || status === 429 || status >= 500;
 }
 
 function requiredString(value: unknown, description: string): string {
@@ -143,10 +207,10 @@ export function normalizeWcaLiveResults(payload: unknown): LiveResultsSnapshot {
 
 function normalizeCubingChinaResult(row: unknown): LiveResult | null {
   if (!isObject(row)) return null;
-  const eventId = asString(row.eventId);
-  const roundId = asString(row.roundId);
+  const eventId = asIdentifier(row.eventId);
+  const roundId = asIdentifier(row.roundId);
   const personId = asString(row.wcaId)?.toUpperCase();
-  const sourceResultId = asString(row.resultId);
+  const sourceResultId = asIdentifier(row.resultId);
   if (!eventId || !roundId || !personId || !sourceResultId) return null;
   return {
     sourceResultId,
@@ -265,7 +329,14 @@ async function fetchCubingChinaResults(
     throw new Error("Cubing China returned no accepted competitors.");
   const fetchOne = async (competitor: unknown): Promise<JsonObject[]> => {
     if (!isObject(competitor)) return [];
-    const user = isObject(competitor.user) ? competitor.user : competitor;
+    // Cubing China returns people as either `user`, `competitor`, or the row
+    // itself. Maoming Open uses `competitor`; use one normalized identity for
+    // both the request WCA ID and the stored person fields.
+    const user = isObject(competitor.user)
+      ? competitor.user
+      : isObject(competitor.competitor)
+        ? competitor.competitor
+        : competitor;
     const number =
       asInteger(competitor.number) ??
       asInteger(competitor.registrantId) ??
@@ -285,13 +356,16 @@ async function fetchCubingChinaResults(
     return payload
       .filter((row) => isObject(row) && row.t === "r")
       .map((row) => ({
-        resultId: row.i,
-        eventId: row.e,
-        roundId: row.r,
-        formatId: row.f,
+        // Cubing China sends result identifiers and common event IDs as JSON
+        // numbers. Normalize them before the generic reader validates fields.
+        resultId: String(row.i),
+        eventId: String(row.e),
+        roundId: String(row.r),
+        formatId: row.f === "" ? null : String(row.f),
         best: row.b,
         average: row.a,
         attempts: row.v,
+        place: row.p,
         wcaId,
         name: user.name,
       }));
@@ -305,10 +379,168 @@ async function fetchCubingChinaResults(
   return normalizeCubingChinaResults({ results: rows.flat() });
 }
 
+type IlrPerson = {
+  countryIso2: string | null;
+  name: string;
+  wcaId: string;
+};
+
+function wcifPeople(payload: unknown): Map<number, IlrPerson> {
+  if (!isObject(payload) || !Array.isArray(payload.persons))
+    throw new Error("Unexpected WCA public WCIF response.");
+  const people = new Map<number, IlrPerson>();
+  for (const person of payload.persons) {
+    if (!isObject(person)) continue;
+    const registrantId = asInteger(person.registrantId);
+    const wcaId = asString(person.wcaId)?.toUpperCase();
+    const name = asString(person.name);
+    if (registrantId === null || !wcaId || !name) continue;
+    people.set(registrantId, {
+      wcaId,
+      name,
+      countryIso2: asString(person.countryIso2)?.toUpperCase() ?? null,
+    });
+  }
+  return people;
+}
+
+function wcifRoundIds(payload: unknown): string[] {
+  if (!isObject(payload) || !Array.isArray(payload.events))
+    throw new Error("Unexpected WCA public WCIF response.");
+  const ids: string[] = [];
+  for (const event of payload.events) {
+    if (!isObject(event) || !Array.isArray(event.rounds)) continue;
+    for (const round of event.rounds) {
+      if (!isObject(round)) continue;
+      const id = asString(round.id);
+      if (id) ids.push(id);
+    }
+  }
+  return ids;
+}
+
+function ilrRoundNumber(roundId: string): number {
+  return Number(roundId.match(/-r(\d+)$/i)?.[1]) || 1;
+}
+
+function ilrEventId(roundId: string): string {
+  const eventId = roundId.match(/^(.+)-r\d+$/i)?.[1];
+  if (!eventId) throw new Error(`Unexpected ILR round ID: ${roundId}.`);
+  return eventId;
+}
+
+function isUnsupportedIlrRound(round: JsonObject): boolean {
+  if (round.format === "h") return true;
+  if (!Array.isArray(round.results) || round.results.length === 0) return false;
+  return round.results.some(
+    (result) =>
+      isObject(result) &&
+      ("match_id" in result ||
+        "matchId" in result ||
+        "opponent" in result ||
+        "winner" in result),
+  );
+}
+
+function normalizeIlrRound(
+  payload: unknown,
+  people: ReadonlyMap<number, IlrPerson>,
+): { results: LiveResult[]; skippedRoundId: string | null } {
+  if (!isObject(payload)) throw new Error("Unexpected WCA ILR round response.");
+  const roundId = requiredString(payload.id, "ILR round ID");
+  if (isUnsupportedIlrRound(payload))
+    return { results: [], skippedRoundId: roundId };
+  if (!Array.isArray(payload.results))
+    throw new Error(`ILR round ${roundId} is missing results.`);
+  const eventId = ilrEventId(roundId);
+  const roundNumber = ilrRoundNumber(roundId);
+  const formatId = asString(payload.format);
+  const results: LiveResult[] = [];
+  for (const row of payload.results) {
+    if (!isObject(row)) continue;
+    const registrantId = asInteger(row.registration_id);
+    const person = registrantId === null ? undefined : people.get(registrantId);
+    if (!person) continue;
+    const attempts = Array.isArray(row.attempts)
+      ? row.attempts.map((attempt) =>
+          isObject(attempt) ? (asInteger(attempt.value) ?? 0) : 0,
+        )
+      : [];
+    results.push({
+      sourceResultId: `${roundId}:${person.wcaId}`,
+      eventId,
+      roundNumber,
+      roundTypeId: String(roundNumber),
+      formatId,
+      personId: person.wcaId,
+      personName: person.name,
+      countryIso2: person.countryIso2,
+      best: asInteger(row.best) ?? 0,
+      average: asInteger(row.average) ?? 0,
+      position: asInteger(row.global_pos) ?? 0,
+      attempts,
+    });
+  }
+  return { results, skippedRoundId: null };
+}
+
+export function normalizeIlrResults(
+  wcif: unknown,
+  roundPayloads: readonly unknown[],
+): LiveResultsSnapshot {
+  const people = wcifPeople(wcif);
+  const results: LiveResult[] = [];
+  const skippedRoundIds: string[] = [];
+  for (const payload of roundPayloads) {
+    const normalized = normalizeIlrRound(payload, people);
+    results.push(...normalized.results);
+    if (normalized.skippedRoundId)
+      skippedRoundIds.push(normalized.skippedRoundId);
+  }
+  for (const eventId of new Set(results.map((result) => result.eventId))) {
+    const eventResults = results.filter((result) => result.eventId === eventId);
+    const finalRound = Math.max(
+      ...eventResults.map((result) => result.roundNumber),
+    );
+    for (const result of eventResults)
+      result.roundTypeId =
+        result.roundNumber === finalRound ? "f" : String(result.roundNumber);
+  }
+  return { results, skippedRoundIds };
+}
+
+export async function fetchIlrResults(
+  competitionId: string,
+): Promise<LiveResultsSnapshot> {
+  const encodedCompetitionId = encodeURIComponent(competitionId);
+  const wcif = await fetchJson(
+    `${WCA_COMPETITION_API_URL}/${encodedCompetitionId}/wcif/public`,
+  );
+  const roundIds = wcifRoundIds(wcif);
+  const payloads: unknown[] = [];
+  for (let index = 0; index < roundIds.length; index += 8) {
+    payloads.push(
+      ...(await Promise.all(
+        roundIds
+          .slice(index, index + 8)
+          .map((roundId) =>
+            fetchJson(
+              `${WCA_ILR_API_URL}/${encodedCompetitionId}/live/rounds/${encodeURIComponent(roundId)}`,
+            ),
+          ),
+      )),
+    );
+  }
+  return normalizeIlrResults(wcif, payloads);
+}
+
 export async function fetchLiveResults(
   source: LiveResultSource,
   remoteCompetitionId: string,
 ): Promise<LiveResultsSnapshot> {
+  if (source === "unknown")
+    throw new Error("An unknown live results source cannot be fetched.");
+  if (source === "ilr") return fetchIlrResults(remoteCompetitionId);
   if (source === "wca-live") {
     return normalizeWcaLiveResults(
       await fetchJson(

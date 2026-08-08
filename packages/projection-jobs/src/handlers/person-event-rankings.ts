@@ -13,19 +13,16 @@ export async function handlePersonEventRankings(
   connection: Connection,
   payload: Record<string, string>,
 ): Promise<void> {
-  const continentId = required(payload.continentId, "continentId");
   const eventId = required(payload.eventId, "eventId");
   const resultType = required(payload.resultType, "resultType");
   if (!isResultType(resultType))
     throw new Error(`Unsupported result type: ${resultType}.`);
 
   const remove = deleteProvisionalPersonEventRankingRowsQuery({
-    continentId,
     eventId,
     resultType,
   });
   const upsert = upsertProvisionalPersonEventRankingSliceQuery({
-    continentId,
     eventId,
     resultType,
   });

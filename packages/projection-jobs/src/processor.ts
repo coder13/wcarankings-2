@@ -12,7 +12,6 @@ import { handlePersonStats } from "./handlers/person-stats.ts";
 import { handlePersonStatRankings } from "./handlers/person-stat-rankings.ts";
 import { handlePersonEventBests } from "./handlers/person-event-bests.ts";
 import { handlePersonEventRankings } from "./handlers/person-event-rankings.ts";
-import { handleResultRankings } from "./handlers/result-rankings.ts";
 import { handleSumOfRanks } from "./handlers/sum-of-ranks.ts";
 import { handleAllYearlyRankings } from "./handlers/yearly-rankings.ts";
 import { supportsProjectionJob } from "./supported.ts";
@@ -45,10 +44,6 @@ export async function processProjectionJob(
   }
   if (job.key.startsWith("person-event-rankings:")) {
     await handlePersonEventRankings(connection, job.payload);
-    return;
-  }
-  if (job.key.startsWith("result-rankings:")) {
-    await handleResultRankings(connection, job.payload);
     return;
   }
   if (job.key.startsWith("sum-of-ranks:")) {

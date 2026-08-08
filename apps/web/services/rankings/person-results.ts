@@ -14,7 +14,10 @@ import {
   RANKINGS_WINDOW_SIZE,
 } from "@/services/rankings/cache";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
-import { personEventResultRankingsQuery } from "@/services/rankings/queries/person-results";
+import {
+  personEventHasActiveLiveResultsQuery,
+  personEventResultRankingsQuery,
+} from "@/services/rankings/queries/person-results";
 
 type PersonEventResultInput = {
   personId: string;
@@ -51,6 +54,8 @@ type PersonEventResultWindow = {
   queryCount: number;
   returnedRows: number;
 };
+
+type ActiveLiveResultRow = { active: number };
 
 function isPersonEventResultWindow(
   value: Record<string, unknown>,
@@ -145,7 +150,6 @@ async function loadWindow(
     [
       input.personId,
       input.eventId,
-      ...(input.year === null ? [] : [input.year]),
       windowStart,
       windowStart + RANKINGS_WINDOW_SIZE,
     ],
@@ -172,6 +176,20 @@ export async function loadPersonEventResultRankings(
     Math.floor((input.start - 1) / RANKINGS_WINDOW_SIZE) *
       RANKINGS_WINDOW_SIZE +
     1;
+  const liveResult = await query<ActiveLiveResultRow>(
+    personEventHasActiveLiveResultsQuery(),
+    [input.personId, input.eventId],
+  );
+  if (liveResult.rows[0]?.active) {
+    const current = await loadWindow(input, windowStart);
+    return personEventResultResponse(
+      input,
+      current,
+      windowStart,
+      "bypass",
+      metadata.availableYears,
+    );
+  }
   const cached = await rankingsWindowCache.getWithStatus(
     windowKey(input, windowStart, metadata.fetchedAt),
     () => loadWindow(input, windowStart),
@@ -179,9 +197,25 @@ export async function loadPersonEventResultRankings(
   if (!isPersonEventResultWindow(cached.value)) {
     throw new Error("The person result cache returned invalid data.");
   }
+  return personEventResultResponse(
+    input,
+    cached.value,
+    windowStart,
+    cached.outcome,
+    metadata.availableYears,
+  );
+}
+
+function personEventResultResponse(
+  input: PersonEventResultInput,
+  window: PersonEventResultWindow,
+  windowStart: number,
+  cacheOutcome: "bypass" | "hit" | "miss" | "coalesced",
+  availableYears: number[],
+) {
   const offset = input.start - windowStart;
-  const entries = cached.value.data.entries.slice(offset, offset + input.limit);
-  const total = cached.value.data.total;
+  const entries = window.data.entries.slice(offset, offset + input.limit);
+  const total = window.data.total;
   const startPosition = Math.min(Math.max(0, input.start - 1), total);
   const hasMore = startPosition + entries.length < total;
 
@@ -197,16 +231,16 @@ export async function loadPersonEventResultRankings(
       startPosition,
       lastRank: entries.at(-1)?.rank ?? null,
       total,
-      availableYears: metadata.availableYears,
+      availableYears,
     },
     diagnostics: {
       timings:
-        cached.outcome === "hit"
+        cacheOutcome === "hit"
           ? { queueMs: 0, statementMs: 0 }
-          : cached.value.timings,
-      queryCount: cached.value.queryCount,
-      returnedRows: cached.value.returnedRows,
-      cacheOutcome: cached.outcome,
+          : window.timings,
+      queryCount: window.queryCount,
+      returnedRows: window.returnedRows,
+      cacheOutcome,
       cacheLayer: "memory" as const,
     },
   };

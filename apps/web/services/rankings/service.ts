@@ -1,4 +1,5 @@
 import { ApiInputError } from "@/lib/api/projection";
+import { query } from "@/db";
 import type { RankingEntry } from "@/lib/wca";
 import {
   readRankingWindowPages,
@@ -11,6 +12,7 @@ import {
 import { queryGenderRankingPage } from "@/services/rankings/gender-rankings";
 import { getCurrentRankingsMetadata } from "@/services/rankings/metadata";
 import { queryPersonMetric } from "@/services/rankings/person-metrics";
+import { activeProvisionalPersonEventQuery } from "@/services/rankings/queries/provisional";
 import {
   queryPersonRanking,
   queryRankingPage,
@@ -36,6 +38,17 @@ interface RankingWindowCacheValue extends Record<string, unknown> {
 }
 
 type RankingWindowResult = Awaited<ReturnType<typeof loadRankingWindow>>;
+
+type ProvisionalRow = { active: number };
+
+async function hasActiveProvisionalPersonEvent(input: QueryInput) {
+  if (input.year !== null || isPersonMetric(input)) return false;
+  const result = await query<ProvisionalRow>(
+    activeProvisionalPersonEventQuery(),
+    [input.eventId],
+  );
+  return Boolean(result.rows[0]?.active);
+}
 
 function personWindowKey(
   input: QueryInput,
@@ -156,7 +169,7 @@ async function loadUncachedRanking(
   metadata: RankingsMetadata,
 ) {
   if (isPersonMetric(input)) return queryPersonMetric(input);
-  if (input.year !== null && input.gender.length) {
+  if (input.year !== null) {
     return queryRankingPage(input, metadata);
   }
   if (input.gender.length) return queryGenderRankingPage(input);
@@ -175,6 +188,17 @@ export async function loadRankingsWithDiagnostics(
   const metadata = await getCurrentRankingsMetadata();
   if (input.year !== null && !metadata.availableYears.includes(input.year)) {
     throw new ApiInputError(`year ${input.year} is unavailable.`);
+  }
+  const hasLivePersonEvent = await hasActiveProvisionalPersonEvent(input);
+  if (hasLivePersonEvent) {
+    const result = await queryGenderRankingPage(input);
+    return {
+      ...result,
+      data: { ...result.data, availableYears: metadata.availableYears },
+      cacheOutcome: "bypass" as const,
+      cacheLayer: "memory" as const,
+      dataVersion: null,
+    };
   }
   const cacheable =
     input.paged &&

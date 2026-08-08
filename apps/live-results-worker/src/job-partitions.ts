@@ -6,9 +6,13 @@ import type {
 
 const PERSON_STATS_SHARD_COUNT = 16;
 export type SnapshotResultIdentity = {
+  average: number;
+  attempts: number[];
+  best: number;
   countryIso2: string | null;
   eventId: string;
   personId: string;
+  sourceResultId: string;
 };
 
 export type CountryRegion = {
@@ -35,9 +39,13 @@ export function partitionJobs(
   const resultIdentities = [
     ...previousResults,
     ...snapshot.results.map((result) => ({
+      average: result.average,
+      attempts: result.attempts,
+      best: result.best,
       countryIso2: result.countryIso2,
       eventId: result.eventId,
       personId: result.personId,
+      sourceResultId: result.sourceResultId,
     })),
   ];
   const peopleByShard = new Map<number, Set<string>>();
@@ -88,16 +96,13 @@ export function partitionJobs(
       "solve-count",
     ] as const) {
       for (const gender of ["all", "m", "f", "o"] as const) {
-        add(
-          `person-stat-rankings:${periodYear}:${metric}:world::${gender}`,
-          {
-            gender,
-            metric,
-            periodYear,
-            regionId: "",
-            scope: "world",
-          },
-        );
+        add(`person-stat-rankings:${periodYear}:${metric}:world::${gender}`, {
+          gender,
+          metric,
+          periodYear,
+          regionId: "",
+          scope: "world",
+        });
         for (const continentId of [...continentIds].sort()) {
           add(
             `person-stat-rankings:${periodYear}:${metric}:continent:${continentId}:${gender}`,
@@ -157,44 +162,11 @@ export function partitionJobs(
       resultType: "average",
       year,
     });
-    const rankingRegions = [
-      { regionId: "", scope: "world" as const },
-      ...[...continentIds].sort().map((regionId) => ({
-        regionId,
-        scope: "continent" as const,
-      })),
-      ...[...countryIds].sort().map((regionId) => ({
-        regionId,
-        scope: "country" as const,
-      })),
-    ];
-    for (const periodYear of ["0", year]) {
-      for (const scope of rankingRegions) {
-        for (const gender of ["all", "m", "f", "o"] as const) {
-          for (const resultType of ["single", "average"] as const) {
-            add(
-              `result-rankings:${periodYear}:${eventId}:${resultType}:${scope.scope}:${scope.regionId || "world"}:${gender}`,
-              {
-                eventId,
-                gender,
-                periodYear,
-                regionId: scope.regionId,
-                resultType,
-                scope: scope.scope,
-              },
-            );
-          }
-        }
-      }
-    }
-    for (const continentId of [...countryIdsByContinent.keys()].sort()) {
-      for (const resultType of ["single", "average"] as const) {
-        const payload = { continentId, eventId, resultType, year };
-        add(
-          `person-event-rankings:${year}:${eventId}:${resultType}:${continentId}`,
-          payload,
-        );
-      }
+    for (const resultType of ["single", "average"] as const) {
+      add(`person-event-rankings:${eventId}:${resultType}`, {
+        eventId,
+        resultType,
+      });
     }
   }
   for (const [continentId, countryIds] of [...countryIdsByContinent].sort()) {
@@ -210,6 +182,41 @@ export function partitionJobs(
     version,
     payload,
   }));
+}
+
+function mergeDelimitedValues(current = "", next = ""): string {
+  return [...new Set([...current.split(","), ...next.split(",")])]
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
+
+/** Combines the shared rebuild scopes from one live-results polling cycle. */
+export function mergeProjectionJobs(
+  jobs: readonly ProjectionJob[],
+): ProjectionJob[] {
+  const merged = new Map<string, ProjectionJob>();
+  for (const job of jobs) {
+    const current = merged.get(job.key);
+    if (!current) {
+      merged.set(job.key, { ...job, payload: { ...job.payload } });
+      continue;
+    }
+    const payload = { ...current.payload, ...job.payload };
+    for (const key of Object.keys(payload)) {
+      if (!key.endsWith("Ids")) continue;
+      payload[key] = mergeDelimitedValues(
+        current.payload[key],
+        job.payload[key],
+      );
+    }
+    merged.set(job.key, {
+      ...job,
+      version: Math.max(current.version, job.version),
+      payload,
+    });
+  }
+  return [...merged.values()];
 }
 
 function personStatsShard(personId: string): number {

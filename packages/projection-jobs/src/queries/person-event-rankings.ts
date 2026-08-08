@@ -3,34 +3,27 @@ import SQL from "sql-template-tag";
 export type PersonEventResultType = "single" | "average";
 
 export const deleteProvisionalPersonEventRankingRowsQuery = ({
-  continentId,
   eventId,
   resultType,
 }: {
-  continentId: string;
   eventId: string;
   resultType: PersonEventResultType;
 }) => SQL`
   DELETE FROM person_event_rankings
   WHERE event_id = CONVERT(${eventId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
     AND result_type = CONVERT(${resultType} USING utf8mb4) COLLATE utf8mb4_unicode_ci
-    AND continent_id = CONVERT(${continentId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
     AND is_provisional = 1
 `;
 
 /**
- * Refreshes one continental slice from shared person_event_bests.
- *
- * World rank and position remain the official-export values. New live-only
- * rows use zero for those fields. The live worker never publishes a World
- * all-time position as current.
+ * Refreshes one full event and result-type slice from shared person_event_bests.
+ * The shared grain contains each person's latest official or provisional best.
+ * Ranking this set makes World, continent, and country positions agree.
  */
 export const upsertProvisionalPersonEventRankingSliceQuery = ({
-  continentId,
   eventId,
   resultType,
 }: {
-  continentId: string;
   eventId: string;
   resultType: PersonEventResultType;
 }) => SQL`
@@ -39,7 +32,7 @@ export const upsertProvisionalPersonEventRankingSliceQuery = ({
     continent_id, gender, world_rank, world_position, continent_rank,
     continent_position, country_rank, country_position, is_provisional
   )
-  WITH world_candidates AS (
+  WITH person_candidates AS (
     SELECT
       best.*,
       ROW_NUMBER() OVER (
@@ -52,18 +45,23 @@ export const upsertProvisionalPersonEventRankingSliceQuery = ({
       ) AS candidate_position
     FROM person_event_bests best
     WHERE best.period_year = 0
-      AND CONVERT(best.event_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(${eventId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
-      AND CONVERT(best.result_type USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(${resultType} USING utf8mb4) COLLATE utf8mb4_unicode_ci
-  ), regional_bests AS (
-    SELECT *
-    FROM world_candidates
-    WHERE candidate_position = 1
-      AND CONVERT(continent_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(${continentId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
+      AND best.event_id = CONVERT(${eventId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
+      AND best.result_type = CONVERT(${resultType} USING utf8mb4) COLLATE utf8mb4_unicode_ci
+  ), person_bests AS (
+    SELECT * FROM person_candidates WHERE candidate_position = 1
   ), ranked AS (
     SELECT
       best.*,
-      DENSE_RANK() OVER (ORDER BY best.result_value) AS continent_rank,
+      DENSE_RANK() OVER (ORDER BY best.result_value) AS world_rank,
       ROW_NUMBER() OVER (
+        ORDER BY best.result_value, best.person_id
+      ) AS world_position,
+      DENSE_RANK() OVER (
+        PARTITION BY best.continent_id
+        ORDER BY best.result_value
+      ) AS continent_rank,
+      ROW_NUMBER() OVER (
+        PARTITION BY best.continent_id
         ORDER BY best.result_value, best.person_id
       ) AS continent_position,
       DENSE_RANK() OVER (
@@ -74,7 +72,7 @@ export const upsertProvisionalPersonEventRankingSliceQuery = ({
         PARTITION BY best.country_id
         ORDER BY best.result_value, best.person_id
       ) AS country_position
-    FROM regional_bests best
+    FROM person_bests best
   )
   SELECT
     ranked.person_id,
@@ -85,24 +83,22 @@ export const upsertProvisionalPersonEventRankingSliceQuery = ({
     ranked.country_id,
     ranked.continent_id,
     ranked.gender,
-    COALESCE(existing.world_rank, 0),
-    COALESCE(existing.world_position, 0),
+    ranked.world_rank,
+    ranked.world_position,
     ranked.continent_rank,
     ranked.continent_position,
     ranked.country_rank,
     ranked.country_position,
     CASE WHEN ranked.result_id < 0 THEN 1 ELSE 0 END
   FROM ranked
-  LEFT JOIN person_event_rankings existing
-    ON CONVERT(existing.person_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ranked.person_id USING utf8mb4) COLLATE utf8mb4_unicode_ci
-    AND CONVERT(existing.event_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ranked.event_id USING utf8mb4) COLLATE utf8mb4_unicode_ci
-    AND CONVERT(existing.result_type USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ranked.result_type USING utf8mb4) COLLATE utf8mb4_unicode_ci
   ON DUPLICATE KEY UPDATE
     result_id = VALUES(result_id),
     result_value = VALUES(result_value),
     country_id = VALUES(country_id),
     continent_id = VALUES(continent_id),
     gender = VALUES(gender),
+    world_rank = VALUES(world_rank),
+    world_position = VALUES(world_position),
     continent_rank = VALUES(continent_rank),
     continent_position = VALUES(continent_position),
     country_rank = VALUES(country_rank),

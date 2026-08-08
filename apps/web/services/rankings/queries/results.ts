@@ -42,7 +42,11 @@ export function resultRankingsQuery(input: ResultRankingsQueryInput) {
       COALESCE(person.name, page.person_id) AS person_name,
       COALESCE(country.name, page.country_id) AS country_name,
       COALESCE(country.iso2, '') AS country_iso2,
-      COALESCE(competition.name, page.competition_id) AS competition_name
+      COALESCE(competition.name, page.competition_id) AS competition_name,
+      STR_TO_DATE(
+        CONCAT(competition.year, '-', LPAD(competition.month, 2, '0'), '-', LPAD(competition.day, 2, '0')),
+        '%Y-%m-%d'
+      ) AS competition_start_date
     FROM
       page
       LEFT JOIN persons person ON person.wca_id = page.person_id
@@ -54,7 +58,15 @@ export function resultRankingsQuery(input: ResultRankingsQueryInput) {
   `;
 }
 
-export function resultRankingCountsQuery(resultType: "single" | "average") {
+interface ResultRankingCountsQueryInput {
+  resultType: "single" | "average";
+  conditions: string[];
+}
+
+export function resultRankingCountsQuery({
+  resultType,
+  conditions,
+}: ResultRankingCountsQueryInput) {
   const table =
     resultType === "single"
       ? "result_rankings_single"
@@ -62,12 +74,7 @@ export function resultRankingCountsQuery(resultType: "single" | "average") {
   return sqlFragment`
     SELECT COUNT(*) AS count
     FROM ${table} ranking
-    WHERE ranking.event_id = ?
-      AND (
-        (? = 'world' AND ? = '')
-        OR (? = 'continent' AND ranking.continent_id = ?)
-        OR (? = 'country' AND ranking.country_id = ?)
-      )
+    WHERE ${conditions.join(" AND ")}
   `;
 }
 

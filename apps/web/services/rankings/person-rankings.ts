@@ -98,20 +98,36 @@ function rankingPageResponse(
   };
 }
 
+function yearlyRecord(
+  scope: "world" | "continent" | "country",
+  type: RankingType,
+): string {
+  const table = yearlyRankingTable(type);
+  return `EXISTS (
+    SELECT 1
+    FROM ${table} record
+    INNER JOIN person_year_ranking_cohorts record_cohort
+      ON record_cohort.cohort_id = record.cohort_id
+    WHERE record.year = ranking.year
+      AND record.event_id = ranking.event_id
+      AND record.person_id = ranking.person_id
+      AND record.result_id = ranking.result_id
+      AND record.is_provisional = ranking.is_provisional
+      AND record_cohort.scope = '${scope}'
+      AND record.public_rank = 1
+  )`;
+}
+
 function yearlyColumns(type: RankingType): string {
-  const recordColumn =
-    type === "average"
-      ? "facts.regional_average_record"
-      : "facts.regional_single_record";
   return `ranking.public_rank AS rank, ranking.position AS sub_rank, ranking.person_id,
-    COALESCE(live.person_name, person.name, ranking.person_id) AS person_name,
+    COALESCE(person.name, live.person_name, ranking.person_id) AS person_name,
     COALESCE(country.id, '') AS country_id, COALESCE(country.name, country.id, '') AS country_name,
     COALESCE(country.iso2, '') AS country_iso2, COALESCE(country.continent_id, '') AS continent_id,
     ranking.result_value AS best, COALESCE(facts.competition_id, live.competition_id, '') AS competition_id,
     COALESCE(competition.name, '') AS competition_name,
-    COALESCE(${recordColumn}, '') = 'WR' AS is_world_record,
-    COALESCE(${recordColumn}, '') IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
-    COALESCE(${recordColumn}, '') = 'NR' AS is_country_record`;
+    ${yearlyRecord("world", type)} AS is_world_record,
+    ${yearlyRecord("continent", type)} AS is_continent_record,
+    ${yearlyRecord("country", type)} AS is_country_record`;
 }
 
 function provisionalYearlyCondition(table: string) {

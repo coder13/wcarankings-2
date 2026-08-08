@@ -156,7 +156,9 @@ async function loadSourceEntries(source: FeedInventoryStat) {
       }
       const result = await loadRankingsWithDiagnostics(params);
       return normalizeSourceEntries(
-        (result.data.entries ?? []) as unknown as Record<string, unknown>[],
+        ("entries" in result.data
+          ? result.data.entries
+          : []) as unknown as Record<string, unknown>[],
       );
     }
     if (source.kind === "result") {

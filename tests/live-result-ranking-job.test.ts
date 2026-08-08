@@ -1,124 +1,101 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { type Connection } from "mysql2/promise";
-import { handleResultRankings } from "../packages/projection-jobs/src/handlers/result-rankings.ts";
 import {
-  deleteStaleProvisionalResultRowsQuery,
-  upsertProvisionalResultRankingSliceQuery,
-} from "../packages/projection-jobs/src/queries/result-rankings.ts";
+  activeLiveResultOverlayQuery,
+  allTimeOfficialResultPageQuery,
+  allTimeOfficialResultPageValues,
+  allTimeOfficialResultTotalQuery,
+  currentYearLiveResultRankingValues,
+  currentYearLiveResultRankingsQuery,
+  liveResultCandidatesQuery,
+} from "../apps/web/services/rankings/queries/live-result-overlay.ts";
 
-const worldInput = {
-  eventId: "333",
-  gender: "all" as const,
-  periodYear: 0,
-  resultType: "single" as const,
-  scope: "world" as const,
-};
-
-test("live result rankings use the requested period, scope, and gender", () => {
-  const result = upsertProvisionalResultRankingSliceQuery(worldInput);
-
-  assert.match(result.sql, /ranking\.period_year = 0/);
-  assert.match(result.sql, /competition\.year = \?/);
-  assert.match(result.sql, /ranking\.result_id > 0/);
-  assert.match(result.sql, /world_rank = VALUES\(world_rank\)/);
-  assert.match(result.sql, /world_position = VALUES\(world_position\)/);
-  assert.doesNotMatch(result.sql, /COALESCE\(existing\.world_rank/);
-
-  const femaleCountry = upsertProvisionalResultRankingSliceQuery({
-    ...worldInput,
-    gender: "f",
-    periodYear: 2026,
-    regionId: "USA",
-    scope: "country",
-  });
-  assert.match(femaleCountry.sql, /candidate\.country_id = \?/);
-  assert.match(femaleCountry.sql, /candidate\.gender = \?/);
-  assert.match(
-    femaleCountry.sql,
-    /gender_country_rank = VALUES\(gender_country_rank\)/,
-  );
-  assert.match(femaleCountry.sql, /\(\? = 0 OR competition\.year = \?\)/);
-});
-
-test("only the World all-gender slice removes obsolete provisional rows", async () => {
-  const calls: string[] = [];
-  const connection = {
-    beginTransaction: async () => calls.push("begin"),
-    query: async (sql: string) => calls.push(sql),
-    commit: async () => calls.push("commit"),
-    rollback: async () => calls.push("rollback"),
-  } as unknown as Connection;
-
-  await handleResultRankings(connection, {
+test("the result overlay reads active snapshots without mutating ranking tables", () => {
+  const query = currentYearLiveResultRankingsQuery({
     eventId: "333",
-    gender: "all",
-    periodYear: "0",
     resultType: "single",
+    year: 2026,
+    gender: [],
     scope: "world",
+    regionId: "",
+    start: 0,
+    limit: 25,
   });
-  assert.equal(calls.length, 4);
-  assert.match(calls[1]!, /DELETE ranking/);
-  assert.equal(calls.at(-1), "commit");
 
-  calls.length = 0;
-  await handleResultRankings(connection, {
+  assert.match(query, /FROM result_facts facts/);
+  assert.match(query, /FROM provisional_live_results live/);
+  assert.match(query, /source\.enabled = 1/);
+  assert.match(query, /JSON_TABLE/);
+  assert.doesNotMatch(query, /INSERT INTO result_rankings/);
+  assert.match(query, /RANK\(\) OVER/);
+});
+
+test("the all-time overlay reads a bounded official window without a CTE", () => {
+  const input = {
     eventId: "333",
-    gender: "f",
-    periodYear: "2026",
-    regionId: "USA",
-    resultType: "average",
-    scope: "country",
-  });
-  assert.equal(calls.length, 3);
-  assert.doesNotMatch(calls[1]!, /DELETE ranking/);
-});
-
-test("stale-row cleanup only removes synthetic live rows in one period", () => {
-  const query = deleteStaleProvisionalResultRowsQuery({
-    eventId: "333",
-    periodYear: 2026,
-    resultType: "single",
-  });
-  assert.match(query.sql, /ranking\.period_year = \?/);
-  assert.match(query.sql, /ranking\.result_id < 0/);
-  assert.match(query.sql, /NOT EXISTS/);
-});
-
-test("result-ranking jobs reject incomplete scope payloads", async () => {
-  const connection = {} as Connection;
-  await assert.rejects(
-    handleResultRankings(connection, {
-      eventId: "333",
-      gender: "all",
-      periodYear: "0",
-      resultType: "single",
-      scope: "country",
-    }),
-    /needs regionId/,
-  );
-});
-
-test("result-ranking build SQL declares each expanded insert target", async () => {
-  const [single, average, query] = await Promise.all([
-    readFile(
-      "data-tools/projection-catalog/people/result-rankings/result_rankings_single.sql",
-      "utf8",
-    ),
-    readFile(
-      "data-tools/projection-catalog/people/result-rankings/result_rankings_average.sql",
-      "utf8",
-    ),
-    readFile("packages/projection-jobs/src/queries/result-rankings.ts", "utf8"),
+    resultType: "single" as const,
+    scope: "world" as const,
+    regionId: "",
+    requestedStart: 0,
+    requestedLimit: 50,
+    start: 0,
+    limit: 50,
+    search: "",
+    searchLimit: null,
+    regexSearch: false,
+    baseTable: "result_rankings_single" as const,
+    gender: [],
+    year: null,
+  };
+  const query = allTimeOfficialResultPageQuery(input);
+  assert.match(query, /ranking\.world_position > 0/);
+  assert.match(query, /FORCE INDEX \(idx_results_single_world\)/);
+  assert.match(query, /ranking\.world_position > \?/);
+  assert.doesNotMatch(query, /WITH/);
+  assert.deepEqual(allTimeOfficialResultPageValues(input, 0, 51), [
+    "333",
+    0,
+    51,
   ]);
+  assert.match(
+    allTimeOfficialResultTotalQuery(input),
+    /ORDER BY ranking\.world_position DESC/,
+  );
+  assert.match(liveResultCandidatesQuery(input), /person_event_rankings best/);
+});
 
-  for (const sql of [single, average]) {
-    assert.match(
-      sql,
-      /INSERT INTO\s+result_rankings_\w+ \([\s\S]*?gender_world_rank/,
-    );
-    assert.match(sql, /period_year SMALLINT UNSIGNED NOT NULL/);
-  }
-  assert.doesNotMatch(query, /competition\.start_date/);
+test("the result service detects active live data before it uses a cache", () => {
+  const query = activeLiveResultOverlayQuery();
+  assert.match(query, /provisional_live_result_sources source/);
+  assert.match(query, /source\.enabled = 1/);
+  assert.match(query, /live\.event_id = \?/);
+});
+
+test("the result overlay applies the requested region", () => {
+  const query = currentYearLiveResultRankingsQuery({
+    eventId: "333",
+    resultType: "average",
+    year: 2026,
+    gender: ["f"],
+    scope: "country",
+    regionId: "USA",
+    start: 0,
+    limit: 25,
+  });
+
+  assert.match(query, /candidates\.country_id = \?/);
+  assert.doesNotMatch(query, /JSON_TABLE/);
+  assert.deepEqual(
+    currentYearLiveResultRankingValues({
+      eventId: "333",
+      resultType: "average",
+      year: 2026,
+      gender: ["f"],
+      scope: "country",
+      regionId: "USA",
+      start: 0,
+      limit: 25,
+    }),
+    [2026, "333", 2026, "333", "f", "USA", "333", 0, 26],
+  );
 });

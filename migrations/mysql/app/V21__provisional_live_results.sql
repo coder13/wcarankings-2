@@ -7,7 +7,6 @@ CREATE TABLE provisional_live_result_sources (
   poll_seconds SMALLINT UNSIGNED NOT NULL DEFAULT 30,
   next_poll_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   snapshot_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
-  queued_snapshot_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
   lease_token CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
   leased_until DATETIME(6) NULL,
   last_success_at DATETIME(6) NULL,

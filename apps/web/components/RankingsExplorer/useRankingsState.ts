@@ -144,6 +144,10 @@ export function useRankingsState() {
         });
       },
       changeSubject(nextSubject: NavigationSubject) {
+        if (nextSubject === "feed") {
+          router.push("/");
+          return;
+        }
         if (nextSubject === "lists") {
           router.push("/lists");
           return;
@@ -165,6 +169,10 @@ export function useRankingsState() {
         );
       },
       leaveList(nextSubject: NavigationSubject) {
+        if (nextSubject === "feed") {
+          router.push("/");
+          return;
+        }
         router.push(
           nextSubject === "lists" ? "/lists" : subjectPath(nextSubject),
         );

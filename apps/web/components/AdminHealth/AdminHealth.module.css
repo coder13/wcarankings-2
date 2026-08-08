@@ -180,9 +180,89 @@
   background: var(--surface-muted);
 }
 
+.jobStatsTable {
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.82rem;
+}
+
+.jobStatsTable th,
+.jobStatsTable td {
+  padding: 0.5rem 0.35rem;
+  white-space: nowrap;
+}
+
+.jobStatsTable th:first-child,
+.jobStatsTable td:first-child {
+  width: 35%;
+  text-align: left;
+}
+
+.jobStatsTable th:nth-child(2),
+.jobStatsTable th:nth-child(3),
+.jobStatsTable th:nth-child(4),
+.jobStatsTable th:nth-child(5),
+.jobStatsTable td:nth-child(2),
+.jobStatsTable td:nth-child(3),
+.jobStatsTable td:nth-child(4),
+.jobStatsTable td:nth-child(5) {
+  width: 4em;
+}
+
+.jobStatsTable th:nth-child(6),
+.jobStatsTable th:nth-child(7),
+.jobStatsTable th:nth-child(8),
+.jobStatsTable td:nth-child(6),
+.jobStatsTable td:nth-child(7),
+.jobStatsTable td:nth-child(8) {
+  width: 5em;
+}
+
+.jobStatsTable th:not(:first-child),
+.jobStatsTable td:not(:first-child) {
+  text-align: center;
+}
+
+.jobStatsTable td:nth-child(7) {
+  text-align: right;
+}
+
+.jobStatGroup + .jobStatGroup {
+  margin-top: 1.5rem;
+}
+
+.jobStatGroup h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.jobStatsTable tbody tr.jobStatClear,
+.jobStatsTable tbody tr.jobStatClear:hover {
+  background: color-mix(in srgb, var(--record-national) 8%, var(--surface));
+}
+
+.jobStatsTable tbody tr.jobStatActive,
+.jobStatsTable tbody tr.jobStatActive:hover {
+  background: color-mix(in srgb, var(--secondary) 10%, var(--surface));
+}
+
+.jobStatsTable tbody tr.jobStatWaiting,
+.jobStatsTable tbody tr.jobStatWaiting:hover {
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.jobStatsTable tbody tr.jobStatFailed,
+.jobStatsTable tbody tr.jobStatFailed:hover {
+  background: color-mix(in srgb, var(--error) 9%, var(--surface));
+}
+
 .queueTable {
   min-width: 620px;
   table-layout: fixed;
+}
+
+.queueTable td {
+  vertical-align: top;
 }
 
 .queueTable th:nth-child(1) {
@@ -190,15 +270,41 @@
 }
 
 .queueTable th:nth-child(3) {
-  width: 5.75rem;
+  width: calc(5.75rem + 1em);
 }
 
 .queueTable th:nth-child(4) {
-  width: 4.5rem;
+  width: 6rem;
 }
 
 .queueTable th:nth-child(5) {
-  width: 5.5rem;
+  width: 4.5rem;
+}
+
+.queueTable th:nth-child(4),
+.queueTable td:nth-child(4),
+.queueTable th:nth-child(5),
+.queueTable td:nth-child(5) {
+  text-align: center;
+}
+
+.queueTable th:nth-child(6) {
+  width: 7rem;
+}
+
+.queueTable th:last-child,
+.queueTable td:last-child {
+  padding-right: 1rem;
+}
+
+.queueTable .tableAction {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.queueActions {
+  display: grid;
+  gap: 0.4rem;
 }
 
 .tableSection {
@@ -289,6 +395,19 @@
   margin-bottom: 0.15rem;
 }
 
+.competitionIdentity {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.competitionCell .competitionFlag {
+  flex: 0 0 auto;
+  color: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .jobCell {
   overflow-wrap: anywhere;
 }
@@ -348,8 +467,8 @@
 }
 
 .queueStateActive {
-  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
-  color: var(--primary);
+  background: color-mix(in srgb, var(--record-national) 16%, var(--surface));
+  color: var(--record-national);
 }
 
 .queueStateFailed {
@@ -364,6 +483,15 @@
 }
 
 .dateTime {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.queueElapsed {
+  display: table-cell;
+  text-align: center;
+  color: var(--record-national);
+  font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -401,6 +529,25 @@
   font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.inlineAction {
+  display: inline-block;
+  min-height: 1.8rem;
+  margin: 0.35rem 0 0;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.inlineAction:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .visuallyHidden {
@@ -587,6 +734,36 @@
 
   .cardHeader button {
     margin-top: 0.85rem;
+  }
+
+  .jobStatsTable {
+    font-size: 0.68rem;
+  }
+
+  .jobStatsTable th,
+  .jobStatsTable td {
+    padding: 0.35rem 0.18rem;
+  }
+
+  .jobStatsTable th {
+    letter-spacing: 0;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .jobStatsTable th:first-child,
+  .jobStatsTable td:first-child {
+    width: 25%;
+  }
+
+  .jobStatsTable td:first-child {
+    white-space: normal;
+  }
+
+  .jobStatsTable th:last-child,
+  .jobStatsTable td:last-child {
+    display: none;
   }
 
   .adminFooter {

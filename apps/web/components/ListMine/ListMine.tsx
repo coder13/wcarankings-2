@@ -6,7 +6,7 @@ import { ListRow } from "@/components/ListBrowse/ListRow";
 import type { ListSummary } from "@/services/lists/types";
 import "@/components/ListBrowse/ListBrowse.css";
 import { useRouter } from "next/navigation";
-import { subjectPath } from "@/components/RankingsExplorer/helpers/navigation";
+import { navigationPath } from "@/components/RankingsExplorer/helpers/navigation";
 
 export function ListMine({ lists }: { lists: ListSummary[] }) {
   const router = useRouter();
@@ -15,7 +15,7 @@ export function ListMine({ lists }: { lists: ListSummary[] }) {
       <AppHeader
         subject="lists"
         onSubjectChange={(value) => {
-          router.push(value === "lists" ? "/lists" : subjectPath(value));
+          router.push(navigationPath(value));
         }}
       />
       <main className="listBrowse">
@@ -29,11 +29,7 @@ export function ListMine({ lists }: { lists: ListSummary[] }) {
         {lists.length ? (
           <ol className="listBrowseList">
             {lists.map((list, index) => (
-              <ListRow
-                key={list.id}
-                list={list}
-                index={index}
-              />
+              <ListRow key={list.id} list={list} index={index} />
             ))}
           </ol>
         ) : (

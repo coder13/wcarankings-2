@@ -1,13 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 import {
+  EXPLORER_SUBJECTS,
   ExplorerSubjectSwitch,
   type ExplorerSubject,
 } from "./ExplorerSubjectSwitch";
 
 const description: Record<ExplorerSubject, string> = {
   people: "All-person rankings such as Sum of Ranks and SoR Kinch.",
-  results: "Official individual results for the selected event and result type.",
+  results:
+    "Official individual results for the selected event and result type.",
   competitions: "Competition bests for the selected event and result type.",
   cities: "City rankings for the selected event and result type.",
 };
@@ -20,10 +22,19 @@ function InteractiveSwitch({
   const [subject, setSubject] = useState<ExplorerSubject>("people");
   return (
     <div style={{ display: "grid", gap: "1rem", minWidth: "min(100%, 30rem)" }}>
-      <ExplorerSubjectSwitch subject={subject} onChange={(nextSubject) => {
-        if (nextSubject !== "lists") setSubject(nextSubject);
-      }} variant={variant} />
-      <p style={{ margin: 0, color: "var(--text-muted)" }}>{description[subject]}</p>
+      <ExplorerSubjectSwitch
+        subject={subject}
+        onChange={(nextSubject) => {
+          const nextExplorerSubject = EXPLORER_SUBJECTS.find(
+            ({ id }) => id === nextSubject,
+          );
+          if (nextExplorerSubject) setSubject(nextExplorerSubject.id);
+        }}
+        variant={variant}
+      />
+      <p style={{ margin: 0, color: "var(--text-muted)" }}>
+        {description[subject]}
+      </p>
     </div>
   );
 }
@@ -46,5 +57,11 @@ export const CompactSelect: Story = {
 };
 
 export const HeaderNavigation: Story = {
-  render: () => <ExplorerSubjectSwitch subject="people" onChange={() => undefined} variant="text" />,
+  render: () => (
+    <ExplorerSubjectSwitch
+      subject="people"
+      onChange={() => undefined}
+      variant="text"
+    />
+  ),
 };

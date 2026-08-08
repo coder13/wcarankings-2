@@ -3,7 +3,12 @@ import type { GenderRankingQueryInput } from "@/services/rankings/types";
 
 interface GenderPersonRankingRowsQueryInput {
   genderCount: number;
-  recordColumn: string;
+  positionColumn: string;
+  regionColumn: string | null;
+}
+
+interface GenderPersonRankingLocateQueryInput {
+  rankColumn: string;
   positionColumn: string;
   regionColumn: string | null;
 }
@@ -46,7 +51,6 @@ export function genderRankingPageQuery(input: GenderRankingQueryInput) {
 
 export function genderPersonRankingRowsQuery({
   genderCount,
-  recordColumn,
   positionColumn,
   regionColumn,
 }: GenderPersonRankingRowsQueryInput) {
@@ -54,6 +58,9 @@ export function genderPersonRankingRowsQuery({
     { length: genderCount },
     () => "?",
   ).join(", ");
+  const genderCondition = genderCount
+    ? ` AND ranking.gender IN (${genderPlaceholders})`
+    : "";
   const regionCondition = regionColumn
     ? ` AND ranking.${regionColumn} = ?`
     : "";
@@ -67,13 +74,15 @@ export function genderPersonRankingRowsQuery({
           ranking.country_id,
           ranking.continent_id,
           ranking.world_rank,
+          ranking.continent_rank,
+          ranking.country_rank,
           ranking.${positionColumn} AS page_position
         FROM
           person_event_rankings ranking
         WHERE
           ranking.event_id = ?
           AND ranking.result_type = ?
-          AND ranking.gender IN (${genderPlaceholders}) ${regionCondition}
+          ${genderCondition}${regionCondition}
         ORDER BY
           ranking.${positionColumn},
           ranking.person_id
@@ -92,21 +101,62 @@ export function genderPersonRankingRowsQuery({
       COALESCE(person.name, page.person_id) AS person_name,
       COALESCE(country.name, page.country_id, '') AS country_name,
       COALESCE(country.iso2, '') AS country_iso2,
-      COALESCE(facts.competition_id, '') AS competition_id,
+      COALESCE(facts.competition_id, live.competition_id, '') AS competition_id,
       COALESCE(competition.name, '') AS competition_name,
-      ${recordColumn} = 'WR' AS is_world_record,
-      ${recordColumn} IN ('AfR', 'AsR', 'ER', 'NaR', 'OcR', 'SaR') AS is_continent_record,
-      ${recordColumn} = 'NR' AS is_country_record
+      page.world_rank = 1 AS is_world_record,
+      page.continent_rank = 1 AS is_continent_record,
+      page.country_rank = 1 AS is_country_record
     FROM
       page
       LEFT JOIN persons person ON person.wca_id = page.person_id
       AND person.sub_id = 1
       LEFT JOIN result_facts facts ON facts.result_id = page.result_id
+      LEFT JOIN provisional_live_results live
+        ON -CAST(live.projection_result_id AS SIGNED) = page.result_id
       LEFT JOIN countries country ON country.id = page.country_id
-      LEFT JOIN competitions competition ON competition.id = facts.competition_id
+      LEFT JOIN competitions competition
+        ON competition.id = COALESCE(facts.competition_id, live.competition_id)
     ORDER BY
       page.page_position,
       page.person_id
+  `;
+}
+
+export function genderPersonRankingLocateQuery({
+  rankColumn,
+  positionColumn,
+  regionColumn,
+}: GenderPersonRankingLocateQueryInput) {
+  return sqlFragment`
+    SELECT
+      ranking.${rankColumn} AS rank,
+      ranking.${positionColumn} AS sub_rank,
+      ranking.person_id,
+      ranking.result_id,
+      ranking.result_value AS best,
+      ranking.country_id,
+      ranking.continent_id,
+      COALESCE(person.name, ranking.person_id) AS person_name,
+      COALESCE(country.name, ranking.country_id, '') AS country_name,
+      COALESCE(country.iso2, '') AS country_iso2,
+      COALESCE(facts.competition_id, live.competition_id, '') AS competition_id,
+      COALESCE(competition.name, '') AS competition_name,
+      ranking.world_rank = 1 AS is_world_record,
+      ranking.continent_rank = 1 AS is_continent_record,
+      ranking.country_rank = 1 AS is_country_record
+    FROM person_event_rankings ranking
+    LEFT JOIN persons person ON person.wca_id = ranking.person_id AND person.sub_id = 1
+    LEFT JOIN result_facts facts ON facts.result_id = ranking.result_id
+    LEFT JOIN provisional_live_results live
+      ON -CAST(live.projection_result_id AS SIGNED) = ranking.result_id
+    LEFT JOIN countries country ON country.id = ranking.country_id
+    LEFT JOIN competitions competition
+      ON competition.id = COALESCE(facts.competition_id, live.competition_id)
+    WHERE ranking.event_id = ?
+      AND ranking.result_type = ?
+      AND ranking.person_id = ?
+      ${regionColumn ? `AND ranking.${regionColumn} = ?` : ""}
+    LIMIT 1
   `;
 }
 
@@ -118,6 +168,9 @@ export function genderPersonRankingCountQuery(
     { length: genderCount },
     () => "?",
   ).join(", ");
+  const genderCondition = genderCount
+    ? ` AND ranking.gender IN (${genderPlaceholders})`
+    : "";
   return sqlFragment`
     SELECT
       COUNT(*) AS count
@@ -126,9 +179,7 @@ export function genderPersonRankingCountQuery(
     WHERE
       ranking.event_id = ?
       AND ranking.result_type = ?
-      AND ranking.gender IN (${genderPlaceholders}) ${
-        regionColumn ? ` AND ranking.${regionColumn} = ?` : ""
-      }
+      ${genderCondition}${regionColumn ? ` AND ranking.${regionColumn} = ?` : ""}
   `;
 }
 
@@ -140,6 +191,9 @@ export function genderPersonRankingPrefixCountQuery(
     { length: genderCount },
     () => "?",
   ).join(", ");
+  const genderCondition = genderCount
+    ? ` AND ranking.gender IN (${genderPlaceholders})`
+    : "";
   return sqlFragment`
     SELECT
       COUNT(*) AS count
@@ -148,7 +202,7 @@ export function genderPersonRankingPrefixCountQuery(
     WHERE
       ranking.event_id = ?
       AND ranking.result_type = ?
-      AND ranking.gender IN (${genderPlaceholders})
+      ${genderCondition}
       AND ranking.result_value < ? ${
         regionColumn ? ` AND ranking.${regionColumn} = ?` : ""
       }

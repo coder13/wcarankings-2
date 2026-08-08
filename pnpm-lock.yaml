@@ -66,6 +66,9 @@ importers:
       '@wcarankings/projection-jobs':
         specifier: workspace:*
         version: link:../../packages/projection-jobs
+      '@wcarankings/worker-health':
+        specifier: workspace:*
+        version: link:../../packages/worker-health
       '@wcarankings/worker-logging':
         specifier: workspace:*
         version: link:../../packages/worker-logging
@@ -78,6 +81,9 @@ importers:
       '@wcarankings/projection-jobs':
         specifier: workspace:*
         version: link:../../packages/projection-jobs
+      '@wcarankings/worker-health':
+        specifier: workspace:*
+        version: link:../../packages/worker-health
       '@wcarankings/worker-logging':
         specifier: workspace:*
         version: link:../../packages/worker-logging
@@ -102,6 +108,9 @@ importers:
       '@wcarankings/projection-jobs':
         specifier: workspace:*
         version: link:../../packages/projection-jobs
+      '@wcarankings/worker-health':
+        specifier: workspace:*
+        version: link:../../packages/worker-health
       i18next:
         specifier: ^26.3.6
         version: 26.3.6(typescript@5.9.3)
@@ -223,6 +232,8 @@ importers:
       sql-template-tag:
         specifier: ^5.2.1
         version: 5.2.1
+
+  packages/worker-health: {}
 
   packages/worker-logging:
     dependencies:

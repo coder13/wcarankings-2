@@ -7,7 +7,7 @@ import {
 
 function usage(): never {
   throw new Error(
-    "Usage: register-live-results-source.ts <wca-live|cubing-china> <competitionId> [remoteCompetitionId] [pollSeconds]",
+    "Usage: register-live-results-source.ts <ilr|wca-live|cubing-china> <competitionId> [remoteCompetitionId] [pollSeconds]",
   );
 }
 
@@ -20,7 +20,8 @@ const [
 if (
   !source ||
   !competitionId ||
-  !LIVE_RESULT_SOURCES.includes(source as LiveResultSource)
+  !LIVE_RESULT_SOURCES.includes(source as LiveResultSource) ||
+  source === "unknown"
 )
   usage();
 const year = new Date().getUTCFullYear();

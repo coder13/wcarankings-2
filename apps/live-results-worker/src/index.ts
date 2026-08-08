@@ -6,11 +6,12 @@ import type {
   RowDataPacket,
 } from "mysql2/promise";
 import { argumentPresent, argumentValue } from "@wcarankings/cli";
-import { databaseOptions, recordWorkerHeartbeat } from "@wcarankings/database";
+import { databaseOptions } from "@wcarankings/database";
 import {
   closeProjectionJobQueue,
   enqueueProjectionJob,
   type ProjectionJobEnqueueOutcome,
+  type ProjectionJob,
 } from "@wcarankings/projection-jobs";
 import {
   closeWorkerLogger,
@@ -18,23 +19,31 @@ import {
   type WorkerLogger,
 } from "@wcarankings/worker-logging";
 import {
+  createWorkerHealthServer,
+  type WorkerHealthServer,
+} from "@wcarankings/worker-health";
+import {
   fetchLiveResults,
-  fetchWcaCompetitionScoretakingSoftware,
+  fetchWcaCompetitionRegistrationCount,
+  fetchWcaCompetitionMetadata,
   LiveResultsNotPublishedError,
   liveResultRoundKey,
   roundSnapshotHashes,
   snapshotHash,
 } from "@wcarankings/live-results";
 import type {
+  LiveResultSource,
   LiveResultsSnapshot,
   LiveResultsSourceRow,
 } from "@wcarankings/live-results";
 import {
+  mergeProjectionJobs,
   partitionJobs,
   type CountryRegion,
   type PersonRegion,
   type SnapshotResultIdentity,
 } from "./job-partitions.ts";
+import { enrichSnapshotPeople } from "./live-people.ts";
 
 const POLL_MS = Math.max(
   60_000,
@@ -44,11 +53,18 @@ const LEASE_SECONDS = Math.max(
   30,
   Number(process.env.PROVISIONAL_RANKING_WORKER_LEASE_SECONDS) || 120,
 );
-const HEARTBEAT_INTERVAL_MS = 15_000;
-const HEARTBEAT_TIMEOUT_SECONDS = 90;
-const SETTINGS_REFRESH_INTERVAL_MS = 60_000;
+const DEFAULT_HEALTH_PORT = 3011;
 const selectedCompetition = argumentValue("competition");
 const once = argumentPresent("once");
+type StoredSnapshotResultIdentity = Omit<SnapshotResultIdentity, "attempts"> & {
+  attemptsJson: unknown;
+};
+type SnapshotQueueWork = {
+  hash: string;
+  previousResults: SnapshotResultIdentity[];
+  snapshot: LiveResultsSnapshot;
+  source: LiveResultsSourceRow;
+};
 let shutdownSignal: "SIGINT" | "SIGTERM" | null = null;
 let resolveShutdownRequest: (() => void) | undefined;
 const shutdownRequested = new Promise<void>((resolve) => {
@@ -63,6 +79,30 @@ function requestShutdown(signal: "SIGINT" | "SIGTERM"): void {
 
 process.once("SIGINT", () => requestShutdown("SIGINT"));
 process.once("SIGTERM", () => requestShutdown("SIGTERM"));
+
+function isRetryableDatabaseLockError(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === "ER_LOCK_WAIT_TIMEOUT" || code === "ER_LOCK_DEADLOCK";
+}
+
+async function retryDatabaseOperation<T>(
+  operation: () => Promise<T>,
+  logger: WorkerLogger,
+  label: string,
+): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!isRetryableDatabaseLockError(error) || attempt >= 5) throw error;
+      logger.warn(`${label} hit a database lock; retrying.`, {
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
+  }
+}
 
 const activeCompetitionPredicate = `
   competition.cancelled = 0
@@ -83,6 +123,7 @@ const activeCompetitionPredicate = `
     )`;
 
 type ActiveCompetition = RowDataPacket & {
+  countryIso2: string;
   id: string;
   year: number;
 };
@@ -114,23 +155,74 @@ type PersonRegionRow = RowDataPacket & {
   personId: string;
 };
 
-function providerCompatibility(scoretakingSoftware: string | null): {
+function cubingChinaAlias(website: string | null): string | null {
+  if (!website) return null;
+  try {
+    const url = new URL(website);
+    if (
+      url.hostname !== "cubing.com" &&
+      url.hostname !== "cubingchina.com" &&
+      url.hostname !== "www.cubingchina.com"
+    )
+      return null;
+    const [, collection, alias] = url.pathname.split("/");
+    return collection === "competition" && alias
+      ? decodeURIComponent(alias)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function providerCompatibility(
+  competition: ActiveCompetition,
+  scoretakingSoftware: string | null,
+  website: string | null,
+): {
   enabled: number;
   status: ProviderStatus;
   message: string | null;
+  remoteCompetitionId: string;
+  sourceName: LiveResultSource;
 } {
   if (scoretakingSoftware === "wca_live")
-    return { enabled: 1, status: "supported", message: null };
+    return {
+      enabled: 1,
+      status: "supported",
+      message: null,
+      remoteCompetitionId: competition.id,
+      sourceName: "wca-live",
+    };
+  if (scoretakingSoftware === "internal")
+    return {
+      enabled: 1,
+      status: "supported",
+      message: null,
+      remoteCompetitionId: competition.id,
+      sourceName: "ilr",
+    };
+  if (competition.countryIso2 === "CN" && scoretakingSoftware === "external")
+    return {
+      enabled: 1,
+      status: "supported",
+      message: null,
+      remoteCompetitionId: cubingChinaAlias(website) ?? competition.id,
+      sourceName: "cubing-china",
+    };
   if (!scoretakingSoftware)
     return {
       enabled: 0,
       status: "unknown",
       message: "WCA did not report scoretaking software.",
+      remoteCompetitionId: competition.id,
+      sourceName: "unknown",
     };
   return {
     enabled: 0,
     status: "unsupported",
     message: `Unsupported scoretaking software: ${scoretakingSoftware}`,
+    remoteCompetitionId: competition.id,
+    sourceName: "unknown",
   };
 }
 
@@ -184,29 +276,47 @@ async function reconcileActiveSources(
 ): Promise<void> {
   const startedAt = performance.now();
   const [activeCompetitions] = await connection.query<ActiveCompetition[]>(
-    `SELECT competition.id, competition.year
+    `SELECT competition.id, competition.year, COALESCE(country.iso2, '') AS countryIso2
      FROM competitions competition
+     LEFT JOIN countries country ON country.id = competition.country_id
      WHERE ${activeCompetitionPredicate}`,
   );
   const discovered = await Promise.all(
     activeCompetitions.map(async (competition) => {
       try {
-        const scoretakingSoftware =
-          await fetchWcaCompetitionScoretakingSoftware(competition.id);
+        const { scoretakingSoftware, website } =
+          await fetchWcaCompetitionMetadata(competition.id);
+        const registeredPersonCount =
+          await fetchWcaCompetitionRegistrationCount(competition.id).catch(
+            (error) => {
+              logger.warn(
+                `Could not fetch registrations for ${competition.id}.`,
+                {
+                  competitionId: competition.id,
+                  error: error instanceof Error ? error.message : String(error),
+                },
+              );
+              return null;
+            },
+          );
         return {
           ...competition,
           scoretakingSoftware,
+          registeredPersonCount,
           metadataAvailable: true,
-          ...providerCompatibility(scoretakingSoftware),
+          ...providerCompatibility(competition, scoretakingSoftware, website),
         };
       } catch {
         return {
           ...competition,
           scoretakingSoftware: null,
+          registeredPersonCount: null,
           metadataAvailable: false,
           enabled: 0,
           status: "unknown" as const,
           message: "WCA scoretaking software is unavailable.",
+          remoteCompetitionId: competition.id,
+          sourceName: "unknown" as const,
         };
       }
     }),
@@ -223,50 +333,56 @@ async function reconcileActiveSources(
            source.leased_until = NULL
        WHERE competition.id IS NULL AND source.enabled = 1`,
     );
-    await connection.query(
-      `UPDATE provisional_live_result_sources source
-       JOIN competitions competition
-         ON competition.id = source.competition_id
-        AND ${activeCompetitionPredicate}
-       SET source.provider_status = 'supported', source.provider_message = NULL
-       WHERE source.source_name = 'cubing-china'`,
-    );
     for (const competition of discovered) {
       await connection.query(
         `UPDATE provisional_live_result_sources
-         SET scoretaking_software = IF(? = 1, ?, scoretaking_software),
+         SET enabled = 0, lease_token = NULL, leased_until = NULL
+         WHERE competition_id = ? AND source_name <> ?`,
+        [competition.id, competition.sourceName],
+      );
+      await connection.query(
+        `UPDATE provisional_live_result_sources
+         SET remote_competition_id = ?,
+             scoretaking_software = IF(? = 1, ?, scoretaking_software),
              provider_status = ?, provider_message = ?,
+             registered_person_count = COALESCE(?, registered_person_count),
              next_poll_at = IF(? = 1 AND enabled = 0 AND ? = 1, CURRENT_TIMESTAMP(6), next_poll_at),
              enabled = IF(? = 1, ?, enabled)
-         WHERE source_name = 'wca-live' AND competition_id = ?`,
+         WHERE source_name = ? AND competition_id = ?`,
         [
+          competition.remoteCompetitionId,
           competition.metadataAvailable ? 1 : 0,
           competition.scoretakingSoftware,
           competition.status,
           competition.message,
+          competition.registeredPersonCount,
           competition.metadataAvailable ? 1 : 0,
           competition.enabled,
           competition.metadataAvailable ? 1 : 0,
           competition.enabled,
+          competition.sourceName,
           competition.id,
         ],
       );
       await connection.query(
         `INSERT INTO provisional_live_result_sources
-           (source_name, competition_id, remote_competition_id, competition_year, enabled, scoretaking_software, provider_status, provider_message)
-         SELECT 'wca-live', ?, ?, ?, ?, ?, ?, ?
+           (source_name, competition_id, remote_competition_id, competition_year, enabled, scoretaking_software, provider_status, provider_message, registered_person_count)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE NOT EXISTS (
            SELECT 1 FROM provisional_live_result_sources source
-           WHERE source.competition_id = ?
+           WHERE source.source_name = ? AND source.competition_id = ?
          )`,
         [
+          competition.sourceName,
           competition.id,
-          competition.id,
+          competition.remoteCompetitionId,
           competition.year,
           competition.enabled,
           competition.scoretakingSoftware,
           competition.status,
           competition.message,
+          competition.registeredPersonCount,
+          competition.sourceName,
           competition.id,
         ],
       );
@@ -298,81 +414,63 @@ async function reconcileActiveSources(
   }
 }
 
-async function applyPollingSettings(
+async function claimSources(
   connection: Connection,
   logger: WorkerLogger,
-): Promise<void> {
-  const [updated] = await connection.query<ResultSetHeader>(
-    `UPDATE provisional_live_result_sources source
-     JOIN live_results_settings settings ON settings.id = 1
-     SET source.next_poll_at = IF(
-           source.poll_seconds <> settings.poll_seconds,
-           DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL settings.poll_seconds SECOND),
-           source.next_poll_at
-         ),
-         source.poll_seconds = settings.poll_seconds
-     WHERE source.source_name = 'wca-live'
-       AND source.enabled = 1
-       AND source.provider_status = 'supported'
-       AND source.poll_seconds <> settings.poll_seconds`,
-  );
-  if (updated.affectedRows > 0)
-    logger.info(
-      `Updated polling settings for ${updated.affectedRows} sources.`,
-      {
-        sourceCount: updated.affectedRows,
-      },
-    );
-}
-
-async function claimSource(
-  connection: Connection,
-  logger: WorkerLogger,
-): Promise<LiveResultsSourceRow | null> {
+): Promise<LiveResultsSourceRow[]> {
   const startedAt = performance.now();
   const token = randomUUID();
   await connection.beginTransaction();
   try {
+    if (!selectedCompetition) {
+      const [scheduled] = await connection.query<ResultSetHeader>(
+        `UPDATE live_results_settings
+         SET next_import_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL poll_seconds SECOND)
+         WHERE id = 1 AND next_import_at <= CURRENT_TIMESTAMP(6)`,
+      );
+      if (scheduled.affectedRows === 0) {
+        await connection.commit();
+        logger.debug("The next live import is not due.", {
+          durationMs: Math.round(performance.now() - startedAt),
+        });
+        return [];
+      }
+    }
     const [rows] = await connection.query<
       (LiveResultsSourceRow & RowDataPacket)[]
     >(
       `SELECT source_name, competition_id, remote_competition_id, competition_year
        FROM provisional_live_result_sources
        WHERE enabled = 1 AND (? = '' OR competition_id = ?)
-         AND (? <> '' OR (next_poll_at <= CURRENT_TIMESTAMP(6)
-           AND (leased_until IS NULL OR leased_until < CURRENT_TIMESTAMP(6))))
-       ORDER BY next_poll_at, competition_id LIMIT 1 FOR UPDATE SKIP LOCKED`,
-      [selectedCompetition, selectedCompetition, selectedCompetition],
+         AND (leased_until IS NULL OR leased_until < CURRENT_TIMESTAMP(6))
+       ORDER BY competition_id FOR UPDATE SKIP LOCKED`,
+      [selectedCompetition, selectedCompetition],
     );
-    const source = rows[0];
-    if (!source) {
+    if (rows.length === 0) {
       await connection.commit();
       logger.debug("No live source is due.", {
         durationMs: Math.round(performance.now() - startedAt),
       });
-      return null;
+      return [];
     }
-    await connection.query(
-      `UPDATE provisional_live_result_sources SET lease_token = ?,
-       leased_until = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL ? SECOND)
-       WHERE source_name = ? AND competition_id = ?`,
-      [token, LEASE_SECONDS, source.source_name, source.competition_id],
-    );
+    for (const source of rows)
+      await connection.query(
+        `UPDATE provisional_live_result_sources SET lease_token = ?,
+         leased_until = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL ? SECOND)
+         WHERE source_name = ? AND competition_id = ?`,
+        [token, LEASE_SECONDS, source.source_name, source.competition_id],
+      );
     await connection.commit();
-    logger.debug(
-      `Claimed live source: ${source.source_name}:${source.competition_id}.`,
-      {
-        sourceName: source.source_name,
-        competitionId: source.competition_id,
-        leaseSeconds: LEASE_SECONDS,
-        durationMs: Math.round(performance.now() - startedAt),
-      },
-    );
-    return {
+    logger.debug(`Claimed ${rows.length} live sources.`, {
+      sourceCount: rows.length,
+      leaseSeconds: LEASE_SECONDS,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
+    return rows.map((source) => ({
       ...source,
       competition_year: Number(source.competition_year),
       lease_token: token,
-    };
+    }));
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -383,13 +481,12 @@ async function saveSnapshot(
   connection: Connection,
   source: LiveResultsSourceRow,
   logger: WorkerLogger,
-): Promise<void> {
+): Promise<SnapshotQueueWork | null> {
   const startedAt = performance.now();
   const fetchStartedAt = performance.now();
   let snapshot: LiveResultsSnapshot | undefined;
   let fetchDurationMs = 0;
   let hash: string;
-  let version: number | null = null;
   let needsQueue: boolean;
   let previousResults: SnapshotResultIdentity[] = [];
   let changedSnapshot: LiveResultsSnapshot | null = null;
@@ -402,17 +499,26 @@ async function saveSnapshot(
   let snapshotChanged = false;
   let transactionOpen = false;
   try {
-    snapshot = await fetchLiveResults(
+    const providerSnapshot = await fetchLiveResults(
       source.source_name,
       source.remote_competition_id,
     );
+    snapshot = await enrichSnapshotPeople(connection, providerSnapshot);
     fetchDurationMs = Math.round(performance.now() - fetchStartedAt);
+    if (snapshot.skippedRoundIds?.length)
+      logger.warn("Skipped unsupported ILR H2H rounds.", {
+        sourceName: source.source_name,
+        competitionId: source.competition_id,
+        roundIds: snapshot.skippedRoundIds,
+      });
     hash = snapshotHash(snapshot);
     const incomingRounds = snapshotRounds(snapshot);
     logger.debug("Fetched live results.", {
       sourceName: source.source_name,
       competitionId: source.competition_id,
       resultCount: snapshot.results.length,
+      skippedUnknownPersonCount:
+        providerSnapshot.results.length - snapshot.results.length,
       roundCount: incomingRounds.size,
       durationMs: fetchDurationMs,
     });
@@ -474,15 +580,16 @@ async function saveSnapshot(
       changedSnapshot = resultsForRounds(snapshot, changedRounds);
       if (needsRoundBaseline) {
         const [rows] = await connection.query<
-          (SnapshotResultIdentity & RowDataPacket)[]
+          (StoredSnapshotResultIdentity & RowDataPacket)[]
         >(
-          `SELECT person_id AS personId, event_id AS eventId,
-            country_iso2 AS countryIso2
+          `SELECT source_result_id AS sourceResultId, person_id AS personId,
+            event_id AS eventId, country_iso2 AS countryIso2, best, average,
+            attempts_json AS attemptsJson
            FROM provisional_live_results
            WHERE source_name = ? AND competition_id = ?`,
           [source.source_name, source.competition_id],
         );
-        previousResults = rows;
+        previousResults = rows.map(snapshotResultIdentityFromRow);
         deletedResultCount = rows.length;
         await connection.query(
           "DELETE FROM provisional_live_results WHERE source_name = ? AND competition_id = ?",
@@ -497,15 +604,16 @@ async function saveSnapshot(
         const predicate = roundPredicate(affectedRounds);
         const parameters = roundParameters(affectedRounds);
         const [rows] = await connection.query<
-          (SnapshotResultIdentity & RowDataPacket)[]
+          (StoredSnapshotResultIdentity & RowDataPacket)[]
         >(
-          `SELECT person_id AS personId, event_id AS eventId,
-            country_iso2 AS countryIso2
+          `SELECT source_result_id AS sourceResultId, person_id AS personId,
+            event_id AS eventId, country_iso2 AS countryIso2, best, average,
+            attempts_json AS attemptsJson
            FROM provisional_live_results
            WHERE source_name = ? AND competition_id = ? AND (${predicate})`,
           [source.source_name, source.competition_id, ...parameters],
         );
-        previousResults = rows;
+        previousResults = rows.map(snapshotResultIdentityFromRow);
         deletedResultCount = rows.length;
         await connection.query(
           `DELETE FROM provisional_live_results
@@ -556,10 +664,6 @@ async function saveSnapshot(
       await connection.query(
         "UPDATE provisional_live_result_state SET source_version = source_version + 1 WHERE id = 1",
       );
-      const [versions] = await connection.query<RowDataPacket[]>(
-        "SELECT source_version FROM provisional_live_result_state WHERE id = 1",
-      );
-      version = Number(versions[0]?.source_version);
     } else if (
       storedRoundRows.length !== incomingRounds.size ||
       storedRoundRows.some(
@@ -590,7 +694,7 @@ async function saveSnapshot(
     await connection.query(
       `UPDATE provisional_live_result_sources SET snapshot_hash = ?, last_success_at = CURRENT_TIMESTAMP(6),
        last_imported_at = IF(? = 1, CURRENT_TIMESTAMP(6), last_imported_at), last_error = NULL,
-       next_poll_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL poll_seconds SECOND), lease_token = NULL, leased_until = NULL
+       lease_token = NULL, leased_until = NULL
        WHERE source_name = ? AND competition_id = ? AND lease_token = ?`,
       [
         hash,
@@ -636,7 +740,7 @@ async function saveSnapshot(
     if (error instanceof LiveResultsNotPublishedError) {
       await connection.query(
         `UPDATE provisional_live_result_sources SET lease_token = NULL, leased_until = NULL,
-         next_poll_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL poll_seconds SECOND), last_error = ?
+         last_error = ?
          WHERE source_name = ? AND competition_id = ? AND lease_token = ?`,
         [
           error.message,
@@ -653,11 +757,11 @@ async function saveSnapshot(
           durationMs: Math.round(performance.now() - startedAt),
         },
       );
-      return;
+      return null;
     }
     await connection.query(
       `UPDATE provisional_live_result_sources SET lease_token = NULL, leased_until = NULL,
-      next_poll_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 60 SECOND), last_error = ?
+      last_error = ?
       WHERE source_name = ? AND competition_id = ? AND lease_token = ?`,
       [
         String(error instanceof Error ? error.message : error).slice(0, 1000),
@@ -668,71 +772,14 @@ async function saveSnapshot(
     );
     throw error;
   }
-  if (needsQueue) {
-    if (!snapshot) throw new Error("Live result snapshot is missing.");
-    const queuedVersion = version ?? (await currentSourceVersion(connection));
-    const resultsForJobs = [
-      ...previousResults,
-      ...(changedSnapshot ?? snapshot).results.map((result) => ({
-        countryIso2: result.countryIso2,
-        eventId: result.eventId,
-        personId: result.personId,
-      })),
-    ];
-    const countryRegionsByIso2 = await countryRegionsFor(
-      connection,
-      resultsForJobs,
-    );
-    const personRegionsById = await personRegionsFor(
-      connection,
-      resultsForJobs,
-    );
-    const jobs = partitionJobs(
-      source,
-      changedSnapshot ?? snapshot,
-      queuedVersion,
-      previousResults,
-      countryRegionsByIso2,
-      personRegionsById,
-    );
-    const queueStartedAt = performance.now();
-    const outcomes: Record<ProjectionJobEnqueueOutcome, number> = {
-      added: 0,
-      unchanged: 0,
-      updated: 0,
-    };
-    for (const job of jobs) {
-      try {
-        outcomes[await enqueueProjectionJob(job)] += 1;
-      } catch (error) {
-        logger.error(`Projection enqueue failed: ${job.key}.`, {
-          sourceName: source.source_name,
-          competitionId: source.competition_id,
-          sourceVersion: queuedVersion,
-          job,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        throw error;
-      }
-    }
-    logger.info(
-      `Queued ${jobs.length} projection rebuilds for ${source.competition_id}.`,
-      {
-        sourceName: source.source_name,
-        competitionId: source.competition_id,
-        jobCount: jobs.length,
-        outcomes,
-        sourceVersion: queuedVersion,
-        durationMs: Math.round(performance.now() - queueStartedAt),
-      },
-    );
-    await connection.query(
-      `UPDATE provisional_live_result_sources SET queued_snapshot_hash = ?
-       WHERE source_name = ? AND competition_id = ? AND snapshot_hash = ?`,
-      [hash, source.source_name, source.competition_id, hash],
-    );
-  }
+  if (!needsQueue) return null;
+  if (!snapshot) throw new Error("Live result snapshot is missing.");
+  return {
+    hash,
+    previousResults,
+    snapshot: changedSnapshot ?? snapshot,
+    source,
+  };
 }
 
 function stateNeedsQueue(state: RowDataPacket, hash: string): boolean {
@@ -744,6 +791,114 @@ async function currentSourceVersion(connection: Connection): Promise<number> {
     "SELECT source_version FROM provisional_live_result_state WHERE id = 1",
   );
   return Number(rows[0]?.source_version);
+}
+
+async function queueSnapshotWorks(
+  connection: Connection,
+  works: readonly SnapshotQueueWork[],
+  logger: WorkerLogger,
+): Promise<void> {
+  if (works.length === 0) return;
+  const sourceVersion = await currentSourceVersion(connection);
+  const partitionedJobs: ProjectionJob[] = [];
+  for (const work of works) {
+    const resultsForJobs = [
+      ...work.previousResults,
+      ...work.snapshot.results.map((result) => ({
+        average: result.average,
+        attempts: result.attempts,
+        best: result.best,
+        countryIso2: result.countryIso2,
+        eventId: result.eventId,
+        personId: result.personId,
+        sourceResultId: result.sourceResultId,
+      })),
+    ];
+    const [countryRegionsByIso2, personRegionsById] = await Promise.all([
+      countryRegionsFor(connection, resultsForJobs),
+      personRegionsFor(connection, resultsForJobs),
+    ]);
+    partitionedJobs.push(
+      ...partitionJobs(
+        work.source,
+        work.snapshot,
+        sourceVersion,
+        work.previousResults,
+        countryRegionsByIso2,
+        personRegionsById,
+      ),
+    );
+  }
+  const jobs = mergeProjectionJobs(partitionedJobs);
+  const startedAt = performance.now();
+  const outcomes: Record<ProjectionJobEnqueueOutcome, number> = {
+    added: 0,
+    unchanged: 0,
+    updated: 0,
+  };
+  for (const job of jobs) {
+    try {
+      outcomes[await enqueueProjectionJob(job)] += 1;
+    } catch (error) {
+      logger.error(`Projection enqueue failed: ${job.key}.`, {
+        sourceVersion,
+        job,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
+  }
+  for (const work of works)
+    await connection.query(
+      `UPDATE provisional_live_result_sources SET queued_snapshot_hash = ?
+       WHERE source_name = ? AND competition_id = ? AND snapshot_hash = ?`,
+      [
+        work.hash,
+        work.source.source_name,
+        work.source.competition_id,
+        work.hash,
+      ],
+    );
+  logger.info(
+    `Queued ${jobs.length} projection rebuilds for ${works.length} live imports.`,
+    {
+      sourceVersion,
+      importCount: works.length,
+      jobCount: jobs.length,
+      partitionedJobCount: partitionedJobs.length,
+      outcomes,
+      durationMs: Math.round(performance.now() - startedAt),
+    },
+  );
+}
+
+function snapshotResultIdentityFromRow(
+  row: StoredSnapshotResultIdentity,
+): SnapshotResultIdentity {
+  return {
+    average: Number(row.average),
+    attempts: parseStoredAttempts(row.attemptsJson),
+    best: Number(row.best),
+    countryIso2: row.countryIso2,
+    eventId: row.eventId,
+    personId: row.personId,
+    sourceResultId: row.sourceResultId,
+  };
+}
+
+function parseStoredAttempts(value: unknown): number[] {
+  const parsed =
+    typeof value === "string"
+      ? JSON.parse(value)
+      : Array.isArray(value)
+        ? value
+        : [];
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter(
+    (attempt): attempt is number =>
+      typeof attempt === "number" && Number.isSafeInteger(attempt),
+  );
 }
 
 async function countryRegionsFor(
@@ -810,16 +965,25 @@ async function main(): Promise<void> {
       "logs/live-results-poller.log",
   });
   let connection: Connection | undefined;
+  let healthServer: WorkerHealthServer | undefined;
   try {
+    healthServer = await createWorkerHealthServer({
+      port:
+        Number(process.env.LIVE_RESULTS_POLLER_HEALTH_PORT) ||
+        DEFAULT_HEALTH_PORT,
+      workerName: "live-results-poller",
+      onRestart: () => {
+        process.kill(process.pid, "SIGTERM");
+      },
+    });
     const databaseConnection = await mysql.createConnection(databaseOptions());
     connection = databaseConnection;
+    await databaseConnection.query("SET SESSION innodb_lock_wait_timeout = 5");
     logger.info("Live results poller started.", {
       pollIntervalMs: POLL_MS,
       selectedCompetition: selectedCompetition || undefined,
     });
     let reconciledDay = "";
-    let lastHeartbeatAt = 0;
-    let lastSettingsRefreshAt = 0;
     let loggedShutdownSignal = false;
     const stopIfRequested = () => {
       if (!shutdownSignal) return false;
@@ -829,53 +993,28 @@ async function main(): Promise<void> {
       }
       return true;
     };
-    async function heartbeat(force = false): Promise<void> {
-      const now = Date.now();
-      if (!force && now - lastHeartbeatAt < HEARTBEAT_INTERVAL_MS) return;
-      try {
-        await recordWorkerHeartbeat(databaseConnection, {
-          workerName: "live-results-poller",
-          timeoutSeconds: HEARTBEAT_TIMEOUT_SECONDS,
-          details: {
-            mode: selectedCompetition ? "manual" : once ? "once" : "scheduled",
-            pollIntervalMs: POLL_MS,
-          },
-        });
-        lastHeartbeatAt = now;
-      } catch (error) {
-        logger.error("Live results poller heartbeat failed.", {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        throw error;
-      }
-    }
     async function reconcileForToday(): Promise<void> {
       const day = utcDay();
       if (day === reconciledDay) return;
-      await reconcileActiveSources(databaseConnection, logger);
+      await retryDatabaseOperation(
+        () => reconcileActiveSources(databaseConnection, logger),
+        logger,
+        "Active source reconciliation",
+      );
       reconciledDay = day;
       await logActiveSources(databaseConnection, logger);
     }
-    async function refreshPollingSettings(): Promise<void> {
-      const now = Date.now();
-      if (now - lastSettingsRefreshAt < SETTINGS_REFRESH_INTERVAL_MS) return;
-      await applyPollingSettings(databaseConnection, logger);
-      lastSettingsRefreshAt = now;
-    }
-
-    await reconcileForToday();
-    await refreshPollingSettings();
-    await heartbeat(true);
+    if (!selectedCompetition) await reconcileForToday();
+    healthServer.setState("ready");
     do {
       if (stopIfRequested()) return;
-      await heartbeat();
-      await reconcileForToday();
-      await refreshPollingSettings();
-      const source = await claimSource(databaseConnection, logger);
-      if (source) {
+      if (!selectedCompetition) await reconcileForToday();
+      const sources = await claimSources(databaseConnection, logger);
+      const queueWorks: SnapshotQueueWork[] = [];
+      for (const source of sources) {
         try {
-          await saveSnapshot(databaseConnection, source, logger);
+          const work = await saveSnapshot(databaseConnection, source, logger);
+          if (work) queueWorks.push(work);
         } catch (error) {
           logger.error(
             `Live poll failed: ${source.source_name}:${source.competition_id}.`,
@@ -888,12 +1027,20 @@ async function main(): Promise<void> {
           );
         }
       }
+      try {
+        await queueSnapshotWorks(databaseConnection, queueWorks, logger);
+      } catch (error) {
+        logger.error("Projection enqueue batch failed.", {
+          importCount: queueWorks.length,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      }
       if (once || selectedCompetition) return;
-      if (!source)
-        await Promise.race([
-          new Promise((resolve) => setTimeout(resolve, POLL_MS)),
-          shutdownRequested,
-        ]);
+      await Promise.race([
+        new Promise((resolve) => setTimeout(resolve, POLL_MS)),
+        shutdownRequested,
+      ]);
     } while (true);
   } catch (error) {
     logger.error("Live results poller stopped unexpectedly.", {
@@ -903,6 +1050,7 @@ async function main(): Promise<void> {
     throw error;
   } finally {
     await connection?.end();
+    await healthServer?.close().catch(() => undefined);
     await closeProjectionJobQueue();
     logger.info("Live results poller stopped.");
     await closeWorkerLogger(logger);
@@ -914,16 +1062,19 @@ async function logActiveSources(
   logger: WorkerLogger,
 ): Promise<void> {
   const [sources] = await connection.query<RowDataPacket[]>(
-    `SELECT source_name, competition_id, next_poll_at
+    `SELECT source_name, competition_id
      FROM provisional_live_result_sources
      WHERE enabled = 1
      ORDER BY competition_id`,
   );
+  const [settings] = await connection.query<RowDataPacket[]>(
+    "SELECT next_import_at FROM live_results_settings WHERE id = 1",
+  );
   logger.info(`Active live sources: ${sources.length}.`, {
+    nextImportAt: settings[0]?.next_import_at,
     sources: sources.map((source) => ({
       sourceName: source.source_name,
       competitionId: source.competition_id,
-      nextPollAt: source.next_poll_at,
     })),
   });
 }

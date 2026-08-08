@@ -6,30 +6,89 @@ interface PersonResultQueryInput {
   year?: number | null;
 }
 
+export function personEventHasActiveLiveResultsQuery() {
+  return sqlFragment`
+    SELECT EXISTS(
+      SELECT 1
+      FROM provisional_live_results live
+      INNER JOIN provisional_live_result_sources source
+        ON source.source_name = live.source_name
+        AND source.competition_id = live.competition_id
+        AND source.enabled = 1
+      WHERE live.person_id = ?
+        AND live.event_id = ?
+      LIMIT 1
+    ) AS active
+  `;
+}
+
 export function personEventResultRankingsQuery({
   source,
   hasStoredDate,
   year = null,
 }: PersonResultQueryInput) {
-  const competitionStartDate = hasStoredDate
-    ? "ranking.competition_start_date"
-    : "NULL";
+  const liveValue = hasStoredDate ? "attempt.result_value" : "live.average";
+  const liveAttemptNumber = hasStoredDate ? "attempt.attempt_number" : "NULL";
+  const liveAttemptsJoin = hasStoredDate
+    ? "INNER JOIN JSON_TABLE(live.attempts_json, '$[*]' COLUMNS (attempt_number FOR ORDINALITY, result_value INT PATH '$')) attempt ON TRUE"
+    : "";
   const positionOrder = hasStoredDate
     ? "ranking.result_value, ranking.competition_start_date, ranking.competition_id, ranking.result_id, ranking.attempt_number"
     : "ranking.result_value, ranking.result_id";
-  const yearJoin =
-    !hasStoredDate && year !== null
-      ? "INNER JOIN result_facts year_facts ON year_facts.result_id = ranking.result_id"
-      : "";
-  let yearCondition = "";
-  if (year !== null) {
-    yearCondition = hasStoredDate
-      ? "AND YEAR(ranking.competition_start_date) = ?"
-      : "AND YEAR(year_facts.competition_start_date) = ?";
-  }
+  const periodYear = year ?? 0;
 
   return sqlFragment`
     WITH
+      target AS (
+        SELECT ? AS person_id, ? AS event_id
+      ),
+      candidates AS (
+        SELECT
+          ranking.result_id,
+          ranking.attempt_number,
+          ranking.result_value,
+          target.person_id,
+          ranking.country_id,
+          ranking.continent_id,
+          ranking.competition_id,
+          ranking.world_rank,
+          ranking.continent_rank,
+          ranking.country_rank,
+          ${hasStoredDate ? "ranking.competition_start_date" : "NULL"} AS competition_start_date
+        FROM ${source} ranking
+        INNER JOIN target
+          ON target.person_id = ranking.person_id
+          AND target.event_id = ranking.event_id
+        WHERE ranking.period_year = ${periodYear}
+        UNION ALL
+        SELECT
+          -CAST(live.projection_result_id AS SIGNED),
+          ${liveAttemptNumber},
+          ${liveValue},
+          target.person_id,
+          country.id,
+          country.continent_id,
+          live.competition_id,
+          0,
+          0,
+          0,
+          STR_TO_DATE(
+            CONCAT(competition.year, '-', LPAD(competition.month, 2, '0'), '-', LPAD(competition.day, 2, '0')),
+            '%Y-%m-%d'
+          )
+        FROM provisional_live_results live
+        INNER JOIN provisional_live_result_sources source
+          ON source.source_name = live.source_name
+          AND source.competition_id = live.competition_id
+          AND source.enabled = 1
+        INNER JOIN target
+          ON target.person_id = live.person_id
+          AND target.event_id = live.event_id
+        INNER JOIN competitions competition ON competition.id = live.competition_id
+        INNER JOIN countries country ON country.iso2 = live.country_iso2
+        ${liveAttemptsJoin}
+        WHERE ${liveValue} > 0 ${year === null ? "" : `AND competition.year = ${year}`}
+      ),
       ranked AS (
         SELECT
           ranking.result_id,
@@ -45,7 +104,7 @@ export function personEventResultRankingsQuery({
             WHEN ranking.country_rank = 1 THEN 'NR'
             ELSE ''
           END AS record_code,
-          ${competitionStartDate} AS competition_start_date,
+          ranking.competition_start_date,
           RANK() OVER (
             ORDER BY
               ranking.result_value
@@ -55,13 +114,7 @@ export function personEventResultRankingsQuery({
               ${positionOrder}
           ) AS position,
           COUNT(*) OVER () AS total_count
-        FROM
-          ${source} ranking
-          ${yearJoin}
-        WHERE
-          ranking.person_id = ?
-          AND ranking.event_id = ?
-          ${yearCondition}
+        FROM candidates ranking
       ),
       page AS (
         SELECT

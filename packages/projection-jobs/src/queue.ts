@@ -13,7 +13,16 @@ export interface ProjectionJob {
 export type ProjectionJobEnqueueOutcome = "added" | "unchanged" | "updated";
 
 export const PROJECTION_JOB_QUEUE_NAME = "wcarankings-projection-jobs";
-let queue: Queue<ProjectionJob> | undefined;
+export const RESULT_RANKING_JOB_QUEUE_NAME = "wcarankings-result-ranking-jobs";
+
+type ProjectionQueueName =
+  typeof PROJECTION_JOB_QUEUE_NAME | typeof RESULT_RANKING_JOB_QUEUE_NAME;
+
+const queues = new Map<ProjectionQueueName, Queue<ProjectionJob>>();
+
+export function isResultRankingJob(job: ProjectionJob): boolean {
+  return job.key.startsWith("result-rankings:");
+}
 
 export function projectionJobConnection() {
   const value = process.env.REDIS_URL;
@@ -31,14 +40,47 @@ export function projectionJobConnection() {
 }
 
 export function projectionJobQueue(): Queue<ProjectionJob> {
-  queue ??= new Queue<ProjectionJob>(PROJECTION_JOB_QUEUE_NAME, {
-    connection: projectionJobConnection(),
-  });
-  return queue;
+  return projectionJobQueueByName(PROJECTION_JOB_QUEUE_NAME);
+}
+
+export function resultRankingJobQueue(): Queue<ProjectionJob> {
+  return projectionJobQueueByName(RESULT_RANKING_JOB_QUEUE_NAME);
+}
+
+export function projectionJobQueueFor(
+  job: ProjectionJob,
+): Queue<ProjectionJob> {
+  return isResultRankingJob(job)
+    ? resultRankingJobQueue()
+    : projectionJobQueue();
+}
+
+export function projectionJobQueues(): Queue<ProjectionJob>[] {
+  return [projectionJobQueue(), resultRankingJobQueue()];
+}
+
+function projectionJobQueueByName(
+  name: ProjectionQueueName,
+): Queue<ProjectionJob> {
+  const existing = queues.get(name);
+  if (!existing || existing.closing) {
+    const queue = new Queue<ProjectionJob>(name, {
+      connection: projectionJobConnection(),
+    });
+    queues.set(name, queue);
+    return queue;
+  }
+  return existing;
 }
 
 export function projectionJobEvents(): QueueEvents {
   return new QueueEvents(PROJECTION_JOB_QUEUE_NAME, {
+    connection: projectionJobConnection(),
+  });
+}
+
+export function resultRankingJobEvents(): QueueEvents {
+  return new QueueEvents(RESULT_RANKING_JOB_QUEUE_NAME, {
     connection: projectionJobConnection(),
   });
 }
@@ -86,7 +128,7 @@ export async function enqueueProjectionJob(
 ): Promise<ProjectionJobEnqueueOutcome> {
   if (!supportsProjectionJob(job))
     throw new Error(`Unsupported projection job key: ${job.key}.`);
-  const queue = projectionJobQueue();
+  const queue = projectionJobQueueFor(job);
   const id = jobId(job);
   const existing = await queue.getJob(id);
   if (existing) {
@@ -102,6 +144,13 @@ export async function enqueueProjectionJob(
 }
 
 export async function closeProjectionJobQueue(): Promise<void> {
-  await queue?.close();
-  queue = undefined;
+  await Promise.all([...queues.values()].map((queue) => queue.close()));
+  queues.clear();
 }
+
+export {
+  closeProjectionJobMetrics,
+  projectionStatName,
+  readProjectionJobMetrics,
+  recordProjectionJobDuration,
+} from "./metrics.ts";
