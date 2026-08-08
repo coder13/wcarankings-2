@@ -8,6 +8,7 @@ import type {
 import { argumentPresent, argumentValue } from "@wcarankings/cli";
 import { databaseOptions, recordWorkerHeartbeat } from "@wcarankings/database";
 import {
+  closeProjectionJobQueue,
   enqueueProjectionJob,
   type ProjectionJobEnqueueOutcome,
 } from "@wcarankings/projection-jobs";
@@ -902,6 +903,7 @@ async function main(): Promise<void> {
     throw error;
   } finally {
     await connection?.end();
+    await closeProjectionJobQueue();
     logger.info("Live results poller stopped.");
     await closeWorkerLogger(logger);
   }
