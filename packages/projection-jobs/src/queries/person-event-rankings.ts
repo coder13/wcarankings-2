@@ -52,13 +52,13 @@ export const upsertProvisionalPersonEventRankingSliceQuery = ({
       ) AS candidate_position
     FROM person_event_bests best
     WHERE best.period_year = 0
-      AND best.event_id = CONVERT(${eventId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
-      AND best.result_type = CONVERT(${resultType} USING utf8mb4) COLLATE utf8mb4_unicode_ci
+      AND CONVERT(best.event_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(${eventId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
+      AND CONVERT(best.result_type USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(${resultType} USING utf8mb4) COLLATE utf8mb4_unicode_ci
   ), regional_bests AS (
     SELECT *
     FROM world_candidates
     WHERE candidate_position = 1
-      AND continent_id = CONVERT(${continentId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
+      AND CONVERT(continent_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(${continentId} USING utf8mb4) COLLATE utf8mb4_unicode_ci
   ), ranked AS (
     SELECT
       best.*,
@@ -94,9 +94,9 @@ export const upsertProvisionalPersonEventRankingSliceQuery = ({
     CASE WHEN ranked.result_id < 0 THEN 1 ELSE 0 END
   FROM ranked
   LEFT JOIN person_event_rankings existing
-    ON existing.person_id = ranked.person_id
-    AND existing.event_id = ranked.event_id
-    AND existing.result_type = ranked.result_type
+    ON CONVERT(existing.person_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ranked.person_id USING utf8mb4) COLLATE utf8mb4_unicode_ci
+    AND CONVERT(existing.event_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ranked.event_id USING utf8mb4) COLLATE utf8mb4_unicode_ci
+    AND CONVERT(existing.result_type USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ranked.result_type USING utf8mb4) COLLATE utf8mb4_unicode_ci
   ON DUPLICATE KEY UPDATE
     result_id = VALUES(result_id),
     result_value = VALUES(result_value),
