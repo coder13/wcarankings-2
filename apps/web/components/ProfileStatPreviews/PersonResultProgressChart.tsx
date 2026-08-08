@@ -13,13 +13,9 @@ import {
 import { formatWcaResult, type RankingType } from "@/lib/wca";
 import type { PersonResultProgressPoint } from "@/services/rankings/person-result-progress";
 
-interface ResultProgressTooltipPayload {
-  payload?: PersonResultProgressPoint;
-}
-
 interface ResultProgressTooltipProps {
   active?: boolean;
-  payload?: readonly ResultProgressTooltipPayload[];
+  payload?: TooltipContentProps["payload"];
   eventId: string;
   resultType: RankingType;
 }
@@ -52,7 +48,7 @@ function ResultProgressTooltip({
   eventId,
   resultType,
 }: ResultProgressTooltipProps) {
-  const point = payload?.[0]?.payload;
+  const point = payload?.[0]?.payload as PersonResultProgressPoint | undefined;
   if (!active || !point) return null;
 
   return (
@@ -100,7 +96,7 @@ export function PersonResultProgressChart({
           />
           <Tooltip
             allowEscapeViewBox={{ x: true, y: true }}
-            content={(properties: TooltipContentProps<number, string>) => (
+            content={(properties: TooltipContentProps) => (
               <ResultProgressTooltip
                 {...properties}
                 eventId={eventId}

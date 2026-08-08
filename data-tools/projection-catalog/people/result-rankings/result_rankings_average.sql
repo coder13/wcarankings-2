@@ -344,4 +344,5 @@ ADD INDEX idx_results_average_person (
   event_id,
   world_position,
   result_id
-);
+),
+ADD INDEX idx_result_rankings_average_live_order (period_year, event_id, result_value, result_id);

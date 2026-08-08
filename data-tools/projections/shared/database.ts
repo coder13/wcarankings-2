@@ -6,6 +6,7 @@ import type {
 import type { RowDataPacket } from "mysql2/promise";
 
 export const INDEXES: readonly IndexDefinition[] = [
+  ["countries", "idx_countries_iso2", "(`iso2`)", "iso2"],
   ["persons", "idx_persons_wca_sub", "(`wca_id`, `sub_id`)", "wca_id,sub_id"],
   ["persons", "idx_persons_name", "(`name`)", "name"],
   [

@@ -386,6 +386,15 @@ ADD INDEX idx_results_single_person (
   result_id,
   attempt_number
 ),
+ADD INDEX idx_result_rankings_single_live_order (
+  period_year,
+  event_id,
+  result_value,
+  competition_start_date,
+  competition_id,
+  result_id,
+  attempt_number
+),
 -- This is the only former solve_facts secondary index selected by the
 -- measured gender-only and gender/country lazy fallback plans.
 ADD INDEX idx_results_single_lazy_gender (

@@ -37,6 +37,12 @@ jobs:
         with:
           bun-version: 1.3.3
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install transfer tooling
+        run: pnpm install --frozen-lockfile --prod
+
       - name: Build data-tools image
         run: docker build --file docker/Dockerfile.data-tools --tag wcarankings-data-tools:pull-request .
 
