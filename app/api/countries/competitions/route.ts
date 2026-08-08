@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   return handleProjectionRequest(request, "country-rankings", (params) =>
     loadCountryRankings(
-      withFixedQueryParams(params, { stat: "competitions" }),
+      withFixedQueryParams(params, { stat: "competitions" }, ["result"]),
     ),
   );
 }
