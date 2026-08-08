@@ -43,10 +43,10 @@ const liveRowsFor = ({
         SELECT
           -CAST(live.projection_result_id AS SIGNED) AS result_id,
           attempts.attempt_number,
-          live.event_id,
-          live.person_id,
-          CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END AS gender,
-          live.competition_id,
+          CAST(live.event_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS event_id,
+          CAST(live.person_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS person_id,
+          CAST(CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS gender,
+          CAST(live.competition_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS competition_id,
           STR_TO_DATE(
             CONCAT(
               competition.year,
@@ -57,10 +57,10 @@ const liveRowsFor = ({
             ),
             '%Y-%m-%d'
           ) AS competition_start_date,
-          country.id AS country_id,
-          country.continent_id,
+          CAST(country.id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS country_id,
+          CAST(country.continent_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS continent_id,
           attempts.result_value,
-          '' AS record_code
+          CAST('' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS record_code
         FROM provisional_live_results live
         INNER JOIN provisional_live_result_sources source
           ON source.source_name = live.source_name
@@ -86,10 +86,10 @@ const liveRowsFor = ({
         SELECT
           -CAST(live.projection_result_id AS SIGNED) AS result_id,
           NULL AS attempt_number,
-          live.event_id,
-          live.person_id,
-          CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END AS gender,
-          live.competition_id,
+          CAST(live.event_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS event_id,
+          CAST(live.person_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS person_id,
+          CAST(CASE WHEN person.gender IN ('m', 'f') THEN person.gender ELSE 'o' END AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS gender,
+          CAST(live.competition_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS competition_id,
           STR_TO_DATE(
             CONCAT(
               competition.year,
@@ -100,10 +100,10 @@ const liveRowsFor = ({
             ),
             '%Y-%m-%d'
           ) AS competition_start_date,
-          country.id AS country_id,
-          country.continent_id,
+          CAST(country.id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS country_id,
+          CAST(country.continent_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS continent_id,
           live.average AS result_value,
-          '' AS record_code
+          CAST('' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS record_code
         FROM provisional_live_results live
         INNER JOIN provisional_live_result_sources source
           ON source.source_name = live.source_name
