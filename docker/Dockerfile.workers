@@ -20,9 +20,10 @@ RUN useradd --system --uid 10001 --create-home wcarankings \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=dependencies /app/apps ./apps
+COPY --from=dependencies /app/packages ./packages
 COPY --chown=wcarankings:wcarankings apps/live-results-worker ./apps/live-results-worker
 COPY --chown=wcarankings:wcarankings apps/projection-worker ./apps/projection-worker
-COPY --chown=wcarankings:wcarankings packages ./packages
 COPY --chown=wcarankings:wcarankings tsconfig.data-tools.json ./tsconfig.data-tools.json
 
 USER wcarankings
