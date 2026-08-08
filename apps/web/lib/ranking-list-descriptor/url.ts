@@ -71,14 +71,14 @@ export function rankingListDescriptorUrl(value: unknown) {
     params.set("result", descriptor.resultType);
     if (descriptor.year !== null) params.set("year", String(descriptor.year));
     addListPersonFilters(params, descriptor);
-    return pathWithParams("/api/rankings", params);
+    return pathWithParams("/api/persons/rankings", params);
   }
   if (descriptor.family === "person-result") {
     params.set("eventId", descriptor.eventId);
     params.set("result", descriptor.resultType);
     if (descriptor.year !== null) params.set("year", String(descriptor.year));
     addListPersonFilters(params, descriptor);
-    return pathWithParams("/api/rankings/results", params);
+    return pathWithParams("/api/persons/results", params);
   }
   if (descriptor.family === "person-composite") {
     params.set(
@@ -92,15 +92,14 @@ export function rankingListDescriptorUrl(value: unknown) {
       params.set("kinch", "continent");
     }
     addPersonFilters(params, descriptor);
-    return pathWithParams("/api/rankings", params);
+    return pathWithParams("/api/persons/rankings", params);
   }
   if (descriptor.family === "person-activity") {
-    params.set("metric", descriptor.metric);
     if (descriptor.metric === "competitions" && descriptor.year !== null) {
       params.set("year", String(descriptor.year));
     }
     addPersonFilters(params, descriptor);
-    return pathWithParams("/api/rankings/people/activity", params);
+    return pathWithParams(`/api/persons/${descriptor.metric}`, params);
   }
   if (descriptor.family === "person-medals") {
     if (descriptor.eventId !== "all") params.set("eventId", descriptor.eventId);
@@ -109,32 +108,33 @@ export function rankingListDescriptorUrl(value: unknown) {
     }
     if (descriptor.year !== null) params.set("year", String(descriptor.year));
     addPersonFilters(params, descriptor);
-    return pathWithParams("/api/rankings/people/medals", params);
+    return pathWithParams("/api/persons/medals", params);
   }
   if (descriptor.family === "competition") {
     if (descriptor.metric === "fastest") {
       params.set("eventId", descriptor.eventId);
       params.set("result", descriptor.resultType);
     } else if (descriptor.metric === "podium") {
-      params.set("ranking", "podium");
       params.set("eventId", descriptor.eventId);
-    } else if (descriptor.metric === "competitor-count") {
-      params.set("ranking", "competitor-count");
-    } else {
-      params.set("ranking", "latitude");
+    } else if (descriptor.metric === "latitude") {
       if (descriptor.hemisphere === "south") params.set("hemisphere", "south");
       addRegion(params, descriptor.region);
     }
-    return pathWithParams("/api/rankings/competitions", params);
+    const endpoint = {
+      fastest: "/api/competitions/best-result",
+      podium: "/api/competitions/podiums",
+      "competitor-count": "/api/competitions/competitor-count",
+      latitude: "/api/competitions/latitude",
+    }[descriptor.metric];
+    return pathWithParams(endpoint, params);
   }
   params.set("eventId", descriptor.eventId);
-  if (descriptor.metric === "fastest") {
-    params.set("result", descriptor.resultType);
-  } else {
-    params.set("stat", descriptor.metric);
-  }
   addCityFilters(params, descriptor);
-  return pathWithParams("/api/rankings/cities", params);
+  const cityEndpoint =
+    descriptor.metric === "fastest"
+      ? `/api/cities/fastest-${descriptor.resultType}`
+      : `/api/cities/${descriptor.metric}`;
+  return pathWithParams(cityEndpoint, params);
 }
 
 function parseUrl(value: string | URL) {
@@ -184,7 +184,7 @@ function podiumResultType(eventId: string): RankingType {
 export function parseRankingListDescriptorUrl(value: string | URL) {
   const url = parseUrl(value);
   const params = url.searchParams;
-  if (url.pathname === "/api/rankings") {
+  if (url.pathname === "/api/persons/rankings") {
     const eventId = params.get("eventId") ?? "333";
     if (eventId === "SOR") {
       return normalizeRankingListDescriptor({
@@ -215,7 +215,7 @@ export function parseRankingListDescriptorUrl(value: string | URL) {
       ...listPersonUrlFields(params),
     });
   }
-  if (url.pathname === "/api/rankings/results") {
+  if (url.pathname === "/api/persons/results") {
     return normalizeRankingListDescriptor({
       version: RANKING_LIST_DESCRIPTOR_VERSION,
       family: "person-result",
@@ -225,22 +225,19 @@ export function parseRankingListDescriptorUrl(value: string | URL) {
       ...listPersonUrlFields(params),
     });
   }
-  if (
-    url.pathname === "/api/rankings/people/activity" ||
-    url.pathname === "/api/rankings/people/competitions"
-  ) {
-    const metric = url.pathname.endsWith("/competitions")
-      ? "competitions"
-      : (params.get("metric") ?? "competitions");
+  const activityMetric = url.pathname.match(
+    /^\/api\/persons\/(competitions|countries|rounds|solves)$/,
+  )?.[1];
+  if (activityMetric) {
     return normalizeRankingListDescriptor({
       version: RANKING_LIST_DESCRIPTOR_VERSION,
       family: "person-activity",
-      metric,
+      metric: activityMetric,
       year: yearFromUrl(params),
       ...personUrlFields(params),
     });
   }
-  if (url.pathname === "/api/rankings/people/medals") {
+  if (url.pathname === "/api/persons/medals") {
     return normalizeRankingListDescriptor({
       version: RANKING_LIST_DESCRIPTOR_VERSION,
       family: "person-medals",
@@ -250,9 +247,17 @@ export function parseRankingListDescriptorUrl(value: string | URL) {
       ...personUrlFields(params),
     });
   }
-  if (url.pathname === "/api/rankings/competitions") {
+  if (url.pathname.startsWith("/api/competitions/")) {
     rejectListParam(params);
-    const metric = params.get("ranking") ?? "fastest";
+    const metric = {
+      "/api/competitions/best-result": "fastest",
+      "/api/competitions/podiums": "podium",
+      "/api/competitions/competitor-count": "competitor-count",
+      "/api/competitions/latitude": "latitude",
+    }[url.pathname];
+    if (!metric) {
+      throw new RankingListDescriptorError("competition metric is invalid.");
+    }
     if (metric === "fastest") {
       return normalizeRankingListDescriptor({
         version: RANKING_LIST_DESCRIPTOR_VERSION,
@@ -305,15 +310,24 @@ export function parseRankingListDescriptorUrl(value: string | URL) {
     }
     throw new RankingListDescriptorError("competition metric is invalid.");
   }
-  if (url.pathname === "/api/rankings/cities") {
+  const cityMetric = url.pathname.match(
+    /^\/api\/cities\/(fastest-single|fastest-average|competitors|competitions|solves)$/,
+  )?.[1];
+  if (cityMetric) {
     rejectListParam(params);
-    const metric = params.get("stat") ?? "fastest";
     return normalizeRankingListDescriptor({
       version: RANKING_LIST_DESCRIPTOR_VERSION,
       family: "city",
-      metric,
+      metric:
+        cityMetric === "fastest-single" || cityMetric === "fastest-average"
+          ? "fastest"
+          : cityMetric,
       eventId: params.get("eventId"),
-      ...(metric === "fastest" ? { resultType: params.get("result") } : {}),
+      ...(cityMetric === "fastest-single" || cityMetric === "fastest-average"
+        ? {
+            resultType: cityMetric === "fastest-single" ? "single" : "average",
+          }
+        : {}),
       year: yearFromUrl(params),
       region: params.get("region"),
       genders: params.getAll("gender"),

@@ -11,7 +11,7 @@ export function profileResultsHref({
   resultType: RankingType;
   year?: number | null;
 }) {
-  const params = new URLSearchParams({ eventId, resultType });
+  const params = new URLSearchParams({ eventId, result: resultType });
   if (year !== null) params.set("year", `${year}`);
-  return `/profile/${personId.toUpperCase()}/results?${params.toString()}`;
+  return `/person/${personId.toUpperCase()}/results?${params.toString()}`;
 }

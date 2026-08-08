@@ -97,7 +97,7 @@ function PersonTopRankingHighlightsFeed({ personId }: { personId: string }) {
       shown.forEach((id) => params.append("shown", id));
       try {
         const response = await fetch(
-          `/api/people/${personId}/top-ranking-highlights?${params.toString()}`,
+          `/api/person/${personId}/top-ranking-highlights?${params.toString()}`,
           { signal: controller.signal },
         );
         const body = (await response.json()) as Response;

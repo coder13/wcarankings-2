@@ -5,9 +5,7 @@ type PageCheck = {
   capability?: CapabilityName;
 };
 
-type CapabilityName =
-  | "personCompetitionRankings"
-  | "personMedalRankings";
+type CapabilityName = "personCompetitionRankings" | "personMedalRankings";
 
 type HealthResponse = {
   generation?: {
@@ -32,17 +30,17 @@ function pageChecks(personId: string): PageCheck[] {
   const checks: PageCheck[] = [
     {
       name: "people: 3x3 single",
-      path: "/?eventId=333&result=single",
+      path: "/persons/rankings?eventId=333&result=single",
       expected: ["3x3x3 Cube Single Rankings | WCA Rankings"],
     },
     {
       name: "people: 3x3 average",
-      path: "/?eventId=333&result=average",
+      path: "/persons/rankings?eventId=333&result=average",
       expected: ["3x3x3 Cube Average Rankings | WCA Rankings"],
     },
     {
       name: "results: 3x3 single",
-      path: "/results?eventId=333&result=single",
+      path: "/persons/results?eventId=333&result=single",
       expected: ["3x3x3 Cube Single Results | WCA Rankings"],
     },
     {
@@ -59,7 +57,7 @@ function pageChecks(personId: string): PageCheck[] {
     },
     {
       name: "persons: yearly rankings",
-      path: "/persons/year/2024?eventId=333&result=single",
+      path: "/persons/rankings?year=2024&eventId=333&result=single",
       expected: ["3x3x3 Cube Single Rankings 2024 | WCA Rankings"],
     },
     {
@@ -114,9 +112,7 @@ function pageChecks(personId: string): PageCheck[] {
     },
   ];
   return checks.map((check) =>
-    check.name === "person profile"
-      ? check
-      : check,
+    check.name === "person profile" ? check : check,
   );
 }
 
@@ -157,11 +153,18 @@ async function checkPage(
       ) {
         throw new Error("SSR description contains a removed label");
       }
-      if (descriptions.some((description) => description?.split("\n").length !== 3)) {
+      if (
+        descriptions.some(
+          (description) => description?.split("\n").length !== 3,
+        )
+      ) {
         throw new Error("SSR description does not contain three result lines");
       }
     }
-    return { skipped: false, elapsedMs: Math.round(performance.now() - startedAt) };
+    return {
+      skipped: false,
+      elapsedMs: Math.round(performance.now() - startedAt),
+    };
   } finally {
     clearTimeout(timeout);
   }

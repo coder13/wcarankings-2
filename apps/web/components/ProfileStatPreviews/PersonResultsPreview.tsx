@@ -33,14 +33,14 @@ export function PersonResultsPreview({ personId }: { personId: string }) {
   useEffect(() => {
     const controller = new AbortController();
     const params = new URLSearchParams({
+      eventId,
       result: resultType,
       limit: "5",
     });
     if (year !== null) params.set("year", `${year}`);
-    fetch(
-      `/api/people/${personId}/event/${eventId}/results?${params.toString()}`,
-      { signal: controller.signal },
-    )
+    fetch(`/api/person/${personId}/results?${params.toString()}`, {
+      signal: controller.signal,
+    })
       .then(async (response) => {
         const body = (await response.json()) as Response;
         if (!response.ok)

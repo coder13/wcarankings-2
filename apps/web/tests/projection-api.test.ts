@@ -89,14 +89,14 @@ test("keeps cursor integers explicit", () => {
   );
 });
 
-test("reads ranking parameter aliases through the same validators", () => {
+test("rejects legacy ranking parameter names", () => {
   const params = new URLSearchParams({
     event: "333",
     type: "single",
     note: "ready",
   });
-  assert.equal(parseEvent(params), "333");
-  assert.equal(parseResultType(params), "single");
+  assert.throws(() => parseEvent(params), ApiInputError);
+  assert.throws(() => parseResultType(params), ApiInputError);
   assert.equal(optionalText(params, "note"), "ready");
   assert.equal(optionalText(new URLSearchParams(), "note"), null);
   assert.throws(

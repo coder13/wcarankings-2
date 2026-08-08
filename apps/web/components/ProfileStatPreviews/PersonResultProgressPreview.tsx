@@ -47,7 +47,7 @@ export function PersonResultProgressPreview({
     const params = new URLSearchParams({ result: resultType });
     if (year !== null) params.set("year", `${year}`);
     fetch(
-      `/api/people/${personId}/event/${eventId}/progress?${params.toString()}`,
+      `/api/person/${personId}/events/${eventId}/progress?${params.toString()}`,
       { signal: controller.signal },
     )
       .then(async (response) => {

@@ -167,7 +167,7 @@ function StorybookFetchMock({ children }: { children: ReactNode }) {
     const originalFetch = window.fetch.bind(window);
     window.fetch = ((input, init) => {
       const requestUrl = new URL(getRequestUrl(input), window.location.href);
-      if (requestUrl.pathname.startsWith("/api/rankings")) {
+      if (requestUrl.pathname.startsWith("/api/persons")) {
         return makeMockResponse(requestUrl, init);
       }
       return originalFetch(input, init);
@@ -280,7 +280,7 @@ export const PersonsInfiniteScroll: Story = {
 export const Results: Story = {
   args: sharedArgs,
   parameters: {
-    nextjs: { navigation: { pathname: "/results" } },
+    nextjs: { navigation: { pathname: "/persons/results" } },
   },
 };
 
@@ -308,6 +308,11 @@ export const CompetitionLatitude: Story = {
 export const SearchOpen: Story = {
   args: sharedArgs,
   parameters: {
-    nextjs: { navigation: { pathname: "/", query: { search: "Avery" } } },
+    nextjs: {
+      navigation: {
+        pathname: "/persons/rankings",
+        query: { search: "Avery" },
+      },
+    },
   },
 };

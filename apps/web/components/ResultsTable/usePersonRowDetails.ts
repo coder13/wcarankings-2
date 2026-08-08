@@ -18,7 +18,7 @@ async function fetchPersonEventDetails(
   signal?: AbortSignal,
 ) {
   const response = await fetch(
-    `/api/people/${encodeURIComponent(personId)}/event/${encodeURIComponent(eventId)}`,
+    `/api/person/${encodeURIComponent(personId)}/events/${encodeURIComponent(eventId)}`,
     { headers: { Accept: "application/json" }, signal },
   );
   if (!response.ok) {
@@ -97,7 +97,7 @@ export function usePersonRowDetails({
     if (thumbRequestedKeys.current.has(key)) return;
     thumbRequestedKeys.current.add(key);
     const source = new EventSource(
-      `/api/people/${encodeURIComponent(details.person.id)}/thumb`,
+      `/api/person/${encodeURIComponent(details.person.id)}/thumb`,
     );
     source.addEventListener("thumb", (event) => {
       const body = JSON.parse((event as MessageEvent).data) as {

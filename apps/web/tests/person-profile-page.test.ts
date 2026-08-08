@@ -10,7 +10,7 @@ test("person profile renders from the server profile loader", async () => {
     ),
     readFile(new URL("../lib/person-profile.ts", import.meta.url), "utf8"),
     readFile(
-      new URL("../app/api/people/[wcaId]/profile/route.ts", import.meta.url),
+      new URL("../app/api/person/[wcaId]/route.ts", import.meta.url),
       "utf8",
     ),
   ]);
