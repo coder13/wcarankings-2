@@ -7,7 +7,7 @@ RUN corepack enable && pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm run build \
-  && pnpm prune --prod \
+  && pnpm prune --prod --config.confirmModulesPurge=false \
   && pnpm store prune
 
 FROM node:22-bookworm-slim AS runner
