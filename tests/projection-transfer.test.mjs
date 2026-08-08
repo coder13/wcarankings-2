@@ -76,4 +76,10 @@ test("publishes result facts as an independent dependency artifact", async () =>
       ?.dependencies,
     ["result-facts"],
   );
+  assert.deepEqual(
+    DEPLOYMENT_PROJECTION_GROUPS.find(
+      (group) => group.name === "country-rankings",
+    )?.dependencies,
+    ["result-facts"],
+  );
 });

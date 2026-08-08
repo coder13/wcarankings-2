@@ -77,7 +77,9 @@ export function RankingsResults() {
           rankingType: filters.rankingType,
           emptyState,
           hideIdentityIds:
-            filters.subject === "competitions" || filters.subject === "cities",
+            filters.subject === "competitions" ||
+            filters.subject === "countries" ||
+            filters.subject === "cities",
         }}
         virtualization={{
           totalHeight: rankings.totalHeight,

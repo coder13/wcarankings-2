@@ -8,6 +8,7 @@ import {
   ALL_RANKING_SCROLL_SCENARIOS,
   CITY_RANKING_SCENARIOS,
   COMPETITION_RANKING_SCENARIOS,
+  COUNTRY_RANKING_SCENARIOS,
   PERSON_RANKING_SCENARIOS,
   PR_STREAK_RANKING_SCENARIOS,
   RANKING_SCROLL_SUITES,
@@ -20,6 +21,7 @@ test("ranking scroll scenarios are divided into the supported stat suites", () =
     "results",
     "competitions",
     "cities",
+    "countries",
     "medals",
     "prStreak",
   ]);
@@ -116,6 +118,27 @@ test("each primary stat covers its distinct ranking modes", () => {
   assert.ok(
     CITY_RANKING_SCENARIOS.every(
       ({ params }) => (params.gender?.length ?? 0) <= 1,
+    ),
+  );
+  assert.deepEqual(
+    new Set(COUNTRY_RANKING_SCENARIOS.map(({ path }) => path)),
+    new Set([
+      "/api/countries/fastest-single",
+      "/api/countries/fastest-average",
+      "/api/countries/competitors",
+      "/api/countries/competitions",
+      "/api/countries/solves",
+    ]),
+  );
+  assert.ok(
+    COUNTRY_RANKING_SCENARIOS.some(
+      ({ params }) => (params.gender?.length ?? 0) > 1,
+    ),
+  );
+  assert.ok(COUNTRY_RANKING_SCENARIOS.some(({ params }) => params.year));
+  assert.ok(
+    COUNTRY_RANKING_SCENARIOS.some(({ params }) =>
+      String(params.region ?? "").startsWith("_"),
     ),
   );
 });

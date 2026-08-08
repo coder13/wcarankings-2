@@ -37,6 +37,23 @@ export const RANKING_STAT_SOURCES = [
       api: "/api/persons/pr-streak",
     },
   },
+  {
+    sourceId: "country-event-stats",
+    entityType: "country",
+    metrics: ["fastest", "competitors", "competitions", "solves"],
+    supportedFilters: {
+      event: true,
+      resultType: true,
+      regionScopes: ["world", "continent"],
+      year: true,
+      genders: true,
+    },
+    feedEligibility: { home: true, person: false },
+    paths: {
+      page: "/countries/fastest-single",
+      api: "/api/countries/fastest-single",
+    },
+  },
 ] as const satisfies readonly RankingStatSourceDefinition[];
 
 export function rankingStatSource(sourceId: string) {

@@ -80,6 +80,40 @@ function makeMockRankings(): RankingEntry[] {
 
 const allEntries = makeMockRankings();
 const entries = allEntries.slice(0, 100);
+const countryEntries: RankingEntry[] = FALLBACK_COUNTRIES.map(
+  (country, index) => ({
+    rank: index + 1,
+    subRank: index + 1,
+    personId: `country:${country.id}`,
+    personName: country.name,
+    identitySubtitle: index % 2 ? "competitions" : "official solves",
+    countryName: country.name,
+    countryIso2:
+      [
+        "AU",
+        "BR",
+        "CA",
+        "CN",
+        "FR",
+        "DE",
+        "IN",
+        "ID",
+        "JP",
+        "NL",
+        "PH",
+        "PL",
+        "KR",
+        "ES",
+        "GB",
+        "US",
+      ][index] ?? "",
+    best: 12_500 - index * 431,
+    formattedValue: new Intl.NumberFormat("en-US").format(12_500 - index * 431),
+    competitionId: "",
+    competitionName: "",
+    recordBadges: [],
+  }),
+);
 const allPrStreakEntries = allEntries.map((entry, index) => {
   const prStreak = Math.max(2, 28 - Math.floor(index / 4));
   return {
@@ -100,9 +134,12 @@ function makeMockResponse(url: URL, init?: RequestInit) {
   }
 
   const search = url.searchParams.get("search")?.trim().toLocaleLowerCase();
-  const fixtureEntries = url.pathname.endsWith("/people/pr-streak")
-    ? allPrStreakEntries
-    : allEntries;
+  let fixtureEntries = allEntries;
+  if (url.pathname.startsWith("/api/countries/")) {
+    fixtureEntries = countryEntries;
+  } else if (url.pathname.endsWith("/people/pr-streak")) {
+    fixtureEntries = allPrStreakEntries;
+  }
   if (search) {
     const searchLimit = Number(url.searchParams.get("searchLimit")) || 500;
     return Promise.resolve(
@@ -167,7 +204,10 @@ function StorybookFetchMock({ children }: { children: ReactNode }) {
     const originalFetch = window.fetch.bind(window);
     window.fetch = ((input, init) => {
       const requestUrl = new URL(getRequestUrl(input), window.location.href);
-      if (requestUrl.pathname.startsWith("/api/persons")) {
+      if (
+        requestUrl.pathname.startsWith("/api/persons") ||
+        requestUrl.pathname.startsWith("/api/countries/")
+      ) {
         return makeMockResponse(requestUrl, init);
       }
       return originalFetch(input, init);
@@ -218,6 +258,17 @@ const prStreakInitialData = {
   total: allPrStreakEntries.length,
   lastRank: allPrStreakEntries[99]?.rank ?? null,
   availableYears: [2026, 2025, 2024, 2023],
+};
+
+const countryInitialData = {
+  entries: countryEntries,
+  hasMore: false,
+  nextPageStart: null,
+  previousPageStart: null,
+  startRank: 1,
+  startPosition: 0,
+  lastRank: countryEntries.at(-1)?.rank ?? null,
+  total: countryEntries.length,
 };
 
 const meta = {
@@ -302,6 +353,21 @@ export const CompetitionLatitude: Story = {
   args: sharedArgs,
   parameters: {
     nextjs: { navigation: { pathname: "/competitions/latitude" } },
+  },
+};
+
+export const Countries: Story = {
+  args: {
+    ...sharedArgs,
+    initial: { ...sharedArgs.initial, data: countryInitialData },
+  },
+  parameters: {
+    nextjs: {
+      navigation: {
+        pathname: "/countries/solves",
+        query: { eventId: "333", gender: "f,o", year: "2025" },
+      },
+    },
   },
 };
 

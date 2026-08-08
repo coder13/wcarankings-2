@@ -34,6 +34,7 @@
     "benchmark:ranking-scroll:results": "bun scripts/benchmark-ranking-results.ts",
     "benchmark:ranking-scroll:competitions": "bun scripts/benchmark-ranking-competitions.ts",
     "benchmark:ranking-scroll:cities": "bun scripts/benchmark-ranking-cities.ts",
+    "benchmark:ranking-scroll:countries": "bun scripts/benchmark-ranking-countries.ts",
     "benchmark:ranking-scroll:medals": "bun scripts/benchmark-ranking-medals.ts",
     "benchmark:ranking-scroll:pr-streak": "bun scripts/benchmark-ranking-pr-streak.ts",
     "benchmark:build:pr-streak": "bun --env-file-if-exists=.env.local scripts/benchmark-pr-streak-build.ts",

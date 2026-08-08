@@ -41,6 +41,8 @@ export async function getRankingsPageMetadata({
   const requestedEvent = searchParam(params, "eventId");
   const requestedResult = searchParam(params, "result");
   const requestedMedal = searchParam(params, "medal");
+  const requestedYear = searchParam(params, "year");
+  const requestedYearNumber = Number(requestedYear);
   let eventId = "333";
   if (options.personMedalRanking) {
     eventId = isEventId(requestedEvent) ? requestedEvent : "all";
@@ -51,11 +53,19 @@ export async function getRankingsPageMetadata({
   const medalType = isMedalRankingType(requestedMedal)
     ? requestedMedal
     : "overall";
+  const year =
+    options.subject === "countries" &&
+    /^\d{4}$/.test(requestedYear) &&
+    requestedYearNumber >= 1982 &&
+    requestedYearNumber <= new Date().getFullYear()
+      ? requestedYearNumber
+      : options.year;
   const metadataInput = {
     ...options,
     eventId,
     rankingType,
     medalType,
+    year,
   } satisfies RankingDocumentTitleInput;
   const topResults = await loadTopRankingResultLabels(
     new URLSearchParams(
@@ -83,6 +93,10 @@ export async function getRankingsPageMetadata({
   imageParams.set("result", metadataInput.rankingType);
   imageParams.set("competitionRanking", metadataInput.competitionRanking);
   imageParams.set("cityRanking", metadataInput.cityRanking);
+  imageParams.set(
+    "countryRanking",
+    metadataInput.countryRanking ?? "fastest-single",
+  );
   imageParams.set(
     "personCompetitionRanking",
     String(metadataInput.personCompetitionRanking === true),
@@ -127,6 +141,7 @@ export async function RankingsPage({
   requiresPersonMedalRankings = false,
   requiresPersonPrStreakRankings = false,
   requiresCityRankings = false,
+  requiresCountryRankings = false,
 }: {
   searchParams?: Promise<RankingsSearchParams>;
   requiresResultRankings?: boolean;
@@ -136,6 +151,7 @@ export async function RankingsPage({
   requiresPersonMedalRankings?: boolean;
   requiresPersonPrStreakRankings?: boolean;
   requiresCityRankings?: boolean;
+  requiresCountryRankings?: boolean;
 } = {}) {
   const featureSwitch = await getProjectionFeatureSwitch();
   const requestedEvent = searchParam(
@@ -157,6 +173,7 @@ export async function RankingsPage({
     (requiresPersonMedalRankings && !featureSwitch.personMedalRankings) ||
     (requiresPersonPrStreakRankings && !featureSwitch.personPrStreakRankings) ||
     (requiresCityRankings && !featureSwitch.cityEventStats) ||
+    (requiresCountryRankings && !featureSwitch.countryEventStats) ||
     (["SOR", "sor-kinch"].includes(requestedEvent) && !featureSwitch.sumOfRanks)
   ) {
     notFound();

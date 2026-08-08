@@ -115,6 +115,7 @@ test("a result-facts semantic change selects only its downstream closure", async
     "person-pr-streak-rankings",
     "person-activity-rankings",
     "city-rankings",
+    "country-rankings",
     "sum-of-ranks",
     "yearly-person-rankings",
     "person-medal-rankings",

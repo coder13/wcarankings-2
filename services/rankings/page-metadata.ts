@@ -1,5 +1,6 @@
 import { formatWcaResult } from "@/lib/wca";
 import { loadCityRankings } from "@/services/rankings/city-rankings";
+import { loadCountryRankings } from "@/services/rankings/country-rankings";
 import { loadCompetitionRankings } from "@/services/rankings/competition-rankings";
 import { loadPersonCompetitionRankings } from "@/services/rankings/person-competitions";
 import { loadPersonMedalRankings } from "@/services/rankings/medals";
@@ -73,9 +74,7 @@ export async function loadTopRankingEntries(
     else if (input.competitionRanking === "latitude") ranking = "latitude";
     const rankingParamsForCompetitions = rankingParams(params, 0, input);
     rankingParamsForCompetitions.set("ranking", ranking);
-    const result = await loadCompetitionRankings(
-      rankingParamsForCompetitions,
-    );
+    const result = await loadCompetitionRankings(rankingParamsForCompetitions);
     return result.data.entries.slice(0, 3) as RankingPageEntry[];
   }
 
@@ -94,6 +93,22 @@ export async function loadTopRankingEntries(
     return result.data.entries.slice(0, 3) as RankingPageEntry[];
   }
 
+  if (input.subject === "countries") {
+    const countryParams = rankingParams(params, 0, input);
+    const countryRanking = input.countryRanking ?? "fastest-single";
+    if (countryRanking === "fastest-single") {
+      countryParams.delete("stat");
+      countryParams.set("result", "single");
+    } else if (countryRanking === "fastest-average") {
+      countryParams.delete("stat");
+      countryParams.set("result", "average");
+    } else {
+      countryParams.set("stat", countryRanking);
+    }
+    const result = await loadCountryRankings(countryParams);
+    return result.data.entries.slice(0, 3) as RankingPageEntry[];
+  }
+
   if (input.personCompetitionRanking) {
     const result = await loadPersonCompetitionRankings(
       rankingParams(params, 1, input),
@@ -102,7 +117,9 @@ export async function loadTopRankingEntries(
   }
 
   if (input.personMedalRanking) {
-    const result = await loadPersonMedalRankings(rankingParams(params, 1, input));
+    const result = await loadPersonMedalRankings(
+      rankingParams(params, 1, input),
+    );
     return result.data.entries.slice(0, 3) as RankingPageEntry[];
   }
 

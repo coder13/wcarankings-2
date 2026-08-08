@@ -417,6 +417,84 @@ export const CITY_RANKING_SCENARIOS = [
   }),
 ];
 
+export const COUNTRY_RANKING_SCENARIOS = [
+  scenario(
+    "fastest-single-world",
+    "fastest country single world",
+    "/api/countries/fastest-single",
+    {
+      eventId: "333",
+    },
+  ),
+  scenario(
+    "fastest-average-world",
+    "fastest country average world",
+    "/api/countries/fastest-average",
+    {
+      eventId: "333",
+    },
+  ),
+  scenario(
+    "fastest-single-north-america",
+    "fastest country single North America",
+    "/api/countries/fastest-single",
+    {
+      eventId: "333",
+      region: "_North America",
+    },
+  ),
+  scenario(
+    "fastest-single-world-2023",
+    "fastest country single 2023",
+    "/api/countries/fastest-single",
+    {
+      eventId: "333",
+      year: "2023",
+    },
+  ),
+  scenario(
+    "fastest-single-world-f",
+    "fastest country single women",
+    "/api/countries/fastest-single",
+    {
+      eventId: "333",
+      gender: ["f"],
+    },
+  ),
+  scenario(
+    "fastest-single-north-america-2023-fo",
+    "fastest country single North America female-other 2023",
+    "/api/countries/fastest-single",
+    {
+      eventId: "333",
+      region: "_North America",
+      year: "2023",
+      gender: ["f", "o"],
+    },
+  ),
+  ...["competitors", "competitions", "solves"].map((stat) =>
+    scenario(
+      `${stat}-world`,
+      `country ${stat} world`,
+      `/api/countries/${stat}`,
+      {
+        eventId: "333",
+      },
+    ),
+  ),
+  scenario(
+    "solves-europe-2023-mf",
+    "country solves Europe male-female 2023",
+    "/api/countries/solves",
+    {
+      eventId: "333",
+      region: "_Europe",
+      year: "2023",
+      gender: ["m", "f"],
+    },
+  ),
+];
+
 export const MEDAL_RANKING_SCENARIOS = [
   scenario(
     "overall-all-events-world",
@@ -460,6 +538,7 @@ export const RANKING_SCROLL_SUITES = {
   results: RESULT_RANKING_SCENARIOS,
   competitions: COMPETITION_RANKING_SCENARIOS,
   cities: CITY_RANKING_SCENARIOS,
+  countries: COUNTRY_RANKING_SCENARIOS,
   medals: MEDAL_RANKING_SCENARIOS,
   prStreak: PR_STREAK_RANKING_SCENARIOS,
 };

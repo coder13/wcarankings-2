@@ -15,6 +15,7 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
       "competition_event_stats",
       "competition_stats",
       "city_event_stats",
+      "country_event_stats",
       "person_sum_of_ranks_scores",
       "person_year_ranking_cohorts",
       "person_year_rankings_single",
@@ -47,6 +48,7 @@ test("derives the bootstrap capability snapshot from verified active tables", ()
     competitionRankings: true,
     personActivityRankings: true,
     cityEventStats: true,
+    countryEventStats: true,
     sumOfRanks: true,
     yearlyPersonRankings: true,
     personCompetitionRankings: true,
@@ -84,6 +86,14 @@ test("city capability requires city stats", () => {
   assert.equal(featureSwitchFromTables([]).cityEventStats, false);
   assert.equal(
     featureSwitchFromTables(["city_event_stats"]).cityEventStats,
+    true,
+  );
+});
+
+test("country capability requires country stats", () => {
+  assert.equal(featureSwitchFromTables([]).countryEventStats, false);
+  assert.equal(
+    featureSwitchFromTables(["country_event_stats"]).countryEventStats,
     true,
   );
 });

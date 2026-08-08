@@ -11,7 +11,11 @@ import type { MedalRankingType } from "@/lib/medal-rankings";
 import { rankingStatSource } from "@/lib/ranking-stat-sources";
 import type { NavigationSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSwitch";
 import { subjectPath } from "./helpers/navigation";
-import type { CityRanking, CompetitionRanking } from "./helpers/rankingModes";
+import type {
+  CityRanking,
+  CompetitionRanking,
+  CountryRanking,
+} from "./helpers/rankingModes";
 import {
   parseRankingsUrl,
   rankingsFilterStateFromUrl,
@@ -38,6 +42,10 @@ export function competitionRankingPath(ranking: CompetitionRanking) {
 
 function cityRankingPath(ranking: CityRanking) {
   return `/cities/${ranking}`;
+}
+
+export function countryRankingPath(ranking: CountryRanking) {
+  return `/countries/${ranking}`;
 }
 
 function podiumRankingType(eventId: string): "single" | "average" {
@@ -171,6 +179,10 @@ export function useRankingsState() {
       },
       changeYear(nextYear: number | null) {
         if (nextYear === filters.year) return;
+        if (filters.subject === "countries") {
+          patchFilters({ year: nextYear });
+          return;
+        }
         if (filters.personCompetitionRanking || filters.personPrStreakRanking) {
           patchFilters(
             { year: nextYear },
@@ -311,6 +323,16 @@ export function useRankingsState() {
             rankingType: next === "fastest-average" ? "average" : "single",
           },
           { history: "push", pathname: cityRankingPath(next) },
+        );
+      },
+      changeCountryRanking(next: CountryRanking) {
+        if (next === filters.countryRanking) return;
+        patchFilters(
+          {
+            countryRanking: next,
+            rankingType: next === "fastest-average" ? "average" : "single",
+          },
+          { history: "push", pathname: countryRankingPath(next) },
         );
       },
       changeHemisphere(latitudeHemisphere: "north" | "south") {

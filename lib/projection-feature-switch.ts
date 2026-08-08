@@ -46,6 +46,7 @@ const PERSON_PR_STREAK_RANKINGS_TABLES = [
   "person_pr_streak_ranking_counts",
 ] as const;
 const CITY_EVENT_STATS_TABLES = ["city_event_stats"] as const;
+const COUNTRY_EVENT_STATS_TABLES = ["country_event_stats"] as const;
 const SUM_OF_RANKS_TABLES = ["person_sum_of_ranks_scores"] as const;
 const YEARLY_TABLES = [
   "person_year_ranking_cohorts",
@@ -89,6 +90,7 @@ export function featureSwitchFromTables(
       PERSON_PR_STREAK_RANKINGS_TABLES,
     ),
     cityEventStats: allPresent(present, CITY_EVENT_STATS_TABLES),
+    countryEventStats: allPresent(present, COUNTRY_EVENT_STATS_TABLES),
     sumOfRanks: allPresent(present, SUM_OF_RANKS_TABLES),
     yearlyPersonRankings: allPresent(present, YEARLY_TABLES),
   };
@@ -133,6 +135,9 @@ async function loadProjectionFeatureSwitch() {
       cityEventStats:
         capabilities.cityEventStats === true ||
         capabilities.cityEventStats === 1,
+      countryEventStats:
+        capabilities.countryEventStats === true ||
+        capabilities.countryEventStats === 1,
       sumOfRanks:
         capabilities.sumOfRanks === true || capabilities.sumOfRanks === 1,
       yearlyPersonRankings:

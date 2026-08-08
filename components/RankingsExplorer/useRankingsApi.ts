@@ -7,6 +7,7 @@ import type { ExplorerSubject } from "../ExplorerSubjectSwitch/ExplorerSubjectSw
 import type {
   CityRanking,
   CompetitionRanking,
+  CountryRanking,
   RankingResource,
 } from "./helpers/rankingModes";
 import type { PersonActivityMetric } from "./rankingsUrl";
@@ -25,6 +26,7 @@ type RankingsApiFilters = {
   subject: ExplorerSubject;
   competitionRanking: CompetitionRanking;
   cityRanking: CityRanking;
+  countryRanking: CountryRanking;
   personCompetitionRanking: boolean;
   personActivityRanking: boolean;
   personActivityMetric: PersonActivityMetric;
@@ -43,6 +45,7 @@ function rankingResource({
   subject,
   competitionRanking,
   cityRanking,
+  countryRanking,
   personCompetitionRanking,
   personActivityRanking,
   personMedalRanking,
@@ -50,6 +53,7 @@ function rankingResource({
   latitudeHemisphere,
 }: RankingsApiFilters): RankingResource {
   if (subject === "results") return "results";
+  if (subject === "countries") return `country-${countryRanking}`;
   if (subject === "cities") return `city-${cityRanking}`;
   if (subject !== "competitions") {
     if (personCompetitionRanking) return "person-competition-count";

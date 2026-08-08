@@ -6,7 +6,7 @@ import { RankingsExplorer } from "./RankingsExplorer";
 import { subjectPath } from "./helpers/navigation";
 import { orderSearchMatches } from "./helpers/search";
 import { getTopRailScrollProgress } from "./useRailScrollProgress";
-import { competitionRankingPath } from "./useRankingsState";
+import { competitionRankingPath, countryRankingPath } from "./useRankingsState";
 import { rankingPageRequestUrl } from "./rankingsQueries";
 import type { RankingsFilterState } from "./rankingsUrl";
 import {
@@ -40,6 +40,9 @@ function pathnameForFilters(filters: RankingsFilterState) {
   if (filters.subject === "competitions") {
     return `/competitions/${filters.competitionRanking}`;
   }
+  if (filters.subject === "countries") {
+    return `/countries/${filters.countryRanking}`;
+  }
   if (filters.subject === "cities") return `/cities/${filters.cityRanking}`;
   if (filters.personCompetitionRanking) return "/persons/competitions";
   if (filters.personActivityRanking) {
@@ -58,6 +61,7 @@ function renderExplorerMarkup(
     subject: "people",
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
+    countryRanking: "fastest-single",
     personCompetitionRanking: false,
     personActivityRanking: false,
     personActivityMetric: "competitions",
@@ -116,6 +120,7 @@ test("gives each non-default subject and competition ranking a page", () => {
   assert.equal(subjectPath("people"), "/persons/rankings");
   assert.equal(subjectPath("results"), "/persons/results");
   assert.equal(subjectPath("competitions"), "/competitions/best-result");
+  assert.equal(subjectPath("countries"), "/countries/fastest-single");
   assert.equal(subjectPath("cities"), "/cities/fastest-single");
   assert.equal(
     competitionRankingPath("best-result"),
@@ -127,12 +132,13 @@ test("gives each non-default subject and competition ranking a page", () => {
     "/competitions/competitor-count",
   );
   assert.equal(competitionRankingPath("latitude"), "/competitions/latitude");
+  assert.equal(countryRankingPath("solves"), "/countries/solves");
 });
 
 test("exposes active person, result, and competition ranking subjects", () => {
   assert.deepEqual(
     EXPLORER_SUBJECTS.map(({ id }) => id),
-    ["people", "results", "competitions", "cities"],
+    ["people", "results", "competitions", "countries", "cities"],
   );
 });
 
@@ -194,6 +200,25 @@ test("keeps gender filters available for Kinch", () => {
   assert.doesNotMatch(markup, /Switch to average rankings/);
 });
 
+test("renders country statistic, year, gender, event, and continent controls", () => {
+  const markup = renderExplorerMarkup(
+    { options: { showSubjectSwitch: true } },
+    {
+      subject: "countries",
+      countryRanking: "solves",
+      year: 2025,
+      gender: ["f", "o"],
+    },
+  );
+  assert.match(markup, /WCA Countries/);
+  assert.match(markup, /aria-label="Country ranking"/);
+  assert.match(markup, /aria-label="Country ranking period"/);
+  assert.match(markup, />2025</);
+  assert.match(markup, /aria-label="Gender"/);
+  assert.match(markup, /aria-label="3x3x3 Cube"/);
+  assert.doesNotMatch(markup, /Switch to average rankings/);
+});
+
 test("renders medal event and statistic controls", () => {
   const markup = renderExplorerMarkup(
     { options: { showSubjectSwitch: true } },
@@ -243,6 +268,7 @@ test("uses a unique canonical path for each person activity stat", () => {
     subject: "people",
     competitionRanking: "best-result",
     cityRanking: "fastest-single",
+    countryRanking: "fastest-single",
     personCompetitionRanking: false,
     personActivityRanking: true,
     personActivityMetric: "countries",
@@ -309,4 +335,30 @@ test("requests PR Streak with one-based positions and no event dimensions", () =
   assert.equal(url.searchParams.get("start"), "1");
   assert.equal(url.searchParams.has("eventId"), false);
   assert.equal(url.searchParams.has("result"), false);
+});
+
+test("uses a fixed country API endpoint for each country ranking", () => {
+  const url = new URL(
+    rankingPageRequestUrl(
+      {
+        eventId: "333",
+        rankingType: "single",
+        regionSelection: { scope: "continent", regionId: "_Europe" },
+        resource: "country-solves",
+        gender: ["f", "o"],
+        year: 2025,
+        medalType: "overall",
+        personActivityMetric: "competitions",
+      },
+      1,
+    ),
+    "http://localhost",
+  );
+  assert.equal(url.pathname, "/api/countries/solves");
+  assert.equal(url.searchParams.has("result"), false);
+  assert.equal(url.searchParams.has("stat"), false);
+  assert.equal(url.searchParams.get("eventId"), "333");
+  assert.equal(url.searchParams.get("region"), "_Europe");
+  assert.equal(url.searchParams.get("year"), "2025");
+  assert.equal(url.searchParams.get("gender"), "f,o");
 });

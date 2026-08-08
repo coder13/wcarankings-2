@@ -11,6 +11,7 @@ const defaults = {
   rankingType: "single" as const,
   competitionRanking: "best-result" as const,
   cityRanking: "fastest-single" as const,
+  countryRanking: "fastest-single" as const,
 };
 
 test("formats specific titles for people rankings and results", () => {
@@ -67,6 +68,23 @@ test("formats titles for non-person ranking views and saved lists", () => {
   assert.equal(
     formatRankingDocumentTitle({ ...defaults, listName: "PNW Cubers" }),
     "PNW Cubers | WCA Rankings",
+  );
+  assert.equal(
+    formatRankingDocumentTitle({
+      ...defaults,
+      subject: "countries",
+      countryRanking: "fastest-average",
+    }),
+    "3x3x3 Cube Fastest Average Countries | WCA Rankings",
+  );
+  assert.equal(
+    formatRankingDocumentTitle({
+      ...defaults,
+      subject: "countries",
+      countryRanking: "solves",
+      year: 2025,
+    }),
+    "3x3x3 Cube Countries by Official Solve Count 2025 | WCA Rankings",
   );
   assert.equal(
     formatRankingDocumentTitle({

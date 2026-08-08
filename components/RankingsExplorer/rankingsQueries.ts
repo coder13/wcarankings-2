@@ -3,10 +3,10 @@
 import { queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { RESULTS_PAGE_SIZE } from "@/lib/rankings-config";
+import { rankingStatSource } from "@/lib/ranking-stat-sources";
 import type { GenderFilter } from "@/lib/wca";
 import type { MedalRankingType } from "@/lib/medal-rankings";
 import type { PersonActivityMetric } from "./rankingsUrl";
-import { rankingStatSource } from "@/lib/ranking-stat-sources";
 import type { RankingResource } from "./helpers/rankingModes";
 import type {
   InitialRankingData,
@@ -39,6 +39,9 @@ function rankingEndpoint(
     return "/api/competitions/competitor-count";
   }
   if (resource.startsWith("latitude-")) return "/api/competitions/latitude";
+  if (resource.startsWith("country-")) {
+    return `/api/countries/${resource.slice("country-".length)}`;
+  }
   return `/api/cities/${resource.slice("city-".length)}`;
 }
 
@@ -110,7 +113,8 @@ function rankingFilterKey(filters: RankingQueryFilters) {
     filters.resource === "person-competition-count" ||
     filters.resource === "person-activity-rankings" ||
     filters.resource === "person-pr-streak" ||
-    filters.resource === "person-medal-rankings"
+    filters.resource === "person-medal-rankings" ||
+    filters.resource.startsWith("country-")
       ? (filters.year ?? "all")
       : "all",
     filters.membershipVersion ?? "current",
@@ -150,7 +154,8 @@ function addRankingFilterParams(
       filters.resource === "person-competition-count" ||
       filters.resource === "person-activity-rankings" ||
       filters.resource === "person-pr-streak" ||
-      filters.resource === "person-medal-rankings") &&
+      filters.resource === "person-medal-rankings" ||
+      filters.resource.startsWith("country-")) &&
     filters.year
   ) {
     params.set("year", String(filters.year));
@@ -161,7 +166,8 @@ function addRankingFilterParams(
       filters.resource === "person-activity-rankings" ||
       filters.resource === "person-pr-streak" ||
       filters.resource === "person-medal-rankings" ||
-      filters.resource === "results") &&
+      filters.resource === "results" ||
+      filters.resource.startsWith("country-")) &&
     filters.gender.length
   ) {
     params.set("gender", filters.gender.join(","));

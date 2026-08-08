@@ -41,6 +41,10 @@ const FALLBACK_PERSON_RANKING_YEARS = [
   ),
   1982,
 ];
+const FALLBACK_COUNTRY_RANKING_YEARS = Array.from(
+  { length: currentYear - 1982 + 1 },
+  (_, index) => currentYear - index,
+);
 
 type PersonRankingPeriodOption = {
   value: string;
@@ -98,8 +102,12 @@ export function RankingsTopRail() {
   );
   const topProgress = useTopRailScrollProgress(RANKING_ROW_HEIGHT * 2);
   const regions = useMemo(
-    () => buildRegionOptions(initialRegions),
-    [initialRegions],
+    () =>
+      buildRegionOptions(initialRegions).filter(
+        (region) =>
+          filters.subject !== "countries" || region.scope !== "country",
+      ),
+    [filters.subject, initialRegions],
   );
   const currentEvent =
     (filters.personMedalRanking && filters.eventId === "all"
@@ -124,12 +132,24 @@ export function RankingsTopRail() {
     personRankingPeriod = filters.year ? String(filters.year) : "pr-streak";
   else if (filters.year) personRankingPeriod = String(filters.year);
   let personRankingYears = rankings.availableYears;
-  if (personRankingYears.length === 0 && rankings.loading) {
-    personRankingYears = FALLBACK_PERSON_RANKING_YEARS;
+  if (personRankingYears.length === 0) {
+    if (filters.subject === "countries") {
+      personRankingYears = FALLBACK_COUNTRY_RANKING_YEARS;
+    } else if (rankings.loading) {
+      personRankingYears = FALLBACK_PERSON_RANKING_YEARS;
+    }
   }
   let personRankingPeriodOptions: readonly PersonRankingPeriodOption[];
   let personRankingPeriodAriaLabel: string | undefined;
-  if (filters.personMedalRanking) {
+  if (filters.subject === "countries") {
+    personRankingPeriodOptions = [
+      { value: "", label: t("rankingsRail.period.allTime") },
+      ...personRankingYears.map((year) => ({
+        value: String(year),
+        label: String(year),
+      })),
+    ];
+  } else if (filters.personMedalRanking) {
     personRankingPeriodOptions = MEDAL_RANKING_OPTIONS;
     personRankingPeriodAriaLabel = "Medal statistic";
   } else if (filters.personCompetitionRanking) {
@@ -177,8 +197,10 @@ export function RankingsTopRail() {
   const showPersonRankingPeriod =
     !source &&
     options.showSubjectSwitch &&
-    filters.subject === "people" &&
+    (filters.subject === "people" || filters.subject === "countries") &&
     personRankingPeriodOptions.length > 1;
+  if (filters.subject === "countries")
+    personRankingPeriodAriaLabel = "Country ranking period";
   const hidesResultType =
     filters.personCompetitionRanking ||
     filters.personActivityRanking ||
@@ -191,6 +213,9 @@ export function RankingsTopRail() {
   const cityUsesResultType =
     filters.subject === "cities" &&
     ["fastest-single", "fastest-average"].includes(filters.cityRanking);
+  const countryUsesResultType =
+    filters.subject === "countries" &&
+    ["fastest-single", "fastest-average"].includes(filters.countryRanking);
   const hidesEventPicker =
     filters.personCompetitionRanking ||
     (filters.personActivityRanking &&
@@ -297,10 +322,13 @@ export function RankingsTopRail() {
               !filters.personMedalRanking &&
               !filters.personActivityRanking &&
               !hidesResultType &&
-              (filters.subject !== "cities" || cityUsesResultType),
+              (filters.subject !== "cities" || cityUsesResultType) &&
+              (filters.subject !== "countries" || countryUsesResultType),
             showEventPicker: !hidesEventPicker,
             showGender:
-              filters.subject === "people" || filters.subject === "results",
+              filters.subject === "people" ||
+              filters.subject === "results" ||
+              filters.subject === "countries",
             hemisphere:
               filters.subject === "competitions" &&
               filters.competitionRanking === "latitude"

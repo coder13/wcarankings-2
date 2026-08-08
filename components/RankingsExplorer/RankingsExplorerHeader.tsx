@@ -7,6 +7,7 @@ import { ShareButton, shouldShowListShare } from "../ShareButton/ShareButton";
 import {
   CITY_RANKING_OPTIONS,
   COMPETITION_RANKING_OPTIONS,
+  COUNTRY_RANKING_OPTIONS,
 } from "./helpers/rankingModes";
 import { useRankingsExplorer } from "./RankingsExplorerContext";
 
@@ -31,7 +32,7 @@ export function RankingsExplorerHeader() {
     search,
   } = useRankingsExplorer();
   const featureSwitch = useProjectionFeatureSwitch();
-  const { subject, competitionRanking, cityRanking } = filters;
+  const { subject, competitionRanking, cityRanking, countryRanking } = filters;
   let headerSubject;
   if (source) headerSubject = "lists" as const;
   else if (showSubjectSwitch) headerSubject = subject;
@@ -101,6 +102,18 @@ export function RankingsExplorerHeader() {
           actions.changeCityRanking(value as typeof cityRanking)
         }
         ariaLabel="City ranking"
+        className="competitionRankingDropdown"
+      />
+    );
+  } else if (!source && showSubjectSwitch && subject === "countries") {
+    contextualControl = (
+      <TextDropdown
+        options={COUNTRY_RANKING_OPTIONS}
+        value={countryRanking}
+        onChange={(value) =>
+          actions.changeCountryRanking(value as typeof countryRanking)
+        }
+        ariaLabel="Country ranking"
         className="competitionRankingDropdown"
       />
     );

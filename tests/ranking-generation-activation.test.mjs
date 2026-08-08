@@ -79,6 +79,11 @@ const manifest = {
       artifactFingerprint: "city-new",
       artifactDigest: "sha256:city",
     },
+    "country-rankings": {
+      semanticFingerprint: "country-semantic",
+      artifactFingerprint: "country-new",
+      artifactDigest: "sha256:country",
+    },
     "sum-of-ranks": {
       semanticFingerprint: "sum-semantic",
       artifactFingerprint: "sum-new",
@@ -236,6 +241,7 @@ test("bootstrap records only table-proven partial capabilities and no fabricated
     personPrStreakRankings: false,
     personEventRankings: false,
     cityEventStats: true,
+    countryEventStats: false,
     sumOfRanks: false,
     yearlyPersonRankings: false,
   });
@@ -266,15 +272,17 @@ test("bootstrap fails without the ranking-generation advisory lock", async () =>
   );
 });
 
-test("capability table mapping keeps city and competition ownership independent", () => {
+test("capability table mapping keeps location and competition ownership independent", () => {
   const capabilities = capabilitiesFromTables([
     "competition_podium_members",
     "competition_event_stats",
     "competition_stats",
     "city_event_stats",
+    "country_event_stats",
   ]);
   assert.equal(capabilities.competitionRankings, true);
   assert.equal(capabilities.cityEventStats, true);
+  assert.equal(capabilities.countryEventStats, true);
 });
 
 test("partial activation preserves unchanged artifacts and capabilities", () => {

@@ -14,6 +14,7 @@ const capabilityLabels: Record<string, string> = {
   personMedalRankings: "Person medal rankings",
   personPrStreakRankings: "Person PR Streak rankings",
   cityEventStats: "City/event statistics",
+  countryEventStats: "Country/event statistics",
   sumOfRanks: "Sum of Ranks",
   yearlyPersonRankings: "Yearly person rankings",
 };
