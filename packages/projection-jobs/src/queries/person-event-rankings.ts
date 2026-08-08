@@ -58,7 +58,7 @@ export const upsertProvisionalPersonEventRankingSliceQuery = ({
     SELECT *
     FROM world_candidates
     WHERE candidate_position = 1
-      AND continent_id = ${continentId}
+      AND continent_id = CONVERT(${continentId} USING utf8mb4) COLLATE utf8mb4_uca1400_ai_ci
   ), ranked AS (
     SELECT
       best.*,
