@@ -6,6 +6,9 @@ on:
 permissions:
   contents: read
 
+env:
+  COMPOSE_FILE: docker/docker-compose.yml
+
 concurrency:
   group: bulk-projection-transfer-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -35,7 +38,7 @@ jobs:
           bun-version: 1.3.3
 
       - name: Build data-tools image
-        run: docker build --file Dockerfile.data-tools --tag wcarankings-data-tools:pull-request .
+        run: docker build --file docker/Dockerfile.data-tools --tag wcarankings-data-tools:pull-request .
 
       - name: Start MariaDB
         run: |

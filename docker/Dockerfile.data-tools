@@ -25,7 +25,7 @@ COPY --chown=data-tools:data-tools apps/projection-worker ./apps/projection-work
 COPY --chown=data-tools:data-tools data-tools ./data-tools
 COPY --chown=data-tools:data-tools packages ./packages
 COPY --chown=data-tools:data-tools scripts ./scripts
-COPY --chown=data-tools:data-tools tsconfig.json ./tsconfig.json
+COPY --chown=data-tools:data-tools tsconfig.data-tools.json ./tsconfig.data-tools.json
 COPY --chown=data-tools:data-tools sql ./sql
 COPY --chown=data-tools:data-tools migrations/mysql ./migrations/mysql
 

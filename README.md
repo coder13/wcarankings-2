@@ -16,7 +16,7 @@ cp .env.example .env.local
 For a local Node process, change `DATABASE_URL` in `.env.local` from the Compose hostname `db` to `127.0.0.1:13307`, then start MariaDB:
 
 ```bash
-docker compose up -d db
+docker compose -f docker/docker-compose.yml up -d db
 pnpm run dev
 ```
 
@@ -88,10 +88,10 @@ apps/web/app/                React UI and API routes
 apps/web/db/                 MySQL connection pool
 migrations/mysql/            Flyway versioned MariaDB migrations
 sql/ranking-projections/     Readable SQL for daily derived ranking projections
-Dockerfile.flyway             Pinned Flyway migration image
+docker/Dockerfile.flyway      Pinned Flyway migration image
 scripts/sync-wca-export.ts  WCA SQL export downloader and importer
-Dockerfile                   Multi-stage production image
-docker-compose.yml           MariaDB + app services
+docker/Dockerfile             Multi-stage production image
+docker/docker-compose.yml     MariaDB + app services
 ```
 
 See [docs/projection-architecture.md](docs/projection-architecture.md) for the

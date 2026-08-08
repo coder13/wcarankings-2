@@ -32,9 +32,9 @@ const SERVER_COMPONENT_PATHS = {
     ".dockerignore",
     "release-compatibility.json",
   ],
-  flyway: ["Dockerfile.flyway", "migrations/mysql"],
+  flyway: ["docker/Dockerfile.flyway", "migrations/mysql"],
   dataTools: [
-    "Dockerfile.data-tools",
+    "docker/Dockerfile.data-tools",
     "data-tools",
     "scripts",
     "sql",

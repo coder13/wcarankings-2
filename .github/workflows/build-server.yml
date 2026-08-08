@@ -46,6 +46,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  COMPOSE_FILE: docker/docker-compose.yml
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -95,13 +98,13 @@ jobs:
             DATABASE_URL=mysql://identity:identity@db:3306/identity \
             docker compose config --no-path-resolution --format json \
               | jq -cS '.services.proxy')
-          echo "compose=$(sha256sum docker-compose.yml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "compose=$(sha256sum docker/docker-compose.yml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           caddy=$( {
             sha256sum ops/Caddyfile
             printf '%s\n' "$proxy_config"
           } | sha256sum | cut -d' ' -f1)
           echo "caddy=$caddy" >> "$GITHUB_OUTPUT"
-          echo "config=$(sha256sum docker-compose.yml ops/Caddyfile | sha256sum | cut -d' ' -f1)" \
+          echo "config=$(sha256sum docker/docker-compose.yml ops/Caddyfile | sha256sum | cut -d' ' -f1)" \
             >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
@@ -150,7 +153,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.flyway
+          file: docker/Dockerfile.flyway
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/wcarankings-flyway:component-${{ steps.components.outputs.flyway }}
@@ -183,7 +186,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.data-tools
+          file: docker/Dockerfile.data-tools
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/wcarankings-data-tools:component-${{ steps.components.outputs.data_tools }}

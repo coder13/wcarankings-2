@@ -7,6 +7,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  COMPOSE_FILE: docker/docker-compose.yml
+
 concurrency:
   group: pull-request-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -124,7 +127,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.flyway
+          file: docker/Dockerfile.flyway
           load: true
           push: false
           tags: |
@@ -206,7 +209,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.data-tools
+          file: docker/Dockerfile.data-tools
           load: true
           push: false
           tags: |

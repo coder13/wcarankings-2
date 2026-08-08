@@ -31,8 +31,8 @@ From the deployment directory on the production host:
 cp .env.example .env
 openssl rand -hex 32
 # Put the generated value in the database environment configuration.
-docker compose up -d db
-docker compose ps
+docker compose -f docker/docker-compose.yml up -d db
+docker compose -f docker/docker-compose.yml ps
 ```
 
 The application image is built by GitHub Actions and transferred to the host;
@@ -55,7 +55,7 @@ one cross-schema `RENAME TABLE`.
 
 Flyway migrations and ranking projection refreshes are separate operations. To
 inspect or validate app-owned migrations without importing WCA data, run
-`docker compose run --rm flyway info` or `docker compose run --rm flyway validate`.
+`docker compose -f docker/docker-compose.yml run --rm flyway info` or `docker compose -f docker/docker-compose.yml run --rm flyway validate`.
 Do not run importer, backfill, or projection rebuild scripts on production by
 SSH. Those scripts are packaged in the approved data-tools image for GitHub
 Actions-controlled deploy/refresh commands and local development only; they are
@@ -104,14 +104,14 @@ The two deployment workflows together do the following:
 6. Uses repository-configured SSH credentials and host verification to establish
    non-interactive access to the production host.
 7. Verifies server/dataset schema compatibility and copies checksummed
-   `docker-compose.yml` and `ops/Caddyfile` to the deployment directory.
+   `docker/docker-compose.yml` and `ops/Caddyfile` to the deployment directory.
 8. Preserves the current image as `wcarankings-app:previous`, then removes
    obsolete application, Flyway, and data-tools image tags while retaining images used by
    running containers and the rollback image.
 9. Streams the new images directly to the server with
    `docker save | gzip | ssh ... 'gzip -d | docker load'`. There is no container
    registry involved.
-10. Tags the loaded application, Flyway, and data-tools images, then runs `docker compose run --rm flyway migrate`.
+10. Tags the loaded application, Flyway, and data-tools images, then runs `docker compose -f docker/docker-compose.yml run --rm flyway migrate`.
 11. Starts and verifies the new application against the still-active compatible
     dataset. Caddy is recreated only when Compose or Caddy configuration changed.
 12. Prepares a complete candidate ranking generation, including raw data when

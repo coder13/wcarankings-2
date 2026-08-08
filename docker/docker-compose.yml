@@ -34,8 +34,8 @@ services:
   flyway:
     image: ${FLYWAY_IMAGE_REF:-wcarankings-flyway:latest}
     build:
-      context: .
-      dockerfile: Dockerfile.flyway
+      context: ..
+      dockerfile: docker/Dockerfile.flyway
     environment:
       FLYWAY_URL: jdbc:mariadb://db:3306/${MYSQL_DATABASE:?MYSQL_DATABASE must be set}
       FLYWAY_USER: ${MYSQL_USER:?MYSQL_USER must be set}
@@ -53,7 +53,9 @@ services:
 
   app:
     image: wcarankings-app:latest
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -136,7 +138,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../ops/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
 
