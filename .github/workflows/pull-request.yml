@@ -292,13 +292,13 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Chromium for visual smoke test
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --filter @wcarankings/web exec playwright install --with-deps chromium
 
       - name: Run visual smoke test
-        run: pnpm exec playwright test --config=playwright.visual-smoke.config.mjs
+        run: pnpm --filter @wcarankings/web exec playwright test --config=playwright.visual-smoke.config.mjs
 
       - name: Run List Browser Tests
-        run: pnpm exec playwright test --config=playwright.list-e2e.config.mjs
+        run: pnpm --filter @wcarankings/web exec playwright test --config=playwright.list-e2e.config.mjs
 
       - name: Show Database State After Browser Test Failure
         if: failure()
@@ -327,9 +327,9 @@ jobs:
         with:
           name: browser-tests-pr-${{ github.event.pull_request.number }}
           path: |
-            artifacts/visual-smoke.png
-            artifacts/visual-playwright-report
-            artifacts/list-playwright-report
+            apps/web/artifacts/visual-smoke.png
+            apps/web/artifacts/visual-playwright-report
+            apps/web/artifacts/list-playwright-report
           if-no-files-found: warn
           retention-days: 14
 
