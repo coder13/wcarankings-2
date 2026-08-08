@@ -10,6 +10,9 @@ RUN corepack enable \
   && pnpm install --frozen-lockfile --prod \
   && pnpm store prune
 
+COPY apps/live-results-worker/src ./apps/live-results-worker/src
+COPY apps/projection-worker/src ./apps/projection-worker/src
+
 FROM docker.io/oven/bun:1.3.3-debian
 
 WORKDIR /app
@@ -22,8 +25,6 @@ RUN useradd --system --uid 10001 --create-home wcarankings \
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/apps ./apps
 COPY --from=dependencies /app/packages ./packages
-COPY --chown=wcarankings:wcarankings apps/live-results-worker ./apps/live-results-worker
-COPY --chown=wcarankings:wcarankings apps/projection-worker ./apps/projection-worker
 COPY --chown=wcarankings:wcarankings tsconfig.data-tools.json ./tsconfig.data-tools.json
 
 USER wcarankings
