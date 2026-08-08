@@ -33,7 +33,7 @@ export function ProfileAvatar({
   useEffect(() => {
     if (avatarUrl) return;
     const controller = new AbortController();
-    fetch(`/api/people/${encodeURIComponent(personId)}/thumb`, {
+    fetch(`/api/person/${encodeURIComponent(personId)}/thumb`, {
       signal: controller.signal,
     })
       .then(async (response) => {

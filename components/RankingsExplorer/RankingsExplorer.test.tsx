@@ -36,7 +36,7 @@ test("clamps top rail progress during elastic overscroll", () => {
 });
 
 function pathnameForFilters(filters: RankingsFilterState) {
-  if (filters.subject === "results") return "/results";
+  if (filters.subject === "results") return "/persons/results";
   if (filters.subject === "competitions") {
     return `/competitions/${filters.competitionRanking}`;
   }
@@ -50,8 +50,7 @@ function pathnameForFilters(filters: RankingsFilterState) {
   }
   if (filters.personMedalRanking) return "/persons/medals";
   if (filters.personPrStreakRanking) return "/persons/pr-streak";
-  if (filters.year) return `/persons/year/${filters.year}`;
-  return "/";
+  return "/persons/rankings";
 }
 
 function renderExplorerMarkup(
@@ -118,8 +117,8 @@ test("ignores empty search-result slots", () => {
 });
 
 test("gives each non-default subject and competition ranking a page", () => {
-  assert.equal(subjectPath("people"), "/");
-  assert.equal(subjectPath("results"), "/results");
+  assert.equal(subjectPath("people"), "/persons/rankings");
+  assert.equal(subjectPath("results"), "/persons/results");
   assert.equal(subjectPath("competitions"), "/competitions/best-result");
   assert.equal(subjectPath("countries"), "/countries/fastest-single");
   assert.equal(subjectPath("cities"), "/cities/fastest-single");
@@ -332,7 +331,7 @@ test("requests PR Streak with one-based positions and no event dimensions", () =
     ),
     "http://localhost",
   );
-  assert.equal(url.pathname, "/api/rankings/people/pr-streak");
+  assert.equal(url.pathname, "/api/persons/pr-streak");
   assert.equal(url.searchParams.get("start"), "1");
   assert.equal(url.searchParams.has("eventId"), false);
   assert.equal(url.searchParams.has("result"), false);

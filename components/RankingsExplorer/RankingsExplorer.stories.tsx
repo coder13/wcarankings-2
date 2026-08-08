@@ -205,7 +205,7 @@ function StorybookFetchMock({ children }: { children: ReactNode }) {
     window.fetch = ((input, init) => {
       const requestUrl = new URL(getRequestUrl(input), window.location.href);
       if (
-        requestUrl.pathname.startsWith("/api/rankings") ||
+        requestUrl.pathname.startsWith("/api/persons") ||
         requestUrl.pathname.startsWith("/api/countries/")
       ) {
         return makeMockResponse(requestUrl, init);
@@ -331,7 +331,7 @@ export const PersonsInfiniteScroll: Story = {
 export const Results: Story = {
   args: sharedArgs,
   parameters: {
-    nextjs: { navigation: { pathname: "/results" } },
+    nextjs: { navigation: { pathname: "/persons/results" } },
   },
 };
 
@@ -374,6 +374,11 @@ export const Countries: Story = {
 export const SearchOpen: Story = {
   args: sharedArgs,
   parameters: {
-    nextjs: { navigation: { pathname: "/", query: { search: "Avery" } } },
+    nextjs: {
+      navigation: {
+        pathname: "/persons/rankings",
+        query: { search: "Avery" },
+      },
+    },
   },
 };

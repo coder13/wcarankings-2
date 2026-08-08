@@ -20,7 +20,7 @@ test("registers PR Streak for ranking pages and both feed modes", () => {
     feedEligibility: { home: true, person: true },
     paths: {
       page: "/persons/pr-streak",
-      api: "/api/rankings/people/pr-streak",
+      api: "/api/persons/pr-streak",
     },
   });
   assert.equal(

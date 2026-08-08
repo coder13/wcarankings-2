@@ -737,8 +737,8 @@ materialized cohort rankings after measurement.
 The active semantic surface is exposed through:
 
 ```text
-GET /api/people/search
-GET /api/rankings
+GET /api/persons/search
+GET /api/persons/rankings
 ```
 
 Sum of Ranks is represented as the synthetic event `eventId=SOR` on the same

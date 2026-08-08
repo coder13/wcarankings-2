@@ -1,22 +1,15 @@
-import { ApiInputError } from "./projection";
+import { ApiInputError } from "@/lib/api/projection";
 
 export function withFixedQueryParams(
   params: URLSearchParams,
   fixed: Record<string, string>,
-  forbidden: readonly string[] = [],
 ) {
-  for (const name of forbidden) {
-    if (params.has(name)) {
-      throw new ApiInputError(`${name} is set by this endpoint.`);
-    }
-  }
-  const next = new URLSearchParams(params);
+  const normalized = new URLSearchParams(params);
   for (const [name, value] of Object.entries(fixed)) {
-    const requested = next.get(name);
-    if (requested !== null && requested !== value) {
-      throw new ApiInputError(`${name} is set by this endpoint.`);
+    if (params.has(name)) {
+      throw new ApiInputError(`${name} is selected by this API route.`);
     }
-    next.set(name, value);
+    normalized.set(name, value);
   }
-  return next;
+  return normalized;
 }

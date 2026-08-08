@@ -4,8 +4,8 @@ import { rankingStatSource } from "@/lib/ranking-stat-sources";
 const countryStats = rankingStatSource("country-event-stats");
 
 const SUBJECT_PATHS: Record<ExplorerSubject, string> = {
-  people: "/",
-  results: "/results",
+  people: "/persons/rankings",
+  results: "/persons/results",
   competitions: "/competitions/best-result",
   countries: countryStats.paths.page,
   cities: "/cities/fastest-single",

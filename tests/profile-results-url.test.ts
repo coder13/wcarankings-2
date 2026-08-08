@@ -9,7 +9,7 @@ test("builds a person result page URL with its selected event and type", () => {
       eventId: "333",
       resultType: "average",
     }),
-    "/profile/2014NIEL03/results?eventId=333&resultType=average",
+    "/person/2014NIEL03/results?eventId=333&result=average",
   );
 });
 
@@ -21,6 +21,6 @@ test("keeps a selected year in the person result page URL", () => {
       resultType: "single",
       year: 2023,
     }),
-    "/profile/2014NIEL03/results?eventId=333&resultType=single&year=2023",
+    "/person/2014NIEL03/results?eventId=333&result=single&year=2023",
   );
 });

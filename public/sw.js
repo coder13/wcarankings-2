@@ -2,12 +2,12 @@ const RANKINGS_CACHE = "wca-rankings-pages-v3";
 const MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 function isRankingPage(url) {
-  if (url.pathname !== "/api/rankings" || url.searchParams.get("paged") !== "1") return false;
+  if (url.pathname !== "/api/persons/rankings" || url.searchParams.get("paged") !== "1") return false;
   return !["search", "locate", "cursorRank", "cursorId"].some((key) => url.searchParams.has(key));
 }
 
 function eventIdFor(request) {
-  return new URL(request.url).searchParams.get("eventId") || new URL(request.url).searchParams.get("event") || "333";
+  return new URL(request.url).searchParams.get("eventId") || "333";
 }
 
 async function withCacheMetadata(response, extraHeaders = {}, cachedAt = Date.now()) {

@@ -15,7 +15,7 @@ export function PersonMedalPreview({ personId }: { personId: string }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/people/${personId}/medals`, { signal: controller.signal })
+    fetch(`/api/person/${personId}/medals`, { signal: controller.signal })
       .then(async (response) => {
         const body = (await response.json()) as Response;
         if (!response.ok)

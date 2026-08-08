@@ -16,25 +16,25 @@ export const PR_STREAK_RANKING_SCENARIOS = [
   scenario(
     "world",
     "precomputed PR Streak world",
-    "/api/rankings/people/pr-streak",
+    "/api/persons/pr-streak",
     {},
   ),
   scenario(
     "canada-f",
     "precomputed PR Streak Canada women",
-    "/api/rankings/people/pr-streak",
+    "/api/persons/pr-streak",
     { region: "Canada", gender: ["f"] },
   ),
   scenario(
     "world-fo",
     "lazy PR Streak world female-other cohort",
-    "/api/rankings/people/pr-streak",
+    "/api/persons/pr-streak",
     { gender: ["f", "o"] },
   ),
   scenario(
     "canada-2023-fo",
     "lazy PR Streak Canada female-other 2023 cohort",
-    "/api/rankings/people/pr-streak",
+    "/api/persons/pr-streak",
     { region: "Canada", year: "2023", gender: ["f", "o"] },
   ),
 ].map((entry) => ({ ...entry, startBase: 1 }));
@@ -43,7 +43,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "event-single-world",
     "precomputed person world single",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "333",
       result: "single",
@@ -53,7 +53,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "event-average-world",
     "precomputed person world average",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "333",
       result: "average",
@@ -63,7 +63,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "event-single-world-2023",
     "precomputed person world single year",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "333",
       result: "single",
@@ -75,14 +75,14 @@ export const PERSON_RANKING_SCENARIOS = [
     scenario(
       `event-single-${region.toLowerCase()}`,
       `precomputed person ${region} single`,
-      "/api/rankings",
+      "/api/persons/rankings",
       { eventId: "333", result: "single", region, paged: "1" },
     ),
   ),
   scenario(
     "event-single-world-f",
     "filtered person world women",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "333",
       result: "single",
@@ -93,7 +93,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "event-single-world-fo",
     "filtered person world female-other",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "333",
       result: "single",
@@ -104,7 +104,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "event-single-canada-2023-fo",
     "filtered person Canada female-other 2023",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "333",
       result: "single",
@@ -117,7 +117,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "event-single-north-america-2023-mf",
     "filtered person North America male-female 2023",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "333",
       result: "single",
@@ -130,7 +130,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "sum-of-ranks-single-world",
     "primed Sum of Ranks world single",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "SOR",
       result: "single",
@@ -140,7 +140,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "sum-of-ranks-average-world",
     "primed Sum of Ranks world average",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "SOR",
       result: "average",
@@ -150,7 +150,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "sum-of-ranks-single-canada",
     "primed Sum of Ranks Canada single",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "SOR",
       result: "single",
@@ -161,7 +161,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "sum-of-ranks-single-world-f",
     "lazy Sum of Ranks world women",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "SOR",
       result: "single",
@@ -169,7 +169,7 @@ export const PERSON_RANKING_SCENARIOS = [
       paged: "1",
     },
   ),
-  scenario("kinch-world", "primed Kinch world", "/api/rankings", {
+  scenario("kinch-world", "primed Kinch world", "/api/persons/rankings", {
     eventId: "sor-kinch",
     result: "single",
     paged: "1",
@@ -177,7 +177,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "kinch-canada-regional",
     "primed Kinch Canada regional order",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "sor-kinch",
       result: "single",
@@ -188,7 +188,7 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "kinch-canada-continent",
     "primed Kinch Canada continent order",
-    "/api/rankings",
+    "/api/persons/rankings",
     {
       eventId: "sor-kinch",
       result: "single",
@@ -200,13 +200,13 @@ export const PERSON_RANKING_SCENARIOS = [
   scenario(
     "competition-count-world",
     "person competition count world",
-    "/api/rankings/people/competitions",
+    "/api/persons/competitions",
     { eventId: "333", result: "single", paged: "1" },
   ),
   scenario(
     "competition-count-canada-f",
     "person competition count Canada women",
-    "/api/rankings/people/competitions",
+    "/api/persons/competitions",
     {
       eventId: "333",
       result: "single",
@@ -221,7 +221,7 @@ export const RESULT_RANKING_SCENARIOS = [
   scenario(
     "single-world",
     "precomputed result world single",
-    "/api/rankings/results",
+    "/api/persons/results",
     {
       eventId: "333",
       result: "single",
@@ -230,7 +230,7 @@ export const RESULT_RANKING_SCENARIOS = [
   scenario(
     "average-world",
     "precomputed result world average",
-    "/api/rankings/results",
+    "/api/persons/results",
     {
       eventId: "333",
       result: "average",
@@ -239,7 +239,7 @@ export const RESULT_RANKING_SCENARIOS = [
   scenario(
     "single-world-2023",
     "lazy result world single year",
-    "/api/rankings/results",
+    "/api/persons/results",
     {
       eventId: "333",
       result: "single",
@@ -250,14 +250,14 @@ export const RESULT_RANKING_SCENARIOS = [
     scenario(
       `single-${region.toLowerCase()}`,
       `result ${region} single`,
-      "/api/rankings/results",
+      "/api/persons/results",
       { eventId: "333", result: "single", region },
     ),
   ),
   scenario(
     "single-world-f",
     "lazy result world women",
-    "/api/rankings/results",
+    "/api/persons/results",
     {
       eventId: "333",
       result: "single",
@@ -267,7 +267,7 @@ export const RESULT_RANKING_SCENARIOS = [
   scenario(
     "average-world-f",
     "lazy result world women average",
-    "/api/rankings/results",
+    "/api/persons/results",
     {
       eventId: "333",
       result: "average",
@@ -277,7 +277,7 @@ export const RESULT_RANKING_SCENARIOS = [
   scenario(
     "single-world-fo",
     "lazy result world female-other",
-    "/api/rankings/results",
+    "/api/persons/results",
     {
       eventId: "333",
       result: "single",
@@ -288,7 +288,7 @@ export const RESULT_RANKING_SCENARIOS = [
     scenario(
       `average-${region.toLowerCase()}-2023-fo`,
       `lazy result ${region} female-other average 2023`,
-      "/api/rankings/results",
+      "/api/persons/results",
       {
         eventId: "333",
         result: "average",
@@ -304,68 +304,52 @@ export const COMPETITION_RANKING_SCENARIOS = [
   scenario(
     "fastest-single",
     "fastest competition single",
-    "/api/rankings/competitions",
+    "/api/competitions/best-result",
     {
       eventId: "333",
       result: "single",
-      ranking: "fastest",
     },
   ),
   scenario(
     "fastest-average",
     "fastest competition average",
-    "/api/rankings/competitions",
+    "/api/competitions/best-result",
     {
       eventId: "333",
       result: "average",
-      ranking: "fastest",
     },
   ),
-  scenario("podium", "competition podium", "/api/rankings/competitions", {
+  scenario("podium", "competition podium", "/api/competitions/podiums", {
     eventId: "333",
     result: "average",
-    ranking: "podium",
   }),
   scenario(
     "competitor-count",
     "competition competitor count",
-    "/api/rankings/competitions",
-    {
-      eventId: "333",
-      result: "single",
-      ranking: "competitor-count",
-    },
+    "/api/competitions/competitor-count",
+    {},
   ),
   scenario(
     "latitude-north",
     "northernmost competitions",
-    "/api/rankings/competitions",
+    "/api/competitions/latitude",
     {
-      eventId: "333",
-      result: "single",
-      ranking: "latitude",
       hemisphere: "north",
     },
   ),
   scenario(
     "latitude-south",
     "southernmost competitions",
-    "/api/rankings/competitions",
+    "/api/competitions/latitude",
     {
-      eventId: "333",
-      result: "single",
-      ranking: "latitude",
       hemisphere: "south",
     },
   ),
   scenario(
     "latitude-north-canada",
     "northernmost Canada competitions",
-    "/api/rankings/competitions",
+    "/api/competitions/latitude",
     {
-      eventId: "333",
-      result: "single",
-      ranking: "latitude",
       hemisphere: "north",
       region: "Canada",
     },
@@ -376,74 +360,59 @@ export const CITY_RANKING_SCENARIOS = [
   scenario(
     "fastest-single-world",
     "fastest city single world",
-    "/api/rankings/cities",
-    {
-      eventId: "333",
-      result: "single",
-    },
+    "/api/cities/fastest-single",
+    { eventId: "333" },
   ),
   scenario(
     "fastest-average-world",
     "fastest city average world",
-    "/api/rankings/cities",
-    {
-      eventId: "333",
-      result: "average",
-    },
+    "/api/cities/fastest-average",
+    { eventId: "333" },
   ),
   scenario(
     "fastest-single-canada",
     "fastest city single Canada",
-    "/api/rankings/cities",
+    "/api/cities/fastest-single",
     {
       eventId: "333",
-      result: "single",
       region: "Canada",
     },
   ),
   scenario(
     "fastest-single-world-f",
     "fastest city single women",
-    "/api/rankings/cities",
+    "/api/cities/fastest-single",
     {
       eventId: "333",
-      result: "single",
       gender: ["f"],
     },
   ),
   scenario(
     "fastest-single-canada-f",
     "fastest city single Canada women",
-    "/api/rankings/cities",
+    "/api/cities/fastest-single",
     {
       eventId: "333",
-      result: "single",
       region: "Canada",
       gender: ["f"],
     },
   ),
   ...["competitors", "competitions", "solves"].map((stat) =>
-    scenario(`${stat}-world`, `city ${stat} world`, "/api/rankings/cities", {
+    scenario(`${stat}-world`, `city ${stat} world`, `/api/cities/${stat}`, {
       eventId: "333",
-      result: "single",
-      stat,
     }),
   ),
   scenario(
     "competitors-canada",
     "city competitors Canada",
-    "/api/rankings/cities",
+    "/api/cities/competitors",
     {
       eventId: "333",
-      result: "single",
-      stat: "competitors",
       region: "Canada",
     },
   ),
-  scenario("solves-world-f", "city solves women", "/api/rankings/cities", {
+  scenario("solves-world-f", "city solves women", "/api/cities/solves", {
     eventId: "333",
-    result: "single",
-    stat: "solves",
     gender: ["f"],
   }),
 ];
@@ -530,31 +499,29 @@ export const MEDAL_RANKING_SCENARIOS = [
   scenario(
     "overall-all-events-world",
     "all-event overall medals",
-    "/api/rankings/people/medals",
+    "/api/persons/medals",
     { medal: "overall", paged: "1" },
   ),
-  scenario(
-    "gold-333-world",
-    "3x3x3 gold medals",
-    "/api/rankings/people/medals",
-    { eventId: "333", medal: "gold", paged: "1" },
-  ),
-  scenario(
-    "bronze-usa",
-    "United States bronze medals",
-    "/api/rankings/people/medals",
-    { medal: "bronze", region: "USA", paged: "1" },
-  ),
+  scenario("gold-333-world", "3x3x3 gold medals", "/api/persons/medals", {
+    eventId: "333",
+    medal: "gold",
+    paged: "1",
+  }),
+  scenario("bronze-usa", "United States bronze medals", "/api/persons/medals", {
+    medal: "bronze",
+    region: "USA",
+    paged: "1",
+  }),
   scenario(
     "silver-all-events-women",
     "women's silver medals",
-    "/api/rankings/people/medals",
+    "/api/persons/medals",
     { medal: "silver", gender: ["f"], paged: "1" },
   ),
   scenario(
     "gold-333-2024-women-france",
     "2024 French women's 3x3x3 gold medals",
-    "/api/rankings/people/medals",
+    "/api/persons/medals",
     {
       eventId: "333",
       medal: "gold",

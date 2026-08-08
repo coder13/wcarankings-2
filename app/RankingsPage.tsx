@@ -134,7 +134,6 @@ export async function getRankingsPageMetadata({
 
 export async function RankingsPage({
   searchParams,
-  requiresYearlyRankings = false,
   requiresResultRankings = false,
   requiresCompetitionRankings = false,
   requiresPersonCompetitionRankings = false,
@@ -145,7 +144,6 @@ export async function RankingsPage({
   requiresCountryRankings = false,
 }: {
   searchParams?: Promise<RankingsSearchParams>;
-  requiresYearlyRankings?: boolean;
   requiresResultRankings?: boolean;
   requiresCompetitionRankings?: boolean;
   requiresPersonCompetitionRankings?: boolean;
@@ -160,9 +158,13 @@ export async function RankingsPage({
     searchParams ? await searchParams : {},
     "eventId",
   );
+  const requestedYear = searchParam(
+    searchParams ? await searchParams : {},
+    "year",
+  );
   if (
     !featureSwitch.core ||
-    (requiresYearlyRankings && !featureSwitch.yearlyPersonRankings) ||
+    (Boolean(requestedYear) && !featureSwitch.yearlyPersonRankings) ||
     (requiresResultRankings && !featureSwitch.resultRankings) ||
     (requiresCompetitionRankings && !featureSwitch.competitionRankings) ||
     (requiresPersonCompetitionRankings &&

@@ -143,7 +143,7 @@ export function rankingsFilterStateFromUrl(
 }
 
 function subjectFromPathname(pathname: string): ExplorerSubject {
-  if (pathname.startsWith("/results")) return "results";
+  if (pathname.startsWith("/persons/results")) return "results";
   if (pathname.startsWith("/competitions")) return "competitions";
   if (pathname.startsWith("/countries")) return "countries";
   if (pathname.startsWith("/cities")) return "cities";
@@ -251,10 +251,8 @@ function rankingTypeForSubject(
   return ["333bf", "444bf", "555bf"].includes(eventId) ? "single" : "average";
 }
 
-function yearFromUrl(pathname: string, params: URLSearchParams) {
-  const value = Number(
-    pathname.match(/^\/persons\/year\/(\d{4})$/)?.[1] ?? params.get("year"),
-  );
+function yearFromUrl(params: URLSearchParams) {
+  const value = Number(params.get("year"));
   return Number.isInteger(value) &&
     value >= FIRST_WCA_YEAR &&
     value <= new Date().getFullYear()
@@ -372,7 +370,7 @@ export function parseRankingsUrl(
     medalType: isMedalRankingType(params.get("medal") ?? "")
       ? (params.get("medal") as MedalRankingType)
       : "overall",
-    year: yearFromUrl(pathname, params),
+    year: yearFromUrl(params),
     eventId: validEventForSubject(
       subject,
       params.get("eventId") ?? (personMedalRanking ? "all" : "333"),
@@ -431,11 +429,7 @@ export function serializeRankingsUrl(
   if (state.personMedalRanking && state.medalType !== "overall") {
     params.set("medal", state.medalType);
   }
-  if (
-    state.subject === "people" &&
-    state.year &&
-    !pathname.startsWith("/persons/year/")
-  ) {
+  if (state.subject === "people" && state.year) {
     params.set("year", String(state.year));
   }
   if (state.subject === "countries" && state.year) {

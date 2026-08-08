@@ -50,7 +50,7 @@ test("builds the full bounded feed stat inventory", () => {
         stat.gender === "f" &&
         stat.year === 2026,
     )?.exploreUrl,
-    "/results?eventId=333&result=single&region=Japan&gender=f&year=2026",
+    "/persons/results?eventId=333&result=single&region=Japan&gender=f&year=2026",
   );
   assert.equal(
     inventory.some((stat) => stat.year !== null && stat.year !== 2026),

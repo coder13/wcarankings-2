@@ -51,7 +51,7 @@ test("scenario URLs preserve scenario-specific filters and pagination", () => {
   const resultUrl = new URL(
     scenarioUrl("http://localhost:3000", resultYear, 2, 50),
   );
-  assert.equal(resultUrl.pathname, "/api/rankings/results");
+  assert.equal(resultUrl.pathname, "/api/persons/results");
   assert.equal(resultUrl.searchParams.get("year"), "2023");
   assert.equal(resultUrl.searchParams.get("start"), "100");
   assert.equal(resultUrl.searchParams.get("limit"), "50");
@@ -62,7 +62,7 @@ test("scenario URLs preserve scenario-specific filters and pagination", () => {
   const personUrl = new URL(
     scenarioUrl("http://localhost:3000/", person, 0, 50),
   );
-  assert.equal(personUrl.pathname, "/api/rankings");
+  assert.equal(personUrl.pathname, "/api/persons/rankings");
   assert.equal(personUrl.searchParams.get("paged"), "1");
   assert.deepEqual(personUrl.searchParams.getAll("gender"), ["f", "o"]);
 });
@@ -73,7 +73,7 @@ test("each primary stat covers its distinct ranking modes", () => {
   );
   assert.ok(
     PR_STREAK_RANKING_SCENARIOS.every(
-      ({ path }) => path === "/api/rankings/people/pr-streak",
+      ({ path }) => path === "/api/persons/pr-streak",
     ),
   );
   assert.ok(
@@ -83,7 +83,7 @@ test("each primary stat covers its distinct ranking modes", () => {
   );
   assert.ok(
     PERSON_RANKING_SCENARIOS.some(
-      ({ path }) => path === "/api/rankings/people/competitions",
+      ({ path }) => path === "/api/persons/competitions",
     ),
   );
   assert.deepEqual(
@@ -91,14 +91,29 @@ test("each primary stat covers its distinct ranking modes", () => {
     new Set(["single", "average"]),
   );
   assert.deepEqual(
-    new Set(COMPETITION_RANKING_SCENARIOS.map(({ params }) => params.ranking)),
-    new Set(["fastest", "podium", "competitor-count", "latitude"]),
+    new Set(COMPETITION_RANKING_SCENARIOS.map(({ path }) => path)),
+    new Set([
+      "/api/competitions/best-result",
+      "/api/competitions/podiums",
+      "/api/competitions/competitor-count",
+      "/api/competitions/latitude",
+    ]),
   );
   assert.deepEqual(
     new Set(
-      CITY_RANKING_SCENARIOS.map(({ params }) => params.stat).filter(Boolean),
+      CITY_RANKING_SCENARIOS.map(({ path }) => path).filter((path) =>
+        [
+          "/api/cities/competitors",
+          "/api/cities/competitions",
+          "/api/cities/solves",
+        ].includes(path),
+      ),
     ),
-    new Set(["competitors", "competitions", "solves"]),
+    new Set([
+      "/api/cities/competitors",
+      "/api/cities/competitions",
+      "/api/cities/solves",
+    ]),
   );
   assert.ok(
     CITY_RANKING_SCENARIOS.every(

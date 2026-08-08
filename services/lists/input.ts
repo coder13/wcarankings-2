@@ -1,3 +1,4 @@
+import { assertCanonicalRankingParams } from "@/lib/api/projection";
 import {
   isEventId,
   isRankingType,
@@ -8,9 +9,10 @@ import {
 } from "@/lib/wca";
 
 export function parseListRankingInput(searchParams: URLSearchParams) {
-  const rawEventId = searchParams.get("eventId") ?? searchParams.get("event");
+  assertCanonicalRankingParams(searchParams);
+  const rawEventId = searchParams.get("eventId");
   const eventId = isEventId(rawEventId) ? rawEventId : "333";
-  const rawType = searchParams.get("result") ?? searchParams.get("type");
+  const rawType = searchParams.get("result");
   let type: RankingType = "single";
   if (eventId !== "333mbf" && isRankingType(rawType)) type = rawType;
   const rawStart = Number(searchParams.get("start"));

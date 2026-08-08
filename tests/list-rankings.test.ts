@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { ApiInputError } from "@/lib/api/projection";
 import { parseListRankingInput } from "@/services/lists/input";
 
 test("normalizes list ranking query parameters", () => {
   const input = parseListRankingInput(
     new URLSearchParams({
-      event: "444",
-      type: "average",
+      eventId: "444",
+      result: "average",
       start: "25",
       limit: "5000",
       search: " Max ",
@@ -34,4 +35,14 @@ test("forces Multi-Blind to single rankings", () => {
     }),
   );
   assert.equal(input.type, "single");
+});
+
+test("rejects legacy ranking parameter names", () => {
+  assert.throws(
+    () =>
+      parseListRankingInput(
+        new URLSearchParams({ event: "444", type: "average" }),
+      ),
+    ApiInputError,
+  );
 });

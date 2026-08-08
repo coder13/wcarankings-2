@@ -46,7 +46,7 @@ test("keeps the pure candidate path bounded and skips candidates without changes
       population: { kind: "everyone" },
     },
     title: "Changed ranking",
-    exploreUrl: "/api/rankings?eventId=333",
+    exploreUrl: "/api/persons/rankings?eventId=333",
     previewRows: [],
     sourceFamily: "person-event",
     diversityKey: "333",
@@ -166,7 +166,7 @@ test("uses grouped ranking reads for recent result candidates", async () => {
     gender: null,
     year: null,
     title: "3x3x3 Cube · Single · World · Everyone · All time",
-    exploreUrl: "/results?eventId=333&result=single",
+    exploreUrl: "/persons/results?eventId=333&result=single",
   };
   const reference = {
     resultId: 123,

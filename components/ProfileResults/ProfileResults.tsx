@@ -43,12 +43,13 @@ function resultUrl(
   start: number,
 ) {
   const params = new URLSearchParams({
+    eventId,
     result: resultType,
     limit: `${PAGE_SIZE}`,
     start: `${start}`,
   });
   if (year !== null) params.set("year", `${year}`);
-  return `/api/people/${personId}/event/${eventId}/results?${params.toString()}`;
+  return `/api/person/${personId}/results?${params.toString()}`;
 }
 
 export function ProfileResults({
