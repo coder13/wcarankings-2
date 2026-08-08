@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages ./packages
+COPY apps/live-results-worker/package.json ./apps/live-results-worker/package.json
+COPY apps/projection-worker/package.json ./apps/projection-worker/package.json
 RUN corepack enable \
   && pnpm install --frozen-lockfile --prod \
   && pnpm store prune
